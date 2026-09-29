@@ -11,7 +11,22 @@ const CODE_KEY: Record<string, MessageKey> = {
   EXTERNAL_SOURCES: "why_EXTERNAL_SOURCES",
   OFFICIAL_CONFIRMATION: "why_OFFICIAL_CONFIRMATION",
   OFFICIAL_DENIAL: "why_OFFICIAL_DENIAL",
+  MARKED_FALSE: "why_MARKED_FALSE",
+  DISPUTED: "why_DISPUTED",
+  NOT_OFFICIAL_YET: "why_NOT_OFFICIAL_YET",
 };
+
+/**
+ * Variantes con detalle (ADR 0086): horas de la ventana ciudadana, y nombre y hora de las fuentes. Una explicación
+ * guardada antes no trae esos datos y usa la línea corta.
+ */
+const DETAILED: Record<string, { key: MessageKey; needs: string[] }> = {
+  CITIZEN_CORROBORATION: { key: "why_CITIZEN_WINDOW", needs: ["from", "to"] },
+  EXTERNAL_SOURCES: { key: "why_EXTERNAL_NAMED", needs: ["sources", "at"] },
+  OFFICIAL_CONFIRMATION: { key: "why_OFFICIAL_NAMED", needs: ["sources", "at"] },
+  OFFICIAL_DENIAL: { key: "why_OFFICIAL_DENIAL_NAMED", needs: ["sources", "at"] },
+};
+const TIME_PARAMS = new Set(["from", "to", "at"]);
 
 /** Pesos con decimales (una persona nueva cuenta 0,5): se muestran con un decimal como mucho. */
 const num = (v: unknown): string => (typeof v === "number" ? String(Math.round(v * 10) / 10) : String(v ?? ""));
@@ -20,13 +35,21 @@ export function fill(template: string, params: Record<string, unknown>): string 
   return template.replace(/\{(\w+)\}/g, (_, k: string) => num(params[k]));
 }
 
-export function explainLines(view: Pick<VerificationView, "explanation">, t: (k: MessageKey) => string): string[] {
+/**
+ * Una línea por regla, en el orden del Blueprint §10.4: comunidad, fuentes externas, oficiales y lo que falta.
+ * `time` da formato a las horas (en la zona del evento); sin él se muestran tal cual.
+ */
+export function explainLines(
+  view: Pick<VerificationView, "explanation">, t: (k: MessageKey) => string, time: (iso: string) => string = (s) => s,
+): string[] {
   return view.explanation.flatMap((e) => {
-    const key = CODE_KEY[e.code];
+    const detailed = DETAILED[e.code];
+    const key = detailed && detailed.needs.every((k) => e.params[k] !== undefined && e.params[k] !== "") ? detailed.key : CODE_KEY[e.code];
     if (!key) return [];
     // Sin confirmaciones todavía, la línea de corroboración no aporta nada.
     if (e.code === "CITIZEN_CORROBORATION" && !Number(e.params["independentWeight"])) return [];
-    return [fill(t(key), e.params)];
+    const params = Object.fromEntries(Object.entries(e.params).map(([k, v]) => [k, TIME_PARAMS.has(k) && typeof v === "string" ? time(v) : v]));
+    return [fill(t(key), params)];
   });
 }
 

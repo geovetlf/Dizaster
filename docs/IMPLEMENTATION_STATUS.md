@@ -277,6 +277,7 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | Publicación por enlace (GET /v1/posts/:id) y enlaces universales /e/ /p/ | ✅ | ADR 0083 |
 | ETag e If-None-Match en recursos cacheables | ✅ | ADR 0084 |
 | País preferido en el perfil | ✅ | ADR 0085 |
+| Explicación legible completa de verificación | ✅ | ADR 0086 |
 | Licencias, auditoría, SBOM, Dependabot; respaldo con prueba de restauración en CI | ✅ | ADR 0070, `scripts/supply-chain.mjs`, `scripts/db-restore-check.mjs` |
 | Idioma de la app elegible en el perfil (es/en/pt/fr o del teléfono) | ✅ | ADR 0069, `app/language.tsx` |
 | Varias cuentas en un teléfono corroboran como una (clave seudónima del teléfono) | ✅ | ADR 0068, migración 0036 |
@@ -306,13 +307,12 @@ Revisión del Blueprint del 2026-09-29 (tras ADR 0070): completada con ADR 0071�
 
 Revisión del Blueprint del 2026-09-29 (tras ADR 0080), verificada contra el código, sin bloqueos:
 
-1. Explicación legible completa del estado de verificación (§10.4).
-2. Alertas de zonas guardadas según el área oficial, no solo el punto (§5.10, §9.4).
-3. Detección determinista de datos personales en publicaciones → cola de moderación (§13.3, §5.12).
-4. Acceso auditado, con motivo, a la evidencia de presencia para moderación (§7.3, §13.1).
-5. MFA (TOTP) para moderación y administración (§13.1).
-6. Detección local del idioma del contenido (§5.15).
-7. Adapters del carril NORMAL (ReliefWeb, OMS, RSS de noticias), PLANNED hasta revisar términos (§9.3).
+1. Alertas de zonas guardadas según el área oficial, no solo el punto (§5.10, §9.4).
+2. Detección determinista de datos personales en publicaciones → cola de moderación (§13.3, §5.12).
+3. Acceso auditado, con motivo, a la evidencia de presencia para moderación (§7.3, §13.1).
+4. MFA (TOTP) para moderación y administración (§13.1).
+5. Detección local del idioma del contenido (§5.15).
+6. Adapters del carril NORMAL (ReliefWeb, OMS, RSS de noticias), PLANNED hasta revisar términos (§9.3).
 
 Bloqueadas o en espera:
 

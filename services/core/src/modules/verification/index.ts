@@ -151,9 +151,11 @@ export class VerificationService {
 
     explanation.push({ code: "CITIZEN_CORROBORATION", params: { independentWeight: confirmWeight, threshold, ...(confirm.from && confirm.to ? { from: confirm.from, to: confirm.to } : {}) } });
     if (denyWeight > 0) explanation.push({ code: "CITIZEN_DENIALS", params: { independentWeight: denyWeight } });
-    if (external.length) explanation.push({ code: "EXTERNAL_SOURCES", params: { count: external.length } });
-    if (officialConfirm.length) explanation.push({ code: "OFFICIAL_CONFIRMATION", params: { count: officialConfirm.length } });
-    if (officialDeny.length) explanation.push({ code: "OFFICIAL_DENIAL", params: { count: officialDeny.length } });
+    // Explicación legible completa (§10.4, ADR 0086): qué fuentes y a qué hora, y lo que todavía falta.
+    const sources = (items: EvidenceForVerification[]) => sourceParams(items.map((e) => registered.get(e.refId)!));
+    if (external.length) explanation.push({ code: "EXTERNAL_SOURCES", params: sources(external) });
+    if (officialConfirm.length) explanation.push({ code: "OFFICIAL_CONFIRMATION", params: sources(officialConfirm) });
+    if (officialDeny.length) explanation.push({ code: "OFFICIAL_DENIAL", params: sources(officialDeny) });
 
     return {
       level,
@@ -238,7 +240,7 @@ export class VerificationService {
       publicState: publicVerificationState(row.level, row.negative_state),
       ruleSetVersion: row.rule_set_version,
       evaluatedAt: row.evaluated_at.toISOString(),
-      explanation: row.explanation,
+      explanation: withStateLines(row.explanation, row.level, row.negative_state),
       evidenceSummary: {
         citizen: data.evidence.filter((e) => e.trustTier === "CITIZEN").length,
         external: [...registered.values()].filter((r) => r.trustTier === "EXTERNAL").length,
@@ -350,3 +352,31 @@ export function bestWindowWeight(
   }
   return best;
 }
+
+/**
+ * Parámetros de una línea de fuentes: cuántas, sus nombres (sin repetir, hasta 3) y la hora más reciente.
+ * NO AI REQUIRED.
+ */
+export function sourceParams(items: readonly { sourceName: string; at: Date }[]): Record<string, string | number> {
+  const names = [...new Set(items.map((i) => i.sourceName))];
+  const latest = items.reduce<Date | null>((m, i) => (!m || i.at > m ? i.at : m), null);
+  return {
+    count: items.length,
+    sources: names.slice(0, 3).join(", ") + (names.length > 3 ? ` +${names.length - 3}` : ""),
+    ...(latest ? { at: latest.toISOString() } : {}),
+  };
+}
+
+/**
+ * Líneas que dependen del estado actual y no de la evidencia (ADR 0086): se añaden al leer, así un cambio de
+ * moderación se explica en el acto. NO AI REQUIRED.
+ */
+export function withStateLines(base: readonly VerificationExplanation[], level: VerificationLevel, negative: NegativeState): VerificationExplanation[] {
+  const out = base.filter((e) => !STATE_CODES.has(e.code));
+  const officialDenial = out.some((e) => e.code === "OFFICIAL_DENIAL");
+  if (negative === "FALSE" && !officialDenial) out.push({ code: "MARKED_FALSE", params: {} });
+  if (negative === "DISPUTED") out.push({ code: "DISPUTED", params: {} });
+  if (level !== "OFFICIALLY_CONFIRMED" && negative !== "FALSE") out.push({ code: "NOT_OFFICIAL_YET", params: {} });
+  return out;
+}
+const STATE_CODES = new Set(["MARKED_FALSE", "DISPUTED", "NOT_OFFICIAL_YET"]);

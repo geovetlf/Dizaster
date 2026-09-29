@@ -9,7 +9,7 @@ import { api } from "../../lib/api";
 import { cacheKeys, readThrough } from "../../lib/offline/read-cache";
 import { readCache } from "../../lib/offline/sqlite-cache";
 import { lang, t, tCount, VERIFICATION_LABEL, verificationLabel } from "../../lib/i18n";
-import { eventTime, eventTitle, timeAgo } from "../../lib/ui/format";
+import { eventTime, eventTitle, formatInZone, timeAgo } from "../../lib/ui/format";
 import { evidenceLine, explainLines, timelineLabel } from "../../lib/verification/explain";
 import { followablePlace } from "../../lib/social/place";
 import { useFollows } from "../../lib/social/follows";
@@ -70,7 +70,7 @@ export default function EventScreen() {
       {verification ? (
         <View style={styles.why}>
           <Text style={styles.section}>{t("whyThisState")}</Text>
-          {explainLines(verification, t).map((line) => <Text key={line} style={styles.whyLine}>• {line}</Text>)}
+          {explainLines(verification, t, (iso) => formatInZone(iso, lang, event.place?.timezone ?? undefined, "time") ?? iso).map((line) => <Text key={line} style={styles.whyLine}>• {line}</Text>)}
           <Text style={styles.meta}>{evidenceLine(verification, t)}</Text>
         </View>
       ) : null}

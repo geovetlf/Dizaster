@@ -166,10 +166,13 @@ export class IngestionService {
    */
   async registeredItems(
     q: Queryable, itemIds: string[], scope?: { categoryCode: string; countryCode: string | null },
-  ): Promise<Map<string, { trustTier: "EXTERNAL" | "OFFICIAL"; assertion: string }>> {
+  ): Promise<Map<string, { trustTier: "EXTERNAL" | "OFFICIAL"; assertion: string; sourceName: string; at: Date }>> {
     if (itemIds.length === 0) return new Map();
-    const { rows } = await q.query<{ id: string; trust_tier: "EXTERNAL" | "OFFICIAL"; assertion: string; categories: string[]; country_scope: string[] }>(
-      `SELECT i.id, s.trust_tier, i.assertion, s.categories, s.country_scope FROM ingestion.external_items i JOIN ingestion.sources s ON s.id = i.source_id
+    const { rows } = await q.query<{
+      id: string; trust_tier: "EXTERNAL" | "OFFICIAL"; assertion: string; categories: string[]; country_scope: string[]; name: string; at: Date;
+    }>(
+      `SELECT i.id, s.trust_tier, i.assertion, s.categories, s.country_scope, s.name, coalesce(i.published_at, i.fetched_at) AS at
+         FROM ingestion.external_items i JOIN ingestion.sources s ON s.id = i.source_id
         WHERE i.id = ANY($1) AND s.status IN ('ACTIVE','PAUSED')`,
       [itemIds],
     );
@@ -177,6 +180,8 @@ export class IngestionService {
     return new Map(rows.map((r) => [r.id, {
       trustTier: r.trust_tier === "OFFICIAL" && (!scope || inOfficialScope(r, scope.categoryCode, scope.countryCode)) ? "OFFICIAL" : "EXTERNAL",
       assertion: r.assertion,
+      sourceName: r.name,
+      at: r.at,
     }]));
   }
 
