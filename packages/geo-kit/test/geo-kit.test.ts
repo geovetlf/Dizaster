@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   CountryLocator,
+  destinationPoint,
   clampToRadius,
   computePresence,
   PRESENCE_RULES_V1,
@@ -317,5 +318,13 @@ describe("teselas del mapa (ADR 0078)", () => {
       { mode: "clusters", events: [], clusters: [c(2, 1)] },
       { mode: "clusters", events: [], clusters: [c(3, 4)] },
     ]).clusters).toEqual([c(5, 4)]);
+  });
+});
+
+describe("destinationPoint (ADR 0087)", () => {
+  it("vuelve a la distancia pedida en cualquier rumbo y cruza el antimeridiano", () => {
+    const from = { lat: -12.05, lng: -77.04 };
+    for (const b of [0, 45, 90, 180, 270]) expect(Math.abs(distanceMeters(from, destinationPoint(from, 10_000, b)) - 10_000)).toBeLessThan(1);
+    expect(destinationPoint({ lat: 0, lng: 179.99 }, 5_000, 90).lng).toBeLessThan(-179);
   });
 });

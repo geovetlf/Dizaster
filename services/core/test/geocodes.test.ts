@@ -43,6 +43,9 @@ describe("geocódigos", () => {
     expect(inside.rowCount).toBe(1);
     expect(row.normalized.uncertaintyM).toBeGreaterThan(1000);
     expect(row.normalized.uncertaintyM).toBeLessThan(60_000);
+    // El contorno de los distritos queda como área oficial afectada del evento (ADR 0087).
+    const snap = await t.c.events.alertSnapshot(t.c.db, row.event_id!);
+    expect(snap!.affectedArea?.type).toBe("MultiPolygon");
   });
 
   it("también con ISO 3166-2", async () => {

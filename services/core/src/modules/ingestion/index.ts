@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import type { CategoryCode, EventCandidate, EventSourceView, GeoPoint, LocalizedText } from "@dizaster/contracts";
+import type { AreaGeometry, CategoryCode, EventCandidate, EventSourceView, GeoPoint, LocalizedText } from "@dizaster/contracts";
 import type { Db, Queryable } from "../../platform/db.js";
 import { withTransaction } from "../../platform/db.js";
 import { DomainError } from "../../platform/errors.js";
@@ -30,6 +30,8 @@ export interface NormalizedItem {
   assertion: "OCCURRING" | "NOT_OCCURRING";
   /** Geocódigos oficiales del área (CAP `<geocode>`): sirven para ubicar el ítem si no trae coordenadas (ADR 0077). */
   geocodes?: { scheme: string; value: string }[];
+  /** Área oficial afectada tal como la da la fuente (CAP `<polygon>`/`<circle>`, ADR 0087). */
+  area?: AreaGeometry;
   raw: Record<string, unknown>;
 }
 
@@ -115,7 +117,11 @@ export class IngestionService {
       // El hash se calcula sobre lo que mandó la fuente, así un ítem repetido no vuelve a consultar el índice.
       const located = !item.point && item.geocodes?.length && this.geo ? await this.geo.locateGeocodes(tx, item.geocodes) : null;
       if (located) {
-        item = { ...item, point: located.point, uncertaintyM: Math.max(item.uncertaintyM, located.radiusM), raw: { ...item.raw, locatedBy: "GEOCODE", areaIds: located.areaIds } };
+        item = {
+          ...item, point: located.point, uncertaintyM: Math.max(item.uncertaintyM, located.radiusM),
+          ...(located.area && !item.area ? { area: located.area } : {}),
+          raw: { ...item.raw, locatedBy: "GEOCODE", areaIds: located.areaIds },
+        };
       }
 
       const itemId = existing?.id ?? newId();
@@ -153,6 +159,7 @@ export class IngestionService {
         externalIds: [item.externalId],
         mediaHashes: [],
         metadata: { assertion: item.assertion, sourceKey },
+        ...(item.area ? { affectedArea: item.area } : {}),
       });
       const eventId = resolution.kind === "CREATED" || resolution.kind === "ATTACHED" ? resolution.eventId : null;
       await tx.query(`UPDATE ingestion.external_items SET status = $2, event_id = $3 WHERE id = $1`, [itemId, eventId ? "MAPPED" : "IGNORED", eventId]);

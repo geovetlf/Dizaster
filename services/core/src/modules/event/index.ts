@@ -17,7 +17,7 @@ import type {
   TrustTier,
   VerificationLevel,
 } from "@dizaster/contracts";
-import { EventSearchQuery, VERIFICATION_LEVEL_RANK, publicVerificationState } from "@dizaster/contracts";
+import { AreaGeometry, EventSearchQuery, VERIFICATION_LEVEL_RANK, publicVerificationState } from "@dizaster/contracts";
 import {
   DEDUP_RULES,
   H3_RES,
@@ -285,6 +285,7 @@ export class EventService {
       ],
     );
     await this.recomputeAggregates(tx, eventId, c);
+    if (c.affectedArea && c.trustTier !== "CITIZEN" && assertion === "OCCURRING") await this.addAffectedArea(tx, eventId, c.affectedArea);
     await this.addFingerprint(tx, eventId, (c.metadata["keywords"] as string[] | undefined) ?? [], c.mediaHashes ?? []);
     const timelineType =
       c.trustTier === "OFFICIAL" ? "OFFICIAL_UPDATE" : c.trustTier === "EXTERNAL" ? "SOURCE_ADDED" : assertion === "NOT_OCCURRING" ? "COUNTER_REPORT_ADDED" : "REPORT_ADDED";
@@ -299,6 +300,20 @@ export class EventService {
       { lane: c.trustTier === "OFFICIAL" ? "urgent" : "interactive" },
     );
     return { kind: "ATTACHED", eventId, evidenceId, confidence, score };
+  }
+
+  /**
+   * Área oficial afectada (ADR 0087): la unión de las áreas que dieron las fuentes externas/oficiales del evento.
+   * Se simplifica (~100 m) para que no crezca sin límite.
+   */
+  private async addAffectedArea(tx: Queryable, eventId: string, area: AreaGeometry): Promise<void> {
+    await tx.query(
+      `UPDATE event.events SET affected_area = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(
+         ST_Union(coalesce(affected_area::geometry, n.g), n.g), 0.001)), 3))::geography
+         FROM (SELECT ST_SetSRID(ST_GeomFromGeoJSON($2), 4326) AS g) n
+        WHERE id = $1`,
+      [eventId, JSON.stringify(area)],
+    );
   }
 
   /**
@@ -537,6 +552,13 @@ export class EventService {
       [targetId, sourceId, mergeId],
     );
     await tx.query(`UPDATE event.events SET merged_into_id = $1, updated_at = now() WHERE id = $2`, [targetId, sourceId]);
+    // El área oficial del absorbido pasa al destino (ADR 0087).
+    await tx.query(
+      `UPDATE event.events t SET affected_area = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(
+         ST_Union(coalesce(t.affected_area::geometry, s.affected_area::geometry), s.affected_area::geometry), 0.001)), 3))::geography
+         FROM event.events s WHERE t.id = $1 AND s.id = $2 AND s.affected_area IS NOT NULL`,
+      [targetId, sourceId],
+    );
     await this.addFingerprint(tx, targetId, source.keywords, source.media_hashes);
     await this.recomputeAggregates(tx, targetId, { observedAt: source.last_activity_at.toISOString(), severityHint: source.severity });
     await tx.query(
@@ -729,16 +751,17 @@ export class EventService {
   async alertSnapshot(q: Queryable, id: string): Promise<{
     id: string; categoryCode: string; severity: number; publicState: PublicVerificationState; publicationState: string;
     status: EventSummary["status"]; place: ContextualLocation | null; regionId: string | null; districtId: string | null;
-    countryCode: string | null; mergedIntoId: string | null; point: GeoPoint;
+    countryCode: string | null; mergedIntoId: string | null; point: GeoPoint; affectedArea: AreaGeometry | null;
   } | null> {
     const { rows } = await q.query<{
       id: string; category_code: string; severity: number; verification_level: VerificationLevel; negative_state: NegativeState;
       publication_state: string; status: EventSummary["status"]; place: ContextualLocation | null; region_id: string | null;
-      district_id: string | null; country_code: string | null; merged_into_id: string | null; lat: number; lng: number;
+      district_id: string | null; country_code: string | null; merged_into_id: string | null; lat: number; lng: number; area: unknown; hull: unknown;
     }>(
       `SELECT id, category_code, severity, verification_level, negative_state, publication_state, status, place,
               region_id, district_id, country_code, merged_into_id,
-              ST_Y(public_geom::geometry) AS lat, ST_X(public_geom::geometry) AS lng
+              ST_Y(public_geom::geometry) AS lat, ST_X(public_geom::geometry) AS lng,
+              ST_AsGeoJSON(affected_area, 5)::json AS area, ST_AsGeoJSON(ST_Multi(ST_ConvexHull(affected_area::geometry)), 5)::json AS hull
          FROM event.events WHERE id = $1`,
       [id],
     );
@@ -748,6 +771,8 @@ export class EventService {
       id: r.id, categoryCode: r.category_code, severity: r.severity, publicState: publicVerificationState(r.verification_level, r.negative_state),
       publicationState: r.publication_state, status: r.status, place: r.place, regionId: r.region_id, districtId: r.district_id,
       countryCode: r.country_code?.trim() ?? null, mergedIntoId: r.merged_into_id, point: { lat: r.lat, lng: r.lng },
+      // Si la unión de áreas quedó demasiado compleja para el contrato, se usa su envolvente convexa.
+      affectedArea: r.area ? AreaGeometry.safeParse(r.area).data ?? AreaGeometry.safeParse(r.hull).data ?? null : null,
     };
   }
 

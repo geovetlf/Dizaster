@@ -250,6 +250,12 @@ export class AlertService {
     };
     // El distrito solo existe si el EVENT lo publica (HIGHLY_SENSITIVE no): seguirlo nunca revela más que el mapa.
     const placeIds = [snap.regionId, snap.districtId].filter((x): x is string => !!x);
+    // Área oficial afectada (ADR 0087): también avisa a quien sigue o se suscribió a un área que la alerta cubre,
+    // aunque el punto del evento caiga fuera. Solo la dan fuentes externas/oficiales: no revela nada ciudadano.
+    const areaJson = snap.affectedArea ? JSON.stringify(snap.affectedArea) : null;
+    if (d.kind === "NEW_EVENT" && snap.affectedArea) {
+      for (const id of await this.geo.areasIntersecting(tx, snap.affectedArea)) if (!placeIds.includes(id)) placeIds.push(id);
+    }
     if (d.kind === "NEW_EVENT") {
       for (const f of await this.social.followersOf(tx, { eventId: snap.id, placeIds })) add(f.profileId, f.userId, f.via === "EVENT" ? "FOLLOWED_EVENT" : "FOLLOWED_PLACE");
       // Un sismo o tsunami mar adentro no pertenece a ningún país, pero afecta a la costa más cercana.
@@ -263,13 +269,16 @@ export class AlertService {
       // Zonas guardadas y "cerca de mí": se mide desde la ubicación pública del EVENT (ya generalizada según su
       // sensibilidad), así que una zona nunca revela más que el mapa.
       const near = await tx.query<{ profile_id: string; match: "SAVED_ZONE" | "NEAR_ME" }>(
-        `SELECT DISTINCT profile_id, 'SAVED_ZONE' AS match FROM alert.zones
+        `WITH area AS (SELECT CASE WHEN $5::text IS NULL THEN NULL ELSE ST_SetSRID(ST_GeomFromGeoJSON($5), 4326)::geography END AS g)
+         SELECT DISTINCT profile_id, 'SAVED_ZONE' AS match FROM alert.zones, area
           WHERE ST_DWithin(center, ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography, radius_m)
+             OR (area.g IS NOT NULL AND ST_DWithin(center, area.g, radius_m))
          UNION
-         SELECT profile_id, 'NEAR_ME' FROM alert.last_locations
+         SELECT profile_id, 'NEAR_ME' FROM alert.last_locations, area
           WHERE seen_at > now() - make_interval(hours => $3)
-            AND ST_DWithin(center, ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography, $4)`,
-        [snap.point.lng, snap.point.lat, LAST_LOCATION_TTL_HOURS, NEAR_ME_RADIUS_M],
+            AND (ST_DWithin(center, ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography, $4)
+                 OR (area.g IS NOT NULL AND ST_DWithin(center, area.g, 0)))`,
+        [snap.point.lng, snap.point.lat, LAST_LOCATION_TTL_HOURS, NEAR_ME_RADIUS_M, areaJson],
       );
       const users = await this.social.userIdsForProfiles(tx, [...subs.rows, ...near.rows].map((r) => r.profile_id));
       for (const r of subs.rows) { const u = users.get(r.profile_id); if (u) add(r.profile_id, u, "CATEGORY"); }

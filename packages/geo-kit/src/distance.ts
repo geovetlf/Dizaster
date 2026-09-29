@@ -11,6 +11,18 @@ export function distanceMeters(a: GeoPoint, b: GeoPoint): number {
   return 2 * EARTH_RADIUS_M * Math.asin(Math.min(1, Math.sqrt(h)));
 }
 
+/** Punto a `meters` de `from` en el rumbo `bearingDeg` (0 = norte), sobre la esfera. NO AI REQUIRED. */
+export function destinationPoint(from: GeoPoint, meters: number, bearingDeg: number): GeoPoint {
+  const d = meters / EARTH_RADIUS_M;
+  const br = toRad(bearingDeg);
+  const lat1 = toRad(from.lat);
+  const lng1 = toRad(from.lng);
+  const lat2 = Math.asin(Math.sin(lat1) * Math.cos(d) + Math.cos(lat1) * Math.sin(d) * Math.cos(br));
+  const lng2 = lng1 + Math.atan2(Math.sin(br) * Math.sin(d) * Math.cos(lat1), Math.cos(d) - Math.sin(lat1) * Math.sin(lat2));
+  const lng = ((((lng2 * 180) / Math.PI) + 540) % 360) - 180;
+  return { lat: (lat2 * 180) / Math.PI, lng };
+}
+
 /**
  * Mediana ponderada por coordenada. Robusta frente a un pin atípico (a diferencia de la media).
  * Se usa para la ubicación agregada de un EVENT a partir de los pines de sus reportes.

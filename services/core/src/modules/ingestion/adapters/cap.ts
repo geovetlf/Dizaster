@@ -1,4 +1,5 @@
-import { distanceMeters } from "@dizaster/geo-kit";
+import { AreaGeometry } from "@dizaster/contracts";
+import { destinationPoint, distanceMeters } from "@dizaster/geo-kit";
 import { XMLParser } from "fast-xml-parser";
 import type { NormalizedItem } from "../index.js";
 import type { FeedAdapter } from "./types.js";
@@ -138,6 +139,7 @@ function normalizeAlert(alert: Node, config: CapConfig): NormalizedItem | null {
     severity: SEVERITY[severity] ?? 2,
     assertion: "OCCURRING",
     ...(geocodes.length ? { geocodes } : {}),
+    ...(geo ? areaShape(areas) : {}),
     raw: {
       identifier, msgType, event, urgency: text(info["urgency"]), certainty: text(info["certainty"]), capSeverity: severity,
       expires: parseDate(info["expires"])?.toISOString() ?? null,
@@ -205,6 +207,43 @@ function areaGeometry(areas: Node[]): { point: { lat: number; lng: number }; rad
   const point = { lat: round(avg(pts.map((p) => p.lat))), lng: round(avg(pts.map((p) => p.lng))) };
   const radius = Math.max(...pts.map((p) => distanceMeters(point, p) + p.r));
   return { point, radiusM: Math.max(MIN_UNCERTAINTY_M, Math.round(radius)) };
+}
+
+/**
+ * Contorno oficial de las áreas (ADR 0087): cada `<polygon>` tal cual y cada `<circle>` como polígono de 32 lados.
+ * Si no es un MultiPolygon válido y acotado, no se guarda (queda el punto y el radio).
+ */
+function areaShape(areas: Node[]): { area?: AreaGeometry } {
+  const polygons: [number, number][][][] = [];
+  for (const a of areas) {
+    for (const poly of list(a["polygon"] as unknown)) {
+      const ring: [number, number][] = [];
+      for (const pair of (text(poly) ?? "").split(/\s+/)) {
+        const [lat, lng] = pair.split(",").map(Number);
+        if (valid(lat, lng)) ring.push([lng!, lat!]);
+      }
+      if (ring.length >= 3) {
+        const [f, l] = [ring[0]!, ring[ring.length - 1]!];
+        if (f[0] !== l[0] || f[1] !== l[1]) ring.push([f[0], f[1]]);
+        if (ring.length >= 4) polygons.push([ring]);
+      }
+    }
+    for (const c of list(a["circle"] as unknown)) {
+      const m = text(c)?.match(/^(-?[\d.]+),(-?[\d.]+)\s+([\d.]+)$/);
+      if (!m || !valid(Number(m[1]), Number(m[2])) || Number(m[3]) <= 0) continue;
+      const center = { lat: Number(m[1]), lng: Number(m[2]) };
+      const ring: [number, number][] = [];
+      for (let i = 0; i < 32; i++) {
+        const p = destinationPoint(center, Number(m[3]) * 1000, (i * 360) / 32);
+        ring.push([round(p.lng), round(p.lat)]);
+      }
+      ring.push([ring[0]![0], ring[0]![1]]);
+      polygons.push([ring]);
+    }
+  }
+  if (polygons.length === 0) return {};
+  const parsed = AreaGeometry.safeParse({ type: "MultiPolygon", coordinates: polygons });
+  return parsed.success ? { area: parsed.data } : {};
 }
 
 const valid = (lat: number | undefined, lng: number | undefined) =>

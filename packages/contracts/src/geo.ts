@@ -6,6 +6,17 @@ export const GeoPoint = z.object({
 });
 export type GeoPoint = z.infer<typeof GeoPoint>;
 
+/**
+ * Área oficial afectada (ADR 0087): MultiPolygon GeoJSON [lng, lat], acotado para no guardar geometrías enormes.
+ * Solo la aportan fuentes externas u oficiales (CAP `<polygon>`/`<circle>` o geocódigos); nunca un reporte ciudadano.
+ */
+const Position = z.tuple([z.number().min(-180).max(180), z.number().min(-90).max(90)]);
+export const AreaGeometry = z.object({
+  type: z.literal("MultiPolygon"),
+  coordinates: z.array(z.array(z.array(Position).min(4).max(2000)).min(1).max(20)).min(1).max(50),
+});
+export type AreaGeometry = z.infer<typeof AreaGeometry>;
+
 /** Caja [oeste, sur, este, norte] en grados. */
 export const BBox = z
   .tuple([z.number(), z.number(), z.number(), z.number()])

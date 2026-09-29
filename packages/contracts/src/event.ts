@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { CategoryCode, CountryCode, Instant, LocalizedText } from "./common.js";
-import { ContextualLocation, GeoPoint, Sensitivity } from "./geo.js";
+import { AreaGeometry, ContextualLocation, GeoPoint, Sensitivity } from "./geo.js";
 import { NegativeState, PublicVerificationState, TrustTier, VerificationLevel } from "./verification.js";
 
 export const EventStatus = z.enum(["ACTIVE", "MONITORING", "RESOLVED", "ARCHIVED"]);
@@ -61,6 +61,8 @@ export const EventCandidate = z.object({
   /** Hash perceptual de las fotos ya procesadas del reporte (sim_media en la deduplicación, ADR 0030). */
   mediaHashes: z.array(z.string().regex(/^[0-9a-f]{16}$/)).max(8).default([]),
   metadata: z.record(z.string(), z.unknown()).default({}),
+  /** Área oficial afectada (ADR 0087). Se ignora si el candidato es ciudadano. */
+  affectedArea: AreaGeometry.optional(),
 });
 export type EventCandidate = z.infer<typeof EventCandidate>;
 

@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { AreaSearchQuery, type AreaSearchResult, type ContextualLocation, type GeoPoint, type Sensitivity } from "@dizaster/contracts";
+import { AreaGeometry, AreaSearchQuery, type AreaSearchResult, type ContextualLocation, type GeoPoint, type Sensitivity } from "@dizaster/contracts";
 import { CountryLocator, H3_RES, distanceMeters, generalize, h3, type CountryFeature } from "@dizaster/geo-kit";
 import type { Queryable } from "../../platform/db.js";
 import { DomainError } from "../../platform/errors.js";
@@ -64,7 +64,9 @@ export class GeoService {
    * el índice administrativo local, nunca por nombre. Devuelve un punto dentro del área (o de la unión de áreas) y
    * un radio que la cubre entera; null si ningún código se reconoce (el ítem queda sin mapa). NO AI REQUIRED.
    */
-  async locateGeocodes(q: Queryable, geocodes: readonly { scheme: string; value: string }[]): Promise<{ point: GeoPoint; radiusM: number; areaIds: string[] } | null> {
+  async locateGeocodes(
+    q: Queryable, geocodes: readonly { scheme: string; value: string }[],
+  ): Promise<{ point: GeoPoint; radiusM: number; areaIds: string[]; area: AreaGeometry | null } | null> {
     const schemes = this.loadGeocodeSchemes();
     const ids: string[] = [];
     const codes: string[] = [];
@@ -81,16 +83,35 @@ export class GeoService {
       `WITH a AS (SELECT id, geom FROM geo.admin_areas WHERE id = ANY($1) OR code = ANY($2)),
             u AS (SELECT array_agg(id ORDER BY id) AS ids, ST_Union(geom) AS g FROM a)
        SELECT ids, ST_Y(ST_PointOnSurface(g)) AS lat, ST_X(ST_PointOnSurface(g)) AS lng,
-              ST_XMin(g) AS xmin, ST_YMin(g) AS ymin, ST_XMax(g) AS xmax, ST_YMax(g) AS ymax
+              ST_XMin(g) AS xmin, ST_YMin(g) AS ymin, ST_XMax(g) AS xmax, ST_YMax(g) AS ymax,
+              ${AREA_GEOJSON_SQL("g")} AS area, ST_AsGeoJSON(ST_Multi(ST_ConvexHull(g)), 5)::json AS hull
          FROM u WHERE g IS NOT NULL`,
       [ids, codes],
     );
-    const r = rows[0];
+    const r = rows[0] as (typeof rows)[number] & { area: unknown; hull: unknown } | undefined;
     if (!r || r.lat === null || r.lng === null || !r.ids) return null;
     const point = { lat: Math.round(r.lat * 1e5) / 1e5, lng: Math.round(r.lng * 1e5) / 1e5 };
     const corners = [[r.ymin, r.xmin], [r.ymin, r.xmax], [r.ymax, r.xmin], [r.ymax, r.xmax]] as const;
     const radiusM = Math.round(Math.max(...corners.map(([lat, lng]) => distanceMeters(point, { lat, lng }))));
-    return { point, radiusM, areaIds: r.ids };
+    // El área oficial (ADR 0087) se guarda simplificada; si aun así es demasiado grande, su envolvente convexa.
+    const area = AreaGeometry.safeParse(r.area).data ?? AreaGeometry.safeParse(r.hull).data ?? null;
+    return { point, radiusM, areaIds: r.ids, area };
+  }
+
+  /**
+   * Áreas administrativas (niveles 1–3) que cubren una parte real del área afectada (ADR 0087): más del 1 % de la
+   * propia área o 1 km². Un vecino que solo toca el borde no cuenta. Acotado a 500.
+   */
+  async areasIntersecting(q: Queryable, area: AreaGeometry): Promise<string[]> {
+    const { rows } = await q.query<{ id: string }>(
+      `WITH g AS (SELECT ST_SetSRID(ST_GeomFromGeoJSON($1), 4326) AS g)
+       SELECT a.id FROM geo.admin_areas a, g
+        WHERE ST_Intersects(a.geom, g.g)
+          AND ST_Area(ST_Intersection(a.geom, g.g)::geography) > least(1e6, 0.01 * ST_Area(a.geom::geography))
+        LIMIT 500`,
+      [JSON.stringify(area)],
+    );
+    return rows.map((r) => r.id);
   }
 
   private loadGeocodeSchemes(): GeocodeScheme[] {
@@ -298,3 +319,6 @@ export class GeoService {
   }
 }
 
+/** GeoJSON simplificado (~100 m) y válido de una geometría, para guardarla como área afectada. */
+export const AREA_GEOJSON_SQL = (col: string) =>
+  `ST_AsGeoJSON(ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(${col}, 0.001)), 3)), 5)::json`;
