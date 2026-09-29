@@ -1,0 +1,43 @@
+{
+  "type": "FeatureCollection",
+  "metadata": { "count": 4 },
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": { "type": "Point", "coordinates": [-76.21, -12.45, -35.0] },
+      "id": "20260929_0000101",
+      "properties": {
+        "source_id": "1801101", "source_catalog": "EMSC-RTS", "lastupdate": "2026-09-29T10:12:00.0Z",
+        "time": "2026-09-29T10:03:21.4Z", "flynn_region": "NEAR COAST OF CENTRAL PERU", "lat": -12.45, "lon": -76.21,
+        "depth": 35.0, "evtype": "ke", "auth": "IGP", "mag": 5.4, "magtype": "mw", "unid": "20260929_0000101"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": { "type": "Point", "coordinates": [-71.9, -16.3, -120.0] },
+      "id": "20260929_0000102",
+      "properties": {
+        "time": "2026-09-29T09:00:00.0Z", "flynn_region": "SOUTHERN PERU", "lat": -16.3, "lon": -71.9,
+        "depth": 120.0, "evtype": "ke", "auth": "IGP", "mag": 3.9, "magtype": "ml", "unid": "20260929_0000102"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": { "type": "Point", "coordinates": [14.1, 50.2, -1.0] },
+      "id": "20260929_0000103",
+      "properties": {
+        "time": "2026-09-29T08:00:00.0Z", "flynn_region": "CZECH REPUBLIC", "lat": 50.2, "lon": 14.1,
+        "depth": 1.0, "evtype": "qb", "auth": "EMSC", "mag": 3.8, "magtype": "ml", "unid": "20260929_0000103"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": { "type": "Point", "coordinates": [140.1, 35.6, -40.0] },
+      "id": "20260929_0000104",
+      "properties": {
+        "time": "2026-09-29T07:00:00.0Z", "flynn_region": "NEAR EAST COAST OF HONSHU, JAPAN", "lat": 35.6, "lon": 140.1,
+        "depth": 40.0, "evtype": "ke", "auth": "JMA", "mag": 2.9, "magtype": "mb", "unid": "20260929_0000104"
+      }
+    }
+  ]
+}

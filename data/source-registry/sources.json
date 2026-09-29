@@ -1,5 +1,5 @@
 {
- "version": "sources-2026.09.3",
+ "version": "sources-2026.09.4",
  "sources": [
   {
    "key": "usgs-earthquakes",
@@ -86,6 +86,30 @@
    "urgentPollSeconds": 300,
    "status": "PLANNED",
    "notes": "Adapter listo; se activa cuando se revisen los términos de uso."
+  },
+  {
+   "key": "emsc-earthquakes",
+   "name": "EMSC — Centro Sismológico Euro-Mediterráneo",
+   "type": "EXTERNAL",
+   "trustTier": "EXTERNAL",
+   "countryScope": [
+    "*"
+   ],
+   "categories": [
+    "natural.earthquake"
+   ],
+   "adapter": "emsc-fdsn-json",
+   "config": {
+    "url": "https://www.seismicportal.eu/fdsnws/event/1/query?format=json&limit=200&minmag=3.5&orderby=time",
+    "minMagnitude": 3.5,
+    "urgentMinMagnitude": 4.5
+   },
+   "license": "Por confirmar (revisar términos de reutilización de EMSC antes de activar)",
+   "termsUrl": "https://www.emsc-csem.org/",
+   "scheduleNormal": "0 5 * * *",
+   "urgentCapable": true,
+   "urgentPollSeconds": 300,
+   "status": "PLANNED"
   },
   {
    "key": "nasa-firms",
