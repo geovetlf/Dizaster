@@ -249,6 +249,18 @@ export function budgetAlertText(lang: Lang, b: { key: string; threshold: number;
   return BUDGET_TEXT[lang](b.key, b.threshold, b.spentUsd.toFixed(2), b.limitUsd.toFixed(2));
 }
 
+const DEGRADATION_TEXT: Record<Lang, (feature: string, killed: boolean, pct: number) => { title: string; body: string }> = {
+  es: (f, k, p) => ({ title: k ? `Presupuesto de infraestructura al ${p}%: "${f}" pausado` : `"${f}" restaurado`, body: k ? "Degradación automática por costo. Reportes y alertas siguen activos." : `El gasto de infraestructura bajó al ${p}%.` }),
+  en: (f, k, p) => ({ title: k ? `Infrastructure budget at ${p}%: "${f}" paused` : `"${f}" restored`, body: k ? "Automatic cost degradation. Reports and alerts stay on." : `Infrastructure spend is back to ${p}%.` }),
+  pt: (f, k, p) => ({ title: k ? `Orçamento de infraestrutura em ${p}%: "${f}" pausado` : `"${f}" restaurado`, body: k ? "Degradação automática por custo. Relatos e alertas continuam ativos." : `O gasto de infraestrutura voltou a ${p}%.` }),
+  fr: (f, k, p) => ({ title: k ? `Budget d'infrastructure à ${p} % : « ${f} » en pause` : `« ${f} » rétabli`, body: k ? "Dégradation automatique liée au coût. Signalements et alertes restent actifs." : `Les dépenses d'infrastructure sont revenues à ${p} %.` }),
+};
+
+/** Aviso de degradación automática por costo (ADR 0138). NO AI REQUIRED. */
+export function costDegradationText(lang: Lang, d: { feature: string; killed: boolean; percent: number }): { title: string; body: string } {
+  return DEGRADATION_TEXT[lang](d.feature, d.killed, Math.round(d.percent));
+}
+
 /**
  * Anti-spam de menciones (ADR 0063). Por encima de estos topes la mención sigue en el post, pero no genera aviso:
  * una cuenta no puede usar @ para inundar de notificaciones a nadie.

@@ -94,3 +94,17 @@ export interface CostDashboard {
   killSwitches: KillSwitchView[];
   ai: AiUsageView[];
 }
+
+/**
+ * Degradación automática por costo fuera de IA (Blueprint §6.2, §12.2; ADR 0138; orden decidido por el propietario).
+ * Presupuesto `infra`: costo variable estimado más almacenamiento del periodo. Al cruzar cada escalón se apaga su
+ * función; si el gasto baja (nuevo periodo o presupuesto mayor), vuelve sola. Reportes, alertas, números de
+ * emergencia y fuentes urgentes nunca están en la escalera.
+ */
+export const INFRA_BUDGET_KEY = "infra";
+export const INGESTION_NORMAL_KILL_SWITCH = "ingestion-normal";
+export const DEGRADATION_LADDER: readonly { atPercent: number; feature: string }[] = [
+  { atPercent: 100, feature: "video" },
+  { atPercent: 110, feature: "media-upload" },
+  { atPercent: 125, feature: INGESTION_NORMAL_KILL_SWITCH },
+];

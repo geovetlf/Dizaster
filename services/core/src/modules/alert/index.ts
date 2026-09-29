@@ -48,7 +48,7 @@ import type { PushMessage, PushSender } from "./push/types.js";
 export { ApnsSender, type ApnsConfig } from "./push/apns.js";
 export { FcmSender, type FcmConfig, type FcmServiceAccount } from "./push/fcm.js";
 export { LogPushSender, PushGateway, type PushMessage, type PushResult, type PushSender } from "./push/types.js";
-export { DEFAULT_PREFERENCES, MENTION_LIMITS, mentionText, alertText, budgetAlertText, sourceAlertText, opsAlertText, type OpsAlertKey, decideAlerts, groupText, inQuietHours, localMinutes, wants } from "./rules.js";
+export { DEFAULT_PREFERENCES, MENTION_LIMITS, mentionText, alertText, budgetAlertText, costDegradationText, sourceAlertText, opsAlertText, type OpsAlertKey, decideAlerts, groupText, inQuietHours, localMinutes, wants } from "./rules.js";
 
 /** Distancia máxima a la costa para asignar un evento marino a un país en las suscripciones por país. */
 export const OFFSHORE_COUNTRY_RADIUS_M = 300_000;

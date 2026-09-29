@@ -2,6 +2,9 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   CostDashboardQuery,
+  DEGRADATION_LADDER,
+  INFRA_BUDGET_KEY,
+  INGESTION_NORMAL_KILL_SWITCH,
   MEDIA_KILL_SWITCHES,
   UpdateBudgetRequest,
   UpdateKillSwitchRequest,
@@ -34,7 +37,7 @@ interface Prices {
 const THRESHOLDS = [50, 80, 100] as const;
 const KILL_CACHE_MS = 15_000;
 /** Funciones con interruptor remoto (ADR 0019, 0064, 0082). */
-export const KNOWN_KILL_SWITCHES = ["ai", "translation", "sms", MEDIA_KILL_SWITCHES.uploads, MEDIA_KILL_SWITCHES.video] as const;
+export const KNOWN_KILL_SWITCHES = ["ai", "translation", "sms", MEDIA_KILL_SWITCHES.uploads, MEDIA_KILL_SWITCHES.video, INGESTION_NORMAL_KILL_SWITCH] as const;
 const GB = 1024 ** 3;
 /** Clave de presupuesto / funcionalidad: minúsculas, puntos y guiones ("ai", "sms", "translation"). */
 const Key = z.string().min(2).max(40).regex(/^[a-z][a-z0-9.-]*$/);
@@ -175,14 +178,78 @@ export class CostService implements CostGuard, UsageSink, AiCallSink {
     const feature = parse(Key, rawFeature);
     const k = parse(UpdateKillSwitchRequest, raw);
     const { rows } = await this.db.query<{ feature: string; killed: boolean; reason: string | null; updated_at: Date }>(
-      `INSERT INTO cost.kill_switches (feature, killed, reason, updated_by) VALUES ($1, $2, $3, $4)
-       ON CONFLICT (feature) DO UPDATE SET killed = EXCLUDED.killed, reason = EXCLUDED.reason, updated_by = EXCLUDED.updated_by, updated_at = now()
+      // Lo que decide una persona deja de ser automático: la degradación ya no lo devuelve sola (ADR 0138).
+      `INSERT INTO cost.kill_switches (feature, killed, reason, updated_by, auto) VALUES ($1, $2, $3, $4, false)
+       ON CONFLICT (feature) DO UPDATE SET killed = EXCLUDED.killed, reason = EXCLUDED.reason, updated_by = EXCLUDED.updated_by, auto = false, updated_at = now()
        RETURNING feature, killed, reason, updated_at`,
       [feature, k.killed, k.reason ?? null, by],
     );
     this.kills = null;
     const r = rows[0]!;
     return { feature: r.feature, killed: r.killed, reason: r.reason, updatedAt: r.updated_at.toISOString() };
+  }
+
+  // ───────────── Degradación automática (ADR 0138) ─────────────
+
+  /**
+   * Costo estimado de infraestructura del periodo en curso: uso medido × precios de referencia más almacenamiento
+   * prorrateado. Es el "gastado" del presupuesto `infra` (no hay factura que leer). NO AI REQUIRED.
+   */
+  async infraSpent(period: BudgetPeriod, q: Queryable = this.db): Promise<number> {
+    const from = this.periodStart(period);
+    const to = this.today();
+    const usage = await q.query<{ module: string; metric: string; units: number }>(
+      `SELECT module, metric, sum(units)::float8 AS units FROM cost.usage_daily WHERE day BETWEEN $1 AND $2 GROUP BY module, metric`, [from, to]);
+    const variable = usage.rows.reduce((sum, r) => sum + (this.prices.unitPrices[`${r.module}.${r.metric}`]?.usd ?? 0) * Number(r.units), 0);
+    const days = (Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000 + 1;
+    const databaseBytes = Number((await q.query<{ n: string }>(`SELECT pg_database_size(current_database()) AS n`)).rows[0]!.n);
+    const storage = ((await this.media.storedBytes(q)) / GB) * this.prices.storageGbMonthUsd.media + (databaseBytes / GB) * this.prices.storageGbMonthUsd.database;
+    return variable + storage * (days / 30);
+  }
+
+  /**
+   * Aplica la escalera de degradación del presupuesto `infra` (orden del propietario): video, fotos nuevas, fuentes no
+   * urgentes. Apaga cada escalón al cruzarlo y devuelve solo lo que apagó la regla cuando el gasto baja; lo que
+   * apagó una persona no se toca. Avisa a administración al 50/80/100 % y en cada cambio. Sin presupuesto `infra` no
+   * degrada nada. Reportes, alertas y fuentes urgentes nunca se apagan por costo. Lo llama el worker cada hora.
+   */
+  async applyDegradation(): Promise<{ percent: number | null; changed: { feature: string; killed: boolean }[] }> {
+    return withTransaction(this.db, async (tx) => {
+      const budget = await this.budget(tx, INFRA_BUDGET_KEY);
+      const spent = budget ? await this.infraSpent(budget.period, tx) : 0;
+      const percent = !budget ? null : budget.limitUsd > 0 ? (spent / budget.limitUsd) * 100 : spent > 0 ? Number.POSITIVE_INFINITY : 0;
+      if (budget && percent !== null) {
+        const periodStart = this.periodStart(budget.period);
+        for (const threshold of THRESHOLDS) {
+          if (percent < threshold) continue;
+          const { rowCount } = await tx.query(
+            `INSERT INTO cost.threshold_alerts (key, period_start, threshold) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`, [INFRA_BUDGET_KEY, periodStart, threshold]);
+          if (rowCount) await publish(tx, "BudgetThresholdReached", { key: INFRA_BUDGET_KEY, threshold, periodStart, spentUsd: round(spent), limitUsd: budget.limitUsd }, { lane: "urgent" });
+        }
+      }
+      const current = new Map((await tx.query<{ feature: string; killed: boolean; auto: boolean }>(
+        `SELECT feature, killed, auto FROM cost.kill_switches WHERE feature = ANY($1)`, [DEGRADATION_LADDER.map((s) => s.feature)])).rows.map((r) => [r.feature, r]));
+      const changed: { feature: string; killed: boolean }[] = [];
+      const shown = percent === null ? 0 : Number.isFinite(percent) ? Math.round(percent) : 999;
+      for (const step of DEGRADATION_LADDER) {
+        const cur = current.get(step.feature);
+        const over = percent !== null && percent >= step.atPercent;
+        if (over && !cur?.killed) {
+          await tx.query(
+            `INSERT INTO cost.kill_switches (feature, killed, reason, auto) VALUES ($1, true, $2, true)
+             ON CONFLICT (feature) DO UPDATE SET killed = true, reason = EXCLUDED.reason, auto = true, updated_by = NULL, updated_at = now()`,
+            [step.feature, `Automático: presupuesto ${INFRA_BUDGET_KEY} al ${shown}%`]);
+          changed.push({ feature: step.feature, killed: true });
+        } else if (!over && cur?.killed && cur.auto) {
+          await tx.query(`UPDATE cost.kill_switches SET killed = false, auto = false, reason = $2, updated_by = NULL, updated_at = now() WHERE feature = $1`,
+            [step.feature, `Automático: presupuesto ${INFRA_BUDGET_KEY} al ${shown}%`]);
+          changed.push({ feature: step.feature, killed: false });
+        }
+      }
+      for (const c of changed) await publish(tx, "CostDegradationChanged", { budgetKey: INFRA_BUDGET_KEY, ...c, percent: shown }, { lane: "urgent" });
+      if (changed.length) this.kills = null;
+      return { percent: percent === null ? null : shown, changed };
+    });
   }
 
   // ───────────── Tablero ─────────────

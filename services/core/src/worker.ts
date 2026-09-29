@@ -45,6 +45,9 @@ async function loop() {
       const ended = await c.events.applySourceEnd(c.db, await c.ingestion.endedItems(c.db, c.clock.now()));
       console.log(JSON.stringify({ msg: "events.source-end", resolved: ended }));
       console.log(JSON.stringify({ msg: "events.archive", archived: await c.events.archiveResolved(c.db, c.clock.now()) }));
+      // Degradación automática por costo fuera de IA (ADR 0138).
+      const degradation = await c.cost.applyDegradation().catch((e: Error) => { console.warn(JSON.stringify({ msg: "cost.degradation", error: e.message })); return null; });
+      if (degradation?.changed.length) console.warn(JSON.stringify({ msg: "cost.degradation.applied", ...degradation }));
       console.log(JSON.stringify({ msg: "events.duplicates", ...(await c.events.sweepDuplicates(c.db, c.clock.now())) }));
     }
     if (Date.now() - lastMeterFlush > 60_000) {

@@ -131,6 +131,8 @@ export class IngestionScheduler {
     private readonly clock: Clock,
     private readonly secrets: Readonly<Record<string, string | undefined>> = {},
     private readonly raw: RawArchive | null = null,
+    /** Degradación por costo (ADR 0138): con el interruptor activo se pausa el carril NORMAL; URGENT nunca se pausa. */
+    private readonly normalLanePaused: () => Promise<boolean> = async () => false,
   ) {}
 
   async tick(): Promise<RunSummary[]> {
@@ -144,13 +146,14 @@ export class IngestionScheduler {
         ORDER BY s.key`,
     );
     const due: Array<{ s: SourceRow; lane: Lane }> = [];
+    const normalPaused = await this.normalLanePaused();
     for (const s of rows) {
       if (!FEED_ADAPTERS.has(s.adapter)) continue;
       if (s.open_until && s.open_until > now) continue;
       if (s.urgent_capable && s.urgent_poll_seconds && (!s.last_urgent_run_at || now.getTime() - s.last_urgent_run_at.getTime() >= s.urgent_poll_seconds * 1000)) {
         due.push({ s, lane: "URGENT" });
       }
-      if (!s.last_normal_run_at || s.last_normal_run_at < lastScheduledAt(s.schedule_normal ?? "0 5 * * *", now)) {
+      if (!normalPaused && (!s.last_normal_run_at || s.last_normal_run_at < lastScheduledAt(s.schedule_normal ?? "0 5 * * *", now))) {
         due.push({ s, lane: "NORMAL" });
       }
     }

@@ -1,5 +1,6 @@
 import { createHmac } from "node:crypto";
 import { resolve } from "node:path";
+import { INGESTION_NORMAL_KILL_SWITCH } from "@dizaster/contracts";
 import { decodeSecret, type AppEnv } from "./platform/config.js";
 import { systemClock, type Clock } from "./platform/clock.js";
 import { Meter } from "./platform/metrics.js";
@@ -11,7 +12,7 @@ import { defaultDataDir } from "./platform/paths.js";
 import { CostService } from "./modules/cost/index.js";
 import { EventService } from "./modules/event/index.js";
 import { FeedService } from "./modules/feed/index.js";
-import { AlertService, ApnsSender, budgetAlertText, sourceAlertText, FcmSender, LogPushSender, PushGateway, type FcmServiceAccount, type PushSender } from "./modules/alert/index.js";
+import { AlertService, ApnsSender, budgetAlertText, costDegradationText, sourceAlertText, FcmSender, LogPushSender, PushGateway, type FcmServiceAccount, type PushSender } from "./modules/alert/index.js";
 import { GeoService } from "./modules/geo/index.js";
 import { ModerationService } from "./modules/moderation/index.js";
 import { TrustService } from "./modules/trust/index.js";
@@ -71,7 +72,9 @@ export function buildContainer(env: AppEnv, overrides: { db?: Db; clock?: Clock;
   const sourceSecrets = Object.fromEntries(Object.entries(process.env).filter(([k]) => k.startsWith("SOURCE_KEY_") || k.startsWith("SOURCE_PUSH_SECRET_")));
   const storage = overrides.storage ?? buildStorage(env, clock);
   const ingestionScheduler = new IngestionScheduler(db, ingestion, overrides.fetcher ?? new NodeHttpFetcher(), clock, sourceSecrets,
-    env.SOURCE_RAW_RETENTION_DAYS > 0 ? { storage, retentionDays: env.SOURCE_RAW_RETENTION_DAYS } : null);
+    env.SOURCE_RAW_RETENTION_DAYS > 0 ? { storage, retentionDays: env.SOURCE_RAW_RETENTION_DAYS } : null,
+    // `cost` se crea más abajo; la función solo se evalúa en cada tick (ADR 0138).
+    () => cost.isKilled(INGESTION_NORMAL_KILL_SWITCH));
   const trust = new TrustService(db, identity, events);
   const verification = new VerificationService(db, ref, events, ingestion, trust);
   const media = new MediaService(db, storage, clock, {
@@ -116,6 +119,12 @@ export function buildContainer(env: AppEnv, overrides: { db?: Db; clock?: Clock;
   dispatcher.on("BudgetThresholdReached", "alert.notify-admins-budget", async (e) => {
     const admins = await identity.usersWithRole(db, "admin");
     await alerts.notifyAdmins(admins, (lang) => budgetAlertText(lang, e.payload), "dizaster://admin-cost", `budget:${e.payload.key}`);
+  });
+  // Degradación automática por costo (ADR 0138): administración y operación saben qué se apagó o se restauró.
+  dispatcher.on("CostDegradationChanged", "alert.notify-admins-degradation", async (e) => {
+    console.warn(JSON.stringify({ msg: "cost.degradation", ...e.payload }));
+    const admins = [...new Set([...(await identity.usersWithRole(db, "admin")), ...(await identity.usersWithRole(db, "operator"))])];
+    await alerts.notifyAdmins(admins, (lang) => costDegradationText(lang, e.payload), "dizaster://admin-cost", `degradation:${e.payload.feature}`);
   });
   // Fuentes urgentes caídas o recuperadas (ADR 0058): log estructurado y push a administración.
   dispatcher.on("SourceHealthChanged", "alert.notify-admins-source", async (e) => {
