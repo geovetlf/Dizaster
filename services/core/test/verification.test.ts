@@ -61,6 +61,19 @@ describe("Verification Engine", () => {
     expect((await verification(eventId)).level).toBe("COMMUNITY_CORROBORATED");
   });
 
+  it("solo cuentan juntos los reportes dentro de una ventana de tiempo coherente (ADR 0081)", async () => {
+    const pin = offset(LIMA, 0, 110000);
+    const [a, b, c] = await Promise.all(["vent1", "vent2", "vent3"].map((h) => createUser(t, h)));
+    const r1 = await submit(t, a!, reportBody(a!, { pin }));
+    await submit(t, b!, reportBody(b!, { pin: offset(pin, 20) }));
+    // Los dos primeros quedan dos días antes: fuera de la ventana de la categoría respecto del tercero.
+    await t.c.db.query(`UPDATE event.evidence SET observed_at = observed_at - interval '2 days' WHERE event_id = $1`, [r1.body.eventId]);
+    await submit(t, c!, reportBody(c!, { pin: offset(pin, -20) }));
+    await drain();
+    const v = await verification(r1.body.eventId!);
+    expect(v.level).toBe("UNVERIFIED");
+  });
+
   it("la misma persona reportando varias veces cuenta una sola vez", async () => {
     const pin = offset(LIMA, 0, 80000);
     const u = await createUser(t, "insistente");

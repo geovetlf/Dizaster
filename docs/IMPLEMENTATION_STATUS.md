@@ -272,6 +272,7 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | Mapa por teselas z/x/y cacheables en CDN, sin sesión | ✅ | ADR 0078 |
 | Horas en la zona del evento y plurales correctos en 4 idiomas | ✅ | ADR 0079 |
 | Adaptador EMSC (sismos), fuente externa PLANNED hasta revisar términos | ✅ (activación BLOQUEADA: términos) | ADR 0080 |
+| Ventana de tiempo coherente al corroborar (verification-3) | ✅ | ADR 0081 |
 | Licencias, auditoría, SBOM, Dependabot; respaldo con prueba de restauración en CI | ✅ | ADR 0070, `scripts/supply-chain.mjs`, `scripts/db-restore-check.mjs` |
 | Idioma de la app elegible en el perfil (es/en/pt/fr o del teléfono) | ✅ | ADR 0069, `app/language.tsx` |
 | Varias cuentas en un teléfono corroboran como una (clave seudónima del teléfono) | ✅ | ADR 0068, migración 0036 |
@@ -298,6 +299,20 @@ Revisión del Blueprint del 2026-09-29 (tras ADR 0054): completada con ADR 0055�
 decisiones o credenciales del propietario (lista de abajo); mientras tanto se continúa con mejoras sin bloqueo.
 
 Revisión del Blueprint del 2026-09-29 (tras ADR 0070): completada con ADR 0071–0080.
+
+Revisión del Blueprint del 2026-09-29 (tras ADR 0080), verificada contra el código, sin bloqueos:
+
+1. Kill switch de video y subidas, con presupuesto antes de gastar en media (§12.2, §5.18).
+2. Detalle de una publicación por enlace y rutas de enlaces universales /e/ y /p/ (§6.3).
+3. ETag e If-None-Match en recursos cacheables de la API (§6.3).
+4. País preferido en el perfil (§5.2).
+5. Explicación legible completa del estado de verificación (§10.4).
+6. Alertas de zonas guardadas según el área oficial, no solo el punto (§5.10, §9.4).
+7. Detección determinista de datos personales en publicaciones → cola de moderación (§13.3, §5.12).
+8. Acceso auditado, con motivo, a la evidencia de presencia para moderación (§7.3, §13.1).
+9. MFA (TOTP) para moderación y administración (§13.1).
+10. Detección local del idioma del contenido (§5.15).
+11. Adapters del carril NORMAL (ReliefWeb, OMS, RSS de noticias), PLANNED hasta revisar términos (§9.3).
 
 Bloqueadas o en espera:
 

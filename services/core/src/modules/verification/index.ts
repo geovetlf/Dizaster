@@ -16,7 +16,7 @@ import type { TrustService } from "../trust/index.js";
 import type { IngestionService } from "../ingestion/index.js";
 import type { ReferenceData } from "../reference/index.js";
 
-export const VERIFICATION_RULES_VERSION = "verification-2";
+export const VERIFICATION_RULES_VERSION = "verification-3";
 
 /** Parámetros anti-abuso de la versión de reglas. El peso de cada persona lo da Trust (ADR 0023). */
 const RULES = {
@@ -110,8 +110,11 @@ export class VerificationService {
     const officialDeny = nonCitizen.filter((e) => registered.get(e.refId)?.trustTier === "OFFICIAL" && e.assertion === "NOT_OCCURRING");
     const external = nonCitizen.filter((e) => registered.get(e.refId)?.trustTier === "EXTERNAL" && e.assertion === "OCCURRING");
 
-    const confirmWeight = await this.independentWeight(tx, eventId, data.evidence.filter((e) => e.trustTier === "CITIZEN" && e.assertion === "OCCURRING"));
-    const denyWeight = await this.independentWeight(tx, eventId, data.evidence.filter((e) => e.trustTier === "CITIZEN" && e.assertion === "NOT_OCCURRING"));
+    const windowMinutes = category?.dedupWindowMinutes ?? 360;
+    const confirm = await this.independentWeight(tx, eventId, data.evidence.filter((e) => e.trustTier === "CITIZEN" && e.assertion === "OCCURRING"), windowMinutes);
+    const deny = await this.independentWeight(tx, eventId, data.evidence.filter((e) => e.trustTier === "CITIZEN" && e.assertion === "NOT_OCCURRING"), windowMinutes);
+    const confirmWeight = confirm.weight;
+    const denyWeight = deny.weight;
 
     let computed: VerificationLevel = "UNVERIFIED";
     let ruleId = "none";
@@ -146,7 +149,7 @@ export class VerificationService {
       ruleId = "dispute-resolved";
     }
 
-    explanation.push({ code: "CITIZEN_CORROBORATION", params: { independentWeight: confirmWeight, threshold } });
+    explanation.push({ code: "CITIZEN_CORROBORATION", params: { independentWeight: confirmWeight, threshold, ...(confirm.from && confirm.to ? { from: confirm.from, to: confirm.to } : {}) } });
     if (denyWeight > 0) explanation.push({ code: "CITIZEN_DENIALS", params: { independentWeight: denyWeight } });
     if (external.length) explanation.push({ code: "EXTERNAL_SOURCES", params: { count: external.length } });
     if (officialConfirm.length) explanation.push({ code: "OFFICIAL_CONFIRMATION", params: { count: officialConfirm.length } });
@@ -172,21 +175,15 @@ export class VerificationService {
    * (dos cuentas en el mismo teléfono cuentan como una). Cada persona pesa según su reputación (nueva 0,5,
    * con mal historial 0,25, normal 1, de confianza 1,5) y un grupo coordinado cuenta como una sola. Quienes
    * escribieron exactamente el mismo texto (≥ 4 palabras, ADR 0074) también cuentan como una sola: pesa el mayor.
+   * Solo cuentan juntos los reportes dentro de una ventana de tiempo coherente (la de deduplicación de la
+   * categoría, ADR 0081): se toma la ventana con más peso. Devuelve también sus horas para la explicación.
    */
-  private async independentWeight(tx: Queryable, eventId: string, evidence: EvidenceForVerification[]): Promise<number> {
+  private async independentWeight(
+    tx: Queryable, eventId: string, evidence: EvidenceForVerification[], windowMinutes: number,
+  ): Promise<WindowWeight> {
     const high = evidence.filter((e) => e.presenceBand === "HIGH" && e.contributorUserId);
-    const seenUsers = new Set<string>();
-    const seenDevices = new Set<string>();
-    const counted: { userId: string; textHash: string | null }[] = [];
-    for (const e of high) {
-      if (seenUsers.has(e.contributorUserId!)) continue;
-      if (e.contributorDeviceId && seenDevices.has(e.contributorDeviceId)) continue;
-      seenUsers.add(e.contributorUserId!);
-      if (e.contributorDeviceId) seenDevices.add(e.contributorDeviceId);
-      counted.push({ userId: e.contributorUserId!, textHash: e.textHash });
-    }
-    const weights = await this.trust.contributionWeights(tx, counted.map((c) => c.userId), eventId);
-    return sameTextCountsOnce(counted, weights);
+    const weights = await this.trust.contributionWeights(tx, [...new Set(high.map((e) => e.contributorUserId!))], eventId);
+    return bestWindowWeight(high, weights, windowMinutes * 60_000);
   }
 
   /**
@@ -316,4 +313,40 @@ export function sameTextCountsOnce(counted: { userId: string; textHash: string |
   }
   for (const w of byText.values()) sum += w;
   return sum;
+}
+
+export interface WindowWeight { weight: number; from: string | null; to: string | null }
+
+/**
+ * Mayor peso independiente dentro de cualquier ventana de `windowMs` (ADR 0081). Dentro de cada ventana: una vez
+ * por persona y por dispositivo, y textos idénticos como uno. Tres reportes repartidos en varios días no suman
+ * juntos. NO AI REQUIRED.
+ */
+export function bestWindowWeight(
+  evidence: Pick<EvidenceForVerification, "contributorUserId" | "contributorDeviceId" | "textHash" | "observedAt">[],
+  weights: Map<string, number>, windowMs: number,
+): WindowWeight {
+  // Primero, una vez por persona y por dispositivo en todo el evento (como antes); después, ventanas sobre eso.
+  const seenUsers = new Set<string>();
+  const seenDevices = new Set<string>();
+  const unique = [...evidence].sort((a, b) => a.observedAt.getTime() - b.observedAt.getTime()).filter((e) => {
+    if (!e.contributorUserId || seenUsers.has(e.contributorUserId)) return false;
+    if (e.contributorDeviceId && seenDevices.has(e.contributorDeviceId)) return false;
+    seenUsers.add(e.contributorUserId);
+    if (e.contributorDeviceId) seenDevices.add(e.contributorDeviceId);
+    return true;
+  });
+  let best: WindowWeight = { weight: 0, from: null, to: null };
+  for (let i = 0; i < unique.length; i++) {
+    const start = unique[i]!.observedAt.getTime();
+    const counted: { userId: string; textHash: string | null }[] = [];
+    let last = start;
+    for (let j = i; j < unique.length && unique[j]!.observedAt.getTime() - start <= windowMs; j++) {
+      counted.push({ userId: unique[j]!.contributorUserId!, textHash: unique[j]!.textHash });
+      last = unique[j]!.observedAt.getTime();
+    }
+    const weight = sameTextCountsOnce(counted, weights);
+    if (weight > best.weight) best = { weight, from: new Date(start).toISOString(), to: new Date(last).toISOString() };
+  }
+  return best;
 }
