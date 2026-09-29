@@ -1,4 +1,4 @@
-import type { EventSummary, MediaView, TimelineEntryView } from "@dizaster/contracts";
+import type { EventSummary, MediaView, TimelineEntryView, VerificationView } from "@dizaster/contracts";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
@@ -6,6 +6,7 @@ import { EventMedia } from "../../components/event-media";
 import { api } from "../../lib/api";
 import { lang, t, VERIFICATION_LABEL, verificationLabel } from "../../lib/i18n";
 import { eventTitle } from "../../lib/ui/format";
+import { evidenceLine, explainLines, timelineLabel } from "../../lib/verification/explain";
 import { followablePlace } from "../../lib/social/place";
 import { useFollows } from "../../lib/social/follows";
 import { openFlag } from "../../lib/moderation/menu";
@@ -17,6 +18,7 @@ export default function EventScreen() {
   const [event, setEvent] = useState<EventSummary | null>(null);
   const [timeline, setTimeline] = useState<TimelineEntryView[]>([]);
   const [media, setMedia] = useState<MediaView[]>([]);
+  const [verification, setVerification] = useState<VerificationView | null>(null);
   const [error, setError] = useState<string | null>(null);
   const follows = useFollows();
 
@@ -27,6 +29,7 @@ export default function EventScreen() {
       .catch((e: Error) => setError(e.message));
     // La media es secundaria: si falla, el evento se muestra igual.
     api.eventMedia(id).then((r) => setMedia(r.media)).catch(() => setMedia([]));
+    api.verification(id).then(setVerification).catch(() => setVerification(null));
   }, [id]);
 
   if (error) return <Text style={[styles.container, styles.entry]}>{error}</Text>;
@@ -43,19 +46,28 @@ export default function EventScreen() {
           <FollowChip label={`${t("followPlace")} ${place.name}`} on={follows.following("place", place.id)} onPress={() => void follows.toggle("place", place.id, place.name)} />
         ) : null}
         <FollowChip label={t("postAboutThis")} on={false} onPress={() => router.push({ pathname: "/compose", params: { eventId: event.id } })} />
+        <FollowChip label={t("nothingHere")} on={false}
+          onPress={() => router.push({ pathname: "/report", params: { eventId: event.id, category: event.categoryCode, deny: "1" } })} />
         <FollowChip label={t("flag")} on={false} onPress={() => openFlag("EVENT", event.id)} />
       </View>
       <Text style={[styles.badge, { backgroundColor: color }]}>{verificationLabel(event.publicVerificationState)}</Text>
       <Text style={styles.meta}>
         {event.reportCount} {t("reports")} · {event.sourceCount} {t("sources")} · {new Date(event.firstSeenAt).toLocaleString()}
       </Text>
+      {verification ? (
+        <View style={styles.why}>
+          <Text style={styles.section}>{t("whyThisState")}</Text>
+          {explainLines(verification, t).map((line) => <Text key={line} style={styles.whyLine}>• {line}</Text>)}
+          <Text style={styles.meta}>{evidenceLine(verification, t)}</Text>
+        </View>
+      ) : null}
       <EventMedia media={media} />
       <Text style={styles.section}>{t("timeline")}</Text>
       <FlatList
         data={timeline}
         keyExtractor={(e) => e.id}
         renderItem={({ item }) => (
-          <Text style={styles.entry}>{new Date(item.at).toLocaleTimeString()} · {item.type}</Text>
+          <Text style={styles.entry}>{new Date(item.at).toLocaleTimeString()} · {timelineLabel(item.type, t)}</Text>
         )}
       />
     </View>
@@ -82,4 +94,6 @@ const styles = StyleSheet.create({
   meta: { color: colors.textMuted, marginBottom: 16 },
   section: { fontSize: 16, fontWeight: "600", marginBottom: 8, color: colors.text },
   entry: { paddingVertical: 6, color: colors.text },
+  why: { marginBottom: space.sm },
+  whyLine: { color: colors.text, marginBottom: 4 },
 });

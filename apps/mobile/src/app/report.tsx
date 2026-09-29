@@ -2,7 +2,7 @@ import { Camera, GeoJSONSource, Layer, Map } from "@maplibre/maplibre-react-nati
 import type { CategoryCatalog, CategoryConfig, GeoPoint, NearbyEvent, SubmitReportRequest, SubmitReportResponse } from "@dizaster/contracts";
 import { clampToRadius } from "@dizaster/geo-kit";
 import * as Location from "expo-location";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { FlatList, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
 import { MediaAttachments } from "../components/media-attachments";
@@ -24,6 +24,9 @@ type Phase = "category" | "locating" | "compose";
 
 export default function ReportScreen() {
   const session = useSession();
+  // "Aquí no pasa nada" desde un evento: contra-reporte presencial sobre ese evento (Blueprint §10.2).
+  const params = useLocalSearchParams<{ eventId?: string; category?: string; deny?: string }>();
+  const deny = params.deny === "1" && !!params.eventId;
   const categories = useMemo(
     () => catalog.categories.filter((c) => c.citizenReportable && !catalog.categories.some((x) => x.parent === c.code)),
     [],
@@ -41,6 +44,15 @@ export default function ReportScreen() {
   const [status, setStatus] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const recent = useRef<Location.LocationObject[]>([]);
+
+  useEffect(() => {
+    if (!deny) return;
+    const c = catalog.categories.find((x) => x.code === params.category && x.citizenReportable);
+    if (!c) return;
+    setTarget(params.eventId ?? null);
+    void choose(c);
+    // Solo al abrir la pantalla desde el evento.
+  }, []);
 
   useEffect(() => {
     api.config().then((c) => setStyleUrl(providerFromAppConfig(c)?.styleUrl("light") ?? null)).catch(() => setStyleUrl(null));
@@ -80,7 +92,7 @@ export default function ReportScreen() {
       const body: SubmitReportRequest = {
         clientReportId: newId(),
         categoryCode: category.code,
-        assertion: "OCCURRING",
+        assertion: deny ? "NOT_OCCURRING" : "OCCURRING",
         ...(text.trim() ? { text: text.trim() } : {}),
         mediaIds: [],
         pin,
@@ -143,7 +155,13 @@ export default function ReportScreen() {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <Text style={styles.title}>{category.names[lang] ?? category.names["es"]}</Text>
-      {category.defaultSeverity >= 4 ? (
+      {deny ? (
+        <View style={styles.nearby}>
+          <Text style={styles.section}>{t("denyTitle")}</Text>
+          <Text style={styles.note}>{t("denyHint")}</Text>
+        </View>
+      ) : null}
+      {!deny && category.defaultSeverity >= 4 ? (
         <Pressable accessibilityRole="button" style={styles.callFirst} onPress={() => router.push("/emergency")}>
           <Text style={styles.callFirstText}>{t("callFirst")}</Text>
         </Pressable>
@@ -167,7 +185,7 @@ export default function ReportScreen() {
         </Map>
       </View>
 
-      {nearby.length > 0 ? (
+      {!deny && nearby.length > 0 ? (
         <View style={styles.nearby}>
           <Text style={styles.section}>{t("sameEvent")}</Text>
           {nearby.map((e) => (

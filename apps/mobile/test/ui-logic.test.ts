@@ -1,8 +1,10 @@
+import type { VerificationView } from "@dizaster/contracts";
 import type { CategoryCatalog, MediaView } from "@dizaster/contracts";
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { categoryStyle, homeChips, MORE_CODE } from "../src/lib/ui/categories";
 import { areaRow, bboxParam, distanceLabel, blurPreviewUri, duration, eventTitle, imageUri, initials, mediaLayout, parseBboxParam, postWhere, timeAgo } from "../src/lib/ui/format";
+import { evidenceLine, explainLines, timelineLabel } from "../src/lib/verification/explain";
 
 const catalog = JSON.parse(readFileSync(new URL("../../../data/categories/categories.json", import.meta.url), "utf8")) as CategoryCatalog;
 
@@ -101,5 +103,35 @@ describe("aviso de contenido sensible", () => {
     expect(blurPreviewUri({ kind: "IMAGE", url: "d.jpg", thumbUrl: "t.jpg" })).toBe("t.jpg");
     expect(blurPreviewUri({ kind: "IMAGE", url: "d.jpg", thumbUrl: null })).toBe("d.jpg");
     expect(blurPreviewUri({ kind: "VIDEO_RECORDED", url: "v.mp4", thumbUrl: null })).toBeNull();
+  });
+});
+
+describe("explicación de la verificación", () => {
+  const tr = (k: string) => ({
+    why_CITIZEN_CORROBORATION: "Confirmaciones: {independentWeight} de {threshold}.",
+    why_EXTERNAL_SOURCES: "Externas: {count}.",
+    why_CITIZEN_DENIALS: "Hay quien lo niega.",
+    evidenceCounts: "{citizen} · {external} · {official}",
+    tl_MERGED: "Unido",
+  })[k] ?? k;
+
+  it("una línea por regla, pesos con un decimal y sin la corroboración vacía", () => {
+    const view: Pick<VerificationView, "explanation" | "evidenceSummary"> = {
+      explanation: [
+        { code: "CITIZEN_CORROBORATION", params: { independentWeight: 2.4999, threshold: 3 } },
+        { code: "CITIZEN_DENIALS", params: { independentWeight: 1 } },
+        { code: "EXTERNAL_SOURCES", params: { count: 2 } },
+        { code: "REGLA_FUTURA", params: {} },
+      ],
+      evidenceSummary: { citizen: 3, external: 2, official: 0 },
+    };
+    expect(explainLines(view, tr as never)).toEqual(["Confirmaciones: 2.5 de 3.", "Hay quien lo niega.", "Externas: 2."]);
+    expect(explainLines({ explanation: [{ code: "CITIZEN_CORROBORATION", params: { independentWeight: 0, threshold: 3 } }] }, tr as never)).toEqual([]);
+    expect(evidenceLine(view, tr as never)).toBe("3 · 2 · 0");
+  });
+
+  it("la cronología usa etiquetas y deja pasar tipos nuevos", () => {
+    expect(timelineLabel("MERGED", tr as never)).toBe("Unido");
+    expect(timelineLabel("LIVE_STARTED", tr as never)).toBe("LIVE_STARTED");
   });
 });

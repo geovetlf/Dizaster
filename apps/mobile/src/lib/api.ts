@@ -1,4 +1,4 @@
-import type { ModeratorEventDetail, SavedZone, SavedZoneInput, AppealView, CaseDetail, CaseSummary, CreateFlagRequest, ModerationActionType, ModerationNotice, CostDashboard, KillSwitchView, QualityReport, CreatePostRequest, TagView, BusinessView, SessionView, CreateBusinessRequest, UpdateBusinessRequest, AlertPreferences, CategorySubscription, CategorySubscriptionInput, NotificationsResponse, AppConfig, AreaSearchResult, FollowTarget, MyFollows, ProfileSearchResult, ProfileView, CommentView, CreateUploadRequest, FeedResponse, FeedTab, CreateUploadResponse, DevicePlatform, MediaView, RegisterPushTokenRequest, EventMapResponse, EventSummary, NearbyEventsResponse, SubmitReportRequest, SubmitReportResponse, TimelineEntryView } from "@dizaster/contracts";
+import type { VerificationView, ModeratorEventDetail, SavedZone, SavedZoneInput, AppealView, CaseDetail, CaseSummary, CreateFlagRequest, ModerationActionType, ModerationNotice, CostDashboard, KillSwitchView, QualityReport, CreatePostRequest, TagView, BusinessView, SessionView, CreateBusinessRequest, UpdateBusinessRequest, AlertPreferences, CategorySubscription, CategorySubscriptionInput, NotificationsResponse, AppConfig, AreaSearchResult, FollowTarget, MyFollows, ProfileSearchResult, ProfileView, CommentView, CreateUploadRequest, FeedResponse, FeedTab, CreateUploadResponse, DevicePlatform, MediaView, RegisterPushTokenRequest, EventMapResponse, EventSummary, NearbyEventsResponse, SubmitReportRequest, SubmitReportResponse, TimelineEntryView } from "@dizaster/contracts";
 import { canRetryWithRefresh, singleFlight } from "./auth/refresh";
 import { API_URL } from "./config";
 import type { Sender } from "./report/queue";
@@ -62,6 +62,7 @@ export const api = {
   events: (bbox: [number, number, number, number], zoom: number) =>
     request<EventMapResponse>(`/v1/events?bbox=${bbox.map((n) => n.toFixed(5)).join(",")}&zoom=${Math.round(zoom)}`),
   event: (id: string) => request<EventSummary>(`/v1/events/${id}`),
+  verification: (id: string) => request<VerificationView>(`/v1/events/${id}/verification`),
   timeline: (id: string) => request<{ entries: TimelineEntryView[] }>(`/v1/events/${id}/timeline`),
   nearby: (lat: number, lng: number, category: string) =>
     request<NearbyEventsResponse>(`/v1/events/nearby?lat=${lat.toFixed(6)}&lng=${lng.toFixed(6)}&category=${encodeURIComponent(category)}`),
