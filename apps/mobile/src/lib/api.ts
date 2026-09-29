@@ -240,6 +240,8 @@ export const api = {
   createPost: (body: Partial<CreatePostRequest> & { text: string }) =>
     request<{ postId: string; eventId: string | null; tags: string[]; mentions: string[] }>("/v1/posts", { method: "POST", body: JSON.stringify(body) }),
   deletePost: (postId: string) => request<void>(`/v1/posts/${postId}`, { method: "DELETE" }),
+  editPost: (postId: string, text: string) =>
+    request<{ postId: string; editedAt: string }>(`/v1/posts/${postId}`, { method: "PATCH", body: JSON.stringify({ text }) }),
   tag: (tag: string) => request<TagView>(`/v1/tags/${encodeURIComponent(tag)}`),
   eventPosts: (eventId: string, cursor: string | null) =>
     request<FeedResponse>(`/v1/events/${eventId}/posts${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`),

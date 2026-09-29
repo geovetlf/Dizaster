@@ -1,4 +1,5 @@
 import {
+  POST_EDIT_WINDOW_HOURS,
   FeedQuery,
   FollowTarget,
   PostSearchQuery,
@@ -288,6 +289,9 @@ export class FeedService {
         mentions: r.mentions,
         businessMentions: r.businessMentions,
         mine: r.mine,
+        editedAt: r.editedAt ? r.editedAt.toISOString() : null,
+        // Solo quien lo escribió ve hasta cuándo puede editarlo (ADR 0136).
+        editableUntil: editableUntil(r),
       };
     });
   }
@@ -323,4 +327,10 @@ function parse<T extends z.ZodType>(schema: T, value: unknown): z.infer<T> {
   const r = schema.safeParse(value);
   if (!r.success) throw new DomainError("VALIDATION", r.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; "));
   return r.data;
+}
+
+function editableUntil(r: FeedRow): string | null {
+  if (!r.mine || (r.kind !== "STANDARD" && r.kind !== "SHARE")) return null;
+  const until = r.createdAt.getTime() + POST_EDIT_WINDOW_HOURS * 3_600_000;
+  return until > Date.now() ? new Date(until).toISOString() : null;
 }

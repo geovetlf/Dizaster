@@ -10,6 +10,7 @@ import { openContentMenu, openOwnPostMenu } from "../lib/moderation/menu";
 import { verificationIcon } from "../lib/social/business";
 import { useMe } from "../lib/social/me";
 import { applyReaction, CONTEXT_REACTIONS } from "../lib/social/reactions";
+import { canEditPost } from "../lib/social/edit";
 import { lang, t } from "../lib/i18n";
 import { foreignLanguageName } from "../lib/language";
 import { categoryStyle } from "../lib/ui/categories";
@@ -92,7 +93,7 @@ export function PostCard({ post, categoryName }: { post: FeedPost; categoryName:
               <Text style={styles.name} numberOfLines={1}>{name}</Text>
               {badge ? <Icon name={badge} size={16} color={colors.link} /> : null}
             </View>
-            <Text style={styles.meta} numberOfLines={1}>{where}</Text>
+            <Text style={styles.meta} numberOfLines={1}>{post.editedAt ? `${where} · ${t("edited")}` : where}</Text>
           </View>
         </Pressable>
         {post.categoryCode ? (
@@ -148,7 +149,10 @@ export function PostCard({ post, categoryName }: { post: FeedPost; categoryName:
           hitSlop={8}
           onPress={() =>
             post.mine
-              ? openOwnPostMenu({ id: post.id, isReport: post.kind === "REPORT" }, () => setHidden(true))
+              ? openOwnPostMenu({
+                id: post.id, isReport: post.kind === "REPORT",
+                onEdit: canEditPost(post) ? () => router.push({ pathname: "/post-edit", params: { id: post.id, text: post.text ?? "" } }) : null,
+              }, () => setHidden(true))
               : openContentMenu({ type: "POST", id: post.id, blockHandle: canBlock(post.author, me.handle) && !post.author.pseudonymous ? post.author.handle : null }, () => setHidden(true))}
         >
           <Icon name="dots-horizontal" size={24} color={colors.text} />

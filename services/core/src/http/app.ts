@@ -46,7 +46,7 @@ const WRITE_ALLOWED_WHEN_SUSPENDED = /^(POST \/v1\/me\/moderation\/[^/]+\/appeal
  * Contenido público e interacción: exigen haber declarado la edad mínima (D-13, ADR 0049). Ajustes, dispositivos,
  * alertas, bloqueos y denuncias no: son de seguridad o privados.
  */
-const AGE_REQUIRED = /^(POST \/v1\/(posts|reports|businesses|media\/uploads)|POST \/v1\/posts\/[^/]+\/(comments|share)|PUT \/v1\/(posts|comments)\/[^/]+\/(like|reactions\/[^/]+)|PUT \/v1\/businesses\/[^/]+|PATCH \/v1\/me)$/;
+const AGE_REQUIRED = /^(POST \/v1\/(posts|reports|businesses|media\/uploads)|POST \/v1\/posts\/[^/]+\/(comments|share)|PUT \/v1\/(posts|comments)\/[^/]+\/(like|reactions\/[^/]+)|PUT \/v1\/businesses\/[^/]+|PATCH \/v1\/me|PATCH \/v1\/posts\/[^/]+)$/;
 
 /** Versión del contrato publicada en OpenAPI; subirla al cambiar la forma de una respuesta. */
 /** Cabeceras de seguridad de la API (ADR 0114). NO AI REQUIRED. */
@@ -598,6 +598,11 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
     const session = requireSession(req);
     await c.reports.withdraw(session, parse(IdParam, req.params).id);
     return reply.status(204).send();
+  });
+
+  app.patch("/v1/posts/:id", async (req) => {
+    const session = requireSession(req);
+    return c.composer.edit(session.profileId, parse(IdParam, req.params).id, req.body);
   });
 
   app.delete("/v1/posts/:id", async (req, reply) => {

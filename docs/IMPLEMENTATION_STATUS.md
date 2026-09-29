@@ -326,6 +326,7 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | Re-procesar el crudo guardado de las fuentes (§7.3) | `pnpm reprocess-source <clave> [desde] [hasta]`: última versión de cada ítem con la configuración actual, idempotente, corrida `REPROCESS`; GDACS y Copernicus ya no inventan fechas | [0133](adr/0133-reprocesar-el-crudo-de-las-fuentes.md) |
 | Tomar casos de moderación (§7.3) | Reserva de 15 min renovable; fuera de la cola ajena, 409 para actuar; vence sola y se suelta al cerrar; la app toma el caso al abrirlo | [0134](adr/0134-tomar-casos-de-moderacion.md) |
 | Informe de transparencia agregado (§13.3) | `GET /v1/admin/transparency` y `pnpm transparency-report`: denuncias, casos, acciones, reversiones y apelaciones; solo conteos, 1–4 como "<5" | [0135](adr/0135-informe-de-transparencia-agregado.md) |
+| Edición de posts (§7.1) | `PATCH /v1/posts/:id` 24 h, solo STANDARD/SHARE; rehace idioma, etiquetas, menciones y revisión de datos personales; historial solo en el caso de moderación; "editado" en la app | [0136](adr/0136-edicion-de-posts.md) |
 | Licencias, auditoría, SBOM, Dependabot; respaldo con prueba de restauración en CI | ✅ | ADR 0070, `scripts/supply-chain.mjs`, `scripts/db-restore-check.mjs` |
 | Idioma de la app elegible en el perfil (es/en/pt/fr o del teléfono) | ✅ | ADR 0069, `app/language.tsx` |
 | Varias cuentas en un teléfono corroboran como una (clave seudónima del teléfono) | ✅ | ADR 0068, migración 0036 |
@@ -365,17 +366,12 @@ Revisión del Blueprint del 2026-09-29 (tras ADR 0112): completada con ADR 0113�
 
 Revisión del Blueprint del 2026-09-29 (tras ADR 0129), verificada contra el código, sin bloqueos:
 
+1. Control de quién puede mencionarte; sin perfil privado en V1 (§7.3; decisión del propietario).
+2. Degradación automática por costo fuera de IA: video, fotos nuevas, fuentes no urgentes; nunca reportes ni alertas (§6.2, §12.2; decisión del propietario).
+3. Registro auditado de requerimientos de autoridades, sin procedimiento de entrega hasta asesoría legal (§5.20, §13.3; decisión del propietario).
 
 Bloqueadas o en espera:
 
-- **EN ESPERA (decisión de producto)** — Degradación automática por costo fuera de IA (§6.2, §12.2): qué funciones
-  se apagan y en qué orden; los precios dependen del proveedor de hosting (D-18).
-- **EN ESPERA (decisión de producto)** — Edición de posts (§7.1): si se editan los posts de un REPORT, por cuánto
-  tiempo y si el historial es público.
-- **EN ESPERA (decisión legal)** — Registro de requerimientos de autoridades (§5.20, §13.3): quién aprueba y qué
-  datos se entregan.
-- **EN ESPERA (decisión de producto)** — Privacidad del perfil (§7.3): qué significa "privado" junto a los reportes
-  seudónimos.
 - **BLOQUEADA** — Identity real: Sign in with Apple, Google y email; App Attest / Play Integrity. Falta: cuentas de
   Apple Developer y Google (client IDs, Service ID, Team ID) y un proveedor de email aprobado (gasto).
 - **BLOQUEADA** — Detección automática de rostros que proponga recuadros (ADR 0042): la opción barata es en el

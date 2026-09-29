@@ -30,6 +30,8 @@ export const SERVER_ERROR_KEYS: Readonly<Record<string, MessageKey>> = {
   ALREADY_DECIDED: "errConflict",
   CASE_CLAIMED: "errCaseClaimed",
   CASE_CLOSED: "errConflict",
+  POST_NOT_EDITABLE: "errPostNotEditable",
+  EDIT_WINDOW_CLOSED: "errPostNotEditable",
   INTERNAL: "errInternal",
 };
 

@@ -33,10 +33,12 @@ export function openContentMenu(target: { type: FlagTargetType; id: string; bloc
  * Menú de un post propio: borrarlo, o si es un reporte, retirarlo (su evidencia deja de contar para el evento,
  * ADR 0037). Siempre con confirmación.
  */
-export function openOwnPostMenu(post: { id: string; isReport: boolean }, onDeleted: () => void): void {
+export function openOwnPostMenu(post: { id: string; isReport: boolean; onEdit?: (() => void) | null }, onDeleted: () => void): void {
   const label = post.isReport ? t("withdrawReport") : t("deletePost");
   const confirm = post.isReport ? t("withdrawReportConfirm") : t("deletePostConfirm");
   Alert.alert(t("options"), undefined, [
+    // Editar solo dentro del plazo y nunca un reporte (ADR 0136).
+    ...(post.onEdit ? [{ text: t("editPost"), onPress: post.onEdit }] : []),
     {
       text: label, style: "destructive" as const,
       onPress: () => {

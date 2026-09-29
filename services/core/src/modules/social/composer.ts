@@ -1,4 +1,4 @@
-import { CreatePostRequest, SharePostRequest } from "@dizaster/contracts";
+import { CreatePostRequest, EditPostRequest, SharePostRequest } from "@dizaster/contracts";
 import { withTransaction, type Db } from "../../platform/db.js";
 import { DomainError, notFound } from "../../platform/errors.js";
 import { publish } from "../../platform/outbox.js";
@@ -109,6 +109,14 @@ export class PostComposer {
     const businessId = req.asBusiness ? await this.business.ownedId(this.db, session.userId, req.asBusiness, { toPublish: true }) : null;
     if (businessId && req.anonymityMode === "PSEUDONYMOUS") throw new DomainError("VALIDATION", "Un negocio no publica de forma seudónima");
     return businessId;
+  }
+
+  /** Editar el texto (ADR 0136). Las reglas viven en `SocialService.editPost`. */
+  async edit(profileId: string, postId: string, raw: unknown): Promise<{ postId: string; editedAt: string }> {
+    const parsed = EditPostRequest.safeParse(raw);
+    if (!parsed.success) throw new DomainError("VALIDATION", parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; "));
+    const r = await withTransaction(this.db, (tx) => this.social.editPost(tx, postId, profileId, parsed.data.text));
+    return { postId, editedAt: r.editedAt.toISOString() };
   }
 
   async delete(profileId: string, postId: string): Promise<void> {

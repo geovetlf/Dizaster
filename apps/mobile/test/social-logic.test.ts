@@ -115,3 +115,14 @@ describe("followSections (ADR 0097)", () => {
     expect(followSections(EMPTY_FOLLOWS, names)).toEqual([]);
   });
 });
+
+describe("editar posts (ADR 0136)", () => {
+  it("solo con plazo del servidor y sin vencer", async () => {
+    const { canEditPost } = await import("../src/lib/social/edit");
+    const now = new Date("2026-09-29T12:00:00Z");
+    expect(canEditPost({ editableUntil: "2026-09-30T11:00:00Z" }, now)).toBe(true);
+    expect(canEditPost({ editableUntil: "2026-09-29T11:00:00Z" }, now)).toBe(false);
+    expect(canEditPost({ editableUntil: null }, now)).toBe(false);
+    expect(canEditPost({}, now)).toBe(false);
+  });
+});

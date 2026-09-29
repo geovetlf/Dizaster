@@ -239,7 +239,11 @@ export class ModerationService {
     const actions = await this.db.query<ActionRow>(
       `SELECT id, action, reason, actor, target_type, target_id, created_at FROM moderation.actions WHERE case_id = $1 ORDER BY created_at`, [caseId],
     );
-    return { ...base, notes: notes.rows.map((n) => ({ reason: n.reason, note: n.note, createdAt: n.created_at.toISOString() })), actions: actions.rows.map(actionView) };
+    const edits = base.target.type === "POST" ? await this.social.postEdits(this.db, base.target.id) : [];
+    return {
+      ...base, notes: notes.rows.map((n) => ({ reason: n.reason, note: n.note, createdAt: n.created_at.toISOString() })), actions: actions.rows.map(actionView),
+      ...(edits.length ? { edits } : {}),
+    };
   }
 
   /** Acción de una persona moderadora sobre el objeto del caso. Motivo obligatorio: la persona afectada lo verá. */

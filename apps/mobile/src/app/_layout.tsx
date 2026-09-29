@@ -34,6 +34,7 @@ export default function RootLayout() {
         <Stack.Screen name="admin-cost" options={{ title: t("costTitle") }} />
         <Stack.Screen name="admin-quality" options={{ title: t("qualityTitle") }} />
         <Stack.Screen name="compose" options={{ title: t("newPost"), presentation: "modal" }} />
+        <Stack.Screen name="post-edit" options={{ title: t("editPost"), presentation: "modal" }} />
         <Stack.Screen name="tag/[tag]" options={{ title: "" }} />
         <Stack.Screen name="b/[handle]" options={{ title: "" }} />
         <Stack.Screen name="sessions" options={{ title: t("sessionsTitle") }} />

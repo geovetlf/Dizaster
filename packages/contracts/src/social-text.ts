@@ -88,6 +88,14 @@ export const CreatePostRequest = z.object({
 });
 export type CreatePostRequest = z.infer<typeof CreatePostRequest>;
 
+/**
+ * Editar un post (ADR 0136): solo el texto, durante `POST_EDIT_WINDOW_HOURS` desde que se publicó. Los posts de un
+ * reporte no se editan (su texto es evidencia); el historial queda para moderación.
+ */
+export const POST_EDIT_WINDOW_HOURS = 24;
+export const EditPostRequest = z.object({ text: z.string().trim().min(1).max(POST_TEXT_MAX) });
+export type EditPostRequest = z.infer<typeof EditPostRequest>;
+
 /** Compartir dentro de la app (ADR 0046): comentario opcional; sin media ni evento propios. */
 export const SharePostRequest = z.object({
   text: z.string().trim().max(POST_TEXT_MAX).optional(),

@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { ChronoPageQuery, detectLanguage, detectPersonalData, extractMentions, extractTags, textFingerprintBase, type CommentView, type FeedTab, type GeoPoint, type PostAuthor, type ProfileSearchResult, type ReactionCounts, type ReactionKind, type ReactionState, type CommentReactionKind, type Units, type UpdateProfileRequest, type ProfileView, type TagView } from "@dizaster/contracts";
+import { ChronoPageQuery, POST_EDIT_WINDOW_HOURS, detectLanguage, detectPersonalData, extractMentions, extractTags, textFingerprintBase, type CommentView, type FeedTab, type GeoPoint, type PostAuthor, type ProfileSearchResult, type ReactionCounts, type ReactionKind, type ReactionState, type CommentReactionKind, type Units, type UpdateProfileRequest, type ProfileView, type TagView } from "@dizaster/contracts";
 import type { Queryable } from "../../platform/db.js";
 import { publish, type OutboxDispatcher } from "../../platform/outbox.js";
 import { DomainError, notFound } from "../../platform/errors.js";
@@ -52,6 +52,7 @@ export interface FeedRow {
   mentions: string[];
   businessMentions: string[];
   mine: boolean;
+  editedAt: Date | null;
 }
 
 export interface FeedFilter {
@@ -398,13 +399,13 @@ export class SocialService {
       id: string; kind: FeedRow["kind"]; author_visibility: string; handle: string; display_name: string; text: string | null; lang: string | null;
       created_at: Date; category_code: string | null; event_id: string | null; distance_m: number | null; score: number;
       media: { id: string; kind: "IMAGE" | "VIDEO_RECORDED" }[] | null; reactions: ReactionCounts | null; my_reactions: ReactionKind[]; comment_count: number; shared_post_id: string | null; share_count: number;
-      mentions: string[]; business_mentions: string[]; mine: boolean | null; business_verification: "UNVERIFIED" | "VERIFIED" | "INSTITUTIONAL_OFFICIAL" | null;
+      mentions: string[]; business_mentions: string[]; mine: boolean | null; edited_at: Date | null; business_verification: "UNVERIFIED" | "VERIFIED" | "INSTITUTIONAL_OFFICIAL" | null;
       avatar_url: string | null;
     }>(
       `WITH x AS (
          SELECT p.id, p.author_id, p.author_type, p.kind, p.author_visibility, coalesce(pr.handle, bp.handle) AS handle,
                 coalesce(pr.display_name, bp.name) AS display_name, bp.verification_status AS business_verification,
-                coalesce(pr.avatar_url, bp.logo_url) AS avatar_url, p.text, p.lang, p.created_at, p.category_code, le.event_id,
+                coalesce(pr.avatar_url, bp.logo_url) AS avatar_url, p.text, p.lang, p.created_at, p.edited_at, p.category_code, le.event_id,
                 p.shared_post_id, p.comment_count, p.share_count, p.reaction_counts,
                 ${nearSql ? `ST_Distance(p.public_point, ${nearSql})` : "NULL"}::float8 AS distance_m,
                 (${score})::float8 AS score
@@ -458,6 +459,7 @@ export class SocialService {
       mentions: [...r.mentions, ...r.business_mentions].sort(),
       businessMentions: r.business_mentions,
       mine: r.mine === true,
+      editedAt: r.edited_at,
     }));
   }
 
@@ -559,6 +561,61 @@ export class SocialService {
    * La persona borra su post. Solo los posts sin reporte: un REPORT es evidencia de un EVENT y se retira por
    * moderación o al borrar la cuenta. Devuelve la media adjunta para que el Media Engine la elimine.
    */
+  /**
+   * Editar el texto de un post propio (ADR 0136). Solo STANDARD y SHARE (un REPORT es evidencia; un OFFICIAL_UPDATE
+   * es la voz de una institución), dentro de `POST_EDIT_WINDOW_HOURS`, y no si moderación lo ocultó o retiró. Guarda
+   * el texto anterior para moderación y rehace lo que depende del texto: idioma, huella, etiquetas, menciones (solo
+   * las nuevas avisan) y la revisión de datos personales.
+   */
+  async editPost(tx: Queryable, postId: string, profileId: string, text: string): Promise<{ editedAt: Date; changed: boolean }> {
+    const { rows } = await tx.query<{ kind: string; author_type: string; text: string | null; created_at: Date; moderation_state: string; edited_at: Date | null; mine: boolean }>(
+      `SELECT p.kind, p.author_type, p.text, p.created_at, p.moderation_state, p.edited_at,
+              CASE WHEN p.author_type = 'PROFILE' THEN p.author_id = $2
+                   ELSE EXISTS (SELECT 1 FROM social.business_profiles ob JOIN social.profiles op ON op.user_id = ob.owner_user_id
+                                 WHERE ob.id = p.author_id AND op.id = $2) END AS mine
+         FROM social.posts p WHERE p.id = $1 AND p.deleted_at IS NULL FOR UPDATE`,
+      [postId, profileId],
+    );
+    const p = rows[0];
+    if (!p || !p.mine) throw notFound("Post");
+    if (p.kind !== "STANDARD" && p.kind !== "SHARE") throw new DomainError("POST_NOT_EDITABLE", "Un reporte no se edita: su texto es parte de la evidencia", 409);
+    if (Date.now() - p.created_at.getTime() > POST_EDIT_WINDOW_HOURS * 3_600_000) {
+      throw new DomainError("EDIT_WINDOW_CLOSED", `Solo se puede editar durante ${POST_EDIT_WINDOW_HOURS} h`, 409);
+    }
+    if (p.moderation_state === "HIDDEN" || p.moderation_state === "REMOVED") throw new DomainError("POST_NOT_EDITABLE", "Este post está en revisión de moderación", 409);
+    if (p.text === text) return { editedAt: p.edited_at ?? p.created_at, changed: false };
+
+    await tx.query(`INSERT INTO social.post_edits (id, post_id, previous_text, editor_profile_id) VALUES ($1, $2, $3, $4)`, [newId(), postId, p.text, profileId]);
+    const base = textFingerprintBase(text);
+    const textHash = base ? createHash("sha256").update(base).digest("hex") : null;
+    const { rows: upd } = await tx.query<{ edited_at: Date }>(
+      `UPDATE social.posts SET text = $2, lang = $3, text_hash = $4, edited_at = now(), updated_at = now() WHERE id = $1 RETURNING edited_at`,
+      [postId, text, detectLanguage(text), textHash],
+    );
+    await tx.query(`DELETE FROM social.post_tags WHERE post_id = $1`, [postId]);
+    // Menciones: se quitan las que ya no están; las que siguen no vuelven a avisar.
+    const handles = extractMentions(text);
+    await tx.query(
+      `DELETE FROM social.post_mentions pm USING social.profiles pr WHERE pm.post_id = $1 AND pr.id = pm.profile_id AND NOT (lower(pr.handle) = ANY($2))`,
+      [postId, handles],
+    );
+    await tx.query(
+      `DELETE FROM social.post_business_mentions pm USING social.business_profiles b WHERE pm.post_id = $1 AND b.id = pm.business_id AND NOT (lower(b.handle) = ANY($2))`,
+      [postId, handles],
+    );
+    await this.indexPostText(tx, postId, profileId, text);
+    if (textHash) await this.detectDuplicateText(tx, textHash);
+    await this.detectPersonalData(tx, "POST", postId, text, p.author_type === "BUSINESS" ? ["ID_DOCUMENT", "PAYMENT_CARD"] : null);
+    return { editedAt: upd[0]!.edited_at, changed: true };
+  }
+
+  /** Historial de ediciones de un post, solo para moderación (ADR 0136). */
+  async postEdits(q: Queryable, postId: string): Promise<{ previousText: string | null; editedAt: string }[]> {
+    const { rows } = await q.query<{ previous_text: string | null; edited_at: Date }>(
+      `SELECT previous_text, edited_at FROM social.post_edits WHERE post_id = $1 ORDER BY edited_at`, [postId]);
+    return rows.map((r) => ({ previousText: r.previous_text, editedAt: r.edited_at.toISOString() }));
+  }
+
   async deletePost(q: Queryable, postId: string, profileId: string, opts: { withdrawReport?: boolean } = {}): Promise<{ mediaIds: string[] }> {
     const { rows } = await q.query<{ kind: string; deleted: boolean; mine: boolean }>(
       `SELECT p.kind, p.deleted_at IS NOT NULL AS deleted,

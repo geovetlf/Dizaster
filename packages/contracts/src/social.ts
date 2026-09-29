@@ -61,6 +61,10 @@ export interface FeedPost {
   share: { post: FeedPost | null } | null;
   /** La persona que mira es quien lo escribió (puede borrarlo). Nunca revela la autoría de un post seudónimo a otros. */
   mine: boolean;
+  /** Última edición (ADR 0136); la app muestra "editado". El texto anterior solo lo ve moderación. */
+  editedAt?: string | null;
+  /** Solo para quien lo escribió: hasta cuándo puede editarlo; null si ya no puede. */
+  editableUntil?: string | null;
 }
 
 export interface FeedResponse {

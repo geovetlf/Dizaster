@@ -81,6 +81,8 @@ export interface ModerationActionView {
 
 export interface CaseDetail extends CaseSummary {
   notes: { reason: FlagReason; note: string; createdAt: string }[];
+  /** Solo POST: textos anteriores a cada edición (ADR 0136). Solo moderación los ve. */
+  edits?: { previousText: string | null; editedAt: string }[];
   actions: ModerationActionView[];
 }
 
