@@ -19,7 +19,7 @@ import { z } from "zod";
 import { withTransaction, type Db, type Queryable } from "../../platform/db.js";
 import { DomainError, notFound } from "../../platform/errors.js";
 import { newId } from "../../platform/ids.js";
-import { publish } from "../../platform/outbox.js";
+import { publish, type OutboxDispatcher } from "../../platform/outbox.js";
 import type { EventService } from "../event/index.js";
 import type { IdentityService } from "../identity/index.js";
 import type { SocialService } from "../social/index.js";
@@ -31,6 +31,8 @@ export const REASON_WEIGHT: Record<FlagReason, number> = { PRIVACY: 5, VIOLENCE:
 /** Personas distintas (con cuentas de más de 24 h) que deben denunciar un post para limitarlo sin esperar revisión. */
 export const AUTO_LIMIT_FLAGGERS = 5;
 export const FLAGS_PER_HOUR = 20;
+/** "Quien denuncia" cuando la señal viene de una regla del sistema (no de una persona). Nunca es un perfil real. */
+export const SYSTEM_REPORTER = "00000000-0000-0000-0000-000000000000";
 /** Plazo para apelar una acción. */
 export const APPEAL_WINDOW_DAYS = 30;
 
@@ -67,6 +69,33 @@ export class ModerationService {
     private readonly verification: VerificationService,
     private readonly trust: TrustService,
   ) {}
+
+  registerHandlers(dispatcher: OutboxDispatcher): void {
+    // Foto casi idéntica a otra anterior de otra persona: se abre (o suma a) un caso para cada post que la usa.
+    dispatcher.on("MediaReuseDetected", "moderation.media-reuse", async (e, tx) => {
+      for (const postId of await this.social.postsWithMedia(tx, e.payload.mediaId)) {
+        await this.systemFlag(tx, "POST", postId, "FALSE_INFO", "Regla: una foto es casi idéntica a otra publicada antes por otra cuenta (posible foto reciclada).");
+      }
+    });
+  }
+
+  /** Señal automática: entra en la cola como una denuncia más, pero nunca cuenta para el límite automático. */
+  private async systemFlag(tx: Queryable, targetType: FlagTargetType, targetId: string, reason: FlagReason, note: string): Promise<void> {
+    await tx.query(
+      `INSERT INTO moderation.cases (id, target_type, target_id) VALUES ($1, $2, $3)
+       ON CONFLICT (target_type, target_id) WHERE status = 'OPEN' DO NOTHING`,
+      [newId(), targetType, targetId],
+    );
+    const caseId = (await tx.query<{ id: string }>(
+      `SELECT id FROM moderation.cases WHERE target_type = $1 AND target_id = $2 AND status = 'OPEN' FOR UPDATE`, [targetType, targetId],
+    )).rows[0]!.id;
+    const inserted = await tx.query(
+      `INSERT INTO moderation.flags (id, case_id, target_type, target_id, reporter_profile_id, reporter_weight, reason, note)
+       VALUES ($1, $2, $3, $4, $5, 1, $6, $7) ON CONFLICT (target_type, target_id, reporter_profile_id) DO NOTHING`,
+      [newId(), caseId, targetType, targetId, SYSTEM_REPORTER, reason, note],
+    );
+    if (inserted.rowCount) await this.reprioritize(tx, caseId);
+  }
 
   // ───────────── Denuncias ─────────────
 
@@ -125,7 +154,7 @@ export class ModerationService {
 
   /** Regla determinista: muchas personas establecidas denunciando lo mismo → se limita (fuera del feed) hasta revisar. */
   private async autoLimit(tx: Queryable, caseId: string, postId: string): Promise<void> {
-    const n = (await tx.query<{ n: number }>(`SELECT count(*)::int AS n FROM moderation.flags WHERE case_id = $1 AND reporter_weight >= 1`, [caseId])).rows[0]!.n;
+    const n = (await tx.query<{ n: number }>(`SELECT count(*)::int AS n FROM moderation.flags WHERE case_id = $1 AND reporter_weight >= 1 AND reporter_profile_id <> '${SYSTEM_REPORTER}'`, [caseId])).rows[0]!.n;
     if (n < AUTO_LIMIT_FLAGGERS) return;
     const t = await this.social.moderationTarget(tx, "POST", postId);
     if (!t || t.state !== "VISIBLE") return;

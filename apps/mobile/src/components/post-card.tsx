@@ -9,7 +9,7 @@ import { openContentMenu } from "../lib/moderation/menu";
 import { useMe } from "../lib/social/me";
 import { lang, t } from "../lib/i18n";
 import { categoryStyle } from "../lib/ui/categories";
-import { duration, initials, mediaLayout, postWhere } from "../lib/ui/format";
+import { duration, imageUri, initials, mediaLayout, postWhere } from "../lib/ui/format";
 import { colors, radius, space } from "../theme";
 import { Icon } from "./icon";
 
@@ -117,7 +117,7 @@ function MediaGrid({ media, onOpen }: { media: MediaView[]; onOpen: (() => void)
     <Pressable accessibilityRole="button" disabled={!onOpen} onPress={onOpen} style={styles.grid}>
       <Tile m={main} style={styles.main} />
       <View style={styles.sideCol}>
-        {side.map((m) => <Tile key={m.id} m={m} style={styles.side} />)}
+        {side.map((m) => <Tile key={m.id} m={m} style={styles.side} small />)}
       </View>
       {extra > 0 ? (
         <View style={styles.extra}><Text style={styles.extraText}>+{extra}</Text></View>
@@ -127,8 +127,8 @@ function MediaGrid({ media, onOpen }: { media: MediaView[]; onOpen: (() => void)
 }
 
 /** Miniatura: foto o, para video, un marco con botón de reproducción y duración (sin cargar el video). */
-function Tile({ m, style }: { m: MediaView; style: object }) {
-  if (m.kind === "IMAGE") return <Image source={{ uri: m.url }} style={[styles.tile, style]} resizeMode="cover" accessibilityIgnoresInvertColors />;
+function Tile({ m, style, small = false }: { m: MediaView; style: object; small?: boolean }) {
+  if (m.kind === "IMAGE") return <Image source={{ uri: imageUri(m, small ? "small" : "large") }} style={[styles.tile, style]} resizeMode="cover" accessibilityIgnoresInvertColors />;
   return (
     <View style={[styles.tile, styles.videoTile, style]}>
       <View style={styles.play}><Icon name="play" size={30} color={colors.white} /></View>

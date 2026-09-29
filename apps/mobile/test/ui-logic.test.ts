@@ -2,7 +2,7 @@ import type { CategoryCatalog, MediaView } from "@dizaster/contracts";
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { categoryStyle, homeChips, MORE_CODE } from "../src/lib/ui/categories";
-import { areaRow, bboxParam, distanceLabel, duration, initials, mediaLayout, parseBboxParam, postWhere, timeAgo } from "../src/lib/ui/format";
+import { areaRow, bboxParam, distanceLabel, duration, imageUri, initials, mediaLayout, parseBboxParam, postWhere, timeAgo } from "../src/lib/ui/format";
 
 const catalog = JSON.parse(readFileSync(new URL("../../../data/categories/categories.json", import.meta.url), "utf8")) as CategoryCatalog;
 
@@ -55,6 +55,12 @@ describe("formato de publicaciones", () => {
     expect(mediaLayout([])).toEqual({ main: null, side: [], extra: 0 });
     expect(mediaLayout([m(1)])).toMatchObject({ side: [], extra: 0 });
     expect(mediaLayout([1, 2, 3, 4, 5].map(m))).toMatchObject({ main: { id: "1" }, side: [{ id: "2" }, { id: "3" }], extra: 2 });
+  });
+
+  it("miniatura para celdas pequeñas, versión de pantalla para lo grande", () => {
+    expect(imageUri({ url: "d.jpg", thumbUrl: "t.jpg" }, "small")).toBe("t.jpg");
+    expect(imageUri({ url: "d.jpg", thumbUrl: "t.jpg" }, "large")).toBe("d.jpg");
+    expect(imageUri({ url: "v.mp4", thumbUrl: null }, "small")).toBe("v.mp4");
   });
 });
 

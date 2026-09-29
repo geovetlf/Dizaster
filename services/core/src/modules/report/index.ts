@@ -123,6 +123,10 @@ export class ReportService {
         publicPoint: eventId ? generalize(req.pin, category.sensitivity).point : null,
       });
       await this.d.social.attachMedia(tx, postId, attachable);
+      // Si alguna foto ya se sabe reciclada, moderación la revisa (si se procesa después, avisa el Media Engine).
+      for (const mediaId of await this.d.media.reuseSuspected(tx, attachable.map((m) => m.id))) {
+        await publish(tx, "MediaReuseDetected", { mediaId });
+      }
       if (eventId) {
         await this.d.social.linkPostToEvent(tx, postId, eventId, "REPORT");
         if (req.mediaIds.length > 0) {

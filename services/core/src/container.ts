@@ -88,6 +88,7 @@ export function buildContainer(env: AppEnv, overrides: { db?: Db; clock?: Clock;
   // Presupuestos y kill switches persistidos: las funciones de pago empiezan a 0 y apagadas (migración 0009).
   const cost = new CostService(db, identity, media, clock, dataDir);
   const moderation = new ModerationService(db, social, identity, events, verification, trust);
+  moderation.registerHandlers(dispatcher);
   dispatcher.on("BudgetThresholdReached", "cost.log-threshold", async (e) => {
     console.warn(JSON.stringify({ msg: "cost.budget.threshold", ...e.payload }));
   });

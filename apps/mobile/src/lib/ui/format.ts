@@ -67,3 +67,9 @@ export function mediaLayout(media: MediaView[]): { main: MediaView | null; side:
   if (media.length === 0) return { main: null, side: [], extra: 0 };
   return { main: media[0]!, side: media.slice(1, 3), extra: Math.max(0, media.length - 3) };
 }
+
+/**
+ * Qué versión cargar: las celdas pequeñas del mosaico usan la miniatura (≤ 400 px), que pesa una fracción;
+ * lo que ocupa el ancho de la pantalla usa la versión de pantalla. Menos datos para quien mira y menos CDN.
+ */
+export const imageUri = (m: Pick<MediaView, "url" | "thumbUrl">, size: "small" | "large") => (size === "small" ? (m.thumbUrl ?? m.url) : m.url);

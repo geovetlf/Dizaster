@@ -12,6 +12,7 @@ import { withTransaction, type Db, type Queryable } from "../../platform/db.js";
 import { DomainError, notFound } from "../../platform/errors.js";
 import { newId } from "../../platform/ids.js";
 import { publish, type OutboxDispatcher } from "../../platform/outbox.js";
+import { NEAR_DUPLICATE_BITS, phashBands, renderImage } from "./images.js";
 import { familyOfMime, MalformedMediaError, sanitize, sniffFamily } from "./sanitize.js";
 import type { StorageProvider } from "./storage/types.js";
 
@@ -35,6 +36,9 @@ export interface MediaLimits {
 
 /** Variante pública saneada (sin metadatos de ubicación). La única que sale por la API. */
 export const PUBLIC_VARIANT = "DISPLAY";
+export const THUMB_VARIANT = "THUMB_S";
+/** Una foto casi idéntica a otra de otra persona subida hace más de esto se señala a moderación. */
+export const REUSE_MIN_AGE_HOURS = 1;
 
 const EXT: Record<string, string> = { "image/jpeg": "jpg", "video/mp4": "mp4", "video/quicktime": "mov" };
 
@@ -162,18 +166,69 @@ export class MediaService {
       if (err instanceof MalformedMediaError) return this.reject(tx, mediaId, `Archivo dañado: ${err.message}`);
       throw err;
     }
-    const publicKey = `public/${mediaId}.${EXT[row.mime] ?? "bin"}`;
-    await this.storage.put(publicKey, result.data, row.mime);
-    await tx.query(
-      `INSERT INTO media.variants (media_id, variant, storage_key, bytes, mime) VALUES ($1, $2, $3, $4, $5)
-       ON CONFLICT (media_id, variant) DO UPDATE SET storage_key = EXCLUDED.storage_key, bytes = EXCLUDED.bytes`,
-      [mediaId, PUBLIC_VARIANT, publicKey, result.data.length, row.mime],
-    );
+    const variant = async (name: string, key: string, data: Uint8Array, mime: string) => {
+      await this.storage.put(key, data, mime);
+      await tx.query(
+        `INSERT INTO media.variants (media_id, variant, storage_key, bytes, mime) VALUES ($1, $2, $3, $4, $5)
+         ON CONFLICT (media_id, variant) DO UPDATE SET storage_key = EXCLUDED.storage_key, bytes = EXCLUDED.bytes, mime = EXCLUDED.mime`,
+        [mediaId, name, key, data.length, mime],
+      );
+    };
+
+    if (declared === "image/jpeg") {
+      // Fotos: se re-codifican (sin ningún metadato) a un tamaño de pantalla y a miniatura, y se calcula el
+      // hash perceptual. Lo que no se puede decodificar se rechaza.
+      let img;
+      try {
+        img = await renderImage(original);
+      } catch (err) {
+        if (err instanceof MalformedMediaError) return this.reject(tx, mediaId, err.message);
+        throw err;
+      }
+      for (const v of img.variants) {
+        await variant(v.variant, v.variant === PUBLIC_VARIANT ? `public/${mediaId}.jpg` : `public/${mediaId}_${v.variant.toLowerCase()}.jpg`, v.data, "image/jpeg");
+      }
+      await tx.query(
+        `UPDATE media.media SET width = $2, height = $3, phash = $4, phash_bands = $5 WHERE id = $1`,
+        [mediaId, img.width, img.height, img.phash, phashBands(img.phash)],
+      );
+      await this.detectReuse(tx, mediaId, row.owner_profile_id, img.phash);
+    } else {
+      await variant(PUBLIC_VARIANT, `public/${mediaId}.${EXT[row.mime] ?? "bin"}`, result.data, row.mime);
+    }
     await tx.query(
       `UPDATE media.media SET state = 'READY', sanitized = $2, processed_at = $3, updated_at = now() WHERE id = $1`,
       [mediaId, result.removed, this.clock.now()],
     );
     await publish(tx, "MediaReady", { mediaId }, { lane: "interactive" });
+  }
+
+  /**
+   * ¿Esta foto ya se había subido? Busca por bandas del hash perceptual (índice GIN) y confirma la distancia.
+   * Se guarda la más antigua como `duplicate_of`. Si era de otra persona y de hace más de una hora, avisa
+   * (MediaReuseDetected) para que moderación revise una posible foto reciclada de otro suceso. Nunca rechaza.
+   */
+  private async detectReuse(tx: Queryable, mediaId: string, ownerProfileId: string, phash: string): Promise<void> {
+    const { rows } = await tx.query<{ id: string; owner_profile_id: string; old: boolean }>(
+      `SELECT id, owner_profile_id, created_at < now() - make_interval(hours => $5) AS old
+         FROM media.media
+        WHERE phash_bands && $2 AND state = 'READY' AND id <> $1
+          AND bit_count(('x' || phash)::bit(64) # ('x' || $3)::bit(64)) <= $4
+        ORDER BY created_at, id LIMIT 1`,
+      [mediaId, phashBands(phash), phash, NEAR_DUPLICATE_BITS, REUSE_MIN_AGE_HOURS],
+    );
+    const earlier = rows[0];
+    if (!earlier) return;
+    const suspected = earlier.owner_profile_id !== ownerProfileId && earlier.old;
+    await tx.query(`UPDATE media.media SET duplicate_of = $2, reuse_suspected = $3 WHERE id = $1`, [mediaId, earlier.id, suspected]);
+    if (suspected) await publish(tx, "MediaReuseDetected", { mediaId });
+  }
+
+  /** De estas media, cuáles parecen una foto reciclada (el reporte avisa a moderación al adjuntarlas). */
+  async reuseSuspected(q: Queryable, mediaIds: string[]): Promise<string[]> {
+    if (mediaIds.length === 0) return [];
+    const { rows } = await q.query<{ id: string }>(`SELECT id FROM media.media WHERE id = ANY($1) AND reuse_suspected`, [mediaIds]);
+    return rows.map((r) => r.id);
   }
 
   /** Un reporte o post solo puede adjuntar media propia, de un tipo soportado en V1 y ya subida. */
@@ -201,18 +256,21 @@ export class MediaService {
     if (mediaIds.length === 0) return [];
     const { rows } = await q.query<{
       id: string; kind: MediaKind; mime: string; width: number | null; height: number | null; duration_ms: number | null;
-      captured_in_app: boolean; storage_key: string;
+      captured_in_app: boolean; storage_key: string; thumb_key: string | null; display_mime: string;
     }>(
-      `SELECT m.id, m.kind, m.mime, m.width, m.height, m.duration_ms, m.captured_in_app, v.storage_key
+      `SELECT m.id, m.kind, m.mime, m.width, m.height, m.duration_ms, m.captured_in_app, v.storage_key, v.mime AS display_mime,
+              t.storage_key AS thumb_key
          FROM media.media m JOIN media.variants v ON v.media_id = m.id AND v.variant = $2
+         LEFT JOIN media.variants t ON t.media_id = m.id AND t.variant = $4
         WHERE m.id = ANY($1) AND m.state = 'READY'
           AND (m.moderation_state = 'APPROVED' OR (m.moderation_state = 'PENDING' AND NOT $3))
         ORDER BY array_position($1::uuid[], m.id)`,
-      [mediaIds, PUBLIC_VARIANT, opts.requireApproval],
+      [mediaIds, PUBLIC_VARIANT, opts.requireApproval, THUMB_VARIANT],
     );
     return rows.map((r) => ({
-      id: r.id, kind: r.kind, mime: r.mime, width: r.width, height: r.height, durationMs: r.duration_ms,
+      id: r.id, kind: r.kind, mime: r.display_mime, width: r.width, height: r.height, durationMs: r.duration_ms,
       capturedInApp: r.captured_in_app, url: this.storage.publicUrl(r.storage_key),
+      thumbUrl: r.thumb_key ? this.storage.publicUrl(r.thumb_key) : null,
     }));
   }
 

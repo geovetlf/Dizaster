@@ -22,6 +22,8 @@ export interface DomainEventMap {
   /** La persona borró su cuenta: cada módulo elimina o anonimiza lo suyo (ADR 0021). */
   AccountDeleted: { userId: string; profileId: string };
   /** Acción de moderación aplicada (por regla o por una persona). */
+  /** Una foto casi idéntica (hash perceptual) a otra subida antes por otra persona: posible foto reciclada. */
+  MediaReuseDetected: { mediaId: string };
   ModerationActionTaken: {
     actionId: string; targetType: string; targetId: string; action: string; actor: "RULE" | "MODERATOR";
     /** Cuenta afectada (autoría del contenido o el perfil); null para acciones sobre un EVENT. */

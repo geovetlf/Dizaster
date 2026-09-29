@@ -83,5 +83,8 @@ export interface MediaView {
   height: number | null;
   durationMs: number | null;
   capturedInApp: boolean;
+  /** Versión para pantalla (fotos: re-codificada, máx. 1600 px, sin metadatos). */
   url: string;
+  /** Miniatura (máx. 400 px) para listas y mosaicos; null en videos hasta que exista el póster. */
+  thumbUrl: string | null;
 }

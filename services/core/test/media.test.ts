@@ -1,4 +1,6 @@
 import { createHash } from "node:crypto";
+import sharp from "sharp";
+import { dctHash, hammingHex, NEAR_DUPLICATE_BITS, phashBands } from "../src/modules/media/images.js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createTestContext, createUser, reportBody, submit, type TestContext, type TestUser } from "./helpers.js";
 import { ANDROID_LOCATION, makeJpeg, makeMp4 } from "./media-fixtures.js";
@@ -187,5 +189,87 @@ describe("retención (cost-first y privacidad)", () => {
     expect(rows.find((r) => r.id === abandoned)?.state).toBe("DELETED");
     const variant = await t.c.db.query<{ storage_key: string }>(`SELECT storage_key FROM media.variants WHERE media_id = $1`, [id]);
     expect(await t.c.storage.stat(variant.rows[0]!.storage_key)).not.toBeNull();
+  });
+});
+
+/** Foto sintética distinta según `seed` (patrón de bloques), como JPEG real. */
+async function photo(seed: number, opts: { width?: number; quality?: number } = {}): Promise<Buffer> {
+  const w = 96, h = 72, px = Buffer.alloc(w * h * 3);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const i = (y * w + x) * 3, b = ((Math.floor(x / 12) * 7 + Math.floor(y / 12) * 13 + seed * 31) % 17) * 15;
+    px[i] = b; px[i + 1] = (b * 3 + seed * 50) % 256; px[i + 2] = 255 - b;
+  }
+  let img = sharp(px, { raw: { width: w, height: h, channels: 3 } });
+  if (opts.width) img = img.resize(opts.width);
+  return img.jpeg({ quality: opts.quality ?? 85 }).toBuffer();
+}
+
+describe("miniaturas y hash perceptual", () => {
+  it("genera versión de pantalla y miniatura re-codificadas, sin metadatos, y guarda tamaño y hash", async () => {
+    const u = await createUser(t, "media_variants");
+    const id = await uploadReady(u, makeJpeg());
+    const { rows } = await t.c.db.query<{ variant: string; storage_key: string; mime: string }>(
+      `SELECT variant, storage_key, mime FROM media.variants WHERE media_id = $1 ORDER BY variant`, [id],
+    );
+    expect(rows.map((r) => r.variant)).toEqual(["DISPLAY", "THUMB_S"]);
+    for (const r of rows) {
+      const data = Buffer.from(await t.c.storage.get(r.storage_key));
+      for (const secret of ["GPSLatitude", "comentario", "ICC_PROFILE", "Exif"]) expect(data.includes(Buffer.from(secret)), `${r.variant}: ${secret}`).toBe(false);
+      const meta = await sharp(data).metadata();
+      expect(meta.format).toBe("jpeg");
+      expect(Math.max(meta.width!, meta.height!)).toBeLessThanOrEqual(r.variant === "THUMB_S" ? 400 : 1600);
+    }
+    const m = (await t.c.db.query(`SELECT width, height, phash, array_length(phash_bands, 1) AS bands FROM media.media WHERE id = $1`, [id])).rows[0];
+    expect(m).toMatchObject({ width: 64, height: 48, bands: 8 });
+    expect(m.phash).toMatch(/^[0-9a-f]{16}$/);
+    const [view] = await t.c.media.publicViews(t.c.db, [id], { requireApproval: false });
+    expect(view!.thumbUrl).toMatch(/_thumb_s\.jpg$/);
+    expect(view!.url).toMatch(/\.jpg$/);
+  });
+
+  it("rechaza un JPEG que no se puede decodificar", async () => {
+    const u = await createUser(t, "media_broken");
+    const broken = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xdb, 0x00, 0x04, 0x01, 0x02, 0xff, 0xda, 0x00, 0x02]), Buffer.alloc(64, 7), Buffer.from([0xff, 0xd9])]);
+    const res = await requestUpload(u, broken);
+    const { mediaId, upload } = res.json();
+    await put(upload, broken);
+    await t.app.inject({ method: "POST", url: `/v1/media/${mediaId}/complete`, headers: auth(u) });
+    await t.c.dispatcher.drain();
+    expect(await state(u, mediaId)).toMatchObject({ state: "REJECTED" });
+  });
+
+  it("el hash tolera recompresión y reescalado, y distingue fotos distintas", async () => {
+    const gray = async (b: Buffer) => sharp(b).resize(32, 32, { fit: "fill" }).greyscale().raw().toBuffer();
+    const a = dctHash(await gray(await photo(1)));
+    const a2 = dctHash(await gray(await photo(1, { width: 60, quality: 40 })));
+    const b = dctHash(await gray(await photo(2)));
+    expect(hammingHex(a, a2)).toBeLessThanOrEqual(NEAR_DUPLICATE_BITS);
+    expect(hammingHex(a, b)).toBeGreaterThan(NEAR_DUPLICATE_BITS);
+    expect(phashBands("00ff000000000000").slice(0, 2)).toEqual([0, 256 + 255]);
+  });
+
+  it("una foto reciclada de otra persona se marca y moderación la revisa; la propia o la distinta no", async () => {
+    const a = await createUser(t, "foto_original");
+    const b = await createUser(t, "foto_reciclada");
+    const original = await uploadReady(a, await photo(5), { width: 96, height: 72 });
+    await t.c.db.query(`UPDATE media.media SET created_at = now() - interval '2 days' WHERE id = $1`, [original]);
+    const mine = await uploadReady(a, await photo(5, { quality: 50 }), { width: 96, height: 72 });
+    const copy = await uploadReady(b, await photo(5, { width: 80, quality: 45 }), { width: 80, height: 60 });
+    const other = await uploadReady(b, await photo(9), { width: 96, height: 72 });
+    const rows = new Map((await t.c.db.query<{ id: string; duplicate_of: string | null; reuse_suspected: boolean }>(
+      `SELECT id, duplicate_of, reuse_suspected FROM media.media WHERE id = ANY($1)`, [[mine, copy, other]],
+    )).rows.map((r) => [r.id, r]));
+    expect(rows.get(mine)).toMatchObject({ duplicate_of: original, reuse_suspected: false });
+    expect(rows.get(copy)).toMatchObject({ duplicate_of: original, reuse_suspected: true });
+    expect(rows.get(other)).toMatchObject({ duplicate_of: null, reuse_suspected: false });
+
+    const r = await submit(t, b, { ...reportBody(b, { pin: { lat: -12.45, lng: -77.02 } }), mediaIds: [copy] });
+    expect(r.status, JSON.stringify(r.body)).toBe(200);
+    await t.c.dispatcher.drain();
+    const flags = (await t.c.db.query<{ reason: string; note: string }>(
+      `SELECT f.reason, f.note FROM moderation.flags f JOIN social.post_media pm ON pm.post_id = f.target_id WHERE pm.media_id = $1`, [copy],
+    )).rows;
+    expect(flags).toHaveLength(1);
+    expect(flags[0]).toMatchObject({ reason: "FALSE_INFO" });
   });
 });

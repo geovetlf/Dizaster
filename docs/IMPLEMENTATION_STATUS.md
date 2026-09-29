@@ -172,13 +172,22 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | Avisos push en el idioma de cada persona | ✅ | `alert/rules.ts` |
 | Revisión nativa de portugués y francés | ⏳ | ver "Requiere acción humana" |
 
+## Etapa 14 — Miniaturas y hash perceptual (hecha)
+
+| Área | Estado | Dónde |
+|---|---|---|
+| Fotos re-codificadas sin metadatos: versión de pantalla (≤ 1600 px) y miniatura (≤ 400 px) | ✅ | `services/core/src/modules/media/images.ts`, ADR 0025 |
+| Hash perceptual (pHash) con búsqueda por bandas indexadas | ✅ | `media.media.phash`, `phash_bands` |
+| Foto reciclada de otra persona → caso de moderación con señal de sistema | ✅ | `MediaReuseDetected`, `ModerationService.systemFlag` |
+| App: miniaturas en el mosaico del feed | ✅ | `components/post-card.tsx` |
+| Póster de video, `sim_media` en deduplicación, difuminado (D-08) | ⏳ | siguientes iteraciones |
+
 ## Siguiente etapa (en orden)
 
-1. Media: miniaturas y hash perceptual para duplicados.
-2. Métricas de calidad del producto (duplicados, tiempo hasta verificación) y aviso push de umbrales a administración.
-3. **BLOQUEADA** — Identity real: Sign in with Apple, Google y email; App Attest / Play Integrity. Falta: cuentas de
+1. Métricas de calidad del producto (duplicados, tiempo hasta verificación) y aviso push de umbrales a administración.
+2. **BLOQUEADA** — Identity real: Sign in with Apple, Google y email; App Attest / Play Integrity. Falta: cuentas de
    Apple Developer y Google (client IDs, Service ID, Team ID) y un proveedor de email aprobado (gasto).
-4. Social: negocios, etiquetas y menciones.
+3. Social: negocios, etiquetas y menciones.
 
 ## Requiere acción humana
 
