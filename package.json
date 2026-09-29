@@ -18,6 +18,7 @@
     "cost:report": "pnpm --filter @dizaster/core run build && pnpm --filter @dizaster/core run cost:report",
     "quality:report": "pnpm --filter @dizaster/core run build && pnpm --filter @dizaster/core run quality:report",
     "grant-role": "pnpm --filter @dizaster/core run build && pnpm --filter @dizaster/core run grant-role",
+    "source-status": "pnpm --filter @dizaster/core run build && pnpm --filter @dizaster/core run source-status",
     "supply-chain": "node scripts/supply-chain.mjs licenses && node scripts/supply-chain.mjs audit",
     "sbom": "node scripts/supply-chain.mjs sbom sbom.cdx.json",
     "db:backup": "scripts/db-backup.sh",

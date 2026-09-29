@@ -16,7 +16,8 @@
     "geo:import:dev": "tsx src/geo-import-cli.ts",
     "cost:report": "node dist/cost-report-cli.js",
     "quality:report": "node dist/quality-report-cli.js",
-    "grant-role": "node dist/grant-role-cli.js"
+    "grant-role": "node dist/grant-role-cli.js",
+    "source-status": "node dist/source-status-cli.js"
   },
   "dependencies": {
     "@dizaster/contracts": "workspace:*",
