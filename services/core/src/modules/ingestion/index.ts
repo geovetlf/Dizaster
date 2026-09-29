@@ -90,7 +90,7 @@ export class IngestionService {
   /**
    * Punto de entrada común de los carriles NORMAL y URGENT. Idempotente por (fuente, id externo).
    */
-  async ingest(sourceKey: string, item: NormalizedItem, lane: "NORMAL" | "URGENT"): Promise<{ externalItemId: string; resolution: ResolutionResult | null; duplicate: boolean }> {
+  async ingest(sourceKey: string, item: NormalizedItem, lane: "NORMAL" | "URGENT", rawRef: string | null = null): Promise<{ externalItemId: string; resolution: ResolutionResult | null; duplicate: boolean }> {
     return withTransaction(this.db, async (tx) => {
       const source = (await tx.query<SourceRow>(`SELECT id, key, type, trust_tier, status FROM ingestion.sources WHERE key = $1`, [sourceKey])).rows[0];
       if (!source) throw new DomainError("UNKNOWN_SOURCE", `Fuente no registrada: ${sourceKey}`);
@@ -101,18 +101,22 @@ export class IngestionService {
         `SELECT id, content_hash FROM ingestion.external_items WHERE source_id = $1 AND external_id = $2`,
         [source.id, item.externalId],
       )).rows[0];
-      if (existing && existing.content_hash === hash) return { externalItemId: existing.id, resolution: null, duplicate: true };
+      if (existing && existing.content_hash === hash) {
+        // Sin cambios: solo se actualiza a qué crudo pertenece la última vez que se vio (ADR 0075).
+        if (rawRef) await tx.query(`UPDATE ingestion.external_items SET raw_ref = $2 WHERE id = $1`, [existing.id, rawRef]);
+        return { externalItemId: existing.id, resolution: null, duplicate: true };
+      }
 
       const itemId = existing?.id ?? newId();
       if (existing) {
-        await tx.query(`UPDATE ingestion.external_items SET content_hash = $2, normalized = $3, lane = $4, fetched_at = now(), ends_at = $5 WHERE id = $1`, [
-          itemId, hash, JSON.stringify(item), lane, item.endsAt ?? null,
+        await tx.query(`UPDATE ingestion.external_items SET content_hash = $2, normalized = $3, lane = $4, fetched_at = now(), ends_at = $5, raw_ref = coalesce($6, raw_ref) WHERE id = $1`, [
+          itemId, hash, JSON.stringify(item), lane, item.endsAt ?? null, rawRef,
         ]);
       } else {
         await tx.query(
-          `INSERT INTO ingestion.external_items (id, source_id, external_id, content_hash, lane, assertion, published_at, normalized, status, ends_at)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'NEW', $9)`,
-          [itemId, source.id, item.externalId, hash, lane, item.assertion, item.publishedAt, JSON.stringify(item), item.endsAt ?? null],
+          `INSERT INTO ingestion.external_items (id, source_id, external_id, content_hash, lane, assertion, published_at, normalized, status, ends_at, raw_ref)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'NEW', $9, $10)`,
+          [itemId, source.id, item.externalId, hash, lane, item.assertion, item.publishedAt, JSON.stringify(item), item.endsAt ?? null, rawRef],
         );
       }
       await publish(tx, "ExternalItemIngested", { externalItemId: itemId, sourceId: source.id, lane }, { lane: lane === "URGENT" ? "urgent" : "batch" });

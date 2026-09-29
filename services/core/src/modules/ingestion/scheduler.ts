@@ -1,9 +1,18 @@
+import { createHash } from "node:crypto";
+import { gzipSync } from "node:zlib";
 import { publish } from "../../platform/outbox.js";
 import type { Clock } from "../../platform/clock.js";
 import type { Db } from "../../platform/db.js";
 import { newId } from "../../platform/ids.js";
 import { FEED_ADAPTERS } from "./adapters/index.js";
 import type { IngestionService } from "./index.js";
+import type { StorageProvider } from "../media/index.js";
+
+/** Archivo del crudo de cada respuesta (ADR 0075). */
+export interface RawArchive {
+  storage: StorageProvider;
+  retentionDays: number;
+}
 
 export type Lane = "NORMAL" | "URGENT";
 
@@ -102,6 +111,7 @@ export class IngestionScheduler {
     private readonly fetcher: HttpFetcher,
     private readonly clock: Clock,
     private readonly secrets: Readonly<Record<string, string | undefined>> = {},
+    private readonly raw: RawArchive | null = null,
   ) {}
 
   async tick(): Promise<RunSummary[]> {
@@ -132,6 +142,53 @@ export class IngestionScheduler {
     return out;
   }
 
+  /**
+   * Guarda la respuesta comprimida en object storage (clave privada, nunca pública) y la anota en la ejecución.
+   * Si es idéntica a la última guardada de la fuente, reutiliza esa clave (fuentes sin ETag repiten mucho).
+   * Un fallo del almacenamiento nunca frena la ingestión: el ítem entra igual, sin crudo.
+   */
+  private async archiveRaw(s: SourceRow, runId: string, body: string, now: Date): Promise<string | null> {
+    if (!this.raw) return null;
+    const sha = createHash("sha256").update(body).digest("hex");
+    try {
+      const last = (await this.db.query<{ raw_ref: string; raw_sha256: string }>(
+        `SELECT raw_ref, raw_sha256 FROM ingestion.runs WHERE source_id = $1 AND raw_ref IS NOT NULL ORDER BY started_at DESC LIMIT 1`, [s.id],
+      )).rows[0];
+      let key = last?.raw_sha256 === sha ? last.raw_ref : null;
+      if (!key) {
+        key = `sources/raw/${s.key}/${now.toISOString().slice(0, 10)}/${runId}.json.gz`;
+        await this.raw.storage.put(key, gzipSync(body), "application/gzip");
+      }
+      await this.db.query(`UPDATE ingestion.runs SET raw_ref = $2, raw_sha256 = $3 WHERE id = $1`, [runId, key, sha]);
+      return key;
+    } catch (err) {
+      console.warn(JSON.stringify({ msg: "ingestion.raw.failed", source: s.key, error: redactSecrets(String(err), this.secrets).slice(0, 300) }));
+      return null;
+    }
+  }
+
+  /** Retención del crudo: borra los objetos que ninguna ejecución reciente usa y limpia sus referencias. */
+  async applyRawRetention(now: Date = this.clock.now()): Promise<{ deleted: number }> {
+    if (!this.raw) return { deleted: 0 };
+    const { rows } = await this.db.query<{ raw_ref: string }>(
+      `SELECT raw_ref FROM ingestion.runs WHERE raw_ref IS NOT NULL
+        GROUP BY raw_ref HAVING max(started_at) < $1::timestamptz - make_interval(days => $2) LIMIT 500`,
+      [now, this.raw.retentionDays],
+    );
+    let deleted = 0;
+    for (const { raw_ref } of rows) {
+      try {
+        await this.raw.storage.delete(raw_ref);
+      } catch {
+        continue; // se reintenta en la próxima pasada
+      }
+      await this.db.query(`UPDATE ingestion.runs SET raw_ref = NULL WHERE raw_ref = $1`, [raw_ref]);
+      await this.db.query(`UPDATE ingestion.external_items SET raw_ref = NULL WHERE raw_ref = $1`, [raw_ref]);
+      deleted++;
+    }
+    return { deleted };
+  }
+
   private async run(s: SourceRow, lane: Lane, now: Date): Promise<RunSummary> {
     const adapter = FEED_ADAPTERS.get(s.adapter)!;
     const runId = newId();
@@ -150,12 +207,14 @@ export class IngestionScheduler {
       if (res.status === 304) {
         summary.status = "NOT_MODIFIED";
       } else if (res.status >= 200 && res.status < 300 && res.body !== undefined) {
+        // El crudo se guarda antes de interpretarlo: si el adapter falla, queda lo que la fuente respondió.
+        const rawRef = await this.archiveRaw(s, runId, res.body, now);
         const items = adapter.parse(res.body, s.config);
         summary.itemsSeen = items.length;
         for (const item of items) {
           const urgent = adapter.isUrgent(item, s.config);
           if (isUrgentLane && !urgent) continue; // lo no crítico espera al carril NORMAL
-          const r = await this.ingestion.ingest(s.key, item, urgent ? "URGENT" : "NORMAL");
+          const r = await this.ingestion.ingest(s.key, item, urgent ? "URGENT" : "NORMAL", rawRef);
           if (!r.duplicate) summary.itemsNew++;
           if (urgent) summary.itemsUrgent++;
         }

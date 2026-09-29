@@ -66,10 +66,11 @@ export function buildContainer(env: AppEnv, overrides: { db?: Db; clock?: Clock;
   const ingestion = new IngestionService(db, events);
   // Claves de fuentes (SOURCE_KEY_*): solo del entorno, nunca en data/ (ADR 0067).
   const sourceSecrets = Object.fromEntries(Object.entries(process.env).filter(([k]) => k.startsWith("SOURCE_KEY_")));
-  const ingestionScheduler = new IngestionScheduler(db, ingestion, overrides.fetcher ?? new NodeHttpFetcher(), clock, sourceSecrets);
+  const storage = overrides.storage ?? buildStorage(env, clock);
+  const ingestionScheduler = new IngestionScheduler(db, ingestion, overrides.fetcher ?? new NodeHttpFetcher(), clock, sourceSecrets,
+    env.SOURCE_RAW_RETENTION_DAYS > 0 ? { storage, retentionDays: env.SOURCE_RAW_RETENTION_DAYS } : null);
   const trust = new TrustService(db, identity, events);
   const verification = new VerificationService(db, ref, events, ingestion, trust);
-  const storage = overrides.storage ?? buildStorage(env, clock);
   const media = new MediaService(db, storage, clock, {
     uploadsPerHour: env.MEDIA_UPLOADS_PER_HOUR_LIMIT,
     uploadUrlTtlSeconds: env.MEDIA_UPLOAD_URL_TTL_SECONDS,

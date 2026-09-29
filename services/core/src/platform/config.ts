@@ -40,6 +40,8 @@ const Env = z.object({
   MEDIA_UPLOADS_PER_HOUR_LIMIT: z.coerce.number().int().positive().default(30),
   /** MB subidos en 24 h por cuenta con reputación normal; nueva: la mitad; baja: un cuarto (ADR 0072). */
   MEDIA_DAILY_UPLOAD_MB: z.coerce.number().int().min(60).default(300),
+  /** Días que se guarda el crudo de cada fuente (ADR 0075); 0 = no se guarda. */
+  SOURCE_RAW_RETENTION_DAYS: z.coerce.number().int().min(0).max(365).default(30),
   MEDIA_UPLOAD_URL_TTL_SECONDS: z.coerce.number().int().min(60).max(3600).default(900),
   MEDIA_ORIGINAL_RETENTION_DAYS: z.coerce.number().int().positive().default(30),
   // Push directo (gratis). "log" no envía nada (desarrollo); "live" usa APNs y FCM con las credenciales de abajo.
