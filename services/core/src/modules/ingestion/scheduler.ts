@@ -4,6 +4,7 @@ import { publish } from "../../platform/outbox.js";
 import type { Clock } from "../../platform/clock.js";
 import type { Db } from "../../platform/db.js";
 import { newId } from "../../platform/ids.js";
+import { promoteByRule } from "./promotion.js";
 import { FEED_ADAPTERS } from "./adapters/index.js";
 import type { IngestionService } from "./index.js";
 import type { StorageProvider } from "../media/index.js";
@@ -212,7 +213,8 @@ export class IngestionScheduler {
         const items = adapter.parse(res.body, s.config);
         summary.itemsSeen = items.length;
         for (const item of items) {
-          const urgent = adapter.isUrgent(item, s.config);
+          // Lo crítico según el adapter, o lo que la regla de la fuente promueve (ADR 0100).
+          const urgent = adapter.isUrgent(item, s.config) || promoteByRule(item, s.config["promote"]);
           if (isUrgentLane && !urgent) continue; // lo no crítico espera al carril NORMAL
           const r = await this.ingestion.ingest(s.key, item, urgent ? "URGENT" : "NORMAL", rawRef);
           if (!r.duplicate) summary.itemsNew++;

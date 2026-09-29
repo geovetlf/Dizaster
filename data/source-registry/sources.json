@@ -1,5 +1,5 @@
 {
- "version": "sources-2026.09.5",
+ "version": "sources-2026.09.6",
  "sources": [
   {
    "key": "usgs-earthquakes",
@@ -246,7 +246,10 @@
    ],
    "adapter": "who-don-json",
    "config": {
-    "url": "https://www.who.int/api/news/diseaseoutbreaknews?$orderby=PublicationDateAndTime%20desc&$top=50"
+    "url": "https://www.who.int/api/news/diseaseoutbreaknews?$orderby=PublicationDateAndTime%20desc&$top=50",
+    "promote": {
+     "keywords": ["ebola", "marburg", "plague", "peste", "cholera", "colera", "mers", "nipah", "h5n1", "yellow fever", "fiebre amarilla"]
+    }
    },
    "license": "Por confirmar: términos de uso del sitio de la OMS",
    "termsUrl": "https://www.who.int/about/policies/terms-of-use",
