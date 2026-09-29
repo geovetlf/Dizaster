@@ -144,7 +144,10 @@ export class FeedService {
   }
 
   async updateMe(q: Queryable, profileId: string, body: unknown): Promise<MyProfile> {
-    await this.social.updateProfile(q, profileId, parse(UpdateProfileRequest, body));
+    const patch = parse(UpdateProfileRequest, body);
+    // País preferido (ADR 0085): solo códigos del dataset de fronteras, para no guardar países inexistentes.
+    if (patch.country && !this.geo.isCountry(patch.country)) throw new DomainError("VALIDATION", `País desconocido: ${patch.country}`, 400);
+    await this.social.updateProfile(q, profileId, patch);
     return this.me(q, profileId);
   }
 

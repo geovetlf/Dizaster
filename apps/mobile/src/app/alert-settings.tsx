@@ -10,6 +10,7 @@ import { sendNearMe, setNearMeEnabled } from "../lib/alerts/notifications";
 import { api } from "../lib/api";
 import { enablePush, openSystemSettings, pushPermission } from "../lib/device/push";
 import { countryOf } from "../lib/geo/country";
+import { preferredCountry } from "../lib/geo/preferred-country";
 import { deleteZoneMap } from "../lib/map/offline";
 import { providerFromAppConfig } from "../lib/map/provider";
 import { lang, t, type MessageKey } from "../lib/i18n";
@@ -168,7 +169,8 @@ function Subscriptions({ subs, onChange }: { subs: CategorySubscription[]; onCha
   const [q, setQ] = useState("");
   const [areas, setAreas] = useState<AreaSearchResult[]>([]);
   const location = useCoarseLocation();
-  const country = location.point ? countryOf(location.point) : null;
+  // Sin ubicación se ofrece el país preferido del perfil (ADR 0085).
+  const country = (location.point ? countryOf(location.point) : null) ?? preferredCountry();
 
   useEffect(() => {
     const text = q.trim();

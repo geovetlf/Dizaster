@@ -152,6 +152,11 @@ export type Units = z.infer<typeof Units>;
 /** Mi perfil: lo público más mis ajustes (ADR 0044). */
 export interface MyProfile extends ProfileView {
   units: Units;
+  /**
+   * País preferido (ISO 3166-1 alfa-2, ADR 0085). Privado. Solo se usa cuando no hay ubicación: números de
+   * emergencia y "todo el país" en alertas. `null` = sin elegir.
+   */
+  country: string | null;
 }
 
 /** Cambios de mi perfil. El handle no se cambia en V1: rompería menciones y enlaces compartidos. */
@@ -161,6 +166,8 @@ export const UpdateProfileRequest = z
     /** Vacío = quitarla. */
     bio: z.string().trim().max(160).nullable().optional(),
     units: Units.optional(),
+    /** `null` = quitarlo. El servidor comprueba que exista en el dataset de fronteras. */
+    country: z.string().regex(/^[A-Z]{2}$/).nullable().optional(),
   })
   .refine((v) => Object.keys(v).length > 0, "Nada que cambiar");
 export type UpdateProfileRequest = z.infer<typeof UpdateProfileRequest>;

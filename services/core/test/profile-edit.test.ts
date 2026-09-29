@@ -29,4 +29,18 @@ describe("editar mi perfil (ADR 0044)", () => {
     expect((await patch(u, { units: "parsecs" })).statusCode).toBe(400);
     expect((await patch(null, { bio: "hola" })).statusCode).toBe(401);
   });
+
+  it("país preferido (ADR 0085): privado, validado y se puede quitar", async () => {
+    const u = await createUser(t, "perfil_pais");
+    expect((await t.app.inject({ url: "/v1/me", headers: auth(u) })).json().country).toBeNull();
+    const res = await patch(u, { country: "PE" });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().country).toBe("PE");
+    const pub = (await t.app.inject({ url: `/v1/profiles/${res.json().handle}` })).json();
+    expect(pub.country).toBeUndefined();
+    expect((await patch(u, { country: "ZZ" })).statusCode).toBe(400);
+    expect((await patch(u, { country: "pe" })).statusCode).toBe(400);
+    expect((await t.app.inject({ url: "/v1/me", headers: auth(u) })).json().country).toBe("PE");
+    expect((await patch(u, { country: null })).json().country).toBeNull();
+  });
 });

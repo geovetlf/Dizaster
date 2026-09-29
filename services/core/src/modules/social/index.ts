@@ -609,10 +609,11 @@ export class SocialService {
   }
 
   /** Ajustes propios del perfil (no públicos). */
-  async settings(q: Queryable, profileId: string): Promise<{ units: Units }> {
-    const { rows } = await q.query<{ units: Units }>(`SELECT units FROM social.profiles WHERE id = $1 AND deleted_at IS NULL`, [profileId]);
+  async settings(q: Queryable, profileId: string): Promise<{ units: Units; country: string | null }> {
+    const { rows } = await q.query<{ units: Units; home_country: string | null }>(
+      `SELECT units, home_country FROM social.profiles WHERE id = $1 AND deleted_at IS NULL`, [profileId]);
     if (!rows[0]) throw notFound("Perfil");
-    return { units: rows[0].units };
+    return { units: rows[0].units, country: rows[0].home_country?.trim() ?? null };
   }
 
   /** Editar mi perfil (ADR 0044). La bio vacía se guarda como NULL. */
@@ -622,6 +623,7 @@ export class SocialService {
     if (patch.displayName !== undefined) sets.push(`display_name = $${params.push(patch.displayName)}`);
     if (patch.bio !== undefined) sets.push(`bio = $${params.push(patch.bio ? patch.bio : null)}`);
     if (patch.units !== undefined) sets.push(`units = $${params.push(patch.units)}`);
+    if (patch.country !== undefined) sets.push(`home_country = $${params.push(patch.country)}`);
     const res = await q.query(`UPDATE social.profiles SET ${sets.join(", ")}, updated_at = now() WHERE id = $1 AND deleted_at IS NULL`, params);
     if (res.rowCount === 0) throw notFound("Perfil");
   }

@@ -1,26 +1,33 @@
 import type { MyProfile, Units } from "@dizaster/contracts";
 import { router } from "expo-router";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { api } from "../lib/api";
-import { t } from "../lib/i18n";
+import { countryOptions } from "../lib/geo/country";
+import { filterCountries } from "../lib/geo/country-choice";
+import { setPreferredCountry } from "../lib/geo/preferred-country";
+import { regionOf } from "../lib/emergency";
+import { lang, locale, t } from "../lib/i18n";
 import { forgetMe } from "../lib/social/me";
 import { setUnits } from "../lib/ui/format";
 import { colors, radius, space } from "../theme";
 
 const BIO_MAX = 160;
 
-/** Editar mi perfil (ADR 0044): nombre visible, bio pública y unidades. El handle no cambia. */
+/** Editar mi perfil (ADR 0044, 0085): nombre visible, bio pública, unidades y país preferido. El handle no cambia. */
 export default function ProfileEditScreen() {
   const [me, setMe] = useState<MyProfile | null>(null);
   const [name, setName] = useState("");
   const [bio, setBio] = useState("");
   const [units, setUnitsState] = useState<Units>("metric");
+  const [country, setCountry] = useState<string | null>(null);
+  const [countryQuery, setCountryQuery] = useState("");
+  const options = useMemo(() => countryOptions(lang), []);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    api.me().then((m) => { setMe(m); setName(m.displayName); setBio(m.bio ?? ""); setUnitsState(m.units); }).catch((e: Error) => setError(e.message));
+    api.me().then((m) => { setMe(m); setName(m.displayName); setBio(m.bio ?? ""); setUnitsState(m.units); setCountry(m.country); }).catch((e: Error) => setError(e.message));
   }, []);
 
   async function save() {
@@ -28,8 +35,9 @@ export default function ProfileEditScreen() {
     setBusy(true);
     setError(null);
     try {
-      const saved = await api.updateMe({ displayName: name.trim(), bio: bio.trim() || null, units });
+      const saved = await api.updateMe({ displayName: name.trim(), bio: bio.trim() || null, units, country });
       setUnits(saved.units);
+      setPreferredCountry(saved.country);
       forgetMe();
       router.back();
     } catch (e) {
@@ -59,6 +67,27 @@ export default function ProfileEditScreen() {
           </Pressable>
         ))}
       </View>
+      <Text style={styles.label}>{t("preferredCountry")}</Text>
+      <View style={styles.row}>
+        <View style={[styles.chip, styles.chipOn]}>
+          <Text style={styles.chipText}>{country ? options.find((o) => o.code === country)?.name ?? country : t("noCountry")}</Text>
+        </View>
+        {country ? (
+          <Pressable accessibilityRole="button" accessibilityLabel={t("remove")} onPress={() => setCountry(null)} style={styles.chip}>
+            <Text style={styles.chipText}>×</Text>
+          </Pressable>
+        ) : null}
+      </View>
+      <TextInput value={countryQuery} onChangeText={setCountryQuery} placeholder={t("searchCountry")} placeholderTextColor={colors.textMuted}
+        style={[styles.input, styles.countrySearch]} autoCorrect={false} />
+      <View style={styles.wrap}>
+        {filterCountries(options, countryQuery, [regionOf(locale)]).filter((o) => o.code !== country).map((o) => (
+          <Pressable key={o.code} accessibilityRole="button" onPress={() => { setCountry(o.code); setCountryQuery(""); }} style={styles.chip}>
+            <Text style={styles.chipText}>{o.name}</Text>
+          </Pressable>
+        ))}
+      </View>
+      <Text style={styles.hint}>{t("preferredCountryHint")}</Text>
       {error ? <Text style={styles.error}>{error}</Text> : null}
       <Pressable accessibilityRole="button" disabled={!valid || busy} onPress={() => void save()} style={[styles.save, (!valid || busy) && styles.disabled]}>
         <Text style={styles.saveText}>{t("save")}</Text>
@@ -75,6 +104,8 @@ const styles = StyleSheet.create({
   bio: { minHeight: 90, textAlignVertical: "top" },
   hint: { color: colors.textMuted, marginTop: 4 },
   row: { flexDirection: "row", gap: space.sm },
+  wrap: { flexDirection: "row", flexWrap: "wrap", gap: space.sm, marginTop: space.sm },
+  countrySearch: { marginTop: space.sm },
   chip: { borderWidth: 1, borderColor: colors.accent, borderRadius: radius.pill, paddingHorizontal: space.md, paddingVertical: 6 },
   chipOn: { backgroundColor: colors.accent },
   chipText: { color: colors.text, fontWeight: "600" },

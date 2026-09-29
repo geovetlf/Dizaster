@@ -5,36 +5,37 @@ import { FlatList, Linking, Pressable, StyleSheet, Text, View } from "react-nati
 import { lookupEmergency, label, regionOf, type EmergencyLookup } from "../lib/emergency";
 import { localEmergencyDataset, refreshEmergencyDataset } from "../lib/emergency-store";
 import { countryOf } from "../lib/geo/country";
+import { chooseCountry, type CountrySource } from "../lib/geo/country-choice";
+import { preferredCountry } from "../lib/geo/preferred-country";
 import { locale, t } from "../lib/i18n";
 import { colors } from "../theme";
 
-/** País por ubicación (calculado en el teléfono); si no hay, la región de los ajustes del sistema. */
-async function detectCountry(): Promise<{ country: string | null; fromSettings: boolean }> {
+/** País por ubicación (calculado en el teléfono); si no hay, el preferido del perfil y luego la región del sistema. */
+async function detectCountry(): Promise<{ country: string | null; source: CountrySource | null }> {
+  let located: string | null = null;
   try {
     const perm = await Location.getForegroundPermissionsAsync();
     const pos = perm.granted
       ? ((await Location.getLastKnownPositionAsync()) ?? (await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Low })))
       : null;
     // La ubicación no sale del dispositivo.
-    const country = pos ? countryOf({ lat: pos.coords.latitude, lng: pos.coords.longitude }) : null;
-    if (country) return { country, fromSettings: false };
+    located = pos ? countryOf({ lat: pos.coords.latitude, lng: pos.coords.longitude }) : null;
   } catch {
-    // Sin permiso o sin señal: se usa la región del teléfono.
+    // Sin permiso o sin señal: país preferido o región del teléfono.
   }
-  const region = regionOf(locale);
-  return { country: region, fromSettings: region !== null };
+  return chooseCountry(located, preferredCountry(), regionOf(locale));
 }
 
 export default function EmergencyScreen() {
   const [lookup, setLookup] = useState<EmergencyLookup | null>(null);
-  const [fromSettings, setFromSettings] = useState(false);
+  const [source, setSource] = useState<CountrySource | null>(null);
 
   useEffect(() => {
     let alive = true;
     (async () => {
       const [dataset, where] = await Promise.all([localEmergencyDataset(), detectCountry()]);
       if (!alive) return;
-      setFromSettings(where.fromSettings);
+      setSource(where.source);
       setLookup(lookupEmergency(dataset, where.country));
       // Primero lo local (sin red); después, si el servidor tiene una versión más nueva, se actualiza en pantalla.
       const next: EmergencyDataset | null = await refreshEmergencyDataset();
@@ -47,7 +48,8 @@ export default function EmergencyScreen() {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>{t("emergencyTitle")}{lookup.country ? ` · ${lookup.country}` : ""}</Text>
-      {fromSettings ? <Text style={styles.hint}>{t("countryFromSettings")}</Text> : null}
+      {source === "settings" ? <Text style={styles.hint}>{t("countryFromSettings")}</Text> : null}
+      {source === "profile" ? <Text style={styles.hint}>{t("countryFromProfile")}</Text> : null}
       {lookup.unverified ? <Text style={styles.warning}>{t("unverifiedNumbers")}</Text> : null}
       {lookup.fallbackToGsm112 ? <Text style={styles.warning}>{t("gsmFallback")}</Text> : null}
       <FlatList
