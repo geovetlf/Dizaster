@@ -4,12 +4,18 @@ import { t, type MessageKey } from "../lib/i18n";
 import { captureMedia, discardLocal, type CaptureKind, type CaptureSource } from "../lib/media/capture";
 import { checkLimits, type LocalMedia } from "../lib/media/local-media";
 import { colors } from "../theme";
+import { RedactEditor } from "./redact-editor";
 
 export const MAX_MEDIA_PER_REPORT = 4;
 
 /** Adjuntar fotos y videos a un reporte. Mismo componente en Android e iOS. */
-export function MediaAttachments({ items, onChange }: { items: LocalMedia[]; onChange: (items: LocalMedia[]) => void }) {
+export function MediaAttachments({ items, onChange, suggestRedaction = false }: {
+  items: LocalMedia[]; onChange: (items: LocalMedia[]) => void;
+  /** Categoría sensible (p. ej. delincuencia): se invita a difuminar rostros y matrículas (D-08). */
+  suggestRedaction?: boolean;
+}) {
   const [busy, setBusy] = useState(false);
+  const [editing, setEditing] = useState<LocalMedia | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const full = items.length >= MAX_MEDIA_PER_REPORT;
 
@@ -38,6 +44,10 @@ export function MediaAttachments({ items, onChange }: { items: LocalMedia[]; onC
     onChange(items.map((x) => (x.localUri === m.localUri ? { ...x, graphic } : x)));
   }
 
+  function setRedactions(m: LocalMedia, redactions: LocalMedia["redactions"]) {
+    onChange(items.map((x) => (x.localUri === m.localUri ? { ...x, redactions } : x)));
+  }
+
   function remove(m: LocalMedia) {
     discardLocal(m);
     onChange(items.filter((x) => x.localUri !== m.localUri));
@@ -50,7 +60,13 @@ export function MediaAttachments({ items, onChange }: { items: LocalMedia[]; onC
         {items.map((m) => (
           <View key={m.localUri} style={styles.thumb}>
             {m.kind === "IMAGE" ? (
-              <Image source={{ uri: m.localUri }} style={styles.image} accessibilityIgnoresInvertColors />
+              <Pressable accessibilityRole="button" accessibilityLabel={t("redactTitle")} onPress={() => setEditing(m)}>
+                <Image source={{ uri: m.localUri }} style={styles.image} accessibilityIgnoresInvertColors />
+                {/* La miniatura va recortada: se indica cuántas zonas se difuminarán en lugar de dibujarlas. */}
+                <View style={[styles.blurBadge, (suggestRedaction || (m.redactions ?? []).length > 0) && styles.blurBadgeOn]}>
+                  <Text style={styles.removeText}>{(m.redactions ?? []).length || "◐"}</Text>
+                </View>
+              </Pressable>
             ) : (
               <View style={[styles.image, styles.video]}>
                 {m.poster ? <Image source={{ uri: m.poster.localUri }} style={StyleSheet.absoluteFill} accessibilityIgnoresInvertColors /> : null}
@@ -73,6 +89,11 @@ export function MediaAttachments({ items, onChange }: { items: LocalMedia[]; onC
         <Button label={t("fromGallery")} disabled={busy || full} onPress={() => void add("library", "IMAGE")} />
       </View>
       {items.length > 0 ? <Text style={styles.note}>{t("graphicHint")}</Text> : null}
+      {items.some((m) => m.kind === "IMAGE") ? <Text style={[styles.note, suggestRedaction && styles.warn]}>{t(suggestRedaction ? "redactSuggest" : "redactHint")}</Text> : null}
+      {editing ? (
+        <RedactEditor uri={editing.localUri} width={editing.width} height={editing.height} boxes={editing.redactions ?? []}
+          onDone={(boxes) => { if (boxes) setRedactions(editing, boxes); setEditing(null); }} />
+      ) : null}
       {message ? <Text style={styles.note}>{message}</Text> : null}
     </View>
   );
@@ -97,6 +118,9 @@ const styles = StyleSheet.create({
   remove: { position: "absolute", top: -6, right: -6, width: 24, height: 24, borderRadius: 12, backgroundColor: colors.surfaceAlt, alignItems: "center", justifyContent: "center" },
   removeText: { color: colors.white, fontSize: 12 },
   graphic: { position: "absolute", bottom: -6, right: -6, width: 24, height: 24, borderRadius: 12, backgroundColor: colors.surfaceAlt, alignItems: "center", justifyContent: "center", opacity: 0.6 },
+  blurBadge: { position: "absolute", bottom: -6, left: -6, width: 24, height: 24, borderRadius: 12, backgroundColor: colors.surfaceAlt, alignItems: "center", justifyContent: "center", opacity: 0.6 },
+  blurBadgeOn: { backgroundColor: colors.accent, opacity: 1 },
+  warn: { color: colors.text, fontWeight: "600" },
   graphicOn: { backgroundColor: colors.accent, opacity: 1 },
   buttons: { flexDirection: "row", gap: 8 },
   button: { flex: 1, borderWidth: 1, borderColor: colors.text, borderRadius: 8, paddingVertical: 10, alignItems: "center" },

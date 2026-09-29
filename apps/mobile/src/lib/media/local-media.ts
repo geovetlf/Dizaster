@@ -1,6 +1,6 @@
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex } from "@noble/hashes/utils.js";
-import { MEDIA_UPLOAD_LIMITS, VIDEO_POSTER_MAX_BYTES, type CreateUploadRequest, type UploadableMediaKind } from "@dizaster/contracts";
+import { MEDIA_UPLOAD_LIMITS, VIDEO_POSTER_MAX_BYTES, type CreateUploadRequest, type RedactionBox, type UploadableMediaKind } from "@dizaster/contracts";
 
 /**
  * Foto o video preparado en el dispositivo, listo para subir. Lógica común a Android e iOS: solo la captura
@@ -22,6 +22,8 @@ export interface LocalMedia {
   poster?: LocalPoster | null;
   /** Quien sube marca que puede impactar (heridos, violencia): se mostrará con aviso (ADR 0035). */
   graphic?: boolean;
+  /** Solo fotos: rostros y matrículas a difuminar; el servidor los aplica a lo que se publica (ADR 0042). */
+  redactions?: RedactionBox[];
 }
 
 export interface LocalPoster {
@@ -87,6 +89,7 @@ export function toUploadRequest(m: LocalMedia): CreateUploadRequest {
     capturedAt: m.capturedAt,
     capturedInApp: m.capturedInApp,
     graphic: m.graphic ?? false,
+    redactions: m.kind === "IMAGE" ? (m.redactions ?? []) : [],
     ...(m.kind === "VIDEO_RECORDED" && m.poster && m.poster.sizeBytes <= VIDEO_POSTER_MAX_BYTES
       ? { poster: { sizeBytes: m.poster.sizeBytes, sha256: m.poster.sha256 } }
       : {}),

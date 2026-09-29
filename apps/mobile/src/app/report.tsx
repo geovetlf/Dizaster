@@ -200,7 +200,7 @@ export default function ReportScreen() {
         </View>
       ) : null}
 
-      <MediaAttachments items={media} onChange={setMedia} />
+      <MediaAttachments items={media} onChange={setMedia} suggestRedaction={category.sensitivity !== "NORMAL"} />
       <TextInput style={styles.input} multiline maxLength={2000} value={text} onChangeText={setText} placeholder="…" placeholderTextColor={colors.textMuted} />
       {category.forcePseudonymous ? (
         <Text style={styles.note}>{t("pseudonymousForced")}</Text>

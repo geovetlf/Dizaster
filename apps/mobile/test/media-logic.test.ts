@@ -111,3 +111,25 @@ describe("cola offline con fotos", () => {
     expect(res.sent).toHaveLength(1);
   });
 });
+
+describe("difuminado en el teléfono (ADR 0042)", () => {
+  it("coloca un recuadro cuadrado centrado en el toque y dentro de la foto", async () => {
+    const { boxAt, toggleBoxAt } = await import("../src/lib/media/redaction");
+    const b = boxAt(200, 100, 400, 200, "M");
+    expect(b.w * 400).toBeCloseTo(b.h * 200, 5);
+    expect(b.x + b.w / 2).toBeCloseTo(0.5, 5);
+    const edge = boxAt(0, 0, 400, 200, "L");
+    expect(edge).toMatchObject({ x: 0, y: 0 });
+    const one = toggleBoxAt([], 200, 100, 400, 200, "S");
+    expect(one).toHaveLength(1);
+    expect(toggleBoxAt(one, 200, 100, 400, 200, "S")).toEqual([]);
+  });
+
+  it("solo las fotos envían recuadros al servidor", async () => {
+    const { toUploadRequest } = await import("../src/lib/media/local-media");
+    const base = { localUri: "file:///x", mime: "image/jpeg", sizeBytes: 10, sha256: "a".repeat(64), width: 10, height: 10, durationMs: null, capturedInApp: true, capturedAt: new Date(0).toISOString() };
+    const box = { x: 0, y: 0, w: 0.1, h: 0.1 };
+    expect(toUploadRequest({ ...base, kind: "IMAGE", redactions: [box] }).redactions).toEqual([box]);
+    expect(toUploadRequest({ ...base, kind: "VIDEO_RECORDED", mime: "video/mp4", durationMs: 1000, redactions: [box] }).redactions).toEqual([]);
+  });
+});

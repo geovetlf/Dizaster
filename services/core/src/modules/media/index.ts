@@ -7,6 +7,7 @@ import {
   type MediaDelivery,
   type MediaKind,
   type MediaView,
+  type RedactionBox,
 } from "@dizaster/contracts";
 import type { Clock } from "../../platform/clock.js";
 import { withTransaction, type Db, type Queryable } from "../../platform/db.js";
@@ -50,6 +51,7 @@ interface MediaRow {
   id: string; owner_profile_id: string; kind: MediaKind; state: string; mime: string; bytes: string; sha256: string;
   storage_key_original: string | null; width: number | null; height: number | null; duration_ms: number | null;
   captured_in_app: boolean; upload_expires_at: Date | null; poster_bytes: number | null; poster_sha256: string | null;
+  redactions: RedactionBox[];
 }
 
 /**
@@ -134,10 +136,10 @@ export class MediaService {
       : null;
     await this.db.query(
       `INSERT INTO media.media (id, owner_profile_id, kind, state, delivery, captured_in_app, captured_at, duration_ms, width, height,
-                                bytes, mime, sha256, storage_key_original, upload_expires_at, poster_bytes, poster_sha256, content_warning)
-       VALUES ($1, $2, $3, 'PENDING_UPLOAD', 'FILE', $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)`,
+                                bytes, mime, sha256, storage_key_original, upload_expires_at, poster_bytes, poster_sha256, content_warning, redactions)
+       VALUES ($1, $2, $3, 'PENDING_UPLOAD', 'FILE', $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)`,
       [id, ownerProfileId, req.kind, req.capturedInApp, req.capturedAt ?? null, req.durationMs ?? null, req.width ?? null, req.height ?? null,
-        req.sizeBytes, req.mime, req.sha256, key, expiresAt, req.poster?.sizeBytes ?? null, req.poster?.sha256 ?? null, req.graphic ? "GRAPHIC" : null],
+        req.sizeBytes, req.mime, req.sha256, key, expiresAt, req.poster?.sizeBytes ?? null, req.poster?.sha256 ?? null, req.graphic ? "GRAPHIC" : null, JSON.stringify(req.redactions)],
     );
     return { mediaId: id, upload, ...(posterUpload ? { posterUpload } : {}), expiresAt: expiresAt.toISOString() };
   }
@@ -198,7 +200,7 @@ export class MediaService {
       // hash perceptual. Lo que no se puede decodificar se rechaza.
       let img;
       try {
-        img = await renderImage(original);
+        img = await renderImage(original, row.redactions);
       } catch (err) {
         if (err instanceof MalformedMediaError) return this.reject(tx, mediaId, err.message);
         throw err;
@@ -406,7 +408,7 @@ export class MediaService {
   private async row(q: Queryable, id: string): Promise<MediaRow | null> {
     const { rows } = await q.query<MediaRow>(
       `SELECT id, owner_profile_id, kind, state, mime, bytes, sha256, storage_key_original, width, height, duration_ms,
-              captured_in_app, upload_expires_at, poster_bytes, poster_sha256
+              captured_in_app, upload_expires_at, poster_bytes, poster_sha256, redactions
          FROM media.media WHERE id = $1`,
       [id],
     );

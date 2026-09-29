@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import sharp from "sharp";
-import { dctHash, hammingHex, NEAR_DUPLICATE_BITS, phashBands } from "../src/modules/media/images.js";
+import { dctHash, hammingHex, NEAR_DUPLICATE_BITS, phashBands, redactionRects } from "../src/modules/media/images.js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createTestContext, createUser, reportBody, submit, type TestContext, type TestUser } from "./helpers.js";
 import { ANDROID_LOCATION, makeJpeg, makeMp4 } from "./media-fixtures.js";
@@ -332,5 +332,49 @@ describe("miniaturas y hash perceptual", () => {
     )).rows;
     expect(flags).toHaveLength(1);
     expect(flags[0]).toMatchObject({ reason: "FALSE_INFO" });
+  });
+});
+
+describe("difuminado de rostros y matrículas (ADR 0042)", () => {
+  /** Tablero de ajedrez fino: mucho detalle que el difuminado debe borrar. */
+  async function checker(): Promise<Buffer> {
+    const w = 200, h = 100, px = Buffer.alloc(w * h * 3);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) px.fill(((x >> 2) + (y >> 2)) % 2 ? 255 : 0, (y * w + x) * 3, (y * w + x) * 3 + 3);
+    return sharp(px, { raw: { width: w, height: h, channels: 3 } }).jpeg({ quality: 95 }).toBuffer();
+  }
+  /** Desviación típica del gris en un recuadro: alta con detalle, baja cuando está difuminado. */
+  async function contrast(img: Buffer, r: { left: number; top: number; width: number; height: number }) {
+    const g = await sharp(img).extract(r).greyscale().raw().toBuffer();
+    const mean = g.reduce((a, b) => a + b, 0) / g.length;
+    return Math.sqrt(g.reduce((a, b) => a + (b - mean) ** 2, 0) / g.length);
+  }
+
+  it("convierte recuadros normalizados en píxeles dentro de la foto", () => {
+    expect(redactionRects([{ x: 0.5, y: 0.5, w: 0.25, h: 0.5 }], 200, 100)).toEqual([{ left: 100, top: 50, width: 50, height: 50 }]);
+    expect(redactionRects([{ x: 0.99, y: 0.99, w: 0.01, h: 0.01 }], 200, 100)[0]).toMatchObject({ width: 2, height: 1 });
+  });
+
+  it("difumina solo dentro del recuadro en todas las variantes públicas", async () => {
+    const u = await createUser(t, "media_redact");
+    const file = await checker();
+    const id = await uploadReady(u, file, { width: 200, height: 100, redactions: [{ x: 0, y: 0, w: 0.5, h: 1 }] });
+    const { rows } = await t.c.db.query<{ variant: string; storage_key: string }>(`SELECT variant, storage_key FROM media.variants WHERE media_id = $1`, [id]);
+    const display = Buffer.from(await t.c.storage.get(rows.find((r) => r.variant === "DISPLAY")!.storage_key));
+    const inside = await contrast(display, { left: 10, top: 10, width: 60, height: 60 });
+    const outside = await contrast(display, { left: 130, top: 10, width: 60, height: 60 });
+    expect(outside).toBeGreaterThan(80);
+    expect(inside).toBeLessThan(outside / 4);
+    // El hash perceptual sale del original: una foto reciclada sin difuminar se sigue detectando.
+    const { rows: [m] } = await t.c.db.query<{ phash: string }>(`SELECT phash FROM media.media WHERE id = $1`, [id]);
+    const gray = await sharp(file).resize(32, 32, { fit: "fill" }).greyscale().raw().toBuffer();
+    expect(m!.phash).toBe(dctHash(gray));
+  });
+
+  it("no acepta difuminado en videos ni recuadros fuera de la foto", async () => {
+    const u = await createUser(t, "media_redact_bad");
+    const video = await requestUpload(u, makeMp4(), { kind: "VIDEO_RECORDED", mime: "video/mp4", durationMs: 1000, redactions: [{ x: 0, y: 0, w: 0.1, h: 0.1 }] });
+    expect(video.statusCode).toBe(400);
+    const out = await requestUpload(u, await checker(), { redactions: [{ x: 0.8, y: 0, w: 0.5, h: 0.1 }] });
+    expect(out.statusCode).toBe(400);
   });
 });

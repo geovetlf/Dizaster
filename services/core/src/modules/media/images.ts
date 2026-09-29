@@ -1,4 +1,4 @@
-import sharp, { type Metadata } from "sharp";
+import sharp, { type Metadata, type OutputInfo, type OverlayOptions, type Sharp } from "sharp";
 import { MalformedMediaError } from "./sanitize.js";
 
 /**
@@ -22,8 +22,44 @@ export interface RenderedImage {
   phash: string;
 }
 
-export async function renderImage(original: Uint8Array): Promise<RenderedImage> {
-  const input = () => sharp(original, { failOn: "error", limitInputPixels: MAX_INPUT_PIXELS }).rotate();
+export interface PixelRect { left: number; top: number; width: number; height: number }
+
+/** Recuadros normalizados → píxeles enteros dentro de la imagen (se descartan los vacíos). */
+export function redactionRects(boxes: readonly { x: number; y: number; w: number; h: number }[], width: number, height: number): PixelRect[] {
+  const out: PixelRect[] = [];
+  for (const b of boxes) {
+    const left = Math.max(0, Math.min(width - 1, Math.floor(b.x * width)));
+    const top = Math.max(0, Math.min(height - 1, Math.floor(b.y * height)));
+    const right = Math.max(left + 1, Math.min(width, Math.ceil((b.x + b.w) * width)));
+    const bottom = Math.max(top + 1, Math.min(height, Math.ceil((b.y + b.h) * height)));
+    out.push({ left, top, width: right - left, height: bottom - top });
+  }
+  return out;
+}
+
+/**
+ * Difumina los recuadros de forma irreversible: cada zona se reduce a unos pocos píxeles (se pierde el detalle)
+ * y se vuelve a ampliar con desenfoque. Trabaja sobre píxeles ya orientados; devuelve la imagen sin comprimir.
+ */
+async function redact(img: Sharp, rects: PixelRect[]): Promise<{ data: Buffer; info: OutputInfo }> {
+  const { data, info } = await img.raw().toBuffer({ resolveWithObject: true });
+  const raw = { width: info.width, height: info.height, channels: info.channels };
+  const overlays: OverlayOptions[] = [];
+  for (const r of rects) {
+    const blocks = Math.max(1, Math.round(Math.min(r.width, r.height) / 6));
+    const small = await sharp(data, { raw }).extract(r)
+      .resize(Math.max(1, Math.round(r.width / blocks)), Math.max(1, Math.round(r.height / blocks)), { fit: "fill" }).raw().toBuffer();
+    const cover = await sharp(small, { raw: { width: Math.max(1, Math.round(r.width / blocks)), height: Math.max(1, Math.round(r.height / blocks)), channels: info.channels } })
+      .resize(r.width, r.height, { fit: "fill", kernel: "cubic" }).blur(Math.max(0.3, blocks / 2)).raw().toBuffer();
+    overlays.push({ input: cover, raw: { width: r.width, height: r.height, channels: info.channels }, left: r.left, top: r.top });
+  }
+  const composed = await sharp(data, { raw }).composite(overlays).raw().toBuffer({ resolveWithObject: true });
+  return composed;
+}
+
+export async function renderImage(original: Uint8Array, redactions: readonly { x: number; y: number; w: number; h: number }[] = []): Promise<RenderedImage> {
+  const source = () => sharp(original, { failOn: "error", limitInputPixels: MAX_INPUT_PIXELS }).rotate();
+  let input = source;
   let meta: Metadata;
   try {
     meta = await input().metadata();
@@ -35,6 +71,12 @@ export async function renderImage(original: Uint8Array): Promise<RenderedImage> 
     const swap = (meta.orientation ?? 1) >= 5;
     const width = (swap ? meta.height : meta.width) ?? 0;
     const height = (swap ? meta.width : meta.height) ?? 0;
+    if (redactions.length > 0) {
+      // Las variantes públicas salen de la versión difuminada; el hash perceptual, del original (detección de reuso).
+      const { data, info } = await redact(source(), redactionRects(redactions, width, height));
+      const raw = { width: info.width, height: info.height, channels: info.channels };
+      input = () => sharp(data, { raw });
+    }
     const variants: RenderedImage["variants"] = [];
     for (const [variant, spec] of Object.entries(IMAGE_VARIANTS) as [ImageVariant, (typeof IMAGE_VARIANTS)[ImageVariant]][]) {
       const { data, info } = await input()
@@ -43,7 +85,7 @@ export async function renderImage(original: Uint8Array): Promise<RenderedImage> 
         .toBuffer({ resolveWithObject: true });
       variants.push({ variant, data, width: info.width, height: info.height });
     }
-    const gray = await input().resize(32, 32, { fit: "fill" }).greyscale().raw().toBuffer();
+    const gray = await source().resize(32, 32, { fit: "fill" }).greyscale().raw().toBuffer();
     return { width, height, variants, phash: dctHash(gray) };
   } catch (err) {
     throw new MalformedMediaError(`Imagen dañada: ${(err as Error).message}`);

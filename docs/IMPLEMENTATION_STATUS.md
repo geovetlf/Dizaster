@@ -240,6 +240,7 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | Números de emergencia con `?since=version` y país por ajustes del teléfono | ✅ | ADR 0039 |
 | Reacciones de contexto (apoyo, útil, yo también lo vi; nunca son evidencia) | ✅ | ADR 0040 |
 | Mapa sin conexión por zona guardada + pipeline PMTiles (subida bloqueada por storage) | ✅ | ADR 0041, `infra/maps` |
+| Difuminado manual de rostros y matrículas en fotos (aplicado en el servidor) | ✅ | ADR 0042 |
 | Reglas `dedup-2` con `sim_media` y `sim_texto` reales | ✅ | `packages/geo-kit/src/dedup.ts` |
 | Fotos procesadas después del reporte suman su hash al evento | ✅ | `MediaReady.phash`, `event.media-fingerprint` |
 
@@ -247,7 +248,7 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 
 1. **BLOQUEADA** — Identity real: Sign in with Apple, Google y email; App Attest / Play Integrity. Falta: cuentas de
    Apple Developer y Google (client IDs, Service ID, Team ID) y un proveedor de email aprobado (gasto).
-2. Difuminado de rostros y matrículas (D-08; modelo abierto, trabajo grande).
+2. Detección automática de rostros que proponga recuadros (D-08, ADR 0042; elegir modelo abierto y medir coste).
 3. Fuentes peruanas IGP, INDECI y SENAMHI: **en espera de acción humana** (confirmar formato/URL y términos);
    si publican CAP, activar es solo configuración (ADR 0033).
 4. **BLOQUEADA** — Publicar el mapa propio: `infra/maps/publish.sh --apply` en cuanto haya bucket aprobado; después

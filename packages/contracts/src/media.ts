@@ -50,6 +50,16 @@ export const VideoPoster = z.object({
 });
 export type VideoPoster = z.infer<typeof VideoPoster>;
 
+/**
+ * Zona a difuminar (rostro, matrícula), en fracciones del ancho/alto de la foto ya orientada (ADR 0042).
+ * El servidor la aplica a todas las variantes públicas; el original privado se borra al acabar la retención.
+ */
+export const RedactionBox = z
+  .object({ x: z.number().min(0).max(1), y: z.number().min(0).max(1), w: z.number().gt(0).max(1), h: z.number().gt(0).max(1) })
+  .refine((b) => b.x + b.w <= 1.0001 && b.y + b.h <= 1.0001, "El recuadro se sale de la foto");
+export type RedactionBox = z.infer<typeof RedactionBox>;
+export const MAX_REDACTIONS = 20;
+
 export const CreateUploadRequest = z
   .object({
     kind: z.enum(["IMAGE", "VIDEO_RECORDED"]),
@@ -67,8 +77,12 @@ export const CreateUploadRequest = z
     graphic: z.boolean().default(false),
     /** Solo videos. Opcional: sin póster el video se muestra con un marco genérico. */
     poster: VideoPoster.optional(),
+    /** Solo fotos: rostros y matrículas que quien sube quiere difuminar. */
+    redactions: z.array(RedactionBox).max(MAX_REDACTIONS).default([]),
   })
   .superRefine((v, ctx) => {
+    // Difuminar un video fotograma a fotograma no está en V1: aceptarlo daría una falsa sensación de protección.
+    if (v.redactions.length > 0 && v.kind !== "IMAGE") ctx.addIssue({ code: "custom", path: ["redactions"], message: "Solo se puede difuminar en fotos" });
     if (v.poster && v.kind !== "VIDEO_RECORDED") ctx.addIssue({ code: "custom", path: ["poster"], message: "Solo los videos llevan póster" });
     const limits = MEDIA_UPLOAD_LIMITS[v.kind];
     if (!(limits.mimes as readonly string[]).includes(v.mime)) ctx.addIssue({ code: "custom", path: ["mime"], message: `Tipo no admitido para ${v.kind}` });
