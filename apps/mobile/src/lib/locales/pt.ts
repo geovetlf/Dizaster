@@ -198,6 +198,7 @@ export const pt: Record<MessageKey, string> = {
   saveZone: "Salvar região",
   costMonth: "mês",
   playVideo: "Reproduzir vídeo",
+  offlineCopy: "Sem conexão: cópia salva",
   searchEvents: "Eventos",
   prefMentions: "Quando alguém me menciona",
   callNow: "Ligar para",

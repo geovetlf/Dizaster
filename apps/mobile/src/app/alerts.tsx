@@ -3,9 +3,12 @@ import { router, Stack, useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from "react-native";
 import { Icon } from "../components/icon";
+import { OfflineNote } from "../components/offline-note";
 import { deliveryNoteKey, routeForNotificationUrl } from "../lib/alerts/logic";
 import { reportUnread } from "../lib/alerts/notifications";
 import { api } from "../lib/api";
+import { cacheKeys, readThrough } from "../lib/offline/read-cache";
+import { readCache } from "../lib/offline/sqlite-cache";
 import { lang, t } from "../lib/i18n";
 import { categoryStyle } from "../lib/ui/categories";
 import { timeAgo } from "../lib/ui/format";
@@ -18,10 +21,14 @@ export default function AlertsScreen() {
   const [unread, setUnread] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [savedAt, setSavedAt] = useState<number | null>(null);
 
   const load = useCallback(async (more: string | null) => {
     try {
-      const r = await api.notifications(more);
+      // Solo la primera página se guarda para leer sin conexión (ADR 0066).
+      const got = more ? { value: await api.notifications(more), savedAt: null } : await readThrough(readCache(), cacheKeys.alerts, () => api.notifications(null));
+      const r = got.value;
+      if (!more) setSavedAt(got.savedAt);
       setItems((prev) => (more ? [...prev, ...r.notifications] : r.notifications));
       setCursor(r.nextCursor);
       setUnread(r.unread);
@@ -70,7 +77,7 @@ export default function AlertsScreen() {
         onEndReachedThreshold={0.4}
         onEndReached={() => { if (cursor) void load(cursor); }}
         ListHeaderComponent={
-          unread > 0 ? (
+          savedAt ? <OfflineNote savedAt={savedAt} /> : unread > 0 ? (
             <Pressable accessibilityRole="button" style={styles.readAll} onPress={() => void readAll()}>
               <Text style={styles.readAllText}>{t("markAllRead")}</Text>
             </Pressable>

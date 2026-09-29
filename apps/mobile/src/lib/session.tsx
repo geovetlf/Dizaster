@@ -4,6 +4,7 @@ import { api, onSessionEvents, setSession } from "./api";
 import { ensureAlertChannel, registerPushIfPermitted, watchPushTokenRotation } from "./device/push";
 import { clearIdentity, loadIdentity, saveIdentity, type StoredIdentity } from "./device/secure-session";
 import { newId } from "./ids";
+import { readCache } from "./offline/sqlite-cache";
 import { startAutoFlush } from "./report/outbox";
 
 interface SessionState {
@@ -84,6 +85,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setSession(null);
     identity.current = null;
     await clearIdentity().catch(() => undefined);
+    // Lo guardado para leer sin conexión (avisos, eventos) era de la cuenta borrada.
+    await readCache().clear().catch(() => undefined);
     setState({ ready: false, deviceId: null, error: null });
     setGeneration((g) => g + 1);
   }, []);

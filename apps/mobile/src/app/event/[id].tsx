@@ -4,7 +4,10 @@ import { useCallback, useEffect, useState } from "react";
 import { Linking, Pressable, StyleSheet, Text, View } from "react-native";
 import { FeedList } from "../../components/feed-list";
 import { EventMedia } from "../../components/event-media";
+import { OfflineNote } from "../../components/offline-note";
 import { api } from "../../lib/api";
+import { cacheKeys, readThrough } from "../../lib/offline/read-cache";
+import { readCache } from "../../lib/offline/sqlite-cache";
 import { lang, t, VERIFICATION_LABEL, verificationLabel } from "../../lib/i18n";
 import { eventTitle, timeAgo } from "../../lib/ui/format";
 import { evidenceLine, explainLines, timelineLabel } from "../../lib/verification/explain";
@@ -24,12 +27,14 @@ export default function EventScreen() {
   const [verification, setVerification] = useState<VerificationView | null>(null);
   const [sources, setSources] = useState<EventSourceView[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [savedAt, setSavedAt] = useState<number | null>(null);
   const follows = useFollows();
 
   useEffect(() => {
     if (!id) return;
-    Promise.all([api.event(id), api.timeline(id)])
-      .then(([e, tl]) => { setEvent(e); setTimeline(tl.entries); })
+    // Sin red se muestra la última versión guardada del evento (ADR 0066).
+    readThrough(readCache(), cacheKeys.event(id), () => Promise.all([api.event(id), api.timeline(id)]))
+      .then(({ value: [e, tl], savedAt }) => { setEvent(e); setTimeline(tl.entries); setSavedAt(savedAt); })
       .catch((e: Error) => setError(e.message));
     // La media es secundaria: si falla, el evento se muestra igual.
     api.eventMedia(id).then((r) => setMedia(r.media)).catch(() => setMedia([]));
@@ -45,6 +50,7 @@ export default function EventScreen() {
   const place = followablePlace(event.place);
   const header = (
     <View style={styles.header}>
+      {savedAt ? <OfflineNote savedAt={savedAt} /> : null}
       <Text style={styles.title}>{eventTitle(event, lang)}</Text>
       {event.place ? <Text style={styles.place}>{event.place.label}</Text> : null}
       <View style={styles.follows}>

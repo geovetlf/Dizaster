@@ -10,6 +10,9 @@ import { parseBboxParam } from "../../lib/ui/format";
 import { useCoarseLocation } from "../../lib/ui/use-coarse-location";
 import { colors } from "../../theme";
 import { api } from "../../lib/api";
+import { OfflineNote } from "../../components/offline-note";
+import { cacheKeys, readThrough } from "../../lib/offline/read-cache";
+import { readCache } from "../../lib/offline/sqlite-cache";
 import { limitAmbientCache } from "../../lib/map/offline";
 import { lang, t } from "../../lib/i18n";
 import { OFFLINE_FALLBACK_STYLE, providerFromAppConfig, type MapProvider } from "../../lib/map/provider";
@@ -27,6 +30,7 @@ export default function MapScreen() {
   const location = useCoarseLocation();
   const [provider, setProvider] = useState<MapProvider | null>(null);
   const [data, setData] = useState<EventMapResponse | null>(null);
+  const [savedAt, setSavedAt] = useState<number | null>(null);
   const [filter, setFilter] = useState<MapFilter>({ category: null, verifiedOnly: false });
   const view = useRef<{ bounds: [number, number, number, number]; zoom: number } | null>(null);
   // Desde la búsqueda de lugares: /map?bbox=w,s,e,n encuadra el área elegida.
@@ -44,7 +48,13 @@ export default function MapScreen() {
 
   const load = useCallback((f: MapFilter) => {
     if (!view.current) return;
-    api.events(view.current.bounds, view.current.zoom, mapFilterQuery(f)).then(setData).catch(() => undefined);
+    // Sin red, el mapa muestra la última vista guardada en lugar de quedar vacío (ADR 0066). Solo se guarda la vista
+    // sin filtros, que es la que sirve de respaldo.
+    const q = mapFilterQuery(f);
+    const fetcher = () => api.events(view.current!.bounds, view.current!.zoom, q);
+    (q ? fetcher().then((value) => ({ value, savedAt: null })) : readThrough(readCache(), cacheKeys.map, fetcher))
+      .then(({ value, savedAt }) => { setData(value); setSavedAt(savedAt); })
+      .catch(() => undefined);
   }, []);
   const onRegionDidChange = useCallback((e: NativeSyntheticEvent<ViewStateChangeEvent>) => {
     const { bounds, zoom } = e.nativeEvent;
@@ -129,6 +139,7 @@ export default function MapScreen() {
             );
           })}
         </ScrollView>
+        {savedAt ? <View style={styles.offline}><OfflineNote savedAt={savedAt} /></View> : null}
       </SafeAreaView>
       {provider ? <Text style={styles.attribution}>{provider.attribution}</Text> : null}
       <View style={styles.actions}>
@@ -144,6 +155,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   map: { flex: 1 },
   filters: { position: "absolute", top: 0, left: 0, right: 0 },
+  offline: { paddingHorizontal: 12 },
   chipRow: { gap: 8, paddingHorizontal: 12, paddingVertical: 8 },
   chip: { backgroundColor: "#0B0F14CC", borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6, borderWidth: 1, borderColor: colors.border },
   chipOn: { backgroundColor: colors.accent, borderColor: colors.accent },
