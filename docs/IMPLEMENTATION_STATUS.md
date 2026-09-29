@@ -323,9 +323,7 @@ Revisión del Blueprint del 2026-09-29 (tras ADR 0070): completada con ADR 0071�
 
 Revisión del Blueprint del 2026-09-29 (tras ADR 0080): completada con ADR 0081–0092.
 
-Revisión del Blueprint del 2026-09-29 (tras ADR 0092), verificada contra el código, sin bloqueos:
-
-
+Revisión del Blueprint del 2026-09-29 (tras ADR 0092): completada con ADR 0093–0102.
 
 Bloqueadas o en espera:
 
