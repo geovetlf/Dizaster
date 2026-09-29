@@ -6,6 +6,7 @@ import { DomainError } from "../../platform/errors.js";
 import { newId } from "../../platform/ids.js";
 import { publish } from "../../platform/outbox.js";
 import type { EventService, ResolutionResult } from "../event/index.js";
+import type { GeoService } from "../geo/index.js";
 
 export { FEED_ADAPTERS, type FeedAdapter } from "./adapters/index.js";
 export { IngestionScheduler, NodeHttpFetcher, lastScheduledAt, resolveSourceUrl, type HttpFetcher, type FetchResult, type RunSummary } from "./scheduler.js";
@@ -27,6 +28,8 @@ export interface NormalizedItem {
   severity: number | null;
   /** NOT_OCCURRING = la fuente niega/desmiente el acontecimiento. */
   assertion: "OCCURRING" | "NOT_OCCURRING";
+  /** Geocódigos oficiales del área (CAP `<geocode>`): sirven para ubicar el ítem si no trae coordenadas (ADR 0077). */
+  geocodes?: { scheme: string; value: string }[];
   raw: Record<string, unknown>;
 }
 
@@ -61,6 +64,7 @@ export class IngestionService {
   constructor(
     private readonly db: Db,
     private readonly events: EventService,
+    private readonly geo: GeoService | null = null,
   ) {}
 
   /** Sincroniza el registro de fuentes (datos versionados) con la base de datos. */
@@ -105,6 +109,13 @@ export class IngestionService {
         // Sin cambios: solo se actualiza a qué crudo pertenece la última vez que se vio (ADR 0075).
         if (rawRef) await tx.query(`UPDATE ingestion.external_items SET raw_ref = $2 WHERE id = $1`, [existing.id, rawRef]);
         return { externalItemId: existing.id, resolution: null, duplicate: true };
+      }
+
+      // Sin coordenadas pero con geocódigos oficiales: se ubica con el índice local (nunca se inventa un punto).
+      // El hash se calcula sobre lo que mandó la fuente, así un ítem repetido no vuelve a consultar el índice.
+      const located = !item.point && item.geocodes?.length && this.geo ? await this.geo.locateGeocodes(tx, item.geocodes) : null;
+      if (located) {
+        item = { ...item, point: located.point, uncertaintyM: Math.max(item.uncertaintyM, located.radiusM), raw: { ...item.raw, locatedBy: "GEOCODE", areaIds: located.areaIds } };
       }
 
       const itemId = existing?.id ?? newId();

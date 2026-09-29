@@ -63,7 +63,7 @@ export function buildContainer(env: AppEnv, overrides: { db?: Db; clock?: Clock;
   const social = new SocialService();
   const identity = new IdentityService(db, social, env.AUTH_JWT_SECRET);
   const events = new EventService(ref, geo, { archiveAfterDays: env.EVENT_ARCHIVE_AFTER_DAYS });
-  const ingestion = new IngestionService(db, events);
+  const ingestion = new IngestionService(db, events, geo);
   // Claves de fuentes (SOURCE_KEY_*): solo del entorno, nunca en data/ (ADR 0067).
   const sourceSecrets = Object.fromEntries(Object.entries(process.env).filter(([k]) => k.startsWith("SOURCE_KEY_")));
   const storage = overrides.storage ?? buildStorage(env, clock);

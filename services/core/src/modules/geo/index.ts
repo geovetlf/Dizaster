@@ -15,6 +15,15 @@ export { MAX_GRANULARITY, labelFor, toContextualLocation, type ResolvedContext }
 export { searchKey, titleCaseEs } from "./names.js";
 export { TIMEZONE_ATTRIBUTION, polygonTimezones, resolveTimezone, type TimezoneLocator } from "./timezone.js";
 
+/** Esquema de geocódigo (data/geo/geocode-schemes.json): lo específico de cada país es dato. */
+interface GeocodeScheme {
+  key: string;
+  names: string[];
+  match: "id" | "code";
+  idPrefix?: string;
+  pattern: string;
+}
+
 /** Tolerancia para puntos que caen justo fuera de un polígono simplificado (costa, bordes): ~2 km. */
 const EDGE_TOLERANCE_DEG = 0.02;
 /** Radio máximo para nombrar una ciudad por cercanía donde no hay polígonos de ciudad. */
@@ -41,9 +50,52 @@ export class GeoService {
     private readonly meter?: Meter,
     private readonly timezones: TimezoneLocator = polygonTimezones(),
   ) {
+    this.dataDir = dataDir;
     const fc = JSON.parse(readFileSync(join(dataDir, "countries/countries-50m.geojson"), "utf8")) as { features: CountryFeature[] };
     this.locator = new CountryLocator(fc.features);
     this.countryCodes = new Set(fc.features.map((f) => f.properties.iso2));
+  }
+
+  private geocodeSchemes: GeocodeScheme[] | null = null;
+  private readonly dataDir: string = "";
+
+  /**
+   * Ubica un ítem de fuente que solo trae geocódigos oficiales (ADR 0077, Blueprint §9.4): coincidencia EXACTA con
+   * el índice administrativo local, nunca por nombre. Devuelve un punto dentro del área (o de la unión de áreas) y
+   * un radio que la cubre entera; null si ningún código se reconoce (el ítem queda sin mapa). NO AI REQUIRED.
+   */
+  async locateGeocodes(q: Queryable, geocodes: readonly { scheme: string; value: string }[]): Promise<{ point: GeoPoint; radiusM: number; areaIds: string[] } | null> {
+    const schemes = this.loadGeocodeSchemes();
+    const ids: string[] = [];
+    const codes: string[] = [];
+    for (const g of geocodes.slice(0, 50)) {
+      const name = g.scheme.trim().toUpperCase();
+      const scheme = schemes.find((s) => s.names.some((n) => n.toUpperCase() === name));
+      const value = g.value.trim().toUpperCase();
+      if (!scheme || !new RegExp(scheme.pattern).test(value)) continue;
+      if (scheme.match === "id") ids.push(`${scheme.idPrefix ?? ""}${value}`);
+      else codes.push(value);
+    }
+    if (ids.length === 0 && codes.length === 0) return null;
+    const { rows } = await q.query<{ ids: string[] | null; lat: number | null; lng: number | null; xmin: number; ymin: number; xmax: number; ymax: number }>(
+      `WITH a AS (SELECT id, geom FROM geo.admin_areas WHERE id = ANY($1) OR code = ANY($2)),
+            u AS (SELECT array_agg(id ORDER BY id) AS ids, ST_Union(geom) AS g FROM a)
+       SELECT ids, ST_Y(ST_PointOnSurface(g)) AS lat, ST_X(ST_PointOnSurface(g)) AS lng,
+              ST_XMin(g) AS xmin, ST_YMin(g) AS ymin, ST_XMax(g) AS xmax, ST_YMax(g) AS ymax
+         FROM u WHERE g IS NOT NULL`,
+      [ids, codes],
+    );
+    const r = rows[0];
+    if (!r || r.lat === null || r.lng === null || !r.ids) return null;
+    const point = { lat: Math.round(r.lat * 1e5) / 1e5, lng: Math.round(r.lng * 1e5) / 1e5 };
+    const corners = [[r.ymin, r.xmin], [r.ymin, r.xmax], [r.ymax, r.xmin], [r.ymax, r.xmax]] as const;
+    const radiusM = Math.round(Math.max(...corners.map(([lat, lng]) => distanceMeters(point, { lat, lng }))));
+    return { point, radiusM, areaIds: r.ids };
+  }
+
+  private loadGeocodeSchemes(): GeocodeScheme[] {
+    this.geocodeSchemes ??= (JSON.parse(readFileSync(join(this.dataDir, "geo/geocode-schemes.json"), "utf8")) as { schemes: GeocodeScheme[] }).schemes;
+    return this.geocodeSchemes;
   }
 
   countryOf(point: GeoPoint, maxDistanceM?: number): string | null {

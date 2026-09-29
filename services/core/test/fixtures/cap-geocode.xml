@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Alerta CAP 1.2 de ejemplo sin polígono, solo con geocódigos (emisor ficticio, solo para pruebas). -->
+<alert xmlns="urn:oasis:names:tc:emergency:cap:1.2">
+  <identifier>EJ-2026-0929-GEO</identifier>
+  <sender>alertas@example.org</sender>
+  <sent>2026-09-29T06:00:00-05:00</sent>
+  <status>Actual</status>
+  <msgType>Alert</msgType>
+  <scope>Public</scope>
+  <info>
+    <language>es-PE</language>
+    <category>Met</category>
+    <event>Lluvias intensas</event>
+    <urgency>Expected</urgency>
+    <severity>Moderate</severity>
+    <certainty>Likely</certainty>
+    <headline>Aviso de lluvias en el litoral sur de Lima</headline>
+    <area>
+      <areaDesc>Pucusana; Santa María del Mar</areaDesc>
+      <geocode><valueName>UBIGEO</valueName><value>150124</value></geocode>
+      <geocode><valueName>UBIGEO</valueName><value>150138</value></geocode>
+    </area>
+  </info>
+</alert>

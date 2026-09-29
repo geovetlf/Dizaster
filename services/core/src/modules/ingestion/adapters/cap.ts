@@ -78,7 +78,7 @@ function findAlerts(doc: Node): Node[] {
   for (const e of entries) {
     const embedded = (e["content"] as Node | undefined)?.["alert"] ?? e["alert"];
     if (embedded) out.push(...list(embedded as Node | Node[]));
-    else if (e["event"] && (e["polygon"] || e["circle"])) out.push(flatEntryAsAlert(e));
+    else if (e["event"] && (e["polygon"] || e["circle"] || e["geocode"])) out.push(flatEntryAsAlert(e));
   }
   return out;
 }
@@ -90,7 +90,7 @@ function flatEntryAsAlert(e: Node): Node {
     info: {
       event: e["event"], severity: e["severity"], urgency: e["urgency"], certainty: e["certainty"],
       effective: e["effective"], onset: e["onset"], expires: e["expires"], headline: e["title"], language: e["language"],
-      area: { polygon: e["polygon"], circle: e["circle"], areaDesc: e["areaDesc"] },
+      area: { polygon: e["polygon"], circle: e["circle"], geocode: e["geocode"], areaDesc: e["areaDesc"] },
     },
   };
 }
@@ -112,7 +112,10 @@ function normalizeAlert(alert: Node, config: CapConfig): NormalizedItem | null {
   const event = text(info["event"]);
   const category = event ? categoryFor(event, config) : null;
   if (!category) return null;
-  const geo = areaGeometry(list(info["area"] as Node | Node[]));
+  const areas = list(info["area"] as Node | Node[]);
+  const geo = areaGeometry(areas);
+  // Sin polígono ni círculo, los geocódigos permiten ubicarla con el índice local (ADR 0077).
+  const geocodes = geo ? [] : areaGeocodes(areas);
 
   const severity = (text(info["severity"]) ?? "Unknown") as CapSeverity;
   const title: Record<string, string> = {};
@@ -134,12 +137,26 @@ function normalizeAlert(alert: Node, config: CapConfig): NormalizedItem | null {
     endsAt: parseDate(info["expires"])?.toISOString() ?? null,
     severity: SEVERITY[severity] ?? 2,
     assertion: "OCCURRING",
+    ...(geocodes.length ? { geocodes } : {}),
     raw: {
       identifier, msgType, event, urgency: text(info["urgency"]), certainty: text(info["certainty"]), capSeverity: severity,
       expires: parseDate(info["expires"])?.toISOString() ?? null,
       areaDesc: list(info["area"] as Node | Node[]).map((a) => text(a["areaDesc"])).filter(Boolean).join("; ") || null,
     },
   };
+}
+
+/** `<geocode><valueName>UBIGEO</valueName><value>150101</value></geocode>`, uno o varios por área. */
+function areaGeocodes(areas: Node[]): { scheme: string; value: string }[] {
+  const out: { scheme: string; value: string }[] = [];
+  for (const a of areas) {
+    for (const g of list(a["geocode"] as Node | Node[])) {
+      const scheme = text((g as Node)["valueName"]);
+      const value = text((g as Node)["value"]);
+      if (scheme && value) out.push({ scheme, value });
+    }
+  }
+  return out.slice(0, 50);
 }
 
 function pickInfo(infos: Node[], languages: string[]): Node | null {

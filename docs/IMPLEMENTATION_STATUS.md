@@ -268,6 +268,7 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | Textos idénticos entre reportes cuentan como un solo corroborador | ✅ | ADR 0074 |
 | Crudo de cada fuente en object storage con retención (raw_ref) | ✅ | ADR 0075 |
 | Fusión automática de duplicados, cola de posibles duplicados y métricas de reversión | ✅ | ADR 0076 |
+| Ítems de fuentes sin coordenadas ubicados por geocódigo exacto (UBIGEO, ISO 3166-2) | ✅ | ADR 0077 |
 | Licencias, auditoría, SBOM, Dependabot; respaldo con prueba de restauración en CI | ✅ | ADR 0070, `scripts/supply-chain.mjs`, `scripts/db-restore-check.mjs` |
 | Idioma de la app elegible en el perfil (es/en/pt/fr o del teléfono) | ✅ | ADR 0069, `app/language.tsx` |
 | Varias cuentas en un teléfono corroboran como una (clave seudónima del teléfono) | ✅ | ADR 0068, migración 0036 |
@@ -295,10 +296,9 @@ decisiones o credenciales del propietario (lista de abajo); mientras tanto se co
 
 Revisión del Blueprint del 2026-09-29 (tras ADR 0070), verificada contra el código, sin bloqueos:
 
-1. Ubicar ítems de fuentes sin coordenadas con el índice geográfico local (geocódigos exactos) (§9.4).
-2. Consultas del mapa alineadas a teselas para que la caché se comparta (§11.4).
-3. Horas en la zona del evento y plurales correctos en 4 idiomas (§5.15).
-4. Adaptador EMSC (PLANNED hasta revisar términos) (§9.3).
+1. Consultas del mapa alineadas a teselas para que la caché se comparta (§11.4).
+2. Horas en la zona del evento y plurales correctos en 4 idiomas (§5.15).
+3. Adaptador EMSC (PLANNED hasta revisar términos) (§9.3).
 
 
 Bloqueadas o en espera:

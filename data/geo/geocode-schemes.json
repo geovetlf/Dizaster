@@ -1,0 +1,19 @@
+{
+  "version": "geocodes-2026.09.1",
+  "description": "Esquemas de geocódigo que traen las alertas sin coordenadas (CAP <geocode>) y cómo se buscan en el índice administrativo local (ADR 0077). Solo coincidencias exactas; nunca por nombre.",
+  "schemes": [
+    {
+      "key": "UBIGEO",
+      "names": ["UBIGEO", "INEI", "UBIGEO_INEI"],
+      "match": "id",
+      "idPrefix": "PE:",
+      "pattern": "^[0-9]{2}([0-9]{2}){0,2}$"
+    },
+    {
+      "key": "ISO3166-2",
+      "names": ["ISO3166-2", "ISO 3166-2", "ISO31662"],
+      "match": "code",
+      "pattern": "^[A-Z]{2}-[A-Z0-9]{1,3}$"
+    }
+  ]
+}
