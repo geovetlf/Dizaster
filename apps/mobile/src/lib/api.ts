@@ -4,6 +4,8 @@ import { canRetryWithRefresh, singleFlight } from "./auth/refresh";
 import { API_URL } from "./config";
 import { EtagCache } from "./http/etag-cache";
 import { isMfaError } from "./auth/mfa";
+import { serverErrorMessage } from "./errors/server-error";
+import { lang, t } from "./i18n";
 import type { Sender } from "./report/queue";
 
 export interface TokenPair { token: string; refreshToken: string; expiresIn: number }
@@ -62,7 +64,7 @@ async function request<T>(path: string, init: RequestInit = {}, retried = false)
   }
   const body = (await res.json().catch(() => ({}))) as T & { message?: string };
   if (res.status === 403 && isMfaError(body)) listeners.mfa?.();
-  if (!res.ok) throw Object.assign(new Error(body.message ?? `HTTP ${res.status}`), { status: res.status, body });
+  if (!res.ok) throw Object.assign(new Error(serverErrorMessage(body, res.status, lang, t)), { status: res.status, body });
   if (isGet) etags.store(path, res.headers.get("etag"), body);
   return body;
 }

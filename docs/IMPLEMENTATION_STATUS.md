@@ -296,6 +296,7 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | Preparación RTL: dirección según el idioma de la app, estilos start/end, guardia | ✅ | ADR 0102 |
 | Timeline y verificación con la misma visibilidad que la ficha del evento | ✅ | ADR 0103 |
 | Corroborar y compartir desde la ficha del evento (ADR 0104) | Hecho | Chip "Yo también lo veo" (ACTIVE/MONITORING) y compartir con `shareUrl`. NO AI REQUIRED |
+| Errores del servidor traducidos por código (ADR 0105) | Hecho | `serverErrorMessage`: español usa el mensaje del servidor; otros idiomas traducen el código. NO AI REQUIRED |
 | Licencias, auditoría, SBOM, Dependabot; respaldo con prueba de restauración en CI | ✅ | ADR 0070, `scripts/supply-chain.mjs`, `scripts/db-restore-check.mjs` |
 | Idioma de la app elegible en el perfil (es/en/pt/fr o del teléfono) | ✅ | ADR 0069, `app/language.tsx` |
 | Varias cuentas en un teléfono corroboran como una (clave seudónima del teléfono) | ✅ | ADR 0068, migración 0036 |
@@ -329,10 +330,9 @@ Revisión del Blueprint del 2026-09-29 (tras ADR 0092): completada con ADR 0093�
 
 Revisión del Blueprint del 2026-09-29 (tras ADR 0102), verificada contra el código, sin bloqueos:
 
-1. Errores del servidor traducidos por código en la app (§5.15).
-2. Paginación por cursor de timeline y comentarios (§6.3, §13.1).
-3. Búsqueda de publicaciones por texto (RF-02).
-4. El testimonio tardío pesa menos (§8.3).
+1. Paginación por cursor de timeline y comentarios (§6.3, §13.1).
+2. Búsqueda de publicaciones por texto (RF-02).
+3. El testimonio tardío pesa menos (§8.3).
 
 
 Bloqueadas o en espera:
