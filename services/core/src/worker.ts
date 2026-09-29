@@ -48,6 +48,7 @@ async function loop() {
       // Degradación automática por costo fuera de IA (ADR 0138).
       const degradation = await c.cost.applyDegradation().catch((e: Error) => { console.warn(JSON.stringify({ msg: "cost.degradation", error: e.message })); return null; });
       if (degradation?.changed.length) console.warn(JSON.stringify({ msg: "cost.degradation.applied", ...degradation }));
+      console.log(JSON.stringify({ msg: "moderation.priorities", ...(await c.moderation.refreshPriorities()) }));
       console.log(JSON.stringify({ msg: "events.duplicates", ...(await c.events.sweepDuplicates(c.db, c.clock.now())) }));
     }
     if (Date.now() - lastMeterFlush > 60_000) {

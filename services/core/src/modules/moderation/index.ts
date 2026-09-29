@@ -126,6 +126,11 @@ export class ModerationService {
         await this.systemFlag(tx, "POST", postId, "SPAM", "Regla: el mismo texto fue publicado por varias cuentas distintas en pocas horas (posible spam coordinado).");
       }
     });
+    // La prioridad depende de la verificación, la gravedad y el alcance (ADR 0150): se recalcula cuando cambian,
+    // no solo al entrar una denuncia.
+    const follow = async (eventId: string, tx: Queryable) => this.reprioritizeForEvent(tx, eventId);
+    dispatcher.on("VerificationChanged", "moderation.priority.verification", (e, tx) => follow(e.payload.eventId, tx));
+    dispatcher.on("EventLifecycleChanged", "moderation.priority.lifecycle", (e, tx) => follow(e.payload.eventId, tx));
   }
 
   /** Señal automática: entra en la cola como una denuncia más, pero nunca cuenta para el límite automático. */
@@ -205,6 +210,36 @@ export class ModerationService {
     }
     priority = Math.max(0, priority);
     await tx.query(`UPDATE moderation.cases SET priority = $2, updated_at = now() WHERE id = $1`, [caseId, Math.round(priority * 100) / 100]);
+  }
+
+  /** Casos abiertos sobre un evento o sobre posts vinculados a él. */
+  private async reprioritizeForEvent(tx: Queryable, eventId: string): Promise<void> {
+    const postIds = await this.social.postsLinkedToEvent(tx, eventId);
+    const { rows } = await tx.query<{ id: string }>(
+      `SELECT id FROM moderation.cases WHERE status = 'OPEN'
+          AND ((target_type = 'EVENT' AND target_id = $1) OR (target_type = 'POST' AND target_id = ANY($2::uuid[])))`,
+      [eventId, postIds],
+    );
+    for (const r of rows) await this.reprioritize(tx, r.id);
+  }
+
+  /**
+   * Barrido periódico (ADR 0150): el alcance de un post crece sin que haya evento de dominio, así que el worker
+   * recalcula cada hora la prioridad de todos los casos abiertos. NO AI REQUIRED.
+   */
+  async refreshPriorities(batch = 500): Promise<{ refreshed: number }> {
+    let refreshed = 0;
+    let after = "";
+    for (;;) {
+      const ids = (await this.db.query<{ id: string }>(
+        `SELECT id FROM moderation.cases WHERE status = 'OPEN' AND id::text > $1 ORDER BY id::text LIMIT $2`, [after, batch],
+      )).rows.map((r) => r.id);
+      if (!ids.length) break;
+      await withTransaction(this.db, async (tx) => { for (const id of ids) await this.reprioritize(tx, id); });
+      refreshed += ids.length;
+      after = ids[ids.length - 1]!;
+    }
+    return { refreshed };
   }
 
   /** Regla determinista: muchas personas establecidas denunciando lo mismo → se limita (fuera del feed) hasta revisar. */

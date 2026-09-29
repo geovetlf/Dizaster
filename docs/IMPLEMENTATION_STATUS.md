@@ -340,6 +340,7 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | 0147 | Notas de moderación en la línea de tiempo del evento (INTERNAL, solo moderación) y sección en la app | ✅ |
 | 0148 | Listas de términos por idioma (data/moderation/terms.json, vacías): coincidencia exacta manda a revisión, nunca oculta | ✅ |
 | 0149 | Ítems externos siguen fusiones, reversiones y divisiones; una declaración por institución y evento se mantiene tras fusionar | ✅ |
+| 0150 | Prioridad de casos de moderación al día: se recalcula con cambios de verificación y ciclo del evento y en un barrido horario | ✅ |
 | Licencias, auditoría, SBOM, Dependabot; respaldo con prueba de restauración en CI | ✅ | ADR 0070, `scripts/supply-chain.mjs`, `scripts/db-restore-check.mjs` |
 | Idioma de la app elegible en el perfil (es/en/pt/fr o del teléfono) | ✅ | ADR 0069, `app/language.tsx` |
 | Varias cuentas en un teléfono corroboran como una (clave seudónima del teléfono) | ✅ | ADR 0068, migración 0036 |
@@ -379,13 +380,12 @@ Revisión del Blueprint del 2026-09-29 (tras ADR 0112): completada con ADR 0113�
 
 Revisión del Blueprint del 2026-09-29 (tras ADR 0148), verificada contra el código, sin bloqueos:
 
-1. Prioridad de casos de moderación al día con verificación y alcance (§13.3, ADR 0116)
-2. Informe de transparencia en la app de administración (§13.3, ADR 0098)
-3. Catálogo de categorías remoto y ajustes por país en la app (§5.15, §6.3)
-4. Posts de actualización oficial OFFICIAL_UPDATE de perfiles institucionales (§7.3)
-5. Preferencias de alerta por zona guardada (§7.3 SavedPlace.alert_prefs)
-6. Detalles de datos: ERROR en ítems externos, compartidos externos, seguidores al dividir (§7.3)
-7. "¿Es el mismo evento?" tras un adjunto dudoso (§8.4); la respuesta "No" espera decisión D2
+1. Informe de transparencia en la app de administración (§13.3, ADR 0098)
+2. Catálogo de categorías remoto y ajustes por país en la app (§5.15, §6.3)
+3. Posts de actualización oficial OFFICIAL_UPDATE de perfiles institucionales (§7.3)
+4. Preferencias de alerta por zona guardada (§7.3 SavedPlace.alert_prefs)
+5. Detalles de datos: ERROR en ítems externos, compartidos externos, seguidores al dividir (§7.3)
+6. "¿Es el mismo evento?" tras un adjunto dudoso (§8.4); la respuesta "No" espera decisión D2
 
 
 Bloqueadas o en espera:

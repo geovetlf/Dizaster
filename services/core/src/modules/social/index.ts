@@ -312,6 +312,12 @@ export class SocialService {
     return rows.map((r) => r.post_id);
   }
 
+  /** Posts vinculados a un evento (cualquier tipo de vínculo). */
+  async postsLinkedToEvent(q: Queryable, eventId: string): Promise<string[]> {
+    const { rows } = await q.query<{ post_id: string }>(`SELECT post_id FROM social.post_event_links WHERE event_id = $1`, [eventId]);
+    return rows.map((r) => r.post_id);
+  }
+
   async linkPostToEvent(tx: Queryable, postId: string, eventId: string, linkType: "REPORT" | "MENTION" | "UPDATE"): Promise<void> {
     await tx.query(
       `INSERT INTO social.post_event_links (post_id, event_id, link_type) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`,
