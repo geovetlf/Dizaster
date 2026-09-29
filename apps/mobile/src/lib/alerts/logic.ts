@@ -10,10 +10,10 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
  */
 export function routeForNotificationUrl(url: unknown): string | null {
   if (typeof url !== "string") return null;
-  const m = /^dizaster:\/\/((event|post)\/([^/?#]+)|alerts|admin-cost)\/?$/.exec(url.trim());
+  const m = /^dizaster:\/\/((event|post)\/([^/?#]+)|alerts|admin-cost|admin-quality|my-moderation)\/?$/.exec(url.trim());
   if (!m) return null;
-  if (m[1] === "alerts") return "/alerts";
-  if (m[1] === "admin-cost") return "/admin-cost";
+  // Pantallas sin id: historial, avisos de administración y "mis avisos" de moderación (ADR 0141).
+  if (!m[2]) return `/${m[1]}`;
   return m[3] && UUID.test(m[3]) ? `/${m[2]}/${m[3].toLowerCase()}` : null;
 }
 

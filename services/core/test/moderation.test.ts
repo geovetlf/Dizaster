@@ -111,6 +111,14 @@ describe("denuncias y cola", () => {
     expect((await decide(mod2, "UPHOLD")).statusCode).toBe(409);
     const after = ((await t.app.inject({ url: "/v1/me/moderation", headers: auth(autor) })).json().notices as ModerationNotice[])[0]!;
     expect(after.appeal).toMatchObject({ status: "REVERSED", decisionReason: "Es un comercio con dirección pública" });
+
+    // Avisos push a la persona afectada (ADR 0141): uno por acción y uno por la decisión; la restauración no repite.
+    await t.c.dispatcher.drain();
+    const inbox = (await t.app.inject({ url: "/v1/me/notifications", headers: auth(autor) })).json().notifications as { kind: string; title: string; body: string; url: string }[];
+    const mine = inbox.filter((n) => n.kind === "MODERATION");
+    expect(mine.map((n) => n.title)).toEqual(["Tu apelación fue aceptada", "Moderación revisó tu contenido", "Moderación revisó tu contenido"]);
+    expect(mine.every((n) => n.url === "dizaster://my-moderation")).toBe(true);
+    expect(JSON.stringify(mine)).not.toMatch(/vecino|flagger|fulano/);
   });
 });
 

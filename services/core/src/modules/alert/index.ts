@@ -34,6 +34,9 @@ import {
   MATCH_PRIORITY,
   MENTION_LIMITS,
   mentionText,
+  moderationNoticeText,
+  NOTIFIED_MODERATION_ACTIONS_EXCLUDED,
+  type ModerationNoticeKind,
   alertText,
   decideAlerts,
   groupText,
@@ -61,7 +64,7 @@ const FLUSH_BATCH = 1000;
 
 /** Deep link del aviso: el EVENT o, para una mención, el post. */
 const subjectUrl = (r: { event_id: string | null; post_id: string | null }) =>
-  r.event_id ? `dizaster://event/${r.event_id}` : `dizaster://post/${r.post_id}`;
+  r.event_id ? `dizaster://event/${r.event_id}` : r.post_id ? `dizaster://post/${r.post_id}` : "dizaster://my-moderation";
 
 interface Recipient { profileId: string; userId: string; match: AlertMatch; prefs: AlertPreferences }
 
@@ -114,6 +117,15 @@ export class AlertService {
     dispatcher.on("VerificationChanged", "alert.evaluate.verification", (e, tx) => run(e.payload.eventId, tx));
     dispatcher.on("EventLifecycleChanged", "alert.evaluate.lifecycle", (e, tx) => run(e.payload.eventId, tx));
     dispatcher.on("UserMentioned", "alert.mention", (e, tx) => this.mention(tx, e.payload).then(() => undefined));
+    // Avisos de moderación a la persona afectada (ADR 0141). Una reversión llega como decisión de apelación.
+    dispatcher.on("ModerationActionTaken", "alert.moderation-notice", async (e, tx) => {
+      const p = e.payload;
+      if (!p.affectedUserId || p.reverses || NOTIFIED_MODERATION_ACTIONS_EXCLUDED.includes(p.action)) return;
+      await this.moderationNotice(tx, p.affectedUserId, `MODERATION:${p.actionId}`, "ACTION");
+    });
+    dispatcher.on("AppealDecided", "alert.appeal-notice", async (e, tx) => {
+      await this.moderationNotice(tx, e.payload.appellantUserId, `APPEAL:${e.payload.appealId}`, e.payload.outcome);
+    });
     // Borrado de cuenta (ADR 0021): no queda rastro de qué zonas o temas seguía la persona.
     dispatcher.on("AccountDeleted", "alert.purge-account", async (e, tx) => {
       await tx.query(`DELETE FROM alert.notifications WHERE profile_id = $1`, [e.payload.profileId]);
@@ -127,6 +139,31 @@ export class AlertService {
       await tx.query(`DELETE FROM alert.zones WHERE profile_id = $1`, [e.payload.profileId]);
       await tx.query(`DELETE FROM alert.last_locations WHERE profile_id = $1`, [e.payload.profileId]);
     });
+  }
+
+  /**
+   * Aviso de moderación (ADR 0141): pasa por la cola (horas de silencio, agrupación, historial) y lleva a "mis
+   * avisos". Nunca nombra a quien denunció. Idempotente por acción o apelación.
+   */
+  async moderationNotice(tx: Queryable, userId: string, dedupKey: string, kind: ModerationNoticeKind): Promise<number> {
+    const profile = await this.social.profileForUser(tx, userId).catch(() => null);
+    if (!profile) return 0;
+    const prefs = (await this.prefsFor(tx, [profile.id])).get(profile.id) ?? DEFAULT_PREFERENCES;
+    if (!wants(prefs, "MODERATION", "MODERATION_NOTICE", 0)) return 0;
+    const inserted = await tx.query<{ id: string }>(
+      `INSERT INTO alert.alerts (id, kind, dedup_key, critical) VALUES ($1, 'MODERATION', $2, false)
+       ON CONFLICT (dedup_key) DO NOTHING RETURNING id`,
+      [newId(), dedupKey],
+    );
+    const alertId = inserted.rows[0]?.id;
+    if (!alertId) return 0;
+    const text = moderationNoticeText(prefs.lang, kind);
+    await tx.query(
+      `INSERT INTO alert.notifications (id, alert_id, profile_id, user_id, match, title, body) VALUES ($1, $2, $3, $4, 'MODERATION_NOTICE', $5, $6)`,
+      [newId(), alertId, profile.id, userId, text.title, text.body],
+    );
+    await publish(tx, "AlertTriggered", { alertId, eventId: null, kind: "MODERATION" }, { lane: "interactive" });
+    return 1;
   }
 
   // ───────────── Decidir ─────────────
@@ -375,7 +412,7 @@ export class AlertService {
         const groupId = single ? null : newId();
         const content = single ? { title: single.title, body: single.body } : groupText(lang, items.map((r) => r.title));
         const url = single ? subjectUrl(single) : "dizaster://alerts";
-        const groupKey = single ? (single.event_id ? `event-${single.event_id}` : `post-${single.post_id}`) : "alerts-summary";
+        const groupKey = single ? (single.event_id ? `event-${single.event_id}` : single.post_id ? `post-${single.post_id}` : "moderation") : "alerts-summary";
         set(items, single ? "SENT" : "GROUPED", groupId);
         units.push({
           ids: items.map((r) => r.id),
@@ -384,8 +421,8 @@ export class AlertService {
             provider: t.provider, token: t.token, environment: t.environment, title: content.title, body: content.body, url, groupKey,
             badge: unread.get(profileId) ?? items.length, critical: items.some((r) => r.critical),
             data: {
-              ...(single ? { ...(single.event_id ? { eventId: single.event_id } : { postId: single.post_id! }), notificationId: single.id } : {}),
-              kind: single ? (single.event_id ? "event" : "mention") : "summary",
+              ...(single ? { ...(single.event_id ? { eventId: single.event_id } : single.post_id ? { postId: single.post_id } : {}), notificationId: single.id } : {}),
+              kind: single ? (single.event_id ? "event" : single.post_id ? "mention" : "moderation") : "summary",
             },
           })),
         });

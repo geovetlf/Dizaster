@@ -14,6 +14,8 @@ describe("deep link desde el aviso", () => {
     expect(routeForNotificationUrl("dizaster://post/abc")).toBeNull();
     expect(routeForNotificationUrl("dizaster://alerts")).toBe("/alerts");
     expect(routeForNotificationUrl("dizaster://admin-cost")).toBe("/admin-cost");
+    expect(routeForNotificationUrl("dizaster://admin-quality")).toBe("/admin-quality");
+    expect(routeForNotificationUrl("dizaster://my-moderation")).toBe("/my-moderation");
     for (const bad of [undefined, 42, "", "https://evil.example/event/x", "dizaster://event/../u/admin", "dizaster://event/abc", `dizaster://u/${ID}`, `dizaster://event/${ID}/extra`]) {
       expect(routeForNotificationUrl(bad)).toBeNull();
     }

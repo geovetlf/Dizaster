@@ -331,6 +331,7 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | 0138 | Degradación automática por costo fuera de IA: presupuesto `infra`, escalera video → fotos nuevas → fuentes no urgentes (100/110/125 %), restaura solo lo automático, aviso a admin/operación | ✅ |
 | 0139 | Registro auditado de requerimientos de autoridades: solo registro (estados con nota, historial de solo inserción, referencias internas), pantalla admin, conteo en transparencia; sin entrega de datos | ✅ |
 | 0140 | Hora de fin del evento (occurred_end): la fija el trigger de estado o la fuente oficial, se borra al reactivar; "Terminó …" en la ficha | ✅ |
+| 0141 | Avisos push de moderación y apelaciones: tipo MODERATION por la cola de avisos, lleva a "mis avisos", nunca nombra a quien denunció | ✅ |
 | Licencias, auditoría, SBOM, Dependabot; respaldo con prueba de restauración en CI | ✅ | ADR 0070, `scripts/supply-chain.mjs`, `scripts/db-restore-check.mjs` |
 | Idioma de la app elegible en el perfil (es/en/pt/fr o del teléfono) | ✅ | ADR 0069, `app/language.tsx` |
 | Varias cuentas en un teléfono corroboran como una (clave seudónima del teléfono) | ✅ | ADR 0068, migración 0036 |
@@ -370,10 +371,9 @@ Revisión del Blueprint del 2026-09-29 (tras ADR 0112): completada con ADR 0113�
 
 Revisión del Blueprint del 2026-09-29 (tras ADR 0139), verificada contra el código, sin bloqueos:
 
-1. Aviso push por acción de moderación y resolución de apelación (ADR 0020 pendiente)
-2. Anti-coordinación: cuentas nuevas creadas juntas (§10.2)
-3. Reportes retirados por moderación dejan de contar para el evento (§6.2)
-4. Área oficial afectada visible en la ficha y el mapa del evento (§7.3, ADR 0087)
+1. Anti-coordinación: cuentas nuevas creadas juntas (§10.2)
+2. Reportes retirados por moderación dejan de contar para el evento (§6.2)
+3. Área oficial afectada visible en la ficha y el mapa del evento (§7.3, ADR 0087)
 
 
 Bloqueadas o en espera:

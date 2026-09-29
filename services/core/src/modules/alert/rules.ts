@@ -78,6 +78,8 @@ export const MATCH_PRIORITY: AlertMatch[] = ["FOLLOWED_EVENT", "SAVED_ZONE", "NE
 export function wants(p: AlertPreferences, kind: AlertKind, match: AlertMatch, severity: number): boolean {
   if (!p.enabled) return false;
   if (kind === "MENTION") return p.mentions;
+  // Avisos sobre mi propio contenido o cuenta: solo los apaga el interruptor general (ADR 0141).
+  if (kind === "MODERATION") return true;
   if (kind !== "NEW_EVENT") {
     if (!p.statusChanges) return false;
     return match === "FOLLOWED_EVENT" ? p.followedEvents : true;
@@ -197,6 +199,8 @@ export function alertText(
       return { title: t.over(a.category), body: where || state };
     case "MENTION":
       return mentionText(lang, null);
+    case "MODERATION":
+      return moderationNoticeText(lang, "ACTION");
   }
 }
 
@@ -259,6 +263,38 @@ const DEGRADATION_TEXT: Record<Lang, (feature: string, killed: boolean, pct: num
 /** Aviso de degradación automática por costo (ADR 0138). NO AI REQUIRED. */
 export function costDegradationText(lang: Lang, d: { feature: string; killed: boolean; percent: number }): { title: string; body: string } {
   return DEGRADATION_TEXT[lang](d.feature, d.killed, Math.round(d.percent));
+}
+
+/** Acciones que la persona afectada ve en "mis avisos" y por las que recibe un push (ADR 0020, 0141). */
+export const NOTIFIED_MODERATION_ACTIONS_EXCLUDED: readonly string[] = ["DISMISS", "RESTORE", "UNSUSPEND_USER", "APPROVE_MEDIA"];
+
+export type ModerationNoticeKind = "ACTION" | "UPHELD" | "REVERSED";
+const MODERATION_TEXT: Record<Lang, Record<ModerationNoticeKind, { title: string; body: string }>> = {
+  es: {
+    ACTION: { title: "Moderación revisó tu contenido", body: "Toca para ver qué se decidió y, si corresponde, apelar." },
+    UPHELD: { title: "Tu apelación fue revisada", body: "Se mantuvo la decisión. Toca para ver el motivo." },
+    REVERSED: { title: "Tu apelación fue aceptada", body: "Se revirtió la decisión. Toca para ver el detalle." },
+  },
+  en: {
+    ACTION: { title: "Moderation reviewed your content", body: "Tap to see what was decided and appeal if it applies." },
+    UPHELD: { title: "Your appeal was reviewed", body: "The decision stands. Tap to see why." },
+    REVERSED: { title: "Your appeal was accepted", body: "The decision was reversed. Tap for details." },
+  },
+  pt: {
+    ACTION: { title: "A moderação revisou seu conteúdo", body: "Toque para ver o que foi decidido e, se couber, recorrer." },
+    UPHELD: { title: "Seu recurso foi revisado", body: "A decisão foi mantida. Toque para ver o motivo." },
+    REVERSED: { title: "Seu recurso foi aceito", body: "A decisão foi revertida. Toque para ver o detalhe." },
+  },
+  fr: {
+    ACTION: { title: "La modération a examiné votre contenu", body: "Touchez pour voir la décision et faire appel le cas échéant." },
+    UPHELD: { title: "Votre appel a été examiné", body: "La décision est maintenue. Touchez pour voir le motif." },
+    REVERSED: { title: "Votre appel a été accepté", body: "La décision a été annulée. Touchez pour le détail." },
+  },
+};
+
+/** Texto del aviso de moderación. Nunca nombra a quien denunció ni copia el contenido. NO AI REQUIRED. */
+export function moderationNoticeText(lang: Lang, kind: ModerationNoticeKind): { title: string; body: string } {
+  return MODERATION_TEXT[lang][kind];
 }
 
 /**

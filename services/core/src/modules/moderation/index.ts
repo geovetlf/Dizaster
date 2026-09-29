@@ -454,10 +454,12 @@ export class ModerationService {
       if (d.decision === "REVERSE") {
         await this.apply(tx, { caseId: r.case_id, targetType: r.target_type, targetId: r.target_id, action: INVERSE[r.action]!, reason: d.reason, moderatorUserId, reverses: r.id });
       }
-      await tx.query(
-        `UPDATE moderation.appeals SET status = $2, decision_reason = $3, decided_by = $4, decided_at = now() WHERE id = $1`,
-        [appealId, d.decision === "REVERSE" ? "REVERSED" : "UPHELD", d.reason, moderatorUserId],
+      const outcome = d.decision === "REVERSE" ? "REVERSED" : "UPHELD";
+      const { rows } = await tx.query<{ appellant_user_id: string }>(
+        `UPDATE moderation.appeals SET status = $2, decision_reason = $3, decided_by = $4, decided_at = now() WHERE id = $1 RETURNING appellant_user_id`,
+        [appealId, outcome, d.reason, moderatorUserId],
       );
+      await publish(tx, "AppealDecided", { appealId, appellantUserId: rows[0]!.appellant_user_id, outcome });
     });
     const status = (await this.db.query<{ status: string }>(`SELECT status FROM moderation.appeals WHERE id = $1`, [appealId])).rows[0]!.status as "UPHELD" | "REVERSED";
     return (await this.appeals(status)).find((a) => a.id === appealId)!;
