@@ -537,6 +537,19 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
     return c.composer.share(session, parse(IdParam, req.params).id, req.body ?? {});
   });
 
+  // Mis reportes (ADR 0094): estado, EVENT y cuándo se borra la ubicación precisa.
+  app.get("/v1/me/reports", async (req, reply) => {
+    const session = requireSession(req);
+    reply.header("cache-control", "no-store");
+    return { reports: await c.reports.myReports(c.db, session.userId) };
+  });
+
+  app.delete("/v1/me/reports/:id", async (req, reply) => {
+    const session = requireSession(req);
+    await c.reports.withdraw(session, parse(IdParam, req.params).id);
+    return reply.status(204).send();
+  });
+
   app.delete("/v1/posts/:id", async (req, reply) => {
     const session = requireSession(req);
     const { id } = parse(IdParam, req.params);

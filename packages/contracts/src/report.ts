@@ -58,3 +58,23 @@ export const SubmitReportResponse = z.discriminatedUnion("outcome", [
   z.object({ outcome: z.literal("REJECTED"), code: ReportRejectionCode, reason: z.string() }),
 ]);
 export type SubmitReportResponse = z.infer<typeof SubmitReportResponse>;
+
+/**
+ * "Mis reportes" (ADR 0094): lo que pasó con cada reporte propio. Sin puntaje de presencia ni razones antiabuso.
+ * `preciseLocationRemovesAt`: cuándo se borrará la ubicación precisa; `preciseLocationRemovedAt`: cuándo se borró.
+ */
+export interface MyReportView {
+  id: string;
+  postId: string | null;
+  eventId: string | null;
+  categoryCode: string;
+  assertion: ReportAssertion;
+  status: "ACCEPTED" | "DOWNGRADED" | "WITHDRAWN";
+  capturedAt: string;
+  receivedAt: string;
+  capturedOffline: boolean;
+  preciseLocationRemovesAt: string | null;
+  preciseLocationRemovedAt: string | null;
+  /** Veces que moderación consultó la presencia de este reporte (ADR 0089), sin decir quién. */
+  presenceReviews: number;
+}

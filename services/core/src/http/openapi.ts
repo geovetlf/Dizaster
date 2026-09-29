@@ -104,6 +104,8 @@ export const OPERATIONS: Record<string, Operation> = {
   "DELETE /v1/blocks/:handle": { summary: "Desbloquear" },
   "GET /v1/me/blocks": { summary: "Perfiles bloqueados" },
   "GET /v1/me/moderation": { summary: "Decisiones de moderación sobre mi contenido" },
+  "GET /v1/me/reports": { summary: "Mis reportes y qué pasó con cada uno (ADR 0094)" },
+  "DELETE /v1/me/reports/:id": { summary: "Retirar un reporte propio (ADR 0094)" },
   "POST /v1/me/moderation/:id/appeal": { summary: "Apelar una decisión", body: C.AppealRequest },
   "GET /v1/moderation/cases": { summary: "Cola de casos (moderación)", query: C.CaseQueueQuery },
   "GET /v1/moderation/cases/:id": { summary: "Detalle de un caso" },

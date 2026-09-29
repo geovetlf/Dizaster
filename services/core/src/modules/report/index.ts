@@ -2,9 +2,11 @@ import { createHash } from "node:crypto";
 import {
   PresenceReviewRequest,
   SubmitReportRequest,
+  type MyReportView,
   type PresenceAccessEntry,
   type PresenceReview,
   type PresenceRejectionReason,
+  type ReportAssertion,
   type SubmitReportResponse,
 } from "@dizaster/contracts";
 import { H3_RES, computePresence, extractKeywords, generalize, h3, textFingerprint } from "@dizaster/geo-kit";
@@ -337,6 +339,38 @@ export class ReportService {
     return rows.length;
   }
 
+  // ───────────── Mis reportes (ADR 0094) ─────────────
+
+  /** Reportes propios, más recientes primero. NO AI REQUIRED. */
+  async myReports(q: Queryable, userId: string, limit = MY_REPORTS_LIMIT): Promise<MyReportView[]> {
+    const { rows } = await q.query<{
+      id: string; post_id: string; event_id: string | null; category_code: string; assertion: ReportAssertion; status: MyReportView["status"];
+      captured_at: Date; received_at: Date; captured_offline: boolean; expires_at: Date | null; generalized_at: Date | null; reviews: number;
+    }>(
+      `SELECT r.id, r.post_id, r.event_id, r.category_code, r.assertion, r.status, r.captured_at, r.received_at, r.captured_offline,
+              p.expires_at, p.generalized_at,
+              (SELECT count(*) FROM report.presence_access_log l WHERE l.report_id = r.id)::int AS reviews
+         FROM report.reports r LEFT JOIN report.presence_evidence p ON p.report_id = r.id
+        WHERE r.author_user_id = $1 ORDER BY r.received_at DESC, r.id DESC LIMIT $2`,
+      [userId, limit],
+    );
+    return rows.map((r) => ({
+      id: r.id,
+      // El post de un reporte retirado ya no existe.
+      postId: r.status === "WITHDRAWN" ? null : r.post_id,
+      eventId: r.event_id,
+      categoryCode: r.category_code,
+      assertion: r.assertion,
+      status: r.status,
+      capturedAt: r.captured_at.toISOString(),
+      receivedAt: r.received_at.toISOString(),
+      capturedOffline: r.captured_offline,
+      preciseLocationRemovesAt: r.generalized_at || !r.expires_at ? null : r.expires_at.toISOString(),
+      preciseLocationRemovedAt: r.generalized_at?.toISOString() ?? null,
+      presenceReviews: r.reviews,
+    }));
+  }
+
   // ───────────── Exportación de datos personales (ADR 0038) ─────────────
 
   /**
@@ -374,6 +408,9 @@ function textHash(text: string | undefined): string | null {
   const f = textFingerprint(text);
   return f ? createHash("sha256").update(f).digest("hex").slice(0, 32) : null;
 }
+
+/** Cuántos reportes muestra "Mis reportes": con 10 por hora como máximo, cubre semanas de uso intenso. */
+export const MY_REPORTS_LIMIT = 200;
 
 /** Consultas de evidencia de presencia por persona de moderación y hora (ADR 0089). */
 export const PRESENCE_ACCESS_PER_HOUR = 30;
