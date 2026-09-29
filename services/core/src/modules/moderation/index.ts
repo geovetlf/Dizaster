@@ -99,6 +99,12 @@ export class ModerationService {
         await this.systemFlag(tx, "POST", postId, "FALSE_INFO", "Regla: una foto es casi idéntica a otra publicada antes por otra cuenta (posible foto reciclada).");
       }
     });
+    // Igual a contenido ya retirado (ADR 0145): la media no se muestra; cada post que la usa entra en la cola.
+    dispatcher.on("BlockedMediaMatched", "moderation.blocked-media", async (e, tx) => {
+      for (const postId of await this.social.postsWithMedia(tx, e.payload.mediaId)) {
+        await this.systemFlag(tx, "POST", postId, "OTHER", "Regla: una foto o video coincide con contenido ya retirado por moderación; está oculto hasta revisarlo (Aprobar media lo muestra).");
+      }
+    });
     // Fotos o video en una categoría sensible: esperan a que una persona los apruebe (y, si hace falta, los marque).
     dispatcher.on("PostMediaNeedsReview", "moderation.sensitive-media", async (e, tx) => {
       await this.systemFlag(tx, "POST", e.payload.postId, "PRIVACY", "Regla: media en una categoría sensible; no se muestra hasta aprobarla (revisar rostros, matrículas e imágenes impactantes).");
@@ -357,7 +363,10 @@ export class ModerationService {
         const prev = p.targetType === "BUSINESS"
           ? await this.social.setBusinessLogo(tx, p.targetId, null)
           : await this.social.setAvatar(tx, p.targetId, null);
-        if (prev) await this.media.purgeMedia(tx, [prev]);
+        if (prev) {
+          await this.media.blockHashes(tx, [prev]);
+          await this.media.purgeMedia(tx, [prev]);
+        }
       } else if (p.targetType === "POST" && (p.action === "APPROVE_MEDIA" || p.action === "MARK_GRAPHIC")) {
         const mediaIds = await this.social.mediaOfPost(tx, p.targetId);
         if (p.action === "APPROVE_MEDIA") await this.media.approve(tx, mediaIds);
@@ -365,6 +374,9 @@ export class ModerationService {
       } else if (p.targetType === "POST") {
         const state = ({ HIDE: "HIDDEN", REMOVE: "REMOVED", RESTORE: "VISIBLE", LIMIT: "LIMITED" } as const)[p.action as "HIDE"];
         if (state) await this.social.setPostModeration(tx, p.targetId, state);
+        // Lista de hashes (ADR 0145): retirar agrega su media; restaurar la quita.
+        if (p.action === "REMOVE") await this.media.blockHashes(tx, await this.social.mediaOfPost(tx, p.targetId));
+        if (p.action === "RESTORE") await this.media.unblockHashes(tx, await this.social.mediaOfPost(tx, p.targetId));
       } else if (p.targetType === "BUSINESS") {
         const state = ({ REMOVE: "REMOVED", RESTORE: "VISIBLE" } as const)[p.action as "REMOVE"];
         if (state) await this.social.setBusinessModeration(tx, p.targetId, state);

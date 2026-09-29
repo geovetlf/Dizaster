@@ -172,6 +172,9 @@ export class ReportService {
       for (const mediaId of await this.d.media.reuseSuspected(tx, attachable.map((m) => m.id))) {
         await publish(tx, "MediaReuseDetected", { mediaId });
       }
+      for (const mediaId of await this.d.media.heldByBlocklist(tx, attachable.map((m) => m.id))) {
+        await publish(tx, "BlockedMediaMatched", { mediaId });
+      }
       if (eventId) {
         await this.d.social.linkPostToEvent(tx, postId, eventId, "REPORT");
         if (req.mediaIds.length > 0) {

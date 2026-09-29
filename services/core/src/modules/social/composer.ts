@@ -60,6 +60,7 @@ export class PostComposer {
       await this.social.attachMedia(tx, postId, media);
       if (media.length > 0 && event && event.sensitivity !== "NORMAL") await publish(tx, "PostMediaNeedsReview", { postId });
       for (const mediaId of await this.media.reuseSuspected(tx, media.map((m) => m.id))) await publish(tx, "MediaReuseDetected", { mediaId });
+      for (const mediaId of await this.media.heldByBlocklist(tx, media.map((m) => m.id))) await publish(tx, "BlockedMediaMatched", { mediaId });
       if (event) await this.social.linkPostToEvent(tx, postId, event.id, "MENTION");
       const indexed = await this.social.indexPostText(tx, postId, profileId, req.text);
       return { postId, eventId: event?.id ?? null, ...indexed };

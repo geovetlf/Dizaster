@@ -258,6 +258,12 @@ export class MediaService {
       [mediaId, result.removed, this.clock.now()],
     );
     const hash = (await tx.query<{ phash: string | null }>(`SELECT phash FROM media.media WHERE id = $1`, [mediaId])).rows[0]?.phash ?? null;
+    // Igual a contenido ya retirado por moderación (ADR 0145): queda oculta y va a revisión; nunca se rechaza sola.
+    const blocked = await this.blockedMatch(tx, mediaId, sha, hash);
+    if (blocked) {
+      await tx.query(`UPDATE media.media SET moderation_state = 'HELD', blocked_match_of = $2 WHERE id = $1`, [mediaId, blocked]);
+      await publish(tx, "BlockedMediaMatched", { mediaId });
+    }
     await publish(tx, "MediaReady", { mediaId, phash: hash }, { lane: "interactive" });
   }
 
@@ -314,6 +320,45 @@ export class MediaService {
     const suspected = earlier.owner_profile_id !== ownerProfileId && earlier.old;
     await tx.query(`UPDATE media.media SET duplicate_of = $2, reuse_suspected = $3 WHERE id = $1`, [mediaId, earlier.id, suspected]);
     if (suspected) await publish(tx, "MediaReuseDetected", { mediaId });
+  }
+
+  // ───────────── Lista de hashes de contenido retirado (ADR 0145) ─────────────
+
+  /** Moderación retiró contenido con esta media: sus hashes (nunca la imagen) pasan a la lista. Idempotente. */
+  async blockHashes(q: Queryable, mediaIds: string[]): Promise<number> {
+    if (mediaIds.length === 0) return 0;
+    const r = await q.query(
+      `INSERT INTO media.blocked_hashes (media_id, sha256, phash, phash_bands)
+       SELECT id, sha256, phash, phash_bands FROM media.media WHERE id = ANY($1)
+       ON CONFLICT (media_id) DO NOTHING`,
+      [mediaIds],
+    );
+    return r.rowCount ?? 0;
+  }
+
+  /** Restaurar (apelación aceptada): los hashes salen de la lista. */
+  async unblockHashes(q: Queryable, mediaIds: string[]): Promise<number> {
+    if (mediaIds.length === 0) return 0;
+    return (await q.query(`DELETE FROM media.blocked_hashes WHERE media_id = ANY($1)`, [mediaIds])).rowCount ?? 0;
+  }
+
+  /** Media de la lista a la que esta se parece: SHA-256 idéntico o hash perceptual casi igual. */
+  private async blockedMatch(q: Queryable, mediaId: string, sha: string, phash: string | null): Promise<string | null> {
+    const { rows } = await q.query<{ media_id: string }>(
+      `SELECT media_id FROM media.blocked_hashes
+        WHERE media_id <> $1 AND (sha256 = $2 OR ($3::text IS NOT NULL AND phash_bands && $4
+          AND bit_count(('x' || phash)::bit(64) # ('x' || $3)::bit(64)) <= $5))
+        ORDER BY created_at LIMIT 1`,
+      [mediaId, sha, phash, phash ? phashBands(phash) : [], NEAR_DUPLICATE_BITS],
+    );
+    return rows[0]?.media_id ?? null;
+  }
+
+  /** De estas media, cuáles quedaron retenidas por coincidir con contenido retirado (el post avisa a moderación). */
+  async heldByBlocklist(q: Queryable, mediaIds: string[]): Promise<string[]> {
+    if (mediaIds.length === 0) return [];
+    const { rows } = await q.query<{ id: string }>(`SELECT id FROM media.media WHERE id = ANY($1) AND moderation_state = 'HELD'`, [mediaIds]);
+    return rows.map((r) => r.id);
   }
 
   /** De estas media, cuáles parecen una foto reciclada (el reporte avisa a moderación al adjuntarlas). */
@@ -403,7 +448,8 @@ export class MediaService {
   /** Moderación (ADR 0035): media que esperaba aprobación en una categoría sensible pasa a mostrarse. */
   async approve(q: Queryable, mediaIds: string[]): Promise<number> {
     if (mediaIds.length === 0) return 0;
-    const res = await q.query(`UPDATE media.media SET moderation_state = 'APPROVED', updated_at = now() WHERE id = ANY($1) AND moderation_state = 'PENDING'`, [mediaIds]);
+    // También la retenida por la lista de hashes (ADR 0145): una persona decidió que puede mostrarse.
+    const res = await q.query(`UPDATE media.media SET moderation_state = 'APPROVED', updated_at = now() WHERE id = ANY($1) AND moderation_state IN ('PENDING','HELD')`, [mediaIds]);
     return res.rowCount ?? 0;
   }
 
