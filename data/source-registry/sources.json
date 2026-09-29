@@ -1,5 +1,5 @@
 {
- "version": "sources-2026.09.8",
+ "version": "sources-2026.09.9",
  "sources": [
   {
    "key": "usgs-earthquakes",
@@ -110,6 +110,36 @@
    "urgentCapable": true,
    "urgentPollSeconds": 300,
    "status": "PLANNED"
+  },
+  {
+   "key": "copernicus-ems",
+   "name": "Copernicus EMS — Cartografía rápida (activaciones)",
+   "type": "EXTERNAL",
+   "trustTier": "EXTERNAL",
+   "countryScope": [
+    "*"
+   ],
+   "categories": [
+    "natural.earthquake",
+    "natural.tsunami",
+    "natural.flood",
+    "natural.landslide",
+    "natural.storm",
+    "natural.volcano",
+    "natural.drought",
+    "natural.cold_wave",
+    "fire.wildfire"
+   ],
+   "adapter": "copernicus-ems-georss",
+   "config": {
+    "url": "https://emergency.copernicus.eu/mapping/activations-rapid/feed"
+   },
+   "license": "Por confirmar (política de datos de Copernicus; revisar la atribución exigida antes de activar)",
+   "termsUrl": "https://emergency.copernicus.eu/",
+   "scheduleNormal": "0 5 * * *",
+   "urgentCapable": false,
+   "status": "PLANNED",
+   "notes": "Adapter listo (ADR 0120); se activa tras revisar términos y validar el feed real (el sandbox no llega a emergency.copernicus.eu)."
   },
   {
    "key": "nasa-firms",
