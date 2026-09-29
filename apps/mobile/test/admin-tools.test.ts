@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseScopeList, parseUsd, shortId } from "../src/lib/admin/admin-tools";
+import { parseDelayMinutes, parseScopeList, parseUsd, shortId } from "../src/lib/admin/admin-tools";
 
 describe("parseUsd", () => {
   it("acepta montos con coma o $ y hasta 2 decimales", () => {
@@ -21,5 +21,16 @@ describe("parseScopeList", () => {
   });
   it("shortId recorta a 8", () => {
     expect(shortId("0123456789abcdef")).toBe("01234567");
+  });
+});
+
+describe("parseDelayMinutes (ADR 0109)", () => {
+  it("acepta enteros de 0 a 1440", () => {
+    expect(parseDelayMinutes(" 5 ")).toBe(5);
+    expect(parseDelayMinutes("0")).toBe(0);
+    expect(parseDelayMinutes("1440")).toBe(1440);
+  });
+  it("rechaza lo demás", () => {
+    for (const bad of ["", "1441", "-1", "2.5", "abc", "12345"]) expect(parseDelayMinutes(bad)).toBeNull();
   });
 });

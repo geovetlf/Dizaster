@@ -25,3 +25,11 @@ export function parseScopeList(text: string, kind: "country" | "category"): { va
 
 /** Id corto para mostrar en registros de auditoría (los primeros 8 caracteres bastan para distinguir a simple vista). */
 export const shortId = (id: string) => id.slice(0, 8);
+
+/** Minutos de retraso de publicación escritos a mano (ADR 0109): entero de 0 a 1440, o null si no es válido. */
+export function parseDelayMinutes(text: string): number | null {
+  const clean = text.trim();
+  if (!/^\d{1,4}$/.test(clean)) return null;
+  const n = Number(clean);
+  return n <= 1440 ? n : null;
+}
