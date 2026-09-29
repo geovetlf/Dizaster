@@ -253,12 +253,13 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | Zona horaria por polígonos de timezone-boundary-builder (§5.5) | ✅ | ADR 0050, `geo/timezone.ts` |
 | Pantalla "Acerca de / licencias" con atribuciones ODbL (§11.3) | ✅ | ADR 0051, `GET /v1/about/attributions`, `app/about.tsx` |
 | Contrato OpenAPI 3.1 desde los contratos zod y trazas OpenTelemetry opcionales (§4.3, §5.22) | ✅ | ADR 0052, `GET /v1/openapi.json`, `src/telemetry.ts` |
+| Moderación cambia el ciclo de vida de un evento, auditado (§5.7) | ✅ | ADR 0053, `POST /v1/moderation/events/:id/status` |
 
 ## Siguiente etapa (en orden)
 
 Revisión del Blueprint del 2026-09-29 (tras ADR 0042), verificada contra el código:
 
-1. Moderación: cambiar el ciclo de vida de un evento; menciones y bloqueo de negocios.
+1. Moderación: menciones y bloqueo de negocios.
 
 Bloqueadas o en espera:
 

@@ -157,9 +157,25 @@ export interface EventMergeView {
   revertedAt: string | null;
 }
 
+export interface EventStatusChangeView {
+  from: EventStatus;
+  to: EventStatus;
+  reason: string;
+  at: string;
+}
+
 export interface ModeratorEventDetail {
   eventId: string;
+  status: EventStatus;
   mergedIntoId: string | null;
   evidence: ModeratorEvidenceView[];
   merges: EventMergeView[];
+  statusChanges: EventStatusChangeView[];
 }
+
+/** Cambio manual del ciclo de vida (ADR 0053): siempre con motivo; reactivar reinicia el reloj de inactividad. */
+export const SetEventStatusRequest = z.object({
+  to: EventStatus,
+  reason: z.string().trim().min(3).max(2000),
+});
+export type SetEventStatusRequest = z.infer<typeof SetEventStatusRequest>;

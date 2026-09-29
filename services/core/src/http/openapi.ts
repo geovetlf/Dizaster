@@ -110,6 +110,7 @@ export const OPERATIONS: Record<string, Operation> = {
   "POST /v1/moderation/events/:id/merge": { summary: "Fusionar eventos", body: C.MergeEventsRequest },
   "POST /v1/moderation/merges/:id/revert": { summary: "Revertir una fusión", body: C.RevertMergeRequest },
   "POST /v1/moderation/events/:id/split": { summary: "Separar un evento", body: C.SplitEventRequest },
+  "POST /v1/moderation/events/:id/status": { summary: "Cambiar el ciclo de vida de un evento", body: C.SetEventStatusRequest },
   "POST /v1/moderation/events/:id/negative-state": { summary: "Marcar un evento en disputa o falso" },
 };
 

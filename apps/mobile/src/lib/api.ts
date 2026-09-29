@@ -1,4 +1,4 @@
-import type { MyProfile, UpdateProfileRequest, ReactionKind, ReactionState, DataExport, VerificationView, ModeratorEventDetail, SavedZone, SavedZoneInput, AppealView, CaseDetail, CaseSummary, CreateFlagRequest, ModerationActionType, ModerationNotice, CostDashboard, KillSwitchView, QualityReport, CreatePostRequest, TagView, BusinessView, SessionView, CreateBusinessRequest, UpdateBusinessRequest, AlertPreferences, CategorySubscription, CategorySubscriptionInput, NotificationsResponse, AppConfig, AttributionsResponse, AreaSearchResult, FollowTarget, MyFollows, ProfileSearchResult, ProfileView, CommentView, CreateUploadRequest, FeedResponse, FeedTab, CreateUploadResponse, DevicePlatform, MediaView, RegisterPushTokenRequest, EventMapResponse, EventSummary, NearbyEventsResponse, SubmitReportRequest, SubmitReportResponse, TimelineEntryView } from "@dizaster/contracts";
+import type { EventStatus, MyProfile, UpdateProfileRequest, ReactionKind, ReactionState, DataExport, VerificationView, ModeratorEventDetail, SavedZone, SavedZoneInput, AppealView, CaseDetail, CaseSummary, CreateFlagRequest, ModerationActionType, ModerationNotice, CostDashboard, KillSwitchView, QualityReport, CreatePostRequest, TagView, BusinessView, SessionView, CreateBusinessRequest, UpdateBusinessRequest, AlertPreferences, CategorySubscription, CategorySubscriptionInput, NotificationsResponse, AppConfig, AttributionsResponse, AreaSearchResult, FollowTarget, MyFollows, ProfileSearchResult, ProfileView, CommentView, CreateUploadRequest, FeedResponse, FeedTab, CreateUploadResponse, DevicePlatform, MediaView, RegisterPushTokenRequest, EventMapResponse, EventSummary, NearbyEventsResponse, SubmitReportRequest, SubmitReportResponse, TimelineEntryView } from "@dizaster/contracts";
 import { canRetryWithRefresh, singleFlight } from "./auth/refresh";
 import { API_URL } from "./config";
 import type { Sender } from "./report/queue";
@@ -134,6 +134,8 @@ export const api = {
     request<{ mergeIds: string[]; event: ModeratorEventDetail }>(`/v1/moderation/events/${targetId}/merge`, { method: "POST", body: JSON.stringify({ sourceEventIds, reason }) }),
   revertMerge: (mergeId: string, reason: string) =>
     request<{ targetEventId: string; restoredEventId: string }>(`/v1/moderation/merges/${mergeId}/revert`, { method: "POST", body: JSON.stringify({ reason }) }),
+  setEventStatus: (id: string, to: EventStatus, reason: string) =>
+    request<ModeratorEventDetail>(`/v1/moderation/events/${id}/status`, { method: "POST", body: JSON.stringify({ to, reason }) }),
   splitEvent: (id: string, evidenceIds: string[], reason: string) =>
     request<{ eventId: string }>(`/v1/moderation/events/${id}/split`, { method: "POST", body: JSON.stringify({ evidenceIds, reason }) }),
   decideAppeal: (id: string, decision: "UPHOLD" | "REVERSE", reason: string) =>

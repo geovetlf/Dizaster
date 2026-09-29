@@ -17,7 +17,7 @@ export interface DomainEventMap {
   /** Evidencias separadas a un evento nuevo. */
   EventSplit: { sourceEventId: string; newEventId: string; evidenceRefIds: string[] };
   VerificationChanged: { eventId: string; from: string; to: string; negativeState: string };
-  EventLifecycleChanged: { eventId: string; to: "ACTIVE" | "MONITORING" | "RESOLVED" };
+  EventLifecycleChanged: { eventId: string; to: "ACTIVE" | "MONITORING" | "RESOLVED" | "ARCHIVED" };
   /** Hay notificaciones nuevas por entregar (despierta al emisor push sin esperar al siguiente ciclo). */
   AlertTriggered: { alertId: string; eventId: string; kind: string };
   ExternalItemIngested: { externalItemId: string; sourceId: string; lane: "NORMAL" | "URGENT" };

@@ -1,4 +1,4 @@
-import type { EventSummary, ModeratorEventDetail, NearbyEvent } from "@dizaster/contracts";
+import type { EventStatus, EventSummary, ModeratorEventDetail, NearbyEvent } from "@dizaster/contracts";
 import { router, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
@@ -9,11 +9,12 @@ import { validReason } from "../../../lib/moderation/logic";
 import { eventTitle, timeAgo } from "../../../lib/ui/format";
 import { colors, radius, space } from "../../../theme";
 
+const STATUSES: EventStatus[] = ["ACTIVE", "MONITORING", "RESOLVED", "ARCHIVED"];
 const TIER: Record<string, MessageKey> = { CITIZEN: "tierCitizen", EXTERNAL: "tierExternal", OFFICIAL: "tierOfficial" };
 
 /**
  * Herramientas de moderación sobre un EVENT (ADR 0034): fusionar duplicados cercanos en él, revertir fusiones y
- * separar evidencias a un evento nuevo. Todo exige motivo y queda registrado; nada muestra quién reportó.
+ * separar evidencias a un evento nuevo, y cambiar su ciclo de vida (ADR 0053). Todo exige motivo y queda registrado; nada muestra quién reportó.
  */
 export default function EventToolsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -75,6 +76,23 @@ export default function EventToolsScreen() {
 
       {!merged ? (
         <>
+          <Text style={styles.section}>{t("lifecycleSection")}</Text>
+          <View style={styles.chips}>
+            {STATUSES.map((s) => {
+              const current = detail.status === s;
+              return (
+                <Pressable key={s} accessibilityRole="button" accessibilityState={{ selected: current, disabled: current || !ok }} disabled={current || !ok}
+                  style={[styles.button, current && styles.current, !current && !ok && styles.disabled]}
+                  onPress={() => confirm(t("confirmStatus"), () => api.setEventStatus(event.id, s, reason.trim()))}>
+                  <Text style={styles.buttonText}>{t(`st_${s}`)}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+          {detail.statusChanges.map((c) => (
+            <Text key={c.at} style={styles.meta}>{timeAgo(c.at, lang)} · {t(`st_${c.from}`)} → {t(`st_${c.to}`)} · {c.reason}</Text>
+          ))}
+
           <Text style={styles.section}>{t("possibleDuplicates")}</Text>
           {nearby.length === 0 ? <Text style={styles.meta}>{t("noDuplicates")}</Text> : null}
           {nearby.map((n) => (
@@ -146,6 +164,8 @@ const styles = StyleSheet.create({
   rowTitle: { color: colors.text, fontWeight: "600" },
   check: { color: colors.text, fontSize: 18 },
   button: { backgroundColor: colors.surfaceAlt, borderRadius: radius.pill, paddingHorizontal: space.md, paddingVertical: space.sm },
+  chips: { flexDirection: "row", flexWrap: "wrap", gap: space.sm },
+  current: { backgroundColor: colors.link },
   wide: { alignSelf: "flex-start", marginTop: space.sm },
   disabled: { opacity: 0.4 },
   buttonText: { color: colors.white, fontWeight: "600" },

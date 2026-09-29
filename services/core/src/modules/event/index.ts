@@ -1,4 +1,5 @@
 import type {
+  EventStatus,
   CategoryConfig,
   ContextualLocation,
   NearbyEvent,
@@ -493,7 +494,7 @@ export class EventService {
 
   /** Lo que moderación necesita para fusionar o dividir: evidencias (sin identidad de quien reportó) y fusiones. */
   async moderatorDetail(q: Queryable, eventId: string): Promise<ModeratorEventDetail> {
-    const ev = (await q.query<{ merged_into_id: string | null }>(`SELECT merged_into_id FROM event.events WHERE id = $1`, [eventId])).rows[0];
+    const ev = (await q.query<{ merged_into_id: string | null; status: EventStatus }>(`SELECT merged_into_id, status FROM event.events WHERE id = $1`, [eventId])).rows[0];
     if (!ev) throw notFound("Evento");
     const evidence = await q.query<{
       id: string; evidence_type: ModeratorEventDetail["evidence"][number]["evidenceType"]; trust_tier: TrustTier; assertion: "OCCURRING" | "NOT_OCCURRING";
@@ -508,9 +509,15 @@ export class EventService {
          FROM event.merge_log WHERE target_event_id = $1 OR merged_event_id = $1 ORDER BY at DESC LIMIT 50`,
       [eventId],
     );
+    const changes = await q.query<{ from_status: EventStatus; to_status: EventStatus; reason: string; at: Date }>(
+      `SELECT from_status, to_status, reason, at FROM event.status_log WHERE event_id = $1 ORDER BY at DESC LIMIT 20`,
+      [eventId],
+    );
     return {
       eventId,
+      status: ev.status,
       mergedIntoId: ev.merged_into_id,
+      statusChanges: changes.rows.map((r) => ({ from: r.from_status, to: r.to_status, reason: r.reason, at: r.at.toISOString() })),
       evidence: evidence.rows.map((r) => ({
         id: r.id, evidenceType: r.evidence_type, trustTier: r.trust_tier, assertion: r.assertion, presenceBand: r.presence_band,
         matchConfidence: r.match_confidence, observedAt: r.observed_at.toISOString(),
@@ -697,6 +704,29 @@ export class EventService {
       monitoring: moved.rows.filter((r) => r.status === "MONITORING").length,
       resolved: moved.rows.filter((r) => r.status === "RESOLVED").length,
     };
+  }
+
+  /**
+   * Cambio manual del ciclo de vida por moderación (ADR 0053): cerrar antes un evento que terminó, archivar uno que
+   * no aporta o reactivar uno cerrado por inactividad. Reactivar reinicia `last_activity_at` para que el ciclo
+   * automático no lo vuelva a cerrar enseguida. Un evento fusionado se gestiona desde el que lo absorbió.
+   */
+  async setStatus(tx: Queryable, eventId: string, to: EventStatus, actor: string, reason: string): Promise<void> {
+    const ev = (await tx.query<{ status: EventStatus; merged_into_id: string | null }>(
+      `SELECT status, merged_into_id FROM event.events WHERE id = $1 FOR UPDATE`, [eventId],
+    )).rows[0];
+    if (!ev) throw notFound("Evento");
+    if (ev.merged_into_id) throw new DomainError("CONFLICT", "El evento está fusionado en otro", 409);
+    if (ev.status === to) throw new DomainError("CONFLICT", "El evento ya está en ese estado", 409);
+    await tx.query(
+      `UPDATE event.events SET status = $2, updated_at = now(), last_activity_at = CASE WHEN $2 = 'ACTIVE' THEN now() ELSE last_activity_at END WHERE id = $1`,
+      [eventId, to],
+    );
+    await tx.query(`INSERT INTO event.status_log (id, event_id, from_status, to_status, reason, actor) VALUES ($1, $2, $3, $4, $5, $6)`, [
+      newId(), eventId, ev.status, to, reason, actor,
+    ]);
+    await this.addTimeline(tx, eventId, "STATUS_CHANGED", { from: ev.status, to, cause: "MODERATION" });
+    await publish(tx, "EventLifecycleChanged", { eventId, to }, { lane: "normal" });
   }
 
   // ───────────── Interfaz para el Verification Engine ─────────────
