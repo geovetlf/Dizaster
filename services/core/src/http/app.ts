@@ -46,6 +46,17 @@ const WRITE_ALLOWED_WHEN_SUSPENDED = /^(POST \/v1\/me\/moderation\/[^/]+\/appeal
 const AGE_REQUIRED = /^(POST \/v1\/(posts|reports|businesses|media\/uploads)|POST \/v1\/posts\/[^/]+\/(comments|share)|PUT \/v1\/(posts|comments)\/[^/]+\/(like|reactions\/[^/]+)|PUT \/v1\/businesses\/[^/]+|PATCH \/v1\/me)$/;
 
 /** Versión del contrato publicada en OpenAPI; subirla al cambiar la forma de una respuesta. */
+/** Cabeceras de seguridad de la API (ADR 0114). NO AI REQUIRED. */
+export const SECURITY_HEADERS: Readonly<Record<string, string>> = {
+  "strict-transport-security": "max-age=31536000; includeSubDomains",
+  "x-content-type-options": "nosniff",
+  "x-frame-options": "DENY",
+  "referrer-policy": "no-referrer",
+  "content-security-policy": "default-src 'none'; frame-ancestors 'none'",
+  "cross-origin-resource-policy": "same-site",
+  "permissions-policy": "geolocation=(), camera=(), microphone=()",
+};
+
 export const API_VERSION = "1.0.0";
 
 export async function buildApp(c: Container): Promise<FastifyInstance> {
@@ -66,6 +77,11 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
   });
 
   app.decorateRequest("session", null);
+  // Cabeceras de seguridad (§13.1, ADR 0114) en toda respuesta, errores incluidos. La API solo sirve JSON y teselas:
+  // nada que ejecutar ni incrustar. HSTS solo tiene efecto detrás de TLS (el proxy de producción).
+  app.addHook("onRequest", async (_req, reply) => {
+    reply.headers(SECURITY_HEADERS);
+  });
   app.addHook("onRequest", async (req) => {
     const h = req.headers.authorization;
     if (h?.startsWith("Bearer ")) req.session = await c.identity.verifyToken(h.slice(7));
