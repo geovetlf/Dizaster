@@ -123,3 +123,11 @@ export async function seedGeoFixtures(t: TestContext): Promise<void> {
     await importDataset(t.c.db, manifest, spec, readFileSync(file), { verifyHash: false });
   }
 }
+
+/** Quita el retraso de publicación de una categoría (ADR 0109) en pruebas que no tratan de él. */
+export async function withoutPublishDelay(t: TestContext, category: string): Promise<void> {
+  await t.c.db.query(
+    `INSERT INTO event.category_settings (category_code, publish_delay_minutes, updated_by) VALUES ($1, 0, gen_random_uuid())
+     ON CONFLICT (category_code) DO UPDATE SET publish_delay_minutes = 0`, [category],
+  );
+}

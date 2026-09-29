@@ -2,11 +2,12 @@ import type { AreaSearchResult, EventSummary, FeedResponse } from "@dizaster/con
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { importDataset, loadManifest, labelFor, searchKey, titleCaseEs } from "../src/modules/geo/index.js";
 import { defaultDataDir } from "../src/platform/paths.js";
-import { createTestContext, createUser, reportBody, seedGeoFixtures, submit, type TestContext } from "./helpers.js";
+import { createTestContext, createUser, reportBody, seedGeoFixtures, submit, type TestContext, withoutPublishDelay } from "./helpers.js";
 
 let t: TestContext;
 beforeAll(async () => {
   t = await createTestContext();
+  await withoutPublishDelay(t, "crime.violence");
   await seedGeoFixtures(t);
 });
 afterAll(async () => { await t.close(); });

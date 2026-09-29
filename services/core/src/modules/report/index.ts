@@ -16,7 +16,7 @@ import { withTransaction } from "../../platform/db.js";
 import { DomainError, notFound } from "../../platform/errors.js";
 import { newId } from "../../platform/ids.js";
 import { publish, type OutboxDispatcher } from "../../platform/outbox.js";
-import { publishDelayMinutes, type EventService } from "../event/index.js";
+import type { EventService } from "../event/index.js";
 import type { GeoService } from "../geo/index.js";
 import type { AttestationVerifier, IdentityService, Session } from "../identity/index.js";
 import type { MediaService } from "../media/index.js";
@@ -97,7 +97,7 @@ export class ReportService {
     return withTransaction(db, async (tx) => {
       const reportId = newId();
       // Categorías HIGHLY_SENSITIVE con retraso (ADR 0099): el post y el evento que cree esperan antes de ser públicos.
-      const delay = publishDelayMinutes(category);
+      const delay = await this.d.events.publishDelayFor(tx, category);
       const publishAfter = delay > 0 ? new Date(receivedAt.getTime() + delay * 60_000).toISOString() : null;
       let result: SubmitReportResponse;
       let eventId: string | null = null;

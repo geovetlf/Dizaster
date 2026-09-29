@@ -1,5 +1,5 @@
 {
- "version": "categories-2026.09.1",
+ "version": "categories-2026.09.2",
  "categories": [
   {
    "code": "natural",
@@ -631,6 +631,7 @@
    "dedupRadiusM": 800,
    "dedupWindowMinutes": 120,
    "offlineToleranceMinutes": 30,
+   "publishDelayMinutes": 5,
    "communityThreshold": 3,
    "sensitivity": "HIGHLY_SENSITIVE",
    "citizenReportable": true,

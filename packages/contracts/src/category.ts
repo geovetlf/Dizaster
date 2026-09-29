@@ -31,6 +31,10 @@ export const CategoryConfig = z.object({
    */
   publishDelayMinutes: z.number().int().min(0).max(1440).default(0),
 });
+/** Retraso de publicación de una categoría HIGHLY_SENSITIVE, editable por administración (ADR 0109). */
+export const SetPublishDelayRequest = z.object({ minutes: z.number().int().min(0).max(1440) });
+export interface PublishDelayView { category: string; minutes: number; catalogMinutes: number; overridden: boolean; updatedAt: string | null }
+
 export type CategoryConfig = z.infer<typeof CategoryConfig>;
 
 export const CategoryRegionOverride = z.object({

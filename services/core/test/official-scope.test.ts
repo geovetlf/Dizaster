@@ -31,15 +31,22 @@ describe("ámbito de una fuente oficial (D-PTWC, ADR 0060)", () => {
     const level = async (eventId: string) =>
       (await t.c.db.query<{ level: string }>(`SELECT level FROM verification.state WHERE event_id = $1`, [eventId])).rows[0]?.level;
 
-    it("PTWC confirma oficialmente un tsunami", async () => {
+    it("PTWC es fuente externa (D-PTWC-2, ADR 0109): corrobora un tsunami, no lo confirma", async () => {
       const r = await t.c.ingestion.ingest("ptwc-tsunami", item("ptwc-1", "natural.tsunami", offset(LIMA, -100_000, -50_000)), "URGENT");
+      await t.c.dispatcher.drain();
+      const id = r.resolution && "eventId" in r.resolution ? r.resolution.eventId : "";
+      expect(await level(id)).toBe("EXTERNALLY_CORROBORATED");
+    });
+
+    it("una fuente oficial confirma dentro de su ámbito", async () => {
+      const r = await t.c.ingestion.ingest("usgs-earthquakes", item("usgs-1", "natural.earthquake", offset(LIMA, 500_000)), "URGENT");
       await t.c.dispatcher.drain();
       const id = r.resolution && "eventId" in r.resolution ? r.resolution.eventId : "";
       expect(await level(id)).toBe("OFFICIALLY_CONFIRMED");
     });
 
     it("una fuente oficial fuera de su categoría solo corrobora externamente", async () => {
-      const r = await t.c.ingestion.ingest("ptwc-tsunami", item("ptwc-2", "natural.earthquake", offset(LIMA, 300_000)), "URGENT");
+      const r = await t.c.ingestion.ingest("usgs-earthquakes", item("usgs-2", "natural.tsunami", offset(LIMA, 300_000)), "URGENT");
       await t.c.dispatcher.drain();
       const id = r.resolution && "eventId" in r.resolution ? r.resolution.eventId : "";
       expect(await level(id)).toBe("EXTERNALLY_CORROBORATED");

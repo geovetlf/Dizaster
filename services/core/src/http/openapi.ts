@@ -102,6 +102,8 @@ export const OPERATIONS: Record<string, Operation> = {
   "GET /v1/admin/cost": { summary: "Tablero de costo (admin)", query: C.CostDashboardQuery },
   "GET /v1/admin/quality": { summary: "Métricas de calidad (admin)", query: C.QualityQuery },
   "PUT /v1/admin/cost/budgets/:key": { summary: "Cambiar un presupuesto (admin)", body: C.UpdateBudgetRequest },
+  "GET /v1/admin/categories/:code/publish-delay": { summary: "Retraso de publicación de una categoría (admin, ADR 0109)" },
+  "PUT /v1/admin/categories/:code/publish-delay": { summary: "Cambiar el retraso de publicación (admin, ADR 0109)", body: C.SetPublishDelayRequest },
   "PUT /v1/admin/kill-switches/:feature": { summary: "Interruptor de una función costosa (admin)", body: C.UpdateKillSwitchRequest },
   "POST /v1/flags": { summary: "Denunciar contenido", body: C.CreateFlagRequest },
   "PUT /v1/blocks/:handle": { summary: "Bloquear un perfil" },

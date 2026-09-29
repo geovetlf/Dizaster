@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import type { CaseDetail, CaseSummary, FeedResponse, MediaView } from "@dizaster/contracts";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { createTestContext, createUser, LIMA, offset, reportBody, submit, type TestContext, type TestUser } from "./helpers.js";
+import { createTestContext, createUser, LIMA, offset, reportBody, submit, type TestContext, type TestUser, withoutPublishDelay } from "./helpers.js";
 import { makeJpeg } from "./media-fixtures.js";
 
 let t: TestContext;
@@ -36,6 +36,7 @@ const act = (caseId: string, action: string) =>
 
 beforeAll(async () => {
   t = await createTestContext();
+  await withoutPublishDelay(t, "crime.violence");
   const m = await createUser(t, "mod_media");
   await t.c.identity.grantRole(m.userId, "moderator");
   const token = (await t.app.inject({ method: "POST", url: "/v1/auth/dev", payload: { handle: "mod_media", platform: "ANDROID", deviceId: m.deviceId } })).json().token as string;

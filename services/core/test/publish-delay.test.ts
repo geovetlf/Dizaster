@@ -69,4 +69,31 @@ describe("retraso de publicación en HIGHLY_SENSITIVE (ADR 0099)", () => {
     expect((r.body as { publishAfter?: string }).publishAfter).toBeUndefined();
     expect((await t.app.inject({ url: `/v1/events/${r.body.eventId}` })).statusCode).toBe(200);
   });
+
+  it("el catálogo trae 5 minutos para violencia y administración lo cambia sin desplegar (ADR 0109)", async () => {
+    const { ReferenceData } = await import("../src/modules/reference/index.js");
+    expect(new ReferenceData(t.c.ref.dataDir).category("crime.violence")!.publishDelayMinutes).toBe(5);
+
+    const admin = await createUser(t, "admin_delay");
+    await t.c.identity.grantRole(admin.userId, "admin");
+    const token = (await t.app.inject({ method: "POST", url: "/v1/auth/dev", payload: { handle: "admin_delay", platform: "ANDROID", deviceId: admin.deviceId } })).json().token as string;
+    const put = (code: string, minutes: number, as = token) =>
+      t.app.inject({ method: "PUT", url: `/v1/admin/categories/${code}/publish-delay`, headers: { authorization: `Bearer ${as}` }, payload: { minutes } });
+
+    const plain = await createUser(t, "no_admin_delay");
+    expect((await put("crime.violence", 7, plain.token)).statusCode).toBe(403);
+    expect((await put("accident.traffic", 7)).statusCode).toBe(400);
+    expect((await put("crime.violence", 2000)).statusCode).toBe(400);
+    expect((await put("no.existe", 7)).statusCode).toBe(404);
+    const ok = await put("crime.violence", 7);
+    expect(ok.statusCode, ok.body).toBe(200);
+    expect(ok.json()).toMatchObject({ category: "crime.violence", minutes: 7, catalogMinutes: 30, overridden: true });
+
+    const u = await createUser(t, "rep_delay7");
+    const r = await submit(t, u, reportBody(u, { category: "crime.violence", pin: offset(LIMA, 8000) }));
+    const wait = Date.parse((r.body as { publishAfter?: string }).publishAfter!) - Date.now();
+    expect(wait).toBeGreaterThan(6 * 60_000);
+    expect(wait).toBeLessThan(8 * 60_000);
+    await t.c.db.query(`DELETE FROM event.category_settings`);
+  });
 });

@@ -17,7 +17,7 @@ import type {
   TrustTier,
   VerificationLevel,
 } from "@dizaster/contracts";
-import { AreaGeometry, ChronoPageQuery, EventSearchQuery, VERIFICATION_LEVEL_RANK, publicVerificationState } from "@dizaster/contracts";
+import { AreaGeometry, ChronoPageQuery, SetPublishDelayRequest, type PublishDelayView, EventSearchQuery, VERIFICATION_LEVEL_RANK, publicVerificationState } from "@dizaster/contracts";
 import {
   DEDUP_RULES,
   H3_RES,
@@ -246,7 +246,7 @@ export class EventService {
   private async create(tx: Queryable, c: EventCandidate, category: CategoryConfig, country: string | null): Promise<ResolutionResult> {
     const id = newId();
     // Retraso de publicación (§8.5, ADR 0099): solo lo creado por ciudadanos; una fuente se publica en el acto.
-    const delay = c.trustTier === "CITIZEN" ? publishDelayMinutes(category) : 0;
+    const delay = c.trustTier === "CITIZEN" ? await this.publishDelayFor(tx, category) : 0;
     const pub = this.geo.generalize(c.point, category.sensitivity);
     // Ubicación contextual: SIEMPRE desde el punto público generalizado, nunca desde el del reportero.
     const place = await this.geo.contextFor(tx, pub.point, category.sensitivity);
@@ -830,6 +830,38 @@ export class EventService {
     );
     const entries = rows.map(publicEntry);
     return { entries, nextCursor: rows.length === p.limit ? rows[rows.length - 1]!.id : null };
+  }
+
+  /**
+   * Minutos de retraso efectivos (ADR 0109): el ajuste de administración si existe, si no el del catálogo. Solo
+   * HIGHLY_SENSITIVE. Se lee en cada reporte (una fila por clave primaria): todas las instancias ven el cambio al
+   * momento. NO AI REQUIRED.
+   */
+  async publishDelayFor(q: Queryable, category: Pick<CategoryConfig, "code" | "sensitivity" | "publishDelayMinutes">): Promise<number> {
+    if (category.sensitivity !== "HIGHLY_SENSITIVE") return 0;
+    const { rows } = await q.query<{ m: number }>(`SELECT publish_delay_minutes AS m FROM event.category_settings WHERE category_code = $1`, [category.code]);
+    return rows[0]?.m ?? publishDelayMinutes(category);
+  }
+
+  async publishDelayView(q: Queryable, category: CategoryConfig): Promise<PublishDelayView> {
+    const { rows } = await q.query<{ m: number; updated_at: Date }>(
+      `SELECT publish_delay_minutes AS m, updated_at FROM event.category_settings WHERE category_code = $1`, [category.code],
+    );
+    const catalogMinutes = publishDelayMinutes(category);
+    return { category: category.code, minutes: rows[0]?.m ?? catalogMinutes, catalogMinutes, overridden: !!rows[0], updatedAt: rows[0]?.updated_at.toISOString() ?? null };
+  }
+
+  /** Administración cambia el retraso (ADR 0109). Solo HIGHLY_SENSITIVE: en el resto no hay retraso posible. */
+  async setPublishDelay(q: Queryable, category: CategoryConfig, raw: unknown, adminUserId: string): Promise<PublishDelayView> {
+    const r = SetPublishDelayRequest.safeParse(raw);
+    if (!r.success) throw new DomainError("VALIDATION", r.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; "));
+    if (category.sensitivity !== "HIGHLY_SENSITIVE") throw new DomainError("VALIDATION", "El retraso de publicación es solo para categorías HIGHLY_SENSITIVE");
+    await q.query(
+      `INSERT INTO event.category_settings (category_code, publish_delay_minutes, updated_by) VALUES ($1, $2, $3)
+       ON CONFLICT (category_code) DO UPDATE SET publish_delay_minutes = EXCLUDED.publish_delay_minutes, updated_by = EXCLUDED.updated_by, updated_at = now()`,
+      [category.code, r.data.minutes, adminUserId],
+    );
+    return this.publishDelayView(q, category);
   }
 
   /** `verifiedOnly` (ADR 0057): solo corroborados o confirmados y sin disputa. */

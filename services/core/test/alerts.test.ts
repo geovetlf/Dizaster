@@ -3,7 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { PushMessage, PushResult, PushSender } from "../src/modules/alert/index.js";
 import { withTransaction } from "../src/platform/db.js";
 import { publish } from "../src/platform/outbox.js";
-import { createTestContext, createUser, offset, reportBody, seedGeoFixtures, submit, type TestContext, type TestUser } from "./helpers.js";
+import { createTestContext, createUser, offset, reportBody, seedGeoFixtures, submit, type TestContext, type TestUser, withoutPublishDelay } from "./helpers.js";
 
 /** Proveedor push de prueba: guarda lo enviado y puede simular tokens inválidos. */
 class RecordingPush implements PushSender {
@@ -21,6 +21,7 @@ const push = new RecordingPush();
 let t: TestContext;
 beforeAll(async () => {
   t = await createTestContext({ push });
+  await withoutPublishDelay(t, "crime.violence");
   await seedGeoFixtures(t);
   await t.c.ingestion.setSourceStatus("usgs-earthquakes", "ACTIVE");
 });

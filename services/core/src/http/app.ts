@@ -814,6 +814,21 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
     const session = await requireAdmin(req);
     return c.cost.setBudget((req.params as { key: string }).key, req.body, session.userId);
   });
+  // Retraso de publicación de categorías HIGHLY_SENSITIVE (ADR 0109).
+  app.get("/v1/admin/categories/:code/publish-delay", async (req) => {
+    await requireAdmin(req);
+    return c.events.publishDelayView(c.db, adminCategory((req.params as { code: string }).code));
+  });
+  app.put("/v1/admin/categories/:code/publish-delay", async (req) => {
+    const session = await requireAdmin(req);
+    return c.events.setPublishDelay(c.db, adminCategory((req.params as { code: string }).code), req.body, session.userId);
+  });
+  const adminCategory = (code: string) => {
+    const cat = c.ref.category(code);
+    if (!cat) throw new DomainError("NOT_FOUND", "Categoría no encontrada", 404);
+    return cat;
+  };
+
   app.put("/v1/admin/kill-switches/:feature", async (req) => {
     const session = await requirePermission(req, "ops.control");
     return c.cost.setKillSwitch((req.params as { feature: string }).feature, req.body, session.userId);

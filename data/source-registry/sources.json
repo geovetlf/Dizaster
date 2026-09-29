@@ -1,5 +1,5 @@
 {
- "version": "sources-2026.09.6",
+ "version": "sources-2026.09.7",
  "sources": [
   {
    "key": "usgs-earthquakes",
@@ -28,8 +28,8 @@
   {
    "key": "ptwc-tsunami",
    "name": "Pacific Tsunami Warning Center (NOAA/NWS)",
-   "type": "OFFICIAL",
-   "trustTier": "OFFICIAL",
+   "type": "EXTERNAL",
+   "trustTier": "EXTERNAL",
    "countryScope": [
     "*"
    ],
@@ -56,7 +56,7 @@
    "urgentCapable": true,
    "urgentPollSeconds": 60,
    "status": "PLANNED",
-   "notes": "D-PTWC (2026-09-29): oficial SOLO para natural.tsunami. Pendiente validar URL y formato CAP del feed: tsunami.gov no es accesible desde el entorno de construcción. Activar = status ACTIVE tras validar con una muestra real."
+   "notes": "D-PTWC-2 (2026-09-29, ADR 0109): fuente EXTERNA (corrobora, nunca confirma oficialmente) hasta que administración registre qué fuentes oficiales valen por país, categoría y jurisdicción. Pendiente validar URL y formato CAP: tsunami.gov no es accesible desde el entorno de construcción. Activar = status ACTIVE tras validar con una muestra real."
   },
   {
    "key": "gdacs",
@@ -248,7 +248,19 @@
    "config": {
     "url": "https://www.who.int/api/news/diseaseoutbreaknews?$orderby=PublicationDateAndTime%20desc&$top=50",
     "promote": {
-     "keywords": ["ebola", "marburg", "plague", "peste", "cholera", "colera", "mers", "nipah", "h5n1", "yellow fever", "fiebre amarilla"]
+     "keywords": [
+      "ebola",
+      "marburg",
+      "plague",
+      "peste",
+      "cholera",
+      "colera",
+      "mers",
+      "nipah",
+      "h5n1",
+      "yellow fever",
+      "fiebre amarilla"
+     ]
     }
    },
    "license": "Por confirmar: términos de uso del sitio de la OMS",

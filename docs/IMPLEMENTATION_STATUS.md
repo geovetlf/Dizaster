@@ -219,7 +219,7 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | Filtros del mapa y estilo por verificación (§11.4) | ✅ | ADR 0057 |
 | Aviso a administración cuando una fuente urgente cae o vuelve (§9.2) | ✅ | ADR 0058 |
 | Cancelación/expiración de la fuente cierran eventos solo de fuentes (§5.7) | ✅ | ADR 0059 |
-| Fuente oficial solo confirma dentro de su ámbito; PTWC registrado (D-PTWC) | ✅ | ADR 0060 |
+| Fuente oficial solo confirma dentro de su ámbito; PTWC registrado como EXTERNAL (D-PTWC-2) | ✅ | ADR 0060, ADR 0109 |
 | Archivado de eventos resueltos a los 7 días (D-ARCHIVE) | ✅ | ADR 0061 |
 | Varios administradores por negocio | ⏳ | cuando haya demanda (`BusinessMember`) |
 
@@ -300,6 +300,7 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | Paginación por cursor de timeline y comentarios (ADR 0106) | Hecho | `ChronoPageQuery` (cursor = id, clave `(at, id)`), compatible sin parámetros; "Ver anteriores" y scroll infinito. NO AI REQUIRED |
 | Búsqueda de publicaciones por texto (ADR 0107) | Hecho | `GET /v1/search/posts` con reglas del feed, trigram (migración 0045), sección en Buscar. NO AI REQUIRED |
 | Testimonio tardío con menor peso (ADR 0108) | Hecho | presence-3: factor 0,5 y tope bajo HIGH para reportes offline fuera de tolerancia. NO AI REQUIRED |
+| PTWC externa; violencia 5 min editable por admin (ADR 0109) | Hecho | Decisiones del propietario 2026-09-29; migración 0046. NO AI REQUIRED |
 | Licencias, auditoría, SBOM, Dependabot; respaldo con prueba de restauración en CI | ✅ | ADR 0070, `scripts/supply-chain.mjs`, `scripts/db-restore-check.mjs` |
 | Idioma de la app elegible en el perfil (es/en/pt/fr o del teléfono) | ✅ | ADR 0069, `app/language.tsx` |
 | Varias cuentas en un teléfono corroboran como una (clave seudónima del teléfono) | ✅ | ADR 0068, migración 0036 |
@@ -314,7 +315,7 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 
 Decisiones del propietario del 2026-09-29 (mensaje "Zero/minimum AI cost architecture"), primero:
 
-A. ✅ PTWC como fuente OFICIAL solo para tsunami (D-PTWC, ADR 0060; feed en PLANNED hasta validar formato).
+A. ✅ PTWC como fuente EXTERNAL (D-PTWC-2, ADR 0109, reemplaza D-PTWC): corrobora, no confirma; feed en PLANNED hasta validar formato.
 B. ✅ RESOLVED → ARCHIVED a los 7 días, configurable; fuera del mapa, accesible por enlace (D-ARCHIVE, ADR 0061).
 C. ✅ "Llamar" marca directo el número de la categoría según el registro de servicios de emergencia; si no hay, lista (D-EMERGENCY-CALL, ADR 0062).
 D. ✅ Push por mención con horas de silencio, preferencias, bloqueos y anti-spam (D-MENTION, ADR 0063).
@@ -331,8 +332,14 @@ Revisión del Blueprint del 2026-09-29 (tras ADR 0080): completada con ADR 0081�
 
 Revisión del Blueprint del 2026-09-29 (tras ADR 0092): completada con ADR 0093–0102.
 
-Revisión del Blueprint del 2026-09-29 (tras ADR 0102), verificada contra el código, sin bloqueos:
+Revisión del Blueprint del 2026-09-29 (tras ADR 0102): completada con ADR 0103–0108.
 
+Revisión del Blueprint del 2026-09-29 (tras ADR 0109, mensaje de bajo costo del propietario), sin bloqueos:
+
+1. Catálogo de capacidades del AI Core: necesaria/opcional, alternativa determinista, costo, asíncrona.
+2. Registro de uso de IA por capacidad (proveedor, modelo, latencia, tokens, costo, estado, alternativa usada).
+3. Interfaces apagadas para visión, embeddings y datos de emergencia externos.
+4. Retraso de publicación editable desde la app de administración.
 
 
 Bloqueadas o en espera:
@@ -347,8 +354,6 @@ Bloqueadas o en espera:
 - **En espera de acción humana** — Activar ReliefWeb y OMS DON (ADR 0092): ReliefWeb pide registrar un `appname`
   y aceptar sus términos; la OMS, confirmar los términos de uso del sitio. Noticias RSS: falta elegir qué medios
   (decisión de producto y de derechos).
-- **En espera de decisión de producto** — Minutos de retraso de publicación para `crime.violence` (ADR 0099): hoy 0,
-  sin efecto hasta que se elija un valor.
 - **En espera de acción humana** — Fuentes IGP, INDECI y SENAMHI (confirmar formato/URL y términos; si publican CAP,
   activar es solo configuración, ADR 0033).
 - **Requiere al propietario** — Capa de IA (proveedor y presupuesto), enlaces de donación verificados (D-15), textos
