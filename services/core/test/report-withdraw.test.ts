@@ -27,7 +27,7 @@ describe("retirar un reporte propio (ADR 0037)", () => {
 
     expect(await eventRow(eventId)).toEqual({ report_count: 1, publication_state: "PUBLISHED" });
     const rep = (await t.c.db.query<{ status: string; device_fix: unknown }>(
-      `SELECT r.status, p.device_fix FROM report.reports r JOIN report.presence_evidence p ON p.report_id = r.id WHERE r.id = $1`, [ra.reportId],
+      `SELECT r.status, coalesce(p.device_fix::text, p.device_fix_enc) AS device_fix FROM report.reports r JOIN report.presence_evidence p ON p.report_id = r.id WHERE r.id = $1`, [ra.reportId],
     )).rows[0]!;
     expect(rep).toEqual({ status: "WITHDRAWN", device_fix: null });
     expect((await t.c.db.query(`SELECT 1 FROM social.posts WHERE id = $1 AND deleted_at IS NOT NULL`, [ra.postId])).rowCount).toBe(1);

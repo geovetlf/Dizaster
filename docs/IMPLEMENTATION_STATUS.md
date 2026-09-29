@@ -246,6 +246,7 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | Comentarios con respuestas de un nivel, borrado propio y reacciones | ✅ | ADR 0045 |
 | Compartir dentro de la app (`Post.kind = SHARE`) | ✅ | ADR 0046 |
 | Límite general de peticiones por cuenta o IP | ✅ | ADR 0047 |
+| Ubicación precisa del reportante cifrada por columna (AES-256-GCM, clave fuera de la BD) | ✅ | ADR 0048 |
 | Reglas `dedup-2` con `sim_media` y `sim_texto` reales | ✅ | `packages/geo-kit/src/dedup.ts` |
 | Fotos procesadas después del reporte suman su hash al evento | ✅ | `MediaReady.phash`, `event.media-fingerprint` |
 
@@ -253,12 +254,11 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 
 Revisión del Blueprint del 2026-09-29 (tras ADR 0042), verificada contra el código:
 
-1. Cifrado por columna de la ubicación precisa con clave del entorno (§13.1).
-2. Edad mínima de 16 años en el registro (D-13; el texto legal lo pone el propietario).
-3. Zona horaria por polígonos (timezone-boundary-builder) (§5.5).
-4. Pantalla "Acerca de / licencias" con atribuciones ODbL (§11.3).
-5. Observabilidad OpenTelemetry y contrato OpenAPI (§5.22, §4.3).
-6. Moderación: cambiar el ciclo de vida de un evento; menciones y bloqueo de negocios.
+1. Edad mínima de 16 años en el registro (D-13; el texto legal lo pone el propietario).
+2. Zona horaria por polígonos (timezone-boundary-builder) (§5.5).
+3. Pantalla "Acerca de / licencias" con atribuciones ODbL (§11.3).
+4. Observabilidad OpenTelemetry y contrato OpenAPI (§5.22, §4.3).
+5. Moderación: cambiar el ciclo de vida de un evento; menciones y bloqueo de negocios.
 
 Bloqueadas o en espera:
 

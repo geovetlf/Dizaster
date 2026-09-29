@@ -122,7 +122,7 @@ describe("privacidad", () => {
     const future = new Date(Date.now() + 31 * 24 * 3600_000);
     const n = await t.c.reports.generalizeExpiredPresence(future);
     expect(n).toBeGreaterThan(0);
-    const { rows } = await t.c.db.query(`SELECT count(*)::int AS n FROM report.presence_evidence WHERE device_fix IS NOT NULL`);
+    const { rows } = await t.c.db.query(`SELECT count(*)::int AS n FROM report.presence_evidence WHERE device_fix IS NOT NULL OR device_fix_enc IS NOT NULL`);
     expect(rows[0].n).toBe(0);
   });
 });

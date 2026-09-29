@@ -144,7 +144,7 @@ describe("borrar la cuenta", () => {
     expect(await q(`SELECT 1 FROM social.reactions WHERE profile_id = $1`, [yo.profileId])).toEqual([]);
     expect(await q(`SELECT 1 FROM social.follows WHERE follower_profile_id = $1 OR target_id = $1::text`, [yo.profileId])).toEqual([]);
 
-    expect(await q(`SELECT device_fix, generalized_at IS NOT NULL AS gen FROM report.presence_evidence WHERE report_id = $1`, [reportId])).toEqual([{ device_fix: null, gen: true }]);
+    expect(await q(`SELECT coalesce(device_fix::text, device_fix_enc) AS device_fix, generalized_at IS NOT NULL AS gen FROM report.presence_evidence WHERE report_id = $1`, [reportId])).toEqual([{ device_fix: null, gen: true }]);
     expect(await q(`SELECT device_id FROM report.reports WHERE id = $1`, [reportId])).toEqual([{ device_id: null }]);
 
     expect(await q(`SELECT state, storage_key_original FROM media.media WHERE id = $1`, [mediaId])).toEqual([{ state: "DELETED", storage_key_original: null }]);

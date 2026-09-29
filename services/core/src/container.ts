@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import { decodeSecret, type AppEnv } from "./platform/config.js";
 import { systemClock, type Clock } from "./platform/clock.js";
 import { Meter } from "./platform/metrics.js";
+import { fieldCipherFromEnv } from "./platform/field-cipher.js";
 import { createPool, type Db } from "./platform/db.js";
 import { OutboxDispatcher } from "./platform/outbox.js";
 import { defaultDataDir } from "./platform/paths.js";
@@ -77,6 +78,7 @@ export function buildContainer(env: AppEnv, overrides: { db?: Db; clock?: Clock;
     db, clock, ref, geo, social, events, identity, media, trust,
     attestation: overrides.attestation ?? new DevAttestationVerifier(),
     limits: { reportsPerHour: env.REPORTS_PER_HOUR_LIMIT, presenceRetentionDays: env.PRESENCE_RETENTION_DAYS },
+    cipher: fieldCipherFromEnv(env.FIELD_KEYS, env.AUTH_JWT_SECRET),
   });
   const business = new BusinessService(db);
   const feed = new FeedService(social, events, media, ref, geo, business);

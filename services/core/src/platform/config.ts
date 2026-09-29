@@ -20,6 +20,8 @@ const Env = z.object({
   /** Detrás de un CDN o balanceador: tomar la IP de X-Forwarded-For. Solo si ese proxy la fija. */
   TRUST_PROXY: z.enum(["true", "false"]).default("false").transform((v) => v === "true"),
   PRESENCE_RETENTION_DAYS: z.coerce.number().int().positive().default(30),
+  /** Claves de cifrado por columna (ADR 0048): "kid:base64(32 bytes)", separadas por comas; la primera cifra. */
+  FIELD_KEYS: z.string().optional(),
   DATA_DIR: z.string().optional(),
   // Media. "local" solo fuera de producción; producción usa un almacenamiento compatible con S3.
   STORAGE_DRIVER: z.enum(["local", "s3"]).default("local"),
@@ -59,6 +61,9 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): AppEnv {
   }
   if (env.STORAGE_DRIVER === "s3" && !(env.S3_ENDPOINT && env.S3_BUCKET && env.S3_ACCESS_KEY_ID && env.S3_SECRET_ACCESS_KEY)) {
     throw new Error("STORAGE_DRIVER=s3 requiere S3_ENDPOINT, S3_BUCKET, S3_ACCESS_KEY_ID y S3_SECRET_ACCESS_KEY");
+  }
+  if (env.NODE_ENV === "production" && !env.FIELD_KEYS) {
+    throw new Error("Producción requiere FIELD_KEYS (cifrado de la ubicación precisa)");
   }
   if (env.NODE_ENV === "production" && env.PUSH_DRIVER !== "live") {
     throw new Error("Producción requiere PUSH_DRIVER=live (APNs y FCM)");

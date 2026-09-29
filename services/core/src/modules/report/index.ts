@@ -17,6 +17,7 @@ import type { MediaService } from "../media/index.js";
 import type { ReferenceData } from "../reference/index.js";
 import type { SocialService } from "../social/index.js";
 import type { TrustService } from "../trust/index.js";
+import type { FieldCipher } from "../../platform/field-cipher.js";
 
 export interface ReportDeps {
   db: Db;
@@ -30,6 +31,8 @@ export interface ReportDeps {
   trust: TrustService;
   attestation: AttestationVerifier;
   limits: { reportsPerHour: number; presenceRetentionDays: number };
+  /** Cifra el fix preciso del dispositivo (ADR 0048). */
+  cipher: FieldCipher;
 }
 
 /**
@@ -173,10 +176,10 @@ export class ReportService {
     const fixPoint = { lat: req.presence.fix.lat, lng: req.presence.fix.lng };
     await tx.query(
       `INSERT INTO report.presence_evidence
-         (report_id, device_fix, fix_h3_r7, fix_to_pin_m, mock_location, attestation_verdict, reasons, score_breakdown, rule_version, expires_at)
+         (report_id, device_fix_enc, fix_h3_r7, fix_to_pin_m, mock_location, attestation_verdict, reasons, score_breakdown, rule_version, expires_at)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::timestamptz + make_interval(days => $11))`,
       [
-        reportId, JSON.stringify(req.presence.fix), h3(fixPoint, H3_RES.ZONE), presence.fixToPinM, req.presence.mockLocation, attestation,
+        reportId, this.d.cipher.encrypt(JSON.stringify(req.presence.fix), reportId), h3(fixPoint, H3_RES.ZONE), presence.fixToPinM, req.presence.mockLocation, attestation,
         presence.reasons, JSON.stringify(presence.breakdown), presence.ruleVersion, receivedAt, this.d.limits.presenceRetentionDays,
       ],
     );
@@ -193,7 +196,7 @@ export class ReportService {
   registerHandlers(dispatcher: OutboxDispatcher): void {
     dispatcher.on("AccountDeleted", "report.generalize-account", async (e, tx) => {
       await tx.query(
-        `UPDATE report.presence_evidence SET device_fix = NULL, generalized_at = COALESCE(generalized_at, now())
+        `UPDATE report.presence_evidence SET device_fix = NULL, device_fix_enc = NULL, generalized_at = COALESCE(generalized_at, now())
           WHERE report_id IN (SELECT id FROM report.reports WHERE author_user_id = $1)`,
         [e.payload.userId],
       );
@@ -237,7 +240,7 @@ export class ReportService {
       if (r.status === "WITHDRAWN") return;
       await tx.query(`UPDATE report.reports SET status = 'WITHDRAWN' WHERE id = $1`, [reportId]);
       await tx.query(
-        `UPDATE report.presence_evidence SET device_fix = NULL, generalized_at = COALESCE(generalized_at, now()) WHERE report_id = $1`, [reportId],
+        `UPDATE report.presence_evidence SET device_fix = NULL, device_fix_enc = NULL, generalized_at = COALESCE(generalized_at, now()) WHERE report_id = $1`, [reportId],
       );
       const eventId = await this.d.events.detachEvidence(tx, "CITIZEN_REPORT", reportId);
       const { mediaIds } = await this.d.social.deletePost(tx, r.post_id, r.author_profile_id, { withdrawReport: true });
@@ -248,11 +251,26 @@ export class ReportService {
 
   async generalizeExpiredPresence(now: Date = this.d.clock.now()): Promise<number> {
     const res = await this.d.db.query(
-      `UPDATE report.presence_evidence SET device_fix = NULL, generalized_at = $1 WHERE expires_at <= $1 AND generalized_at IS NULL`,
+      `UPDATE report.presence_evidence SET device_fix = NULL, device_fix_enc = NULL, generalized_at = $1 WHERE expires_at <= $1 AND generalized_at IS NULL`,
       [now],
     );
     return res.rowCount ?? 0;
   }
+
+  /** Filas anteriores al cifrado (ADR 0048): se cifran y se vacía la columna en claro. Idempotente, por lotes. */
+  async encryptLegacyFixes(batch = 500): Promise<number> {
+    const { rows } = await this.d.db.query<{ report_id: string; device_fix: unknown }>(
+      `SELECT report_id, device_fix FROM report.presence_evidence WHERE device_fix IS NOT NULL LIMIT $1`, [batch],
+    );
+    for (const r of rows) {
+      await this.d.db.query(
+        `UPDATE report.presence_evidence SET device_fix_enc = $2, device_fix = NULL WHERE report_id = $1 AND device_fix IS NOT NULL`,
+        [r.report_id, this.d.cipher.encrypt(JSON.stringify(r.device_fix), r.report_id)],
+      );
+    }
+    return rows.length;
+  }
+
   // ───────────── Exportación de datos personales (ADR 0038) ─────────────
 
   /**
@@ -263,11 +281,17 @@ export class ReportService {
     const { rows } = await q.query(
       `SELECT r.id, r.post_id, r.event_id, r.category_code, r.assertion, r.status, r.anonymity_mode, r.captured_at, r.received_at,
               r.captured_offline, r.presence_band, ST_Y(r.pin::geometry) AS pin_lat, ST_X(r.pin::geometry) AS pin_lng,
-              p.device_fix, p.generalized_at AS precise_location_removed_at
+              p.device_fix, p.device_fix_enc, p.generalized_at AS precise_location_removed_at
          FROM report.reports r LEFT JOIN report.presence_evidence p ON p.report_id = r.id
         WHERE r.author_user_id = $1 ORDER BY r.received_at DESC LIMIT 10000`,
       [userId],
     );
-    return { reports: rows };
+    // Se descifra solo para la propia persona; el valor cifrado nunca sale.
+    return {
+      reports: rows.map(({ device_fix_enc, ...r }) => ({
+        ...r,
+        device_fix: device_fix_enc ? JSON.parse(this.d.cipher.decrypt(device_fix_enc as string, r["id"] as string)) : r["device_fix"],
+      })),
+    };
   }
 }

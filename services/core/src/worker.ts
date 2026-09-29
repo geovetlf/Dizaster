@@ -42,6 +42,7 @@ async function loop() {
       lastDaily = Date.now();
       console.log(JSON.stringify({ msg: "retention.cost", ...(await c.cost.applyRetention()) }));
       const generalized = await c.reports.generalizeExpiredPresence();
+      await c.reports.encryptLegacyFixes();
       console.log(JSON.stringify({ msg: "retention.presence.generalized", count: generalized }));
       const media = await c.media.applyRetention();
       console.log(JSON.stringify({ msg: "retention.media", ...media }));
