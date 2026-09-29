@@ -294,6 +294,7 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | Promoción NORMAL → URGENT por regla configurable por fuente (OMS con regla) | ✅ | ADR 0100 |
 | Roles verificador y operador con tabla de permisos compartida | ✅ | ADR 0101 |
 | Preparación RTL: dirección según el idioma de la app, estilos start/end, guardia | ✅ | ADR 0102 |
+| Timeline y verificación con la misma visibilidad que la ficha del evento | ✅ | ADR 0103 |
 | Licencias, auditoría, SBOM, Dependabot; respaldo con prueba de restauración en CI | ✅ | ADR 0070, `scripts/supply-chain.mjs`, `scripts/db-restore-check.mjs` |
 | Idioma de la app elegible en el perfil (es/en/pt/fr o del teléfono) | ✅ | ADR 0069, `app/language.tsx` |
 | Varias cuentas en un teléfono corroboran como una (clave seudónima del teléfono) | ✅ | ADR 0068, migración 0036 |
@@ -324,6 +325,16 @@ Revisión del Blueprint del 2026-09-29 (tras ADR 0070): completada con ADR 0071�
 Revisión del Blueprint del 2026-09-29 (tras ADR 0080): completada con ADR 0081–0092.
 
 Revisión del Blueprint del 2026-09-29 (tras ADR 0092): completada con ADR 0093–0102.
+
+Revisión del Blueprint del 2026-09-29 (tras ADR 0102), verificada contra el código, sin bloqueos:
+
+1. "Yo también lo veo": corroborar desde la ficha del evento (§8.4).
+2. Compartir un evento desde su ficha (Anexo A.7).
+3. Errores del servidor traducidos por código en la app (§5.15).
+4. Paginación por cursor de timeline y comentarios (§6.3, §13.1).
+5. Búsqueda de publicaciones por texto (RF-02).
+6. El testimonio tardío pesa menos (§8.3).
+
 
 Bloqueadas o en espera:
 

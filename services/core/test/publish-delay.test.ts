@@ -40,6 +40,10 @@ describe("retraso de publicación en HIGHLY_SENSITIVE (ADR 0099)", () => {
     const eventId = r.body.eventId!;
     expect(await mapIds()).not.toContain(eventId);
     expect((await t.app.inject({ url: `/v1/events/${eventId}` })).statusCode).toBe(404);
+    // Ni la timeline ni la verificación lo delatan (ADR 0103).
+    for (const sub of ["timeline", "verification", "sources", "media"]) {
+      expect((await t.app.inject({ url: `/v1/events/${eventId}/${sub}` })).statusCode, sub).toBe(404);
+    }
     expect(await feedIds(otro)).not.toContain(r.body.postId);
     expect(await feedIds()).not.toContain(r.body.postId);
     expect(await feedIds(ana)).toContain(r.body.postId);
@@ -53,6 +57,8 @@ describe("retraso de publicación en HIGHLY_SENSITIVE (ADR 0099)", () => {
     await t.c.dispatcher.drain();
     expect(await mapIds()).toContain(eventId);
     expect((await t.app.inject({ url: `/v1/events/${eventId}` })).statusCode).toBe(200);
+    expect((await t.app.inject({ url: `/v1/events/${eventId}/timeline` })).statusCode).toBe(200);
+    expect((await t.app.inject({ url: `/v1/events/${eventId}/verification` })).statusCode).toBe(200);
     expect(await feedIds(otro)).toContain(r.body.postId);
     expect((await t.c.db.query(`SELECT 1 FROM platform.outbox WHERE type = 'EventPublished' AND payload->>'eventId' = $1`, [eventId])).rowCount).toBe(1);
   });

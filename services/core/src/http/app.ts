@@ -322,7 +322,12 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
 
   const IdParam = z.object({ id: z.uuid() });
   app.get("/v1/events/:id", async (req) => c.events.getEvent(c.db, parse(IdParam, req.params).id));
-  app.get("/v1/events/:id/timeline", async (req) => ({ entries: await c.events.timeline(c.db, parse(IdParam, req.params).id) }));
+  // Timeline y verificación siguen la misma visibilidad que la ficha: un evento oculto o retrasado da 404 (ADR 0103).
+  app.get("/v1/events/:id/timeline", async (req) => {
+    const { id } = parse(IdParam, req.params);
+    await c.events.getEvent(c.db, id);
+    return { entries: await c.events.timeline(c.db, id) };
+  });
   app.get("/v1/events/:id/posts", async (req, reply) => {
     reply.header("cache-control", "no-store");
     return c.feed.eventPosts(c.db, parse(IdParam, req.params).id, req.query, req.session?.profileId ?? null);
@@ -336,7 +341,11 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
     reply.header("cache-control", "public, max-age=60");
     return { sources: await c.ingestion.sourcesView(c.db, refs) };
   });
-  app.get("/v1/events/:id/verification", async (req) => c.verification.view(c.db, parse(IdParam, req.params).id));
+  app.get("/v1/events/:id/verification", async (req) => {
+    const { id } = parse(IdParam, req.params);
+    await c.events.getEvent(c.db, id);
+    return c.verification.view(c.db, id);
+  });
 
   // Media pública del evento: solo variantes saneadas; en categorías sensibles, solo la aprobada por moderación.
   app.get("/v1/events/:id/media", async (req) => {
