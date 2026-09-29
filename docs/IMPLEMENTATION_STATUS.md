@@ -316,6 +316,7 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | Ventana de tiempo del mapa (§6.3) | Hecho: window=6h/24h/7d en /v1/events y teselas (cacheable), chip en el mapa | ADR 0123 |
 | Ciclo de vida del evento en el feed (§5.3, §6.2) | Hecho: event_signals.lifecycle desde EventLifecycleChanged; resuelto −8 h, archivado −24 h en Para ti | ADR 0124 |
 | Categorías secundarias del evento (§7.3) | Hecho: recalculadas desde la evidencia activa; filtro del mapa y búsqueda las usan; línea También en la ficha | ADR 0125 |
+| Reglas de exclusión de publicidad (§5.16, D-14) | Hecho: adPlacementDenials en contratos; sin anuncios en V1 (ADS_ENABLED_V1 = false) | ADR 0126 |
 | Licencias, auditoría, SBOM, Dependabot; respaldo con prueba de restauración en CI | ✅ | ADR 0070, `scripts/supply-chain.mjs`, `scripts/db-restore-check.mjs` |
 | Idioma de la app elegible en el perfil (es/en/pt/fr o del teléfono) | ✅ | ADR 0069, `app/language.tsx` |
 | Varias cuentas en un teléfono corroboran como una (clave seudónima del teléfono) | ✅ | ADR 0068, migración 0036 |
@@ -355,10 +356,9 @@ Revisión del Blueprint del 2026-09-29 (tras ADR 0112): completada con ADR 0113�
 
 Revisión del Blueprint del 2026-09-29 (tras ADR 0120), verificada contra el código, sin bloqueos:
 
-1. Reglas de exclusión de publicidad (§5.16, D-14).
-2. Runbooks de operación e incidentes (§13.1, §18).
-3. Ingestión por push con firma por fuente (§9.2).
-4. Firma en el dispositivo de la evidencia offline (§8.1, §8.3, C-04).
+1. Runbooks de operación e incidentes (§13.1, §18).
+2. Ingestión por push con firma por fuente (§9.2).
+3. Firma en el dispositivo de la evidencia offline (§8.1, §8.3, C-04).
 
 
 Bloqueadas o en espera:
