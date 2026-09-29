@@ -313,7 +313,10 @@ export class EventService {
       `SELECT sensitivity, publication_state FROM event.events WHERE id = $1`, [eventId],
     )).rows[0];
     if (!ev || rows.length === 0) {
-      await tx.query(`UPDATE event.events SET last_activity_at = greatest(last_activity_at, $2), updated_at = now() WHERE id = $1`, [eventId, c.observedAt]);
+      await tx.query(
+        `UPDATE event.events SET last_activity_at = greatest(last_activity_at, $2), report_count = 0, source_count = 0, updated_at = now() WHERE id = $1`,
+        [eventId, c.observedAt],
+      );
       return;
     }
     const official = rows.filter((r) => r.trust_tier === "OFFICIAL").sort((a, b) => b.observed_at.getTime() - a.observed_at.getTime())[0];
@@ -341,6 +344,29 @@ export class EventService {
         place?.region?.id ?? null, place?.district?.id ?? null, place ? JSON.stringify(place) : null,
       ],
     );
+  }
+
+  /**
+   * Retiro de un reporte (ADR 0037): su evidencia queda DETACHED (se conserva para auditoría pero deja de contar),
+   * se recalculan geometría y contadores, y los consumidores reevalúan como con cualquier cambio de evidencia.
+   */
+  async detachEvidence(tx: Queryable, evidenceType: "CITIZEN_REPORT", refId: string): Promise<string | null> {
+    const { rows } = await tx.query<{ id: string; event_id: string }>(
+      `UPDATE event.evidence SET status = 'DETACHED' WHERE evidence_type = $1 AND ref_id = $2 AND status = 'ACTIVE' RETURNING id, event_id`,
+      [evidenceType, refId],
+    );
+    const r = rows[0];
+    if (!r) return null;
+    await this.recomputeAggregates(tx, r.event_id, { observedAt: new Date(0).toISOString() });
+    // Un evento que se queda sin ninguna evidencia deja de mostrarse (su único reporte se retiró).
+    await tx.query(
+      `UPDATE event.events SET publication_state = 'HIDDEN', updated_at = now()
+        WHERE id = $1 AND NOT EXISTS (SELECT 1 FROM event.evidence WHERE event_id = $1 AND status = 'ACTIVE')`,
+      [r.event_id],
+    );
+    await this.addTimeline(tx, r.event_id, "REPORT_WITHDRAWN", {});
+    await publish(tx, "EventEvidenceAdded", { eventId: r.event_id, evidenceId: r.id, evidenceType: "WITHDRAWN" });
+    return r.event_id;
   }
 
   // ───────────── Fusión y división manual (moderación, ADR 0034) ─────────────

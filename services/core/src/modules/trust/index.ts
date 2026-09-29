@@ -52,6 +52,15 @@ export class TrustService {
       await this.updateStanding(tx, rows.map((r) => r.user_id));
     });
 
+    // Retirar un reporte antes de que el evento se decida lo quita del historial; después, lo decidido se conserva.
+    dispatcher.on("ReportWithdrawn", "trust.forget-withdrawn", async (e, tx) => {
+      if (!e.payload.eventId) return;
+      await tx.query(
+        `DELETE FROM trust.contributions c WHERE c.user_id = $1 AND c.event_id = $2
+            AND NOT EXISTS (SELECT 1 FROM trust.event_outcomes o WHERE o.event_id = c.event_id AND o.outcome IN ('CONFIRMED','FALSE'))`,
+        [e.payload.userId, e.payload.eventId],
+      );
+    });
     dispatcher.on("ModerationActionTaken", "trust.record-sanction", async (e, tx) => {
       const p = e.payload;
       if (p.reverses) {

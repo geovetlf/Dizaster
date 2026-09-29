@@ -108,7 +108,7 @@ export function PostCard({ post, categoryName }: { post: FeedPost; categoryName:
           hitSlop={8}
           onPress={() =>
             post.mine
-              ? openOwnPostMenu({ id: post.id, deletable: post.kind !== "REPORT" }, () => setHidden(true))
+              ? openOwnPostMenu({ id: post.id, isReport: post.kind === "REPORT" }, () => setHidden(true))
               : openContentMenu({ type: "POST", id: post.id, blockHandle: canBlock(post.author, me.handle) && !post.author.pseudonymous ? post.author.handle : null }, () => setHidden(true))}
         >
           <Icon name="dots-horizontal" size={24} color={colors.text} />

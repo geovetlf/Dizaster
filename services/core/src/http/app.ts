@@ -379,7 +379,11 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
 
   app.delete("/v1/posts/:id", async (req, reply) => {
     const session = requireSession(req);
-    await c.composer.delete(session.profileId, parse(IdParam, req.params).id);
+    const { id } = parse(IdParam, req.params);
+    // Un post de tipo REPORT se "borra" retirando el reporte (su evidencia deja de contar, ADR 0037).
+    const reportId = await c.reports.reportIdForPost(c.db, id);
+    if (reportId) await c.reports.withdraw(session, reportId);
+    else await c.composer.delete(session.profileId, id);
     return reply.status(204).send();
   });
 

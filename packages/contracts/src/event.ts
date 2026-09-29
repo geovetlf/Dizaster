@@ -29,6 +29,7 @@ export const TimelineEntryType = z.enum([
   "MEDIA_ADDED",
   "MERGED",
   "SPLIT",
+  "REPORT_WITHDRAWN",
   "LIVE_STARTED",
   "LIVE_ENDED",
 ]);

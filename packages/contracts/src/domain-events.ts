@@ -24,6 +24,8 @@ export interface DomainEventMap {
   MediaUploaded: { mediaId: string };
   MediaReady: { mediaId: string; phash?: string | null };
   MediaRejected: { mediaId: string; reason: string };
+  /** Quien reportó retiró su reporte (ADR 0037): su evidencia deja de contar y su post desaparece. */
+  ReportWithdrawn: { reportId: string; userId: string; eventId: string | null };
   /** La persona borró su cuenta: cada módulo elimina o anonimiza lo suyo (ADR 0021). */
   AccountDeleted: { userId: string; profileId: string };
   /** Acción de moderación aplicada (por regla o por una persona). */

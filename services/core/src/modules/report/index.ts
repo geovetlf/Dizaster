@@ -7,7 +7,7 @@ import { H3_RES, computePresence, extractKeywords, generalize, h3 } from "@dizas
 import type { Clock } from "../../platform/clock.js";
 import type { Db, Queryable } from "../../platform/db.js";
 import { withTransaction } from "../../platform/db.js";
-import { DomainError } from "../../platform/errors.js";
+import { DomainError, notFound } from "../../platform/errors.js";
 import { newId } from "../../platform/ids.js";
 import { publish, type OutboxDispatcher } from "../../platform/outbox.js";
 import type { EventService } from "../event/index.js";
@@ -214,6 +214,35 @@ export class ReportService {
         [e.payload.newEventId, e.payload.evidenceRefIds, e.payload.sourceEventId],
       );
       await this.d.social.relinkPosts(tx, rows.map((r) => r.post_id), e.payload.sourceEventId, e.payload.newEventId);
+    });
+  }
+
+  /** Post de un reporte (para que "borrar" un post propio de tipo REPORT lo retire). */
+  async reportIdForPost(q: Queryable, postId: string): Promise<string | null> {
+    const { rows } = await q.query<{ id: string }>(`SELECT id FROM report.reports WHERE post_id = $1`, [postId]);
+    return rows[0]?.id ?? null;
+  }
+
+  /**
+   * Retirar un reporte propio (Blueprint §6.1, ADR 0037). Idempotente. La evidencia deja de contar para el evento,
+   * el post y su media se borran y la presencia precisa se generaliza en el acto. La reputación conserva lo ya
+   * decidido: retirar después de un desmentido no borra ese antecedente.
+   */
+  async withdraw(session: Session, reportId: string): Promise<void> {
+    await withTransaction(this.d.db, async (tx) => {
+      const r = (await tx.query<{ status: string; post_id: string; author_profile_id: string }>(
+        `SELECT status, post_id, author_profile_id FROM report.reports WHERE id = $1 AND author_user_id = $2 FOR UPDATE`, [reportId, session.userId],
+      )).rows[0];
+      if (!r) throw notFound("Reporte");
+      if (r.status === "WITHDRAWN") return;
+      await tx.query(`UPDATE report.reports SET status = 'WITHDRAWN' WHERE id = $1`, [reportId]);
+      await tx.query(
+        `UPDATE report.presence_evidence SET device_fix = NULL, generalized_at = COALESCE(generalized_at, now()) WHERE report_id = $1`, [reportId],
+      );
+      const eventId = await this.d.events.detachEvidence(tx, "CITIZEN_REPORT", reportId);
+      const { mediaIds } = await this.d.social.deletePost(tx, r.post_id, r.author_profile_id, { withdrawReport: true });
+      await this.d.media.purgeMedia(tx, mediaIds);
+      await publish(tx, "ReportWithdrawn", { reportId, userId: session.userId, eventId });
     });
   }
 

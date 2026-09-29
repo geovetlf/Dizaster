@@ -30,22 +30,22 @@ export function openContentMenu(target: { type: FlagTargetType; id: string; bloc
 }
 
 /**
- * Menú de un post propio: borrarlo (con confirmación). Un reporte no se borra desde aquí porque es evidencia de
- * un evento: se retira borrando la cuenta o por moderación.
+ * Menú de un post propio: borrarlo, o si es un reporte, retirarlo (su evidencia deja de contar para el evento,
+ * ADR 0037). Siempre con confirmación.
  */
-export function openOwnPostMenu(post: { id: string; deletable: boolean }, onDeleted: () => void): void {
-  Alert.alert(t("options"), post.deletable ? undefined : t("reportNotDeletable"), [
-    ...(post.deletable
-      ? [{
-          text: t("deletePost"), style: "destructive" as const,
-          onPress: () => {
-            Alert.alert(t("deletePost"), t("deletePostConfirm"), [
-              { text: t("cancel"), style: "cancel" },
-              { text: t("deletePost"), style: "destructive", onPress: () => { api.deletePost(post.id).then(onDeleted).catch(() => undefined); } },
-            ]);
-          },
-        }]
-      : []),
+export function openOwnPostMenu(post: { id: string; isReport: boolean }, onDeleted: () => void): void {
+  const label = post.isReport ? t("withdrawReport") : t("deletePost");
+  const confirm = post.isReport ? t("withdrawReportConfirm") : t("deletePostConfirm");
+  Alert.alert(t("options"), undefined, [
+    {
+      text: label, style: "destructive" as const,
+      onPress: () => {
+        Alert.alert(label, confirm, [
+          { text: t("cancel"), style: "cancel" },
+          { text: label, style: "destructive", onPress: () => { api.deletePost(post.id).then(onDeleted).catch(() => undefined); } },
+        ]);
+      },
+    },
     { text: t("cancel"), style: "cancel" },
   ], { cancelable: true });
 }

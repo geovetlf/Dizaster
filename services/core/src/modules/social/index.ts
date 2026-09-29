@@ -426,7 +426,7 @@ export class SocialService {
    * La persona borra su post. Solo los posts sin reporte: un REPORT es evidencia de un EVENT y se retira por
    * moderación o al borrar la cuenta. Devuelve la media adjunta para que el Media Engine la elimine.
    */
-  async deletePost(q: Queryable, postId: string, profileId: string): Promise<{ mediaIds: string[] }> {
+  async deletePost(q: Queryable, postId: string, profileId: string, opts: { withdrawReport?: boolean } = {}): Promise<{ mediaIds: string[] }> {
     const { rows } = await q.query<{ kind: string; deleted: boolean; mine: boolean }>(
       `SELECT p.kind, p.deleted_at IS NOT NULL AS deleted,
               CASE WHEN p.author_type = 'PROFILE' THEN p.author_id = $2
@@ -437,7 +437,7 @@ export class SocialService {
     );
     const r = rows[0];
     if (!r || r.deleted || !r.mine) throw notFound("Post");
-    if (r.kind === "REPORT") throw new DomainError("REPORT_POST", "Un reporte no se borra desde aquí: forma parte de la evidencia de un evento", 409);
+    if (r.kind === "REPORT" && !opts.withdrawReport) throw new DomainError("REPORT_POST", "Un reporte no se borra desde aquí: forma parte de la evidencia de un evento", 409);
     await q.query(`UPDATE social.posts SET text = NULL, public_point = NULL, deleted_at = now(), updated_at = now() WHERE id = $1`, [postId]);
     await q.query(`DELETE FROM social.post_tags WHERE post_id = $1`, [postId]);
     await q.query(`DELETE FROM social.post_mentions WHERE post_id = $1`, [postId]);

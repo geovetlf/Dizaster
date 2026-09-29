@@ -126,8 +126,10 @@ describe("publicar sin reporte", () => {
     expect(m).toEqual({ state: "DELETED", storage_key_original: null });
     expect((await t.app.inject({ method: "DELETE", url: `/v1/posts/${postId}`, headers: auth(beto) })).statusCode).toBe(404);
 
+    // Un post de reporte no se borra: se retira el reporte (ADR 0037; ver event-merge/withdraw).
     const rep = await submit(t, beto, reportBody(beto, { category: "infra.power_outage", pin: LIMA }));
-    expect((await t.app.inject({ method: "DELETE", url: `/v1/posts/${rep.body.postId}`, headers: auth(beto) })).statusCode).toBe(409);
+    expect((await t.app.inject({ method: "DELETE", url: `/v1/posts/${rep.body.postId}`, headers: auth(ana) })).statusCode).toBe(404);
+    expect((await t.app.inject({ method: "DELETE", url: `/v1/posts/${rep.body.postId}`, headers: auth(beto) })).statusCode).toBe(204);
   });
 
   it("tiene un límite por hora", async () => {
