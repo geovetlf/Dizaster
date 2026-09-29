@@ -133,7 +133,7 @@ const styles = StyleSheet.create({
   author: { color: colors.text, fontWeight: "700" },
   time: { color: colors.textMuted, fontWeight: "400" },
   text: { color: colors.text, marginTop: 4 },
-  reply: { marginLeft: space.xl },
+  reply: { marginStart: space.xl },
   actions: { flexDirection: "row", alignItems: "center", gap: space.lg, marginTop: space.sm },
   action: { flexDirection: "row", alignItems: "center", gap: 4 },
   link: { color: colors.textMuted, fontWeight: "600" },

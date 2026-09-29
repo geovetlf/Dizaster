@@ -13,6 +13,8 @@ import { lang, t } from "../../lib/i18n";
 import { LANGUAGE_NAMES } from "../../lib/language";
 import { reportQueue } from "../../lib/report/outbox";
 import { useSession } from "../../lib/session";
+import { isRtlNow } from "../../lib/ui/apply-direction";
+import { forwardChevron } from "../../lib/ui/direction";
 import { colors, radius, space } from "../../theme";
 
 /** Perfil: acceso al perfil público y ajustes de este teléfono. */
@@ -96,7 +98,7 @@ function Row({ icon, label, value, onPress }: { icon: IconProps["name"]; label: 
     <Pressable accessibilityRole={onPress ? "button" : "text"} disabled={!onPress} style={styles.row} onPress={onPress}>
       <Icon name={icon} size={22} color={colors.text} />
       <Text style={styles.rowLabel}>{label}</Text>
-      {value ? <Text style={[styles.rowValue, onPress && styles.rowAction]}>{value}</Text> : <Icon name="chevron-right" size={22} color={colors.textMuted} />}
+      {value ? <Text style={[styles.rowValue, onPress && styles.rowAction]}>{value}</Text> : <Icon name={forwardChevron(isRtlNow())} size={22} color={colors.textMuted} />}
     </Pressable>
   );
 }

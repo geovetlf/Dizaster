@@ -54,7 +54,7 @@ const styles = StyleSheet.create({
   tagline: { color: colors.textMuted, fontSize: 13, marginTop: 2 },
   iconButton: { width: 44, height: 44, borderRadius: radius.md, backgroundColor: colors.surface, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, alignItems: "center", justifyContent: "center" },
   sos: { backgroundColor: colors.accent, borderColor: colors.accent },
-  badge: { position: "absolute", top: 4, right: 4, minWidth: 18, height: 18, paddingHorizontal: 4, borderRadius: radius.pill, backgroundColor: colors.accent, alignItems: "center", justifyContent: "center" },
+  badge: { position: "absolute", top: 4, end: 4, minWidth: 18, height: 18, paddingHorizontal: 4, borderRadius: radius.pill, backgroundColor: colors.accent, alignItems: "center", justifyContent: "center" },
   badgeText: { color: colors.white, fontSize: 11, fontWeight: "800" },
   sosText: { color: colors.white, fontWeight: "800", fontSize: 13 },
   search: { flexDirection: "row", alignItems: "center", gap: space.sm, marginTop: space.lg, backgroundColor: colors.surface, borderRadius: radius.pill, paddingHorizontal: space.lg, paddingVertical: 12, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border },

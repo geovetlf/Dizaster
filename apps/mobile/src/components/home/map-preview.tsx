@@ -7,6 +7,8 @@ import { api } from "../../lib/api";
 import { t } from "../../lib/i18n";
 import { OFFLINE_FALLBACK_STYLE, providerFromAppConfig } from "../../lib/map/provider";
 import { categoryStyle } from "../../lib/ui/categories";
+import { isRtlNow } from "../../lib/ui/apply-direction";
+import { forwardChevron } from "../../lib/ui/direction";
 import { colors, radius, space } from "../../theme";
 import { Icon } from "../icon";
 
@@ -59,7 +61,7 @@ export function MapPreview({ center, category, onLocate }: { center: { lat: numb
       <Pressable accessibilityRole="button" style={[styles.pill, styles.left]} onPress={() => router.push("/map")}>
         <Icon name="crosshairs-gps" size={18} color={colors.accent} />
         <Text style={styles.pillText}>{t("nearYou")}</Text>
-        <Icon name="chevron-right" size={18} color={colors.text} />
+        <Icon name={forwardChevron(isRtlNow())} size={18} color={colors.text} />
       </Pressable>
       <Pressable accessibilityRole="button" style={[styles.pill, styles.right]} onPress={() => router.push("/map")}>
         <Icon name="arrow-expand" size={16} color={colors.text} />
@@ -75,8 +77,8 @@ export function MapPreview({ center, category, onLocate }: { center: { lat: numb
 const styles = StyleSheet.create({
   box: { height: 220, borderRadius: radius.lg, overflow: "hidden", marginTop: space.lg, backgroundColor: colors.surface },
   pill: { position: "absolute", top: space.md, flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#0B0F14E6", borderRadius: radius.pill, paddingHorizontal: space.md, paddingVertical: 8 },
-  left: { left: space.md },
-  right: { right: space.md },
+  left: { start: space.md },
+  right: { end: space.md },
   pillText: { color: colors.text, fontSize: 13, fontWeight: "600" },
-  locate: { position: "absolute", right: space.md, bottom: space.md, width: 44, height: 44, borderRadius: 22, backgroundColor: "#F2F4F7", alignItems: "center", justifyContent: "center" },
+  locate: { position: "absolute", end: space.md, bottom: space.md, width: 44, height: 44, borderRadius: 22, backgroundColor: "#F2F4F7", alignItems: "center", justifyContent: "center" },
 });

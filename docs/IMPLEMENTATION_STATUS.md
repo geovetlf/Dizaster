@@ -293,6 +293,7 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | Retraso de publicación configurable en HIGHLY_SENSITIVE (valor en espera: 0) | ✅ | ADR 0099 |
 | Promoción NORMAL → URGENT por regla configurable por fuente (OMS con regla) | ✅ | ADR 0100 |
 | Roles verificador y operador con tabla de permisos compartida | ✅ | ADR 0101 |
+| Preparación RTL: dirección según el idioma de la app, estilos start/end, guardia | ✅ | ADR 0102 |
 | Licencias, auditoría, SBOM, Dependabot; respaldo con prueba de restauración en CI | ✅ | ADR 0070, `scripts/supply-chain.mjs`, `scripts/db-restore-check.mjs` |
 | Idioma de la app elegible en el perfil (es/en/pt/fr o del teléfono) | ✅ | ADR 0069, `app/language.tsx` |
 | Varias cuentas en un teléfono corroboran como una (clave seudónima del teléfono) | ✅ | ADR 0068, migración 0036 |
@@ -324,7 +325,6 @@ Revisión del Blueprint del 2026-09-29 (tras ADR 0080): completada con ADR 0081�
 
 Revisión del Blueprint del 2026-09-29 (tras ADR 0092), verificada contra el código, sin bloqueos:
 
-1. Preparación para idiomas RTL (§5.15).
 
 
 Bloqueadas o en espera:

@@ -232,7 +232,7 @@ const styles = StyleSheet.create({
   tile: { borderRadius: radius.md, backgroundColor: colors.surfaceAlt, overflow: "hidden" },
   videoTile: { alignItems: "center", justifyContent: "center", backgroundColor: "#11161D" },
   play: { width: 52, height: 52, borderRadius: 26, backgroundColor: "#000000AA", alignItems: "center", justifyContent: "center" },
-  duration: { position: "absolute", right: 8, bottom: 8, color: colors.white, backgroundColor: "#000000AA", paddingHorizontal: 6, borderRadius: 4, fontSize: 12 },
+  duration: { position: "absolute", end: 8, bottom: 8, color: colors.white, backgroundColor: "#000000AA", paddingHorizontal: 6, borderRadius: 4, fontSize: 12 },
   context: { flexDirection: "row", flexWrap: "wrap", gap: space.sm, marginTop: space.md },
   chip: { flexDirection: "row", alignItems: "center", gap: 4, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, borderRadius: radius.pill, paddingHorizontal: 10, paddingVertical: 4 },
   chipOn: { backgroundColor: colors.accent, borderColor: colors.accent },

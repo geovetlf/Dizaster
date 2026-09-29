@@ -56,5 +56,5 @@ const styles = StyleSheet.create({
   video: { alignItems: "center", justifyContent: "center", backgroundColor: "#11161D" },
   play: { width: 48, height: 48, borderRadius: 24, backgroundColor: "#000000AA", alignItems: "center", justifyContent: "center" },
   playText: { color: "#FFFFFF", fontSize: 20 },
-  duration: { position: "absolute", right: 8, bottom: 8, color: "#FFFFFF", backgroundColor: "#000000AA", paddingHorizontal: 6, borderRadius: 4, fontSize: 12 },
+  duration: { position: "absolute", end: 8, bottom: 8, color: "#FFFFFF", backgroundColor: "#000000AA", paddingHorizontal: 6, borderRadius: 4, fontSize: 12 },
 });

@@ -1,5 +1,6 @@
 import { File, Paths } from "expo-file-system";
-import { locale, setLang } from "./i18n";
+import { lang, locale, setLang } from "./i18n";
+import { applyDirection } from "./ui/apply-direction";
 import { parseLanguagePref, resolveLang, type LanguagePref } from "./language";
 
 const file = () => new File(Paths.document, "app-language.txt");
@@ -17,6 +18,8 @@ export function loadLanguagePref(): LanguagePref {
 
 export function applyLanguagePref(pref: LanguagePref): void {
   setLang(resolveLang(pref, locale));
+  // La dirección sigue al idioma de la app, no al del teléfono (ADR 0102).
+  applyDirection(lang);
 }
 
 /** Guarda, aplica y avisa a la raíz de la app para que vuelva a pintar la navegación en el idioma nuevo. */
