@@ -27,10 +27,13 @@ describe("fin oficial de un evento (ADR 0059)", () => {
   it("una alerta retirada cierra un evento que solo sostenía esa fuente", async () => {
     const id = eventOf(await t.c.ingestion.ingest("usgs-earthquakes", quake("end-w-1", offset(LIMA, -60_000)), "NORMAL"));
     await t.c.dispatcher.drain();
-    expect(await t.c.ingestion.withdraw("usgs-earthquakes", "end-w-1", new Date(Date.now() - 1000))).toBe(true);
+    const withdrawnAt = new Date(Date.now() - 1000);
+    expect(await t.c.ingestion.withdraw("usgs-earthquakes", "end-w-1", withdrawnAt)).toBe(true);
     expect(await t.c.ingestion.withdraw("usgs-earthquakes", "end-w-1", new Date())).toBe(false);
     expect(await run()).toBeGreaterThanOrEqual(1);
     expect(await status(id)).toBe("RESOLVED");
+    // Hora de fin (ADR 0140): la que dio la fuente.
+    expect((await t.app.inject({ url: `/v1/events/${id}` })).json().endedAt).toBe(withdrawnAt.toISOString());
     const tl = (await t.app.inject({ url: `/v1/events/${id}/timeline` })).json().entries as { type: string; payload: { cause?: string } }[];
     expect(tl.some((e) => e.type === "STATUS_CHANGED" && e.payload.cause === "SOURCE_WITHDRAWN")).toBe(true);
   });
@@ -53,5 +56,17 @@ describe("fin oficial de un evento (ADR 0059)", () => {
     await t.c.dispatcher.drain();
     await run();
     expect(await status(id)).toBe("ACTIVE");
+  });
+
+  it("sin hora de la fuente usa la última actividad y se borra al reactivar (ADR 0140)", async () => {
+    const id = eventOf(await t.c.ingestion.ingest("usgs-earthquakes", quake("end-m-1", offset(LIMA, 200_000)), "NORMAL"));
+    await t.c.dispatcher.drain();
+    const last = (await t.c.db.query<{ last_activity_at: Date }>(`SELECT last_activity_at FROM event.events WHERE id = $1`, [id])).rows[0]!.last_activity_at;
+    const ended = async () => (await t.app.inject({ url: `/v1/events/${id}` })).json().endedAt as string | null;
+    expect(await ended()).toBeNull();
+    await t.c.events.setStatus(t.c.db, id, "RESOLVED", "test", "terminó");
+    expect(await ended()).toBe(last.toISOString());
+    await t.c.events.setStatus(t.c.db, id, "ACTIVE", "test", "sigue");
+    expect(await ended()).toBeNull();
   });
 });

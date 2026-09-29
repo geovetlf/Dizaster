@@ -72,14 +72,14 @@ interface EventRow {
   id: string; category_code: string; title: Record<string, string> | null; lat: number; lng: number;
   sensitivity: EventSummary["sensitivity"]; country_code: string | null; status: EventSummary["status"];
   severity: number; verification_level: VerificationLevel; negative_state: NegativeState; report_count: number;
-  source_count: number; official_source_count: number; first_seen_at: Date; last_activity_at: Date; publication_state: string; merged_into_id: string | null;
+  source_count: number; official_source_count: number; first_seen_at: Date; last_activity_at: Date; occurred_end: Date | null; publication_state: string; merged_into_id: string | null;
   place: ContextualLocation | null; secondary_categories: string[] | null;
 }
 
 const PUBLIC_EVENT_COLUMNS = `
   e.id, e.category_code, e.title, ST_Y(e.public_geom::geometry) AS lat, ST_X(e.public_geom::geometry) AS lng,
   e.sensitivity, e.country_code, e.status, e.severity, e.verification_level, e.negative_state,
-  e.report_count, e.source_count, e.official_source_count, e.first_seen_at, e.last_activity_at, e.publication_state, e.merged_into_id, e.place,
+  e.report_count, e.source_count, e.official_source_count, e.first_seen_at, e.last_activity_at, e.occurred_end, e.publication_state, e.merged_into_id, e.place,
   e.secondary_categories`;
 
 function toSummary(r: EventRow): EventSummary {
@@ -102,6 +102,7 @@ function toSummary(r: EventRow): EventSummary {
     officialSourceCount: r.official_source_count ?? 0,
     firstSeenAt: r.first_seen_at.toISOString(),
     lastActivityAt: r.last_activity_at.toISOString(),
+    endedAt: r.occurred_end?.toISOString() ?? null,
   };
 }
 
@@ -1086,9 +1087,10 @@ export class EventService {
    * expiradas) pasa a RESOLVED. Si hay un reporte ciudadano o una fuente vigente, no se toca: sigue el ciclo por
    * inactividad. `ended` lo da ingestion (ids de ítems externos con su motivo).
    */
-  async applySourceEnd(q: Queryable, ended: { id: string; reason: "WITHDRAWN" | "EXPIRED" }[]): Promise<number> {
+  async applySourceEnd(q: Queryable, ended: { id: string; reason: "WITHDRAWN" | "EXPIRED"; at?: Date }[]): Promise<number> {
     if (ended.length === 0) return 0;
     const reasonById = new Map(ended.map((e) => [e.id, e.reason]));
+    const atById = new Map(ended.map((e) => [e.id, e.at]));
     const { rows } = await q.query<{ id: string; status: EventStatus; refs: string[] }>(
       `SELECT e.id, e.status, array_agg(ev.ref_id::text) AS refs
          FROM event.events e JOIN event.evidence ev ON ev.event_id = e.id AND ev.status = 'ACTIVE'
@@ -1100,7 +1102,10 @@ export class EventService {
     );
     for (const r of rows) {
       const withdrawn = r.refs.some((ref) => reasonById.get(ref) === "WITHDRAWN");
-      await q.query(`UPDATE event.events SET status = 'RESOLVED', updated_at = now() WHERE id = $1`, [r.id]);
+      // Hora de fin (ADR 0140): la última hora de fin que dieron las fuentes; sin ella, el trigger usa la última actividad.
+      const ends = r.refs.map((ref) => atById.get(ref)?.getTime()).filter((x): x is number => x !== undefined);
+      await q.query(`UPDATE event.events SET status = 'RESOLVED', occurred_end = $2, updated_at = now() WHERE id = $1`,
+        [r.id, ends.length ? new Date(Math.max(...ends)) : null]);
       await this.addTimeline(q, r.id, "STATUS_CHANGED", { from: r.status, to: "RESOLVED", cause: withdrawn ? "SOURCE_WITHDRAWN" : "SOURCE_EXPIRED" });
       await publish(q, "EventLifecycleChanged", { eventId: r.id, to: "RESOLVED" }, { lane: "normal" });
     }

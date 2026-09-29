@@ -118,7 +118,12 @@ export default function EventScreen() {
       </View>
       <Text style={[styles.badge, { backgroundColor: color }]}>{verificationLabel(event.publicVerificationState)}</Text>
       <Text style={styles.meta}>
-        {[...evidenceCounts(event, tCount), eventTime(event.firstSeenAt, lang, event.place?.timezone, zoneLabels())].join(" · ")}
+        {[
+          ...evidenceCounts(event, tCount),
+          eventTime(event.firstSeenAt, lang, event.place?.timezone, zoneLabels()),
+          // Hora de fin (ADR 0140), solo en eventos cerrados.
+          ...(event.endedAt ? [`${t("eventEnded")} ${eventTime(event.endedAt, lang, event.place?.timezone, zoneLabels())}`] : []),
+        ].join(" · ")}
       </Text>
       {verification ? (
         <View style={styles.why}>

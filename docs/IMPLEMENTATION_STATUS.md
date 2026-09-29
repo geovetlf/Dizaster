@@ -330,6 +330,7 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | Quién puede mencionarte (§7.3) | `mentionsFrom` EVERYONE/FOLLOWING/NOBODY en mi perfil; una mención no permitida queda como texto, sin enlace ni aviso; sin perfil privado en V1 | [0137](adr/0137-quien-puede-mencionarte.md) |
 | 0138 | Degradación automática por costo fuera de IA: presupuesto `infra`, escalera video → fotos nuevas → fuentes no urgentes (100/110/125 %), restaura solo lo automático, aviso a admin/operación | ✅ |
 | 0139 | Registro auditado de requerimientos de autoridades: solo registro (estados con nota, historial de solo inserción, referencias internas), pantalla admin, conteo en transparencia; sin entrega de datos | ✅ |
+| 0140 | Hora de fin del evento (occurred_end): la fija el trigger de estado o la fuente oficial, se borra al reactivar; "Terminó …" en la ficha | ✅ |
 | Licencias, auditoría, SBOM, Dependabot; respaldo con prueba de restauración en CI | ✅ | ADR 0070, `scripts/supply-chain.mjs`, `scripts/db-restore-check.mjs` |
 | Idioma de la app elegible en el perfil (es/en/pt/fr o del teléfono) | ✅ | ADR 0069, `app/language.tsx` |
 | Varias cuentas en un teléfono corroboran como una (clave seudónima del teléfono) | ✅ | ADR 0068, migración 0036 |
@@ -367,10 +368,19 @@ Revisión del Blueprint del 2026-09-29 (tras ADR 0109, mensaje de bajo costo del
 
 Revisión del Blueprint del 2026-09-29 (tras ADR 0112): completada con ADR 0113–0120.
 
-Revisión del Blueprint del 2026-09-29 (tras ADR 0129), verificada contra el código, sin bloqueos:
+Revisión del Blueprint del 2026-09-29 (tras ADR 0139), verificada contra el código, sin bloqueos:
+
+1. Aviso push por acción de moderación y resolución de apelación (ADR 0020 pendiente)
+2. Anti-coordinación: cuentas nuevas creadas juntas (§10.2)
+3. Reportes retirados por moderación dejan de contar para el evento (§6.2)
+4. Área oficial afectada visible en la ficha y el mapa del evento (§7.3, ADR 0087)
 
 
 Bloqueadas o en espera:
+
+- **EN ESPERA** — Lista propia de hashes de contenido retirado (§5.12): falta decidir si una subida que coincide se
+  rechaza o queda oculta y va a moderación.
+- **EN ESPERA** — Ocultar automáticamente comentarios con muchas denuncias (ADR 0020): falta decisión del propietario.
 
 - **BLOQUEADA** — Identity real: Sign in with Apple, Google y email; App Attest / Play Integrity. Falta: cuentas de
   Apple Developer y Google (client IDs, Service ID, Team ID) y un proveedor de email aprobado (gasto).

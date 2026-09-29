@@ -90,6 +90,8 @@ export const EventSummary = z.object({
   officialSourceCount: z.number().int(),
   firstSeenAt: Instant,
   lastActivityAt: Instant,
+  /** Hora de fin (§7.3 occurred_end, ADR 0140): solo en eventos RESOLVED o ARCHIVED. */
+  endedAt: Instant.nullable().optional(),
 });
 export type EventSummary = z.infer<typeof EventSummary>;
 

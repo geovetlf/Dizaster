@@ -205,6 +205,7 @@ export const pt: Record<MessageKey, string> = {
   why_EXTERNAL_DENIAL: "Uma fonte externa diz que não ocorreu: em disputa.",
   why_EXTERNAL_DENIAL_NAMED: "Uma fonte externa diz que não ocorreu: {sources}, {at}.",
   adminDelays: "Atraso de publicação",
+  eventEnded: "Terminou",
   adminAuthority: "Solicitações de autoridades",
   authorityHint: "Apenas registro auditado. O Dizaster não entrega nenhum dado até contar com assessoria jurídica.",
   authorityNew: "Registrar solicitação",

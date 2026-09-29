@@ -215,9 +215,9 @@ export class IngestionService {
    * Ítems vinculados a un evento cuya vigencia terminó (retirados o expirados) en la ventana dada, con el motivo.
    * Solo los recientes: un evento viejo ya lo cerró el ciclo por inactividad.
    */
-  async endedItems(q: Queryable, now: Date, windowDays = 7): Promise<{ id: string; reason: "WITHDRAWN" | "EXPIRED" }[]> {
-    const { rows } = await q.query<{ id: string; reason: "WITHDRAWN" | "EXPIRED" }>(
-      `SELECT id, CASE WHEN withdrawn_at IS NOT NULL THEN 'WITHDRAWN' ELSE 'EXPIRED' END AS reason
+  async endedItems(q: Queryable, now: Date, windowDays = 7): Promise<{ id: string; reason: "WITHDRAWN" | "EXPIRED"; at: Date }[]> {
+    const { rows } = await q.query<{ id: string; reason: "WITHDRAWN" | "EXPIRED"; at: Date }>(
+      `SELECT id, CASE WHEN withdrawn_at IS NOT NULL THEN 'WITHDRAWN' ELSE 'EXPIRED' END AS reason, coalesce(withdrawn_at, ends_at) AS at
          FROM ingestion.external_items
         WHERE event_id IS NOT NULL AND coalesce(withdrawn_at, ends_at) <= $1
           AND coalesce(withdrawn_at, ends_at) > $1::timestamptz - make_interval(days => $2)`,
