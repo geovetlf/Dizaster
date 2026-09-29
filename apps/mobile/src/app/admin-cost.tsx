@@ -1,8 +1,9 @@
-import type { BudgetView, CostDashboard } from "@dizaster/contracts";
+import { can, type BudgetView, type CostDashboard } from "@dizaster/contracts";
 import { useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 import { Alert, Pressable, RefreshControl, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
 import { api } from "../lib/api";
+import { useRoles } from "../lib/auth/roles";
 import { parseUsd } from "../lib/admin/admin-tools";
 import { barHeights, budgetTone, formatBytes, formatUnits, formatUsd, moduleRows } from "../lib/admin/cost-format";
 import { lang, t } from "../lib/i18n";
@@ -17,6 +18,8 @@ export default function AdminCostScreen() {
   const [d, setD] = useState<CostDashboard | null>(null);
   const [error, setError] = useState(false);
   const [editing, setEditing] = useState<string | null>(null);
+  // Operación ve el tablero y usa los kill switches; los presupuestos son solo de administración (ADR 0101).
+  const isAdmin = can(useRoles(), "admin");
 
   const load = useCallback(async (n: number) => {
     try {
@@ -76,12 +79,12 @@ export default function AdminCostScreen() {
           <Text style={styles.section}>{t("costBudgets")}</Text>
           {d.budgets.map((b) => (
             <View key={b.key}>
-              <Pressable accessibilityRole="button" style={styles.row} onPress={() => setEditing(editing === b.key ? null : b.key)}>
+              <Pressable accessibilityRole={isAdmin ? "button" : "text"} disabled={!isAdmin} style={styles.row} onPress={() => setEditing(editing === b.key ? null : b.key)}>
                 <View style={[styles.dot, { backgroundColor: TONE[budgetTone(b.percent)] }]} />
                 <Text style={styles.rowLabel}>{b.key} · {b.period === "DAILY" ? "24 h" : t("costMonth")}</Text>
                 <Text style={styles.amount}>{usd(b.spentUsd)} / {usd(b.limitUsd)}</Text>
               </Pressable>
-              {editing === b.key ? <BudgetEditor budget={b} onSaved={() => { setEditing(null); void load(days); }} /> : null}
+              {isAdmin && editing === b.key ? <BudgetEditor budget={b} onSaved={() => { setEditing(null); void load(days); }} /> : null}
             </View>
           ))}
 

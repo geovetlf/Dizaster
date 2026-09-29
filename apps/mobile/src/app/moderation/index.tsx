@@ -1,8 +1,9 @@
-import type { AppealView, CaseSummary, DuplicateCandidateView } from "@dizaster/contracts";
+import { can, type AppealView, type CaseSummary, type DuplicateCandidateView } from "@dizaster/contracts";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 import { FlatList, Pressable, RefreshControl, StyleSheet, Text, TextInput, View } from "react-native";
 import { api } from "../../lib/api";
+import { useRoles } from "../../lib/auth/roles";
 import { lang, t } from "../../lib/i18n";
 import { reasonSummary, validReason } from "../../lib/moderation/logic";
 import { eventTitle, timeAgo } from "../../lib/ui/format";
@@ -17,13 +18,24 @@ export default function ModerationScreen() {
   const [duplicates, setDuplicates] = useState<DuplicateCandidateView[]>([]);
   const [loaded, setLoaded] = useState(false);
 
+  // Cada rol ve sus pestañas (ADR 0101): verificación solo duplicados; moderación, todo.
+  const roles = useRoles();
+  const moderates = can(roles, "content.moderate");
+  const verifies = can(roles, "event.verify");
+  const tabs = [...(moderates ? (["queue", "appeals"] as const) : []), ...(verifies ? (["duplicates"] as const) : [])];
+  const shown = tabs.includes(tab) ? tab : tabs[0] ?? "queue";
+
   const load = useCallback(async () => {
-    const [q, a, d] = await Promise.all([api.moderationQueue(), api.appeals(), api.duplicateQueue()]).catch(() => [null, null, null] as const);
+    const [q, a, d] = await Promise.all([
+      moderates ? api.moderationQueue().catch(() => null) : null,
+      moderates ? api.appeals().catch(() => null) : null,
+      verifies ? api.duplicateQueue().catch(() => null) : null,
+    ]);
     if (q) { setCases(q.cases); setCursor(q.nextCursor); }
     if (a) setAppeals(a.appeals);
     if (d) setDuplicates(d.candidates);
     setLoaded(true);
-  }, []);
+  }, [moderates, verifies]);
   useFocusEffect(useCallback(() => { void load(); }, [load]));
 
   async function more() {
@@ -35,15 +47,15 @@ export default function ModerationScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.tabs}>
-        {(["queue", "appeals", "duplicates"] as const).map((k) => (
-          <Pressable key={k} accessibilityRole="tab" accessibilityState={{ selected: tab === k }} style={[styles.tab, tab === k && styles.tabOn]} onPress={() => setTab(k)}>
+        {tabs.map((k) => (
+          <Pressable key={k} accessibilityRole="tab" accessibilityState={{ selected: shown === k }} style={[styles.tab, shown === k && styles.tabOn]} onPress={() => setTab(k)}>
             <Text style={styles.tabText}>
               {k === "queue" ? `${t("moderationQueue")} (${cases.length})` : k === "appeals" ? `${t("moderationAppeals")} (${appeals.length})` : `${t("duplicatesTab")} (${duplicates.length})`}
             </Text>
           </Pressable>
         ))}
       </View>
-      {tab === "queue" ? (
+      {shown === "queue" ? (
         <FlatList
           data={cases}
           keyExtractor={(c) => c.id}
@@ -61,7 +73,7 @@ export default function ModerationScreen() {
             </Pressable>
           )}
         />
-      ) : tab === "duplicates" ? (
+      ) : shown === "duplicates" ? (
         <FlatList
           data={duplicates}
           keyExtractor={(d) => d.id}

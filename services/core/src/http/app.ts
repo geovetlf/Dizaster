@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { MEDIA_KILL_SWITCHES, MfaCodeRequest, MfaVerifyRequest, type MfaStatus } from "@dizaster/contracts";
+import { MEDIA_KILL_SWITCHES, MfaCodeRequest, MfaVerifyRequest, can, isStaff, type MfaStatus, type Permission } from "@dizaster/contracts";
 import { isValidTile, tileBounds } from "@dizaster/geo-kit";
 import Fastify, { type FastifyInstance, type FastifyRequest } from "fastify";
 import { z } from "zod";
@@ -743,7 +743,14 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
   // ───────────── MFA TOTP del personal (ADR 0090) ─────────────
   const requireStaffRole = (req: FastifyRequest) => {
     const session = requireSession(req);
-    if (!session.roles.includes("moderator") && !session.roles.includes("admin")) throw forbidden("Solo moderación y administración");
+    if (!isStaff(session.roles)) throw forbidden("Solo personal de Dizaster");
+    return session;
+  };
+  // Permisos por rol (ADR 0101): una tabla compartida con la app; además, MFA verificada cuando es obligatoria.
+  const requirePermission = async (req: FastifyRequest, permission: Permission) => {
+    const session = requireSession(req);
+    if (!can(session.roles, permission)) throw forbidden("Tu rol no permite esta acción");
+    await c.mfa.assertStaff(session);
     return session;
   };
   app.get("/v1/me/mfa", async (req, reply): Promise<MfaStatus> => {
@@ -775,21 +782,16 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
 
   // ───────────── Costos (rol admin): tablero, presupuestos y kill switches remotos ─────────────
   // Personal (ADR 0090): además del rol, segundo factor verificado en esta sesión cuando MFA es obligatoria.
-  const requireAdmin = async (req: FastifyRequest) => {
-    const session = requireSession(req);
-    if (!session.roles.includes("admin")) throw forbidden("Solo administración");
-    await c.mfa.assertStaff(session);
-    return session;
-  };
+  const requireAdmin = (req: FastifyRequest) => requirePermission(req, "admin");
   app.get("/v1/admin/cost", async (req, reply) => {
-    await requireAdmin(req);
+    await requirePermission(req, "ops.view");
     // Lo medido en este proceso entra antes de leer: el tablero no va por detrás de sí mismo.
     await c.meter.flush(c.cost);
     reply.header("cache-control", "no-store");
     return c.cost.dashboard(req.query);
   });
   app.get("/v1/admin/quality", async (req, reply) => {
-    await requireAdmin(req);
+    await requirePermission(req, "ops.view");
     await c.meter.flush(c.cost);
     reply.header("cache-control", "no-store");
     return c.quality.report(req.query);
@@ -799,7 +801,7 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
     return c.cost.setBudget((req.params as { key: string }).key, req.body, session.userId);
   });
   app.put("/v1/admin/kill-switches/:feature", async (req) => {
-    const session = await requireAdmin(req);
+    const session = await requirePermission(req, "ops.control");
     return c.cost.setKillSwitch((req.params as { feature: string }).feature, req.body, session.userId);
   });
 
@@ -836,12 +838,8 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
   });
 
   // ───────────── Moderación (rol moderator) ─────────────
-  const requireModerator = async (req: FastifyRequest) => {
-    const session = requireSession(req);
-    if (!session.roles.includes("moderator") && !session.roles.includes("admin")) throw forbidden("Solo moderación");
-    await c.mfa.assertStaff(session);
-    return session;
-  };
+  const requireModerator = (req: FastifyRequest) => requirePermission(req, "content.moderate");
+  const requireVerifier = (req: FastifyRequest) => requirePermission(req, "event.verify");
   app.get("/v1/moderation/cases", async (req, reply) => {
     await requireModerator(req);
     reply.header("cache-control", "no-store");
@@ -880,12 +878,12 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
   });
   // Fusión y división de eventos (ADR 0034). La auditoría vive en event.merge_log y event.split_log.
   app.get("/v1/moderation/events/:id", async (req, reply) => {
-    await requireModerator(req);
+    await requireVerifier(req);
     reply.header("cache-control", "no-store");
     return c.events.moderatorDetail(c.db, parse(IdParam, req.params).id);
   });
   app.post("/v1/moderation/events/:id/merge", async (req) => {
-    const session = await requireModerator(req);
+    const session = await requireVerifier(req);
     const { id } = parse(IdParam, req.params);
     const b = parse(MergeEventsRequest, req.body);
     const mergeIds = await withTransaction(c.db, async (tx) => {
@@ -897,37 +895,37 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
   });
   // Cola de posibles duplicados (ADR 0076): se fusionan con la ruta de arriba o se descartan.
   app.get("/v1/moderation/duplicates", async (req, reply) => {
-    await requireModerator(req);
+    await requireVerifier(req);
     reply.header("cache-control", "no-store");
     return { candidates: await c.events.duplicateQueue(c.db) };
   });
   app.post("/v1/moderation/duplicates/:id/dismiss", async (req, reply) => {
-    const session = await requireModerator(req);
+    const session = await requireVerifier(req);
     const { reason } = parse(DismissDuplicateRequest, req.body);
     await c.events.dismissDuplicate(c.db, parse(IdParam, req.params).id, session.userId, reason);
     return reply.status(204).send();
   });
   app.post("/v1/moderation/merges/:id/revert", async (req) => {
-    const session = await requireModerator(req);
+    const session = await requireVerifier(req);
     const { reason } = parse(RevertMergeRequest, req.body);
     return withTransaction(c.db, (tx) => c.events.revertMerge(tx, parse(IdParam, req.params).id, session.userId, reason));
   });
   app.post("/v1/moderation/events/:id/split", async (req, reply) => {
-    const session = await requireModerator(req);
+    const session = await requireVerifier(req);
     const { id } = parse(IdParam, req.params);
     const b = parse(SplitEventRequest, req.body);
     const eventId = await withTransaction(c.db, (tx) => c.events.split(tx, id, b.evidenceIds, session.userId, b.reason));
     return reply.status(201).send({ eventId });
   });
   app.post("/v1/moderation/events/:id/status", async (req) => {
-    const session = await requireModerator(req);
+    const session = await requireVerifier(req);
     const { id } = parse(IdParam, req.params);
     const b = parse(SetEventStatusRequest, req.body);
     await withTransaction(c.db, (tx) => c.events.setStatus(tx, id, b.to, session.userId, b.reason));
     return c.events.moderatorDetail(c.db, id);
   });
   app.post("/v1/moderation/events/:id/negative-state", async (req) => {
-    const session = await requireModerator(req);
+    const session = await requireVerifier(req);
     const { id } = parse(IdParam, req.params);
     const b = parse(z.object({ to: NegativeState, reason: z.string().max(2000), evidenceRefs: z.array(z.uuid()).max(20).default([]) }), req.body);
     await c.verification.moderatorSetNegative({ eventId: id, moderatorUserId: session.userId, to: b.to, reason: b.reason, evidenceRefs: b.evidenceRefs });

@@ -8,7 +8,8 @@ import { newId } from "../../platform/ids.js";
 import { publish } from "../../platform/outbox.js";
 import type { SocialService } from "../social/index.js";
 
-export type Role = "user" | "moderator" | "admin";
+export type { Role } from "@dizaster/contracts";
+import type { Role, StaffRole } from "@dizaster/contracts";
 
 export interface Session {
   userId: string;
@@ -156,7 +157,7 @@ export class IdentityService {
     return rows[0]?.ok ?? false;
   }
 
-  async grantRole(userId: string, role: Exclude<Role, "user">): Promise<void> {
+  async grantRole(userId: string, role: StaffRole): Promise<void> {
     await this.db.query(`UPDATE identity.users SET roles = array(SELECT DISTINCT unnest(roles || $2::text)) WHERE id = $1`, [userId, role]);
   }
 
@@ -410,7 +411,7 @@ export class IdentityService {
   }
 
   /** Personas con un rol (p. ej. administración, para avisos operativos). Excluye cuentas suspendidas o borradas. */
-  async usersWithRole(q: Queryable, role: Exclude<Role, "user">): Promise<string[]> {
+  async usersWithRole(q: Queryable, role: StaffRole): Promise<string[]> {
     const { rows } = await q.query<{ id: string }>(`SELECT id FROM identity.users WHERE $1 = ANY(roles) AND status = 'ACTIVE'`, [role]);
     return rows.map((r) => r.id);
   }

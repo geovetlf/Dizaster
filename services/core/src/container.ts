@@ -119,7 +119,8 @@ export function buildContainer(env: AppEnv, overrides: { db?: Db; clock?: Clock;
   // Fuentes urgentes caídas o recuperadas (ADR 0058): log estructurado y push a administración.
   dispatcher.on("SourceHealthChanged", "alert.notify-admins-source", async (e) => {
     console.warn(JSON.stringify({ msg: "ingestion.source.health", ...e.payload }));
-    const admins = await identity.usersWithRole(db, "admin");
+    // Operación también recibe la caída de fuentes (ADR 0101).
+    const admins = [...new Set([...(await identity.usersWithRole(db, "admin")), ...(await identity.usersWithRole(db, "operator"))])];
     await alerts.notifyAdmins(admins, (lang) => sourceAlertText(lang, e.payload), "dizaster://admin-quality", `source:${e.payload.sourceKey}`);
   });
   // Perfiles institucionales oficiales como fuente OFICIAL (ADR 0095).
