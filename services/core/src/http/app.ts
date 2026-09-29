@@ -2,7 +2,7 @@ import Fastify, { type FastifyInstance, type FastifyRequest } from "fastify";
 import { z } from "zod";
 import {
   BBox, CreateCommentRequest, DevicePlatform, MEDIA_UPLOAD_LIMITS, MergeEventsRequest, NegativeState, ReactionKind, CommentReactionKind, ConfirmAgeRequest, RegisterPushTokenRequest, RevertMergeRequest,
-  SplitEventRequest, SetEventStatusRequest, DATA_EXPORT_FORMAT, type AppConfig, type Attribution, type AttributionsResponse, type DataExport, type EmergencyNumbersResponse, type EventSearchResponse,
+  SplitEventRequest, SetEventStatusRequest, DismissDuplicateRequest, DATA_EXPORT_FORMAT, type AppConfig, type Attribution, type AttributionsResponse, type DataExport, type EmergencyNumbersResponse, type EventSearchResponse,
 } from "@dizaster/contracts";
 import { LocalDiskStorage } from "../modules/media/index.js";
 import type { Container } from "../container.js";
@@ -756,10 +756,22 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
     const b = parse(MergeEventsRequest, req.body);
     const mergeIds = await withTransaction(c.db, async (tx) => {
       const out: string[] = [];
-      for (const sourceId of new Set(b.sourceEventIds)) out.push(await c.events.merge(tx, id, sourceId, session.userId, b.reason));
+      for (const sourceId of new Set(b.sourceEventIds)) out.push(await c.events.merge(tx, id, sourceId, `MODERATOR:${session.userId}`, b.reason));
       return out;
     });
     return { mergeIds, event: await c.events.moderatorDetail(c.db, id) };
+  });
+  // Cola de posibles duplicados (ADR 0076): se fusionan con la ruta de arriba o se descartan.
+  app.get("/v1/moderation/duplicates", async (req, reply) => {
+    requireModerator(req);
+    reply.header("cache-control", "no-store");
+    return { candidates: await c.events.duplicateQueue(c.db) };
+  });
+  app.post("/v1/moderation/duplicates/:id/dismiss", async (req, reply) => {
+    const session = requireModerator(req);
+    const { reason } = parse(DismissDuplicateRequest, req.body);
+    await c.events.dismissDuplicate(c.db, parse(IdParam, req.params).id, session.userId, reason);
+    return reply.status(204).send();
   });
   app.post("/v1/moderation/merges/:id/revert", async (req) => {
     const session = requireModerator(req);

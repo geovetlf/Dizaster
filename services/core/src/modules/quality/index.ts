@@ -67,7 +67,11 @@ export class QualityService {
       generatedAt: now.toISOString(),
       slos,
       api,
-      events: { ...ev, mergeRate: ev.created > 0 ? Math.round((ev.merged / ev.created) * 1000) / 1000 : null },
+      events: {
+        ...ev,
+        mergeRate: ev.created > 0 ? Math.round((ev.merged / ev.created) * 1000) / 1000 : null,
+        autoMergeRevertRate: ev.autoMerged > 0 ? Math.round((ev.autoMergeReverted / ev.autoMerged) * 1000) / 1000 : null,
+      },
       verification: await verification.qualityStats(q, from, now),
       alerts: al,
       ingestion: ing,

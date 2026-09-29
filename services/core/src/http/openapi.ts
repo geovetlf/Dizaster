@@ -111,6 +111,8 @@ export const OPERATIONS: Record<string, Operation> = {
   "GET /v1/moderation/events/:id": { summary: "Evento visto por moderación" },
   "POST /v1/moderation/events/:id/merge": { summary: "Fusionar eventos", body: C.MergeEventsRequest },
   "POST /v1/moderation/merges/:id/revert": { summary: "Revertir una fusión", body: C.RevertMergeRequest },
+  "GET /v1/moderation/duplicates": { summary: "Cola de posibles eventos duplicados (ADR 0076)" },
+  "POST /v1/moderation/duplicates/:id/dismiss": { summary: "Descartar un posible duplicado", body: C.DismissDuplicateRequest },
   "POST /v1/moderation/events/:id/split": { summary: "Separar un evento", body: C.SplitEventRequest },
   "POST /v1/moderation/events/:id/status": { summary: "Cambiar el ciclo de vida de un evento", body: C.SetEventStatusRequest },
   "POST /v1/moderation/events/:id/negative-state": { summary: "Marcar un evento en disputa o falso" },

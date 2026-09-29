@@ -5,6 +5,7 @@ import type {
   NearbyEvent,
   EventCandidate,
   EventMapResponse,
+  DuplicateCandidateView,
   EventMergeView,
   EventSummary,
   ModeratorEventDetail,
@@ -16,7 +17,7 @@ import type {
   TrustTier,
   VerificationLevel,
 } from "@dizaster/contracts";
-import { EventSearchQuery, publicVerificationState } from "@dizaster/contracts";
+import { EventSearchQuery, VERIFICATION_LEVEL_RANK, publicVerificationState } from "@dizaster/contracts";
 import {
   DEDUP_RULES,
   H3_RES,
@@ -28,7 +29,8 @@ import {
   weightedMedianPoint,
   type DedupCandidateEvent,
 } from "@dizaster/geo-kit";
-import type { Queryable } from "../../platform/db.js";
+import type { Db, Queryable } from "../../platform/db.js";
+import { withTransaction } from "../../platform/db.js";
 import { DomainError, notFound } from "../../platform/errors.js";
 import { newId } from "../../platform/ids.js";
 import { publish, type OutboxDispatcher } from "../../platform/outbox.js";
@@ -214,7 +216,13 @@ export class EventService {
   }
 
   private async findCandidates(tx: Queryable, c: EventCandidate, category: CategoryConfig): Promise<DedupCandidateEvent[]> {
-    const root = c.categoryCode.split(".")[0]!;
+    return this.candidateEvents(tx, c.categoryCode, c.point, c.observedAt, category, null);
+  }
+
+  private async candidateEvents(
+    tx: Queryable, categoryCode: string, point: GeoPoint, observedAt: string | Date, category: CategoryConfig, excludeId: string | null,
+  ): Promise<DedupCandidateEvent[]> {
+    const root = categoryCode.split(".")[0]!;
     const { rows } = await tx.query<{ id: string; category_code: string; lat: number; lng: number; last_activity_at: Date; keywords: string[]; media_hashes: string[] }>(
       `SELECT id, category_code, ST_Y(geom::geometry) AS lat, ST_X(geom::geometry) AS lng, last_activity_at, keywords, media_hashes
          FROM event.events
@@ -222,10 +230,11 @@ export class EventService {
           AND (category_code = ANY($1) OR category_code LIKE $2)
           AND ST_DWithin(geom, ST_SetSRID(ST_MakePoint($3, $4), 4326)::geography, $5)
           AND last_activity_at >= $6::timestamptz - make_interval(mins => $7)
+          AND ($8::uuid IS NULL OR id <> $8)
         LIMIT 50`,
       [
-        [c.categoryCode, ...category.compatibleWith], `${root}.%`, c.point.lng, c.point.lat,
-        category.dedupRadiusM, c.observedAt, category.dedupWindowMinutes,
+        [categoryCode, ...category.compatibleWith], `${root}.%`, point.lng, point.lat,
+        category.dedupRadiusM, observedAt, category.dedupWindowMinutes, excludeId,
       ],
     );
     return rows.map((r) => ({
@@ -374,6 +383,132 @@ export class EventService {
     return r.event_id;
   }
 
+  // ───────────── Fusión automática y cola de posibles duplicados (ADR 0076) ─────────────
+
+  /**
+   * Barrido periódico de EVENTs duplicados que la resolución en línea no evitó (el pin medio se movió, llegaron por
+   * fuentes distintas, reportes casi simultáneos en zonas vecinas). Mismas reglas que al adjuntar un reporte
+   * (`decideDedup`, dedup-2): con un único candidato claro se fusiona sola, con actor `RULE:auto-merge` y reversible;
+   * en la franja ambigua, o si ambos tienen fuentes externas u oficiales, el par va a la cola de moderación.
+   * Un par que moderación separó (fusión revertida) o descartó nunca se vuelve a proponer. NO AI REQUIRED.
+   */
+  async sweepDuplicates(db: Db, now: Date): Promise<{ merged: number; queued: number }> {
+    const { rows } = await db.query<{
+      id: string; category_code: string; country_code: string | null; lat: number; lng: number; last_activity_at: Date;
+      keywords: string[]; media_hashes: string[]; verification_level: VerificationLevel; first_seen_at: Date; sourced: boolean;
+    }>(
+      `SELECT e.id, e.category_code, e.country_code, ST_Y(e.geom::geometry) AS lat, ST_X(e.geom::geometry) AS lng, e.last_activity_at,
+              e.keywords, e.media_hashes, e.verification_level, e.first_seen_at,
+              EXISTS (SELECT 1 FROM event.evidence v WHERE v.event_id = e.id AND v.status = 'ACTIVE' AND v.trust_tier <> 'CITIZEN') AS sourced
+         FROM event.events e
+        WHERE e.status IN ('ACTIVE','MONITORING') AND e.merged_into_id IS NULL AND e.negative_state <> 'FALSE'
+          AND e.last_activity_at >= $1::timestamptz - make_interval(hours => $2)
+        ORDER BY e.first_seen_at DESC LIMIT $3`,
+      [now, AUTO_MERGE.lookbackHours, AUTO_MERGE.maxEventsPerRun],
+    );
+    const byId = new Map(rows.map((r) => [r.id, r]));
+    const gone = new Set<string>();
+    let merged = 0, queued = 0;
+    for (const e of rows) {
+      if (gone.has(e.id)) continue;
+      const category = this.ref.category(e.category_code, e.country_code?.trim() ?? null);
+      if (!category) continue;
+      const point = { lat: e.lat, lng: e.lng };
+      const all = (await this.candidateEvents(db, e.category_code, point, e.last_activity_at, category, e.id)).filter((c) => !gone.has(c.id));
+      const blocked = await this.blockedPairs(db, e.id, all.map((c) => c.id));
+      const candidates = all.filter((c) => !blocked.has(c.id));
+      const decision = decideDedup(
+        {
+          categoryCode: e.category_code, point, observedAt: e.last_activity_at, keywords: e.keywords, mediaHashes: e.media_hashes,
+          dedupRadiusM: category.dedupRadiusM, dedupWindowMinutes: category.dedupWindowMinutes, compatibleWith: category.compatibleWith,
+        },
+        candidates,
+      );
+      if (decision.kind === "NEW") continue;
+      if (decision.kind === "AMBIGUOUS") {
+        for (const c of decision.candidates.slice(0, 3)) queued += await this.queueDuplicate(db, e.id, c.eventId, c.score, "AMBIGUOUS_SCORE");
+        continue;
+      }
+      const other = byId.get(decision.eventId) ?? (await this.sweepRow(db, decision.eventId));
+      if (!other) continue;
+      if (e.sourced && other.sourced) {
+        // Dos ítems distintos de fuentes externas u oficiales: la fuente los considera distintos; decide una persona.
+        queued += await this.queueDuplicate(db, e.id, other.id, decision.score, "BOTH_SOURCED");
+        continue;
+      }
+      const [target, source] = mergeOrder(e, other);
+      try {
+        await withTransaction(db, (tx) => this.merge(tx, target.id, source.id, AUTO_MERGE.actor, `${DEDUP_RULES.version} score ${decision.score}`, decision.score));
+        gone.add(source.id);
+        merged++;
+      } catch (err) {
+        if (!(err instanceof DomainError)) throw err; // ya fusionado por otra vía: se ignora
+      }
+    }
+    return { merged, queued };
+  }
+
+  private async sweepRow(q: Queryable, id: string) {
+    const { rows } = await q.query<{ id: string; verification_level: VerificationLevel; first_seen_at: Date; sourced: boolean }>(
+      `SELECT e.id, e.verification_level, e.first_seen_at,
+              EXISTS (SELECT 1 FROM event.evidence v WHERE v.event_id = e.id AND v.status = 'ACTIVE' AND v.trust_tier <> 'CITIZEN') AS sourced
+         FROM event.events e WHERE e.id = $1 AND e.merged_into_id IS NULL`,
+      [id],
+    );
+    return rows[0] ?? null;
+  }
+
+  /** Candidatos que no se deben volver a proponer con `eventId`: fusión revertida o par ya en la cola/descartado. */
+  private async blockedPairs(q: Queryable, eventId: string, others: string[]): Promise<Set<string>> {
+    if (others.length === 0) return new Set();
+    const { rows } = await q.query<{ other: string }>(
+      `SELECT CASE WHEN target_event_id = $1 THEN merged_event_id ELSE target_event_id END AS other FROM event.merge_log
+        WHERE reverted_at IS NOT NULL AND ((target_event_id = $1 AND merged_event_id = ANY($2)) OR (merged_event_id = $1 AND target_event_id = ANY($2)))
+       UNION
+       SELECT CASE WHEN event_a = $1 THEN event_b ELSE event_a END FROM event.duplicate_candidates
+        WHERE (event_a = $1 AND event_b = ANY($2)) OR (event_b = $1 AND event_a = ANY($2))`,
+      [eventId, others],
+    );
+    return new Set(rows.map((r) => r.other));
+  }
+
+  private async queueDuplicate(q: Queryable, a: string, b: string, score: number, reason: "AMBIGUOUS_SCORE" | "BOTH_SOURCED"): Promise<number> {
+    const [lo, hi] = a < b ? [a, b] : [b, a];
+    const res = await q.query(
+      `INSERT INTO event.duplicate_candidates (id, event_a, event_b, score, reason) VALUES ($1, $2, $3, $4, $5) ON CONFLICT (event_a, event_b) DO NOTHING`,
+      [newId(), lo, hi, score, reason],
+    );
+    return res.rowCount ?? 0;
+  }
+
+  /** Cola de moderación: pares abiertos cuyos dos eventos siguen sin fusionar, los más antiguos primero. */
+  async duplicateQueue(q: Queryable, limit = 50): Promise<DuplicateCandidateView[]> {
+    const { rows } = await q.query<{ id: string; event_a: string; event_b: string; score: number; reason: DuplicateCandidateView["reason"]; created_at: Date }>(
+      `SELECT d.id, d.event_a, d.event_b, d.score, d.reason, d.created_at FROM event.duplicate_candidates d
+         JOIN event.events a ON a.id = d.event_a AND a.merged_into_id IS NULL
+         JOIN event.events b ON b.id = d.event_b AND b.merged_into_id IS NULL
+        WHERE d.status = 'OPEN' ORDER BY d.created_at LIMIT $1`,
+      [limit],
+    );
+    const ids = [...new Set(rows.flatMap((r) => [r.event_a, r.event_b]))];
+    const events = ids.length
+      ? new Map((await q.query<EventRow>(`SELECT ${PUBLIC_EVENT_COLUMNS} FROM event.events e WHERE e.id = ANY($1)`, [ids])).rows.map((r) => [r.id, toSummary(r)]))
+      : new Map<string, EventSummary>();
+    return rows.map((r) => ({
+      id: r.id, score: r.score, reason: r.reason, createdAt: r.created_at.toISOString(),
+      events: [events.get(r.event_a)!, events.get(r.event_b)!],
+    }));
+  }
+
+  /** "No son el mismo": el par sale de la cola y el barrido no lo vuelve a proponer. */
+  async dismissDuplicate(q: Queryable, id: string, moderatorUserId: string, reason: string): Promise<void> {
+    const res = await q.query(
+      `UPDATE event.duplicate_candidates SET status = 'DISMISSED', resolved_at = now(), resolved_by = $2 WHERE id = $1 AND status = 'OPEN'`,
+      [id, `MODERATOR:${moderatorUserId}:${reason.slice(0, 200)}`],
+    );
+    if (!res.rowCount) throw notFound("Posible duplicado");
+  }
+
   // ───────────── Fusión y división manual (moderación, ADR 0034) ─────────────
 
   /**
@@ -381,7 +516,7 @@ export class EventService {
    * redirigido (`merged_into_id`) y todo se anota en `merge_log` para poder revertirlo. Para los consumidores la
    * fusión equivale a que el destino recibe evidencia nueva (verificación, alertas, feed y reputación se recalculan).
    */
-  async merge(tx: Queryable, targetId: string, sourceId: string, moderatorUserId: string, reason: string): Promise<string> {
+  async merge(tx: Queryable, targetId: string, sourceId: string, actor: string, reason: string, score: number | null = null): Promise<string> {
     if (targetId === sourceId) throw new DomainError("VALIDATION", "Un evento no se puede fusionar consigo mismo");
     const { rows } = await tx.query<{ id: string; merged_into_id: string | null; severity: number; last_activity_at: Date; keywords: string[]; media_hashes: string[] }>(
       `SELECT id, merged_into_id, severity, last_activity_at, keywords, media_hashes FROM event.events WHERE id = ANY($1) ORDER BY id FOR UPDATE`,
@@ -405,8 +540,13 @@ export class EventService {
     await this.addFingerprint(tx, targetId, source.keywords, source.media_hashes);
     await this.recomputeAggregates(tx, targetId, { observedAt: source.last_activity_at.toISOString(), severityHint: source.severity });
     await tx.query(
-      `INSERT INTO event.merge_log (id, target_event_id, merged_event_id, reason, actor, moved_evidence) VALUES ($1, $2, $3, $4, $5, $6)`,
-      [mergeId, targetId, sourceId, reason, `MODERATOR:${moderatorUserId}`, moved.rows.map((r) => r.id)],
+      `INSERT INTO event.merge_log (id, target_event_id, merged_event_id, reason, actor, moved_evidence, score) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      [mergeId, targetId, sourceId, reason, actor, moved.rows.map((r) => r.id), score],
+    );
+    await tx.query(
+      `UPDATE event.duplicate_candidates SET status = 'MERGED', resolved_at = now(), resolved_by = $3
+        WHERE status = 'OPEN' AND event_a = LEAST($1::uuid, $2::uuid) AND event_b = GREATEST($1::uuid, $2::uuid)`,
+      [targetId, sourceId, actor],
     );
     await this.addTimeline(tx, targetId, "MERGED", { mergedEventId: sourceId });
     await this.addTimeline(tx, sourceId, "MERGED", { intoEventId: targetId });
@@ -872,13 +1012,20 @@ export class EventService {
   // ───────────── Calidad (ADR 0026) ─────────────
 
   /** EVENTs creados en el periodo y cuántos terminaron fusionados en otro (duplicados que la resolución no evitó). */
-  async qualityStats(q: Queryable, from: Date, to: Date): Promise<{ created: number; merged: number }> {
+  async qualityStats(q: Queryable, from: Date, to: Date): Promise<{ created: number; merged: number; autoMerged: number; autoMergeReverted: number; duplicatesOpen: number }> {
     const { rows } = await q.query<{ created: number; merged: number }>(
       `SELECT count(*)::int AS created, count(*) FILTER (WHERE merged_into_id IS NOT NULL)::int AS merged
          FROM event.events WHERE created_at >= $1 AND created_at < $2`,
       [from, to],
     );
-    return rows[0]!;
+    const auto = await q.query<{ auto_merged: number; reverted: number; open: number }>(
+      `SELECT count(*)::int AS auto_merged, count(*) FILTER (WHERE reverted_at IS NOT NULL)::int AS reverted,
+              (SELECT count(*)::int FROM event.duplicate_candidates WHERE status = 'OPEN') AS open
+         FROM event.merge_log WHERE actor LIKE 'RULE:%' AND at >= $1 AND at < $2`,
+      [from, to],
+    );
+    const a = auto.rows[0]!;
+    return { ...rows[0]!, autoMerged: a.auto_merged, autoMergeReverted: a.reverted, duplicatesOpen: a.open };
   }
 
   async createdAt(q: Queryable, ids: string[]): Promise<Map<string, Date>> {
@@ -886,4 +1033,15 @@ export class EventService {
     const { rows } = await q.query<{ id: string; created_at: Date }>(`SELECT id, created_at FROM event.events WHERE id = ANY($1)`, [ids]);
     return new Map(rows.map((r) => [r.id, r.created_at]));
   }
+}
+
+/** Fusión automática (ADR 0076): mismas bandas que dedup-2; esto solo acota el barrido. */
+export const AUTO_MERGE = { actor: "RULE:auto-merge", lookbackHours: 24, maxEventsPerRun: 200 } as const;
+
+/** Destino de una fusión automática: el de mayor nivel, luego el que tiene fuentes, luego el más antiguo. */
+export function mergeOrder<T extends { id: string; verification_level: VerificationLevel; sourced: boolean; first_seen_at: Date }>(a: T, b: T): [T, T] {
+  const key = (e: T) => [VERIFICATION_LEVEL_RANK[e.verification_level] ?? 0, e.sourced ? 1 : 0, -e.first_seen_at.getTime()] as const;
+  const [ka, kb] = [key(a), key(b)];
+  for (let i = 0; i < ka.length; i++) if (ka[i] !== kb[i]) return ka[i]! > kb[i]! ? [a, b] : [b, a];
+  return a.id < b.id ? [a, b] : [b, a];
 }

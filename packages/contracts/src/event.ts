@@ -198,6 +198,19 @@ export interface EventStatusChangeView {
   at: string;
 }
 
+/** Par de EVENTs que quizá son el mismo suceso, para revisión (ADR 0076). */
+export interface DuplicateCandidateView {
+  id: string;
+  score: number;
+  /** AMBIGUOUS_SCORE: coincidencia en la franja ambigua; BOTH_SOURCED: ambos tienen fuentes externas u oficiales. */
+  reason: "AMBIGUOUS_SCORE" | "BOTH_SOURCED";
+  createdAt: string;
+  events: [EventSummary, EventSummary];
+}
+
+export const DismissDuplicateRequest = z.object({ reason: z.string().trim().min(3).max(2000) });
+export type DismissDuplicateRequest = z.infer<typeof DismissDuplicateRequest>;
+
 export interface ModeratorEventDetail {
   eventId: string;
   status: EventStatus;

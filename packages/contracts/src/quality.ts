@@ -32,7 +32,17 @@ export interface QualityReport {
     p95Ms: number | null;
     p99Ms: number | null;
   };
-  events: { created: number; merged: number; mergeRate: number | null };
+  events: {
+    created: number;
+    merged: number;
+    mergeRate: number | null;
+    /** Fusiones automáticas del periodo y cuántas revirtió moderación (ADR 0076): calibran los umbrales. */
+    autoMerged: number;
+    autoMergeReverted: number;
+    autoMergeRevertRate: number | null;
+    /** Pares abiertos en la cola de posibles duplicados. */
+    duplicatesOpen: number;
+  };
   verification: {
     /** EVENTs que alcanzaron por primera vez cada nivel positivo en el periodo. */
     communityCorroborated: number;
