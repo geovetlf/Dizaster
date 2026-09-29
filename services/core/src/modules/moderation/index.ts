@@ -28,6 +28,19 @@ import type { TrustService } from "../trust/index.js";
 import type { VerificationService } from "../verification/index.js";
 
 /** Peso de cada motivo en la prioridad: primero lo que puede dañar a una persona. */
+/**
+ * Peso de la verificación del evento vinculado en la cola (§13.3, ADR 0116): lo no verificado, en disputa o falso
+ * con alcance es lo más urgente de revisar; lo confirmado oficialmente, lo que menos. El alcance lo multiplica
+ * (log10: 10 lectores ≈ ×1, 1.000 ≈ ×3). NO AI REQUIRED.
+ */
+export const VERIFICATION_WEIGHT: Record<string, number> = {
+  FALSE: 3, DISPUTED: 3, UNVERIFIED: 2, COMMUNITY_CORROBORATED: 1, EXTERNALLY_CORROBORATED: 0, OFFICIALLY_CONFIRMED: -1,
+};
+export function verificationPriority(state: string, reach: number): number {
+  const w = VERIFICATION_WEIGHT[state] ?? 0;
+  return w * Math.max(1, Math.log10(1 + Math.max(0, reach)));
+}
+
 export const REASON_WEIGHT: Record<FlagReason, number> = { PRIVACY: 5, VIOLENCE: 5, ILLEGAL: 4, HARASSMENT: 3, FALSE_INFO: 2, SPAM: 1, OTHER: 1 };
 /** Personas distintas (con cuentas de más de 24 h) que deben denunciar un post para limitarlo sin esperar revisión. */
 export const AUTO_LIMIT_FLAGGERS = 5;
@@ -151,7 +164,10 @@ export class ModerationService {
     });
   }
 
-  /** Prioridad = Σ peso del motivo × peso de quien denuncia + alcance (log) + gravedad del evento vinculado. */
+  /**
+   * Prioridad = Σ peso del motivo × peso de quien denuncia + alcance (log) + gravedad del evento vinculado
+   * + verificación × alcance (ADR 0116). Nunca negativa.
+   */
   private async reprioritize(tx: Queryable, caseId: string): Promise<void> {
     const c = (await tx.query<{ target_type: FlagTargetType; target_id: string }>(`SELECT target_type, target_id FROM moderation.cases WHERE id = $1`, [caseId])).rows[0]!;
     const flags = await tx.query<{ reason: FlagReason; reporter_weight: number }>(`SELECT reason, reporter_weight FROM moderation.flags WHERE case_id = $1`, [caseId]);
@@ -163,12 +179,14 @@ export class ModerationService {
         if (t.eventId) {
           const s = (await this.events.publicStates(tx, [t.eventId])).get(t.eventId);
           if (s && s.severity >= 4) priority += 3;
+          if (s) priority += verificationPriority(s.publicVerificationState, t.reach);
         }
       }
     } else if (c.target_type === "EVENT") {
       const s = (await this.events.publicStates(tx, [c.target_id])).get(c.target_id);
-      if (s) priority += s.severity;
+      if (s) priority += s.severity + verificationPriority(s.publicVerificationState, 0);
     }
+    priority = Math.max(0, priority);
     await tx.query(`UPDATE moderation.cases SET priority = $2, updated_at = now() WHERE id = $1`, [caseId, Math.round(priority * 100) / 100]);
   }
 

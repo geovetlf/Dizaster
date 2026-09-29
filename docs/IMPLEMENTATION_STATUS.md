@@ -306,6 +306,7 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | USGS y GDACS como fuentes externas (ADR 0112) | Hecho | Decisión del propietario; solo instituciones autorizadas confirman |
 | Auditoría inmutable y cabeceras de seguridad (ADR 0113, 0114) | Hecho | Triggers solo-inserción (migración 0048); HSTS, nosniff, CSP, etc. en toda respuesta. NO AI REQUIRED |
 | Negación externa marca DISPUTED (ADR 0115) | Hecho | verification-4: fuente EXTERNAL con NOT_OCCURRING → DISPUTED, nunca FALSE. NO AI REQUIRED |
+| Moderación priorizada por verificación (ADR 0116) | Hecho | Peso del estado público × alcance en la prioridad del caso. NO AI REQUIRED |
 | Licencias, auditoría, SBOM, Dependabot; respaldo con prueba de restauración en CI | ✅ | ADR 0070, `scripts/supply-chain.mjs`, `scripts/db-restore-check.mjs` |
 | Idioma de la app elegible en el perfil (es/en/pt/fr o del teléfono) | ✅ | ADR 0069, `app/language.tsx` |
 | Varias cuentas en un teléfono corroboran como una (clave seudónima del teléfono) | ✅ | ADR 0068, migración 0036 |
@@ -343,11 +344,10 @@ Revisión del Blueprint del 2026-09-29 (tras ADR 0109, mensaje de bajo costo del
 
 Revisión del Blueprint del 2026-09-29 (tras ADR 0112), verificada contra el código, sin bloqueos:
 
-1. Cola de moderación priorizada también por verificación (§13.3).
-2. Conteo de fuentes oficiales y externas por separado en la ficha (§10.1).
-3. Contadores sociales mantenidos al escribir, no con COUNT(*) al leer (§7.4).
-4. Foto de perfil y logo de negocio (§7.3, RF-02).
-5. Adaptador Copernicus EMS en PLANNED (§9.3).
+1. Conteo de fuentes oficiales y externas por separado en la ficha (§10.1).
+2. Contadores sociales mantenidos al escribir, no con COUNT(*) al leer (§7.4).
+3. Foto de perfil y logo de negocio (§7.3, RF-02).
+4. Adaptador Copernicus EMS en PLANNED (§9.3).
 
 
 Bloqueadas o en espera:

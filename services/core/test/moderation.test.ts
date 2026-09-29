@@ -60,7 +60,8 @@ describe("denuncias y cola", () => {
     expect((await t.c.db.query(`SELECT moderation_state FROM social.posts WHERE id = $1`, [id])).rows[0]).toEqual({ moderation_state: "VISIBLE" });
     const [first] = (await queue()).cases;
     expect(first!.target.id).toBe(id);
-    expect(first!.priority).toBeCloseTo((AUTO_LIMIT_FLAGGERS - 1) * 5 + 2.5, 1);
+    // + 2 del evento vinculado sin verificar con poco alcance (ADR 0116).
+    expect(first!.priority).toBeCloseTo((AUTO_LIMIT_FLAGGERS - 1) * 5 + 2.5 + 2, 1);
 
     await flag(flaggers[AUTO_LIMIT_FLAGGERS - 1]!, { targetType: "POST", targetId: id, reason: "PRIVACY" });
     expect((await t.c.db.query(`SELECT moderation_state FROM social.posts WHERE id = $1`, [id])).rows[0]).toEqual({ moderation_state: "LIMITED" });
@@ -178,5 +179,16 @@ describe("bloqueos", () => {
 
     await t.app.inject({ method: "DELETE", url: `/v1/blocks/${h}`, headers: auth(yo) });
     expect(((await t.app.inject({ url: "/v1/feed?tab=for_you", headers: auth(yo) })).json() as FeedResponse).posts.map((p) => p.text)).toContain("Post con nombre de molesto");
+  });
+});
+
+describe("prioridad por verificación (ADR 0116)", () => {
+  it("lo no verificado o en disputa con alcance va antes; lo confirmado oficialmente, después", async () => {
+    const { verificationPriority } = await import("../src/modules/moderation/index.js");
+    expect(verificationPriority("DISPUTED", 1000)).toBeCloseTo(9, 1);
+    expect(verificationPriority("UNVERIFIED", 0)).toBe(2);
+    expect(verificationPriority("OFFICIALLY_CONFIRMED", 1000)).toBeLessThan(0);
+    expect(verificationPriority("EXTERNALLY_CORROBORATED", 1000)).toBe(0);
+    expect(verificationPriority("DISPUTED", 1000)).toBeGreaterThan(verificationPriority("COMMUNITY_CORROBORATED", 1000));
   });
 });
