@@ -1,5 +1,6 @@
 import * as Notifications from "expo-notifications";
-import { Platform } from "react-native";
+import { Linking, Platform } from "react-native";
+import { permissionView, type PermissionView } from "../alerts/logic";
 import { api } from "../api";
 import { APNS_MODE } from "../config";
 import { toPushRegistration } from "./push-token";
@@ -43,4 +44,17 @@ export function watchPushTokenRotation(deviceId: string): () => void {
     if (reg) api.registerPushToken(deviceId, reg).catch(() => undefined);
   });
   return () => sub.remove();
+}
+
+/** Estado actual del permiso de notificaciones (sin preguntar). */
+export async function pushPermission(): Promise<PermissionView> {
+  return permissionView(await Notifications.getPermissionsAsync());
+}
+
+/**
+ * Tras un rechazo definitivo el sistema ya no muestra el diálogo (iOS nunca repite; Android 13+ tras dos
+ * rechazos): la única vía es abrir los ajustes de la app, en ambas plataformas.
+ */
+export function openSystemSettings(): Promise<void> {
+  return Linking.openSettings();
 }

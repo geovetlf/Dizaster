@@ -31,6 +31,15 @@ const Env = z.object({
   MEDIA_UPLOADS_PER_HOUR_LIMIT: z.coerce.number().int().positive().default(30),
   MEDIA_UPLOAD_URL_TTL_SECONDS: z.coerce.number().int().min(60).max(3600).default(900),
   MEDIA_ORIGINAL_RETENTION_DAYS: z.coerce.number().int().positive().default(30),
+  // Push directo (gratis). "log" no envía nada (desarrollo); "live" usa APNs y FCM con las credenciales de abajo.
+  PUSH_DRIVER: z.enum(["log", "live"]).default("log"),
+  APNS_TEAM_ID: z.string().optional(),
+  APNS_KEY_ID: z.string().optional(),
+  /** Clave .p8 de APNs: el PEM tal cual o en base64. */
+  APNS_PRIVATE_KEY: z.string().optional(),
+  APNS_BUNDLE_ID: z.string().default("app.dizaster.mobile"),
+  /** JSON de la cuenta de servicio de Firebase, tal cual o en base64. */
+  FCM_SERVICE_ACCOUNT_JSON: z.string().optional(),
 });
 
 export type AppEnv = z.infer<typeof Env>;
@@ -46,5 +55,14 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): AppEnv {
   if (env.STORAGE_DRIVER === "s3" && !(env.S3_ENDPOINT && env.S3_BUCKET && env.S3_ACCESS_KEY_ID && env.S3_SECRET_ACCESS_KEY)) {
     throw new Error("STORAGE_DRIVER=s3 requiere S3_ENDPOINT, S3_BUCKET, S3_ACCESS_KEY_ID y S3_SECRET_ACCESS_KEY");
   }
+  if (env.NODE_ENV === "production" && env.PUSH_DRIVER !== "live") {
+    throw new Error("Producción requiere PUSH_DRIVER=live (APNs y FCM)");
+  }
   return env;
+}
+
+/** Acepta un secreto en claro o en base64 (cómodo para variables de entorno de una sola línea). */
+export function decodeSecret(v: string): string {
+  const t = v.trim();
+  return t.startsWith("-----") || t.startsWith("{") ? t : Buffer.from(t, "base64").toString("utf8");
 }

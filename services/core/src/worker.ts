@@ -15,6 +15,9 @@ let lastIngestionTick = 0;
 async function loop() {
   while (!stopping) {
     const n = await c.dispatcher.runOnce(200);
+    // Entrega de alertas: barata (una consulta indexada) y justo después de procesar eventos de dominio.
+    const pushed = await c.alerts.flush();
+    if (pushed.SENT + pushed.GROUPED + pushed.FAILED > 0) console.log(JSON.stringify({ msg: "alerts.flush", ...pushed }));
     if (Date.now() - lastIngestionTick > 30_000) {
       lastIngestionTick = Date.now();
       for (const run of await c.ingestionScheduler.tick()) console.log(JSON.stringify({ msg: "ingestion.run", ...run }));

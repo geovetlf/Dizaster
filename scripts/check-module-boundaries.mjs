@@ -7,9 +7,9 @@ import { join, relative } from "node:path";
 const modulesDir = new URL("../services/core/src/modules/", import.meta.url).pathname;
 const SCHEMA_BY_MODULE = {
   identity: ["identity"], social: ["social"], report: ["report"], event: ["event"], verification: ["verification"],
-  ingestion: ["ingestion"], media: ["media"], geo: ["geo"], reference: [], feed: [],
+  ingestion: ["ingestion"], media: ["media"], geo: ["geo"], reference: [], feed: [], alert: ["alert"],
 };
-const ALL_SCHEMAS = ["identity", "social", "report", "event", "verification", "ingestion", "media", "geo"];
+const ALL_SCHEMAS = ["identity", "social", "report", "event", "verification", "ingestion", "media", "geo", "alert"];
 const errors = [];
 
 function walk(dir) {

@@ -30,9 +30,12 @@ export default function ProfileScreen() {
     }, []),
   );
 
+  /** Pide permiso en contexto; si el sistema ya no lo muestra, lleva a los ajustes de alertas (y desde ahí a los del sistema). */
   async function turnOnAlerts() {
     if (!session.deviceId) return;
-    setAlerts(await enablePush(session.deviceId).catch(() => false));
+    const on = await enablePush(session.deviceId).catch(() => false);
+    setAlerts(on);
+    router.push("/alert-settings");
   }
 
   return (
@@ -40,7 +43,7 @@ export default function ProfileScreen() {
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={styles.title}>{t("profile")}</Text>
         {handle ? <Row icon="account-circle-outline" label={t("myPublicProfile")} value={`@${handle}`} onPress={() => router.push(`/u/${handle}`)} /> : null}
-        <Row icon="bell-outline" label={t("alerts")} value={alerts ? t("alertsOn") : t("alertsOff")} {...(alerts ? {} : { onPress: () => void turnOnAlerts() })} />
+        <Row icon="bell-outline" label={t("alerts")} value={alerts ? t("alertsOn") : t("alertsOff")} onPress={() => (alerts ? router.push("/alert-settings") : void turnOnAlerts())} />
         <Row icon="cloud-upload-outline" label={t("pendingReports")} value={String(pending)} />
         <Row icon="phone-alert" label={t("emergencyTitle")} onPress={() => router.push("/emergency")} />
         <Text style={styles.note}>{t("privacyNote")}</Text>

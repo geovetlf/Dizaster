@@ -5,13 +5,14 @@ import type { FastifyInstance } from "fastify";
 import { v7 } from "uuid";
 import { buildContainer, type Container } from "../src/container.js";
 import { buildApp } from "../src/http/app.js";
+import { LogPushSender, type PushSender } from "../src/modules/alert/index.js";
 import { loadEnv } from "../src/platform/config.js";
 import { createPool } from "../src/platform/db.js";
 import { migrate } from "../src/platform/migrate.js";
 import { MIGRATIONS_DIR } from "../src/platform/paths.js";
 
 export const TEST_DB_URL = process.env["TEST_DATABASE_URL"] ?? "postgres://dizaster:dizaster@localhost:5432/dizaster_test";
-const SCHEMAS = ["platform", "identity", "social", "report", "event", "verification", "ingestion", "media", "geo"];
+const SCHEMAS = ["platform", "identity", "social", "report", "event", "verification", "ingestion", "media", "geo", "alert"];
 
 export async function resetDatabase(): Promise<void> {
   const db = createPool(TEST_DB_URL);
@@ -29,7 +30,7 @@ export interface TestContext {
   close(): Promise<void>;
 }
 
-export async function createTestContext(): Promise<TestContext> {
+export async function createTestContext(opts: { push?: PushSender } = {}): Promise<TestContext> {
   await resetDatabase();
   const env = loadEnv({
     NODE_ENV: "test",
@@ -41,7 +42,7 @@ export async function createTestContext(): Promise<TestContext> {
     STORAGE_LOCAL_DIR: mkdtempSync(join(tmpdir(), "dizaster-storage-")),
     MEDIA_UPLOADS_PER_HOUR_LIMIT: "6",
   });
-  const c = buildContainer(env);
+  const c = buildContainer(env, { push: opts.push ?? new LogPushSender(() => undefined) });
   await c.ingestion.syncRegistry(c.ref.sources);
   const app = await buildApp(c);
   return { c, app, close: async () => { await app.close(); await c.db.end(); } };

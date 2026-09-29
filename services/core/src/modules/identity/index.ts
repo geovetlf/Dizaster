@@ -41,6 +41,14 @@ export class DevAttestationVerifier implements AttestationVerifier {
   }
 }
 
+export interface PushTarget {
+  userId: string;
+  deviceId: string;
+  provider: "APNS" | "FCM";
+  token: string;
+  environment: "development" | "production";
+}
+
 export class IdentityService {
   private readonly key: Uint8Array;
 
@@ -123,6 +131,26 @@ export class IdentityService {
         [deviceId, req.token, req.provider, req.provider === "APNS" ? req.environment : "production"],
       );
     });
+  }
+
+  /** Destinos push de varias cuentas (solo dispositivos con token vigente). */
+  async pushTargets(q: Queryable, userIds: string[]): Promise<PushTarget[]> {
+    if (userIds.length === 0) return [];
+    const { rows } = await q.query<{ user_id: string; id: string; push_provider: "APNS" | "FCM"; push_token: string; push_environment: "development" | "production" }>(
+      `SELECT user_id, id, push_provider, push_token, push_environment FROM identity.devices
+        WHERE user_id = ANY($1) AND push_token IS NOT NULL`,
+      [userIds],
+    );
+    return rows.map((r) => ({ userId: r.user_id, deviceId: r.id, provider: r.push_provider, token: r.push_token, environment: r.push_environment }));
+  }
+
+  /** El proveedor dijo que el token ya no existe (app desinstalada, token rotado): se olvida. */
+  async dropPushToken(q: Queryable, provider: "APNS" | "FCM", token: string): Promise<void> {
+    await q.query(
+      `UPDATE identity.devices SET push_token = NULL, push_provider = NULL, push_environment = NULL, push_token_updated_at = now()
+        WHERE push_provider = $1 AND push_token = $2`,
+      [provider, token],
+    );
   }
 
   async clearPushToken(userId: string, deviceId: string): Promise<void> {

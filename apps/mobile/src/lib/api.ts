@@ -1,4 +1,4 @@
-import type { AppConfig, AreaSearchResult, FollowTarget, MyFollows, ProfileSearchResult, ProfileView, CommentView, CreateUploadRequest, FeedResponse, FeedTab, CreateUploadResponse, DevicePlatform, MediaView, RegisterPushTokenRequest, EventMapResponse, EventSummary, NearbyEventsResponse, SubmitReportRequest, SubmitReportResponse, TimelineEntryView } from "@dizaster/contracts";
+import type { AlertPreferences, CategorySubscription, CategorySubscriptionInput, NotificationsResponse, AppConfig, AreaSearchResult, FollowTarget, MyFollows, ProfileSearchResult, ProfileView, CommentView, CreateUploadRequest, FeedResponse, FeedTab, CreateUploadResponse, DevicePlatform, MediaView, RegisterPushTokenRequest, EventMapResponse, EventSummary, NearbyEventsResponse, SubmitReportRequest, SubmitReportResponse, TimelineEntryView } from "@dizaster/contracts";
 import { API_URL } from "./config";
 import type { Sender } from "./report/queue";
 
@@ -58,6 +58,18 @@ export const api = {
   profilePosts: (handle: string, cursor?: string | null) =>
     request<FeedResponse>(`/v1/profiles/${encodeURIComponent(handle)}/posts${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`),
   searchProfiles: (q: string) => request<{ profiles: ProfileSearchResult[] }>(`/v1/profiles?${new URLSearchParams({ q })}`),
+  alertPreferences: () => request<AlertPreferences>("/v1/me/alert-preferences"),
+  updateAlertPreferences: (patch: Partial<AlertPreferences>) =>
+    request<AlertPreferences>("/v1/me/alert-preferences", { method: "PUT", body: JSON.stringify(patch) }),
+  alertSubscriptions: () => request<{ subscriptions: CategorySubscription[] }>("/v1/me/alert-subscriptions"),
+  addAlertSubscription: (body: Partial<CategorySubscriptionInput> & Pick<CategorySubscriptionInput, "categoryCode" | "areaId">) =>
+    request<CategorySubscription>("/v1/me/alert-subscriptions", { method: "POST", body: JSON.stringify(body) }),
+  removeAlertSubscription: (id: string) => request<void>(`/v1/me/alert-subscriptions/${id}`, { method: "DELETE" }),
+  notifications: (cursor?: string | null, limit = 20) =>
+    request<NotificationsResponse>(`/v1/me/notifications?${new URLSearchParams({ limit: String(limit), ...(cursor ? { cursor } : {}) })}`),
+  /** Sin ids: marca todo como leído. */
+  markNotificationsRead: (ids?: string[]) =>
+    request<{ unread: number }>("/v1/me/notifications/read", { method: "POST", ...(ids ? { body: JSON.stringify({ ids }) } : {}) }),
   myFollows: () => request<MyFollows>("/v1/me/follows"),
   follow: (target: FollowTarget, id: string, on: boolean) =>
     request<{ following: boolean }>(`/v1/follows/${target}/${encodeURIComponent(id)}`, { method: on ? "PUT" : "DELETE" }),

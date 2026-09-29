@@ -1,6 +1,6 @@
 import { createHmac } from "node:crypto";
 import { resolve } from "node:path";
-import type { AppEnv } from "./platform/config.js";
+import { decodeSecret, type AppEnv } from "./platform/config.js";
 import { systemClock, type Clock } from "./platform/clock.js";
 import { InMemoryCostGuard } from "./platform/cost-guard.js";
 import { createPool, type Db } from "./platform/db.js";
@@ -8,6 +8,7 @@ import { OutboxDispatcher } from "./platform/outbox.js";
 import { defaultDataDir } from "./platform/paths.js";
 import { EventService } from "./modules/event/index.js";
 import { FeedService } from "./modules/feed/index.js";
+import { AlertService, ApnsSender, FcmSender, LogPushSender, PushGateway, type FcmServiceAccount, type PushSender } from "./modules/alert/index.js";
 import { GeoService } from "./modules/geo/index.js";
 import { DevAttestationVerifier, IdentityService, type AttestationVerifier } from "./modules/identity/index.js";
 import { IngestionScheduler, IngestionService, NodeHttpFetcher, type HttpFetcher } from "./modules/ingestion/index.js";
@@ -34,11 +35,12 @@ export interface Container {
   storage: StorageProvider;
   reports: ReportService;
   feed: FeedService;
+  alerts: AlertService;
   dispatcher: OutboxDispatcher;
   cost: InMemoryCostGuard;
 }
 
-export function buildContainer(env: AppEnv, overrides: { db?: Db; clock?: Clock; attestation?: AttestationVerifier; fetcher?: HttpFetcher; storage?: StorageProvider } = {}): Container {
+export function buildContainer(env: AppEnv, overrides: { db?: Db; clock?: Clock; attestation?: AttestationVerifier; fetcher?: HttpFetcher; storage?: StorageProvider; push?: PushSender } = {}): Container {
   const db = overrides.db ?? createPool(env.DATABASE_URL);
   const clock = overrides.clock ?? systemClock;
   const dataDir = env.DATA_DIR ?? defaultDataDir();
@@ -70,9 +72,26 @@ export function buildContainer(env: AppEnv, overrides: { db?: Db; clock?: Clock;
   verification.registerHandlers(dispatcher);
   media.registerHandlers(dispatcher);
   feed.registerHandlers(dispatcher);
+  const alerts = new AlertService(db, ref, events, social, identity, geo, overrides.push ?? buildPush(env, clock), clock);
+  alerts.registerHandlers(dispatcher);
   // Presupuestos iniciales: las funciones de pago están a 0 hasta que se aprueben (cost-first).
   const cost = new InMemoryCostGuard({ "ai.daily": 0, "sms.daily": 0, "translation.daily": 0 }, { ai: true, sms: true, translation: true });
-  return { env, db, clock, ref, geo, social, identity, events, ingestion, ingestionScheduler, verification, media, storage, reports, feed, dispatcher, cost };
+  return { env, db, clock, ref, geo, social, identity, events, ingestion, ingestionScheduler, verification, media, storage, reports, feed, alerts, dispatcher, cost };
+}
+
+/** APNs y FCM directos. Si falta la credencial de una plataforma, sus avisos quedan solo en el historial. */
+function buildPush(env: AppEnv, clock: Clock): PushSender {
+  if (env.PUSH_DRIVER === "log") return new LogPushSender();
+  const now = () => clock.now();
+  const apns = env.APNS_TEAM_ID && env.APNS_KEY_ID && env.APNS_PRIVATE_KEY
+    ? new ApnsSender({ teamId: env.APNS_TEAM_ID, keyId: env.APNS_KEY_ID, privateKeyPem: decodeSecret(env.APNS_PRIVATE_KEY), bundleId: env.APNS_BUNDLE_ID }, now)
+    : null;
+  const fcm = env.FCM_SERVICE_ACCOUNT_JSON
+    ? new FcmSender({ account: JSON.parse(decodeSecret(env.FCM_SERVICE_ACCOUNT_JSON)) as FcmServiceAccount }, now)
+    : null;
+  if (!apns) console.warn(JSON.stringify({ msg: "push.apns.disabled", reason: "faltan APNS_TEAM_ID, APNS_KEY_ID o APNS_PRIVATE_KEY" }));
+  if (!fcm) console.warn(JSON.stringify({ msg: "push.fcm.disabled", reason: "falta FCM_SERVICE_ACCOUNT_JSON" }));
+  return new PushGateway({ APNS: apns, FCM: fcm });
 }
 
 function buildStorage(env: AppEnv, clock: Clock): StorageProvider {

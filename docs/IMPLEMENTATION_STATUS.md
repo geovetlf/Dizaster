@@ -93,12 +93,25 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | Seguir evento y lugar desde la pantalla del evento | ✅ | `apps/mobile/src/app/event/[id].tsx` |
 | Seguir negocios y etiquetas | ⏳ | modelo listo (`target_type`) |
 
+## Etapa 7 — Alertas push (hecha)
+
+| Área | Estado | Dónde |
+|---|---|---|
+| Motor de alertas independiente, reglas puras (evento nuevo corroborado, cambio de estado, severidad, fin) | ✅ | `services/core/src/modules/alert`, ADR 0018 |
+| Alertas por evento seguido, lugar seguido, categoría + zona (distrito…país) y cambios de estado | ✅ | `AlertService.recipients` |
+| Deduplicación, límite por hora, agrupación y horas de silencio (con excepción oficial grave) | ✅ | `alert.alerts`, `AlertService.flush` |
+| Privacidad: el aviso nunca incluye autoría, textos ni coordenadas | ✅ | `alertText`, `test/alerts.test.ts` |
+| Preferencias, suscripciones e historial (API) | ✅ | `/v1/me/alert-preferences`, `/v1/me/alert-subscriptions`, `/v1/me/notifications` |
+| APNs (HTTP/2, .p8) y FCM HTTP v1 directos detrás de `PushSender`; tokens muertos se borran | ✅ probado con servidores locales | `push/apns.ts`, `push/fcm.ts` |
+| App: historial, ajustes, campana con contador, deep link al EVENT, permisos (incluido "bloqueado" → Ajustes) | ✅ iOS y Android | `apps/mobile/src/app/alerts.tsx`, `alert-settings.tsx`, `src/lib/alerts` |
+| Envío real a teléfonos | ⏳ | necesita clave APNs y cuenta de servicio de Firebase (ver abajo) |
+| Alertas por cercanía a la ubicación actual | ⏳ | decisión de producto (D-16, sin ubicación en segundo plano) |
+
 ## Siguiente etapa (en orden)
 
-1. Identity real: Sign in with Apple, Google y email; App Attest / Play Integrity (necesita cuentas de Apple y Google).
-2. Alertas push de lo que sigo (eventos y lugares) por APNs/FCM directos.
-3. Tablero de costo persistido y métricas por módulo.
-4. Social: negocios, etiquetas y menciones.
+1. Tablero de costo persistido y métricas por módulo.
+2. Identity real: Sign in with Apple, Google y email; App Attest / Play Integrity (necesita cuentas de Apple y Google).
+3. Social: negocios, etiquetas y menciones.
 
 ## Requiere acción humana
 
@@ -109,6 +122,7 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | Cuenta Expo (gratis) y token `EXPO_TOKEN` | Crear cuentas es personal | Ver `docs/MOBILE_PLATFORMS.md`; con eso el agente compila el APK para tu Android |
 | Apple Developer Program (US$99/año) y clave de App Store Connect API | Titularidad, pago y decisión legal (individual u organización) | Ver `docs/MOBILE_PLATFORMS.md` |
 | Firebase (FCM, gratis) y Google Play Console (US$25) | Titularidad y pago | Ver `docs/MOBILE_PLATFORMS.md` |
+| Credenciales push del servidor: clave APNs `.p8` (+ Team ID, Key ID) y cuenta de servicio de Firebase | Salen de las cuentas de Apple y Google del propietario | Entregarlas como secretos del servidor (`APNS_*`, `FCM_SERVICE_ACCOUNT_JSON`) y poner `PUSH_DRIVER=live` |
 | Probar iOS en un iPhone físico antes de publicar | El agente no tiene dispositivos | Un iPhone propio o de un tester de confianza |
 | Verificar números de emergencia de Perú | Debe hacerlo una persona contra la fuente oficial | Confirmar 105, 116, 106, 115, 100 y fuentes |
 | Clave NASA FIRMS | Registro personal | Solicitar MAP_KEY gratuita cuando se active la fuente |

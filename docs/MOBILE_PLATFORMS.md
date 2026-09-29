@@ -16,6 +16,7 @@ La evaluación y la decisión están en [ADR 0013](adr/0013-plataformas-moviles-
 | App Links / Universal Links | ✅ preparado | ✅ preparado | Se activan con el dominio (D-21) |
 | Identidad del dispositivo en almacén seguro | ✅ Keystore | ✅ Keychain | Solo en el dispositivo, sin copia de seguridad |
 | Token push nativo | ✅ FCM | ✅ APNs | Permiso pedido en contexto, no al abrir |
+| Alertas: historial, ajustes, deep link al EVENT, permiso bloqueado → Ajustes | ✅ canal "alerts" | ✅ `time-sensitive` solo oficial grave | ADR 0018 |
 | Cámara, fotos, video | ⏳ etapa 3 | ⏳ etapa 3 | Permisos ya declarados en ambas |
 | Atestación del dispositivo | ⏳ | ⏳ | Play Integrity / App Attest, mismo contrato |
 
@@ -61,7 +62,9 @@ El agente no puede crear cuentas, aceptar contratos ni pagar. Todo lo demás ya 
 1. **Probar en tu Android**: con los pasos de Expo hechos, el agente lanza una build `preview` y te da el enlace del APK.
 2. **Push (FCM)**: crear un proyecto gratuito en Firebase con el paquete `app.dizaster.mobile`, descargar
    `google-services.json` y dárselo al agente (se guarda como archivo secreto de EAS, nunca en el repositorio).
-   Para enviar push desde el backend hace falta además una cuenta de servicio de Firebase.
+   Para enviar push desde el backend hace falta además una cuenta de servicio de Firebase (Firebase → Configuración
+   del proyecto → Cuentas de servicio → Generar clave privada). Ese JSON va al servidor como
+   `FCM_SERVICE_ACCOUNT_JSON` (texto o base64), con `PUSH_DRIVER=live`.
 3. **Publicar**: cuenta de Google Play Console (pago único de US$25).
 
 ### iOS (requiere cuenta Apple; no requiere Mac)
@@ -71,7 +74,9 @@ El agente no puede crear cuentas, aceptar contratos ni pagar. Todo lo demás ya 
    App Manager). Con ella EAS crea certificados, perfiles de aprovisionamiento y el identificador
    `app.dizaster.mobile` con las capacidades Push Notifications y Associated Domains, sin sesión interactiva.
 3. **Clave APNs (.p8)** (Apple Developer → Certificates, IDs & Profiles → Keys) para que el backend envíe push.
-   Se guarda como secreto del servidor.
+   Se guarda como secreto del servidor: `APNS_PRIVATE_KEY` (contenido del .p8 o base64), `APNS_KEY_ID`,
+   `APNS_TEAM_ID`. El identificador de la app necesita también la capacidad Time Sensitive Notifications
+   (gratuita; EAS la activa al firmar).
 4. **Probar en un iPhone real**: una build interna solo se instala en iPhones registrados (su UDID), y TestFlight
    también necesita un iPhone. Sin iPhone propio hay tres caminos: registrar el iPhone de un tester de confianza,
    usar TestFlight con testers del piloto o contratar un servicio de dispositivos en la nube (con costo).

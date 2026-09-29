@@ -352,6 +352,32 @@ export class EventService {
     );
   }
 
+  /** Lo que el Alert Engine necesita de un EVENT: solo datos públicos (lugar contextual, estado, severidad). */
+  async alertSnapshot(q: Queryable, id: string): Promise<{
+    id: string; categoryCode: string; severity: number; publicState: PublicVerificationState; publicationState: string;
+    status: EventSummary["status"]; place: ContextualLocation | null; regionId: string | null; districtId: string | null;
+    countryCode: string | null; mergedIntoId: string | null; point: GeoPoint;
+  } | null> {
+    const { rows } = await q.query<{
+      id: string; category_code: string; severity: number; verification_level: VerificationLevel; negative_state: NegativeState;
+      publication_state: string; status: EventSummary["status"]; place: ContextualLocation | null; region_id: string | null;
+      district_id: string | null; country_code: string | null; merged_into_id: string | null; lat: number; lng: number;
+    }>(
+      `SELECT id, category_code, severity, verification_level, negative_state, publication_state, status, place,
+              region_id, district_id, country_code, merged_into_id,
+              ST_Y(public_geom::geometry) AS lat, ST_X(public_geom::geometry) AS lng
+         FROM event.events WHERE id = $1`,
+      [id],
+    );
+    const r = rows[0];
+    if (!r) return null;
+    return {
+      id: r.id, categoryCode: r.category_code, severity: r.severity, publicState: publicVerificationState(r.verification_level, r.negative_state),
+      publicationState: r.publication_state, status: r.status, place: r.place, regionId: r.region_id, districtId: r.district_id,
+      countryCode: r.country_code?.trim() ?? null, mergedIntoId: r.merged_into_id, point: { lat: r.lat, lng: r.lng },
+    };
+  }
+
   async timeline(q: Queryable, eventId: string): Promise<TimelineEntryView[]> {
     const { rows } = await q.query<{ id: string; type: TimelineEntryView["type"]; at: Date; payload: Record<string, unknown> }>(
       `SELECT id, type, at, payload FROM event.timeline WHERE event_id = $1 AND visibility = 'PUBLIC' ORDER BY at, id`,
@@ -449,7 +475,10 @@ export class EventService {
        RETURNING e.id, e.status`,
       [codes, monitorMin, resolveMin, now],
     );
-    for (const r of moved.rows) await this.addTimeline(q, r.id, "STATUS_CHANGED", { to: r.status, cause: "INACTIVITY" });
+    for (const r of moved.rows) {
+      await this.addTimeline(q, r.id, "STATUS_CHANGED", { to: r.status, cause: "INACTIVITY" });
+      await publish(q, "EventLifecycleChanged", { eventId: r.id, to: r.status as "MONITORING" | "RESOLVED" }, { lane: "normal" });
+    }
     return {
       monitoring: moved.rows.filter((r) => r.status === "MONITORING").length,
       resolved: moved.rows.filter((r) => r.status === "RESOLVED").length,

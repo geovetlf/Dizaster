@@ -12,6 +12,9 @@ export interface DomainEventMap {
   EventEvidenceAdded: { eventId: string; evidenceId: string; evidenceType: string };
   EventMerged: { targetEventId: string; mergedEventId: string };
   VerificationChanged: { eventId: string; from: string; to: string; negativeState: string };
+  EventLifecycleChanged: { eventId: string; to: "ACTIVE" | "MONITORING" | "RESOLVED" };
+  /** Hay notificaciones nuevas por entregar (despierta al emisor push sin esperar al siguiente ciclo). */
+  AlertTriggered: { alertId: string; eventId: string; kind: string };
   ExternalItemIngested: { externalItemId: string; sourceId: string; lane: "NORMAL" | "URGENT" };
   MediaUploaded: { mediaId: string };
   MediaReady: { mediaId: string };

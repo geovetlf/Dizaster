@@ -34,6 +34,9 @@ const config: ExpoConfig = {
     // Identificador provisional hasta aprobar marca y dominio (D-21).
     bundleIdentifier: "app.dizaster.mobile",
     ...(linkDomain ? { associatedDomains: [`applinks:${linkDomain}`] } : {}),
+    // Solo una confirmación oficial grave usa "time-sensitive" (atraviesa Concentración). Capacidad gratuita;
+    // EAS la activa en el App ID al firmar. Sin "critical alerts": requieren permiso especial de Apple.
+    entitlements: { "com.apple.developer.usernotifications.time-sensitive": true },
     infoPlist: {
       NSLocationWhenInUseUsageDescription: LOCATION_TEXT,
       NSCameraUsageDescription: CAMERA_TEXT,

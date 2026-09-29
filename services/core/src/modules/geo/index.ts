@@ -30,6 +30,7 @@ const DEFAULT_LEVEL_NAMES = { "1": "Región", "2": "Provincia", "3": "Distrito" 
 export class GeoService {
   private readonly locator: CountryLocator;
   private readonly countryNames = new Intl.DisplayNames(["es"], { type: "region" });
+  private readonly countryCodes: Set<string>;
 
   constructor(
     dataDir: string,
@@ -37,10 +38,11 @@ export class GeoService {
   ) {
     const fc = JSON.parse(readFileSync(join(dataDir, "countries/countries-50m.geojson"), "utf8")) as { features: CountryFeature[] };
     this.locator = new CountryLocator(fc.features);
+    this.countryCodes = new Set(fc.features.map((f) => f.properties.iso2));
   }
 
-  countryOf(point: GeoPoint): string | null {
-    return this.locator.locate(point);
+  countryOf(point: GeoPoint, maxDistanceM?: number): string | null {
+    return this.locator.locate(point, maxDistanceM);
   }
 
   distanceMeters(a: GeoPoint, b: GeoPoint): number {
@@ -125,6 +127,11 @@ export class GeoService {
       [point.lng, point.lat, country, CITY_RADIUS_M],
     );
     return rows[0] ?? null;
+  }
+
+  /** País presente en el dataset de fronteras (ISO 3166-1 alfa-2). */
+  isCountry(code: string): boolean {
+    return this.countryCodes.has(code);
   }
 
   countryName(code: string): string {

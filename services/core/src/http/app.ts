@@ -208,6 +208,47 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
     return c.feed.me(c.db, session.profileId);
   });
 
+  // ───────────── Alertas: preferencias, suscripciones e historial (personales: nunca se cachean) ─────────────
+  app.get("/v1/me/alert-preferences", async (req, reply) => {
+    const session = requireSession(req);
+    reply.header("cache-control", "no-store");
+    return c.alerts.preferences(c.db, session.profileId);
+  });
+
+  app.put("/v1/me/alert-preferences", async (req) => {
+    const session = requireSession(req);
+    return c.alerts.updatePreferences(c.db, session.profileId, req.body);
+  });
+
+  app.get("/v1/me/alert-subscriptions", async (req, reply) => {
+    const session = requireSession(req);
+    reply.header("cache-control", "no-store");
+    return { subscriptions: await c.alerts.subscriptions(c.db, session.profileId) };
+  });
+
+  app.post("/v1/me/alert-subscriptions", async (req, reply) => {
+    const session = requireSession(req);
+    return reply.status(201).send(await c.alerts.addSubscription(c.db, session.profileId, req.body));
+  });
+
+  app.delete("/v1/me/alert-subscriptions/:id", async (req, reply) => {
+    const session = requireSession(req);
+    await c.alerts.removeSubscription(c.db, session.profileId, parse(IdParam, req.params).id);
+    return reply.status(204).send();
+  });
+
+  app.get("/v1/me/notifications", async (req, reply) => {
+    const session = requireSession(req);
+    reply.header("cache-control", "no-store");
+    return c.alerts.notifications(c.db, session.profileId, req.query);
+  });
+
+  app.post("/v1/me/notifications/read", async (req) => {
+    const session = requireSession(req);
+    const b = parse(z.object({ ids: z.array(z.uuid()).max(200).optional() }).optional(), req.body);
+    return c.alerts.markRead(c.db, session.profileId, b?.ids ?? null);
+  });
+
   app.get("/v1/me/follows", async (req, reply) => {
     const session = requireSession(req);
     reply.header("cache-control", "no-store");

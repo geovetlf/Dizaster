@@ -256,6 +256,24 @@ export class SocialService {
     return rows.map((r) => ({ type: r.target_type, targetId: r.target_id, handle: r.handle, displayName: r.display_name }));
   }
 
+  /** Seguidores de un EVENT o de alguno de sus lugares, con la cuenta de cada perfil (para el Alert Engine). */
+  async followersOf(q: Queryable, t: { eventId: string; placeIds: string[] }): Promise<{ profileId: string; userId: string; via: "EVENT" | "PLACE" }[]> {
+    const { rows } = await q.query<{ profile_id: string; user_id: string; via: "EVENT" | "PLACE" }>(
+      `SELECT DISTINCT ON (f.follower_profile_id) f.follower_profile_id AS profile_id, pr.user_id, f.target_type AS via
+         FROM social.follows f JOIN social.profiles pr ON pr.id = f.follower_profile_id
+        WHERE (f.target_type = 'EVENT' AND f.target_id = $1) OR (f.target_type = 'PLACE' AND f.target_id = ANY($2))
+        ORDER BY f.follower_profile_id, (f.target_type = 'EVENT') DESC`,
+      [t.eventId, t.placeIds],
+    );
+    return rows.map((r) => ({ profileId: r.profile_id, userId: r.user_id, via: r.via }));
+  }
+
+  async userIdsForProfiles(q: Queryable, profileIds: string[]): Promise<Map<string, string>> {
+    if (profileIds.length === 0) return new Map();
+    const { rows } = await q.query<{ id: string; user_id: string }>(`SELECT id, user_id FROM social.profiles WHERE id = ANY($1)`, [profileIds]);
+    return new Map(rows.map((r) => [r.id, r.user_id]));
+  }
+
   async handleById(q: Queryable, profileId: string): Promise<string> {
     const { rows } = await q.query<{ handle: string }>(`SELECT handle FROM social.profiles WHERE id = $1`, [profileId]);
     if (!rows[0]) throw notFound("Perfil");
