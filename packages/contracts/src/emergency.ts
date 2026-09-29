@@ -38,3 +38,26 @@ export const EmergencyDataset = z.object({
   numbers: z.array(EmergencyNumber),
 });
 export type EmergencyDataset = z.infer<typeof EmergencyDataset>;
+
+/**
+ * Respuesta de `/v1/reference/emergency-numbers?since=<versión>` (ADR 0039). Si la app ya tiene la versión
+ * vigente, `unchanged` y sin números: la consulta diaria cuesta unos bytes.
+ */
+export const EmergencyNumbersResponse = z.object({
+  version: z.string(),
+  unchanged: z.boolean(),
+  numbers: z.array(EmergencyNumber),
+});
+export type EmergencyNumbersResponse = z.infer<typeof EmergencyNumbersResponse>;
+
+/** Compara versiones tipo `emergency-2026.09.10` por tramos numéricos (10 > 9). */
+export function compareDatasetVersions(a: string, b: string): number {
+  const parts = (v: string) => (v.match(/\d+/g) ?? []).map(Number);
+  const x = parts(a);
+  const y = parts(b);
+  for (let i = 0; i < Math.max(x.length, y.length); i++) {
+    const d = (x[i] ?? 0) - (y[i] ?? 0);
+    if (d !== 0) return Math.sign(d);
+  }
+  return 0;
+}

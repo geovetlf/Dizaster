@@ -198,6 +198,7 @@ export const pt: Record<MessageKey, string> = {
   saveZone: "Salvar região",
   costMonth: "mês",
   playVideo: "Reproduzir vídeo",
+  countryFromSettings: "País pelas configurações do telefone (sem localização).",
   exportData: "Baixar meus dados",
   exportPreparing: "Preparando…",
   exportFailed: "Não foi possível preparar a cópia dos seus dados. Tente novamente em um minuto.",

@@ -1,4 +1,4 @@
-import type { EmergencyDataset, EmergencyNumber } from "@dizaster/contracts";
+import { compareDatasetVersions, type EmergencyDataset, type EmergencyNumber } from "@dizaster/contracts";
 
 export interface EmergencyLookup {
   country: string | null;
@@ -29,4 +29,18 @@ export function lookupEmergency(dataset: EmergencyDataset, country: string | nul
 export function label(n: EmergencyNumber, locale: string): string {
   const lang = locale.split("-")[0] ?? "es";
   return n.label[locale] ?? n.label[lang] ?? n.label["es"] ?? n.label["en"] ?? n.service;
+}
+
+/** Se queda con el dataset más nuevo entre el empaquetado y el descargado (una app actualizada puede traer uno más reciente). */
+export function newestDataset(bundled: EmergencyDataset, cached: EmergencyDataset | null): EmergencyDataset {
+  return cached && compareDatasetVersions(cached.version, bundled.version) > 0 ? cached : bundled;
+}
+
+/**
+ * País de reserva cuando no hay ubicación: la región de los ajustes del teléfono ("es-PE" → "PE").
+ * Blueprint §11: ubicación → SIM/red → locale del sistema.
+ */
+export function regionOf(locale: string): string | null {
+  const m = /[-_]([A-Za-z]{2})(?:[-_@]|$)/.exec(locale);
+  return m ? m[1]!.toUpperCase() : null;
 }

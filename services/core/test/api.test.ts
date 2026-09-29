@@ -23,6 +23,16 @@ describe("API de referencia y configuración", () => {
     expect(nums.numbers.map((n: { number: string }) => n.number)).toEqual(expect.arrayContaining(["105", "116", "106"]));
   });
 
+  it("con since= no repite el dataset si la app ya tiene la versión vigente", async () => {
+    const full = (await t.app.inject({ url: "/v1/reference/emergency-numbers" })).json();
+    expect(full.unchanged).toBe(false);
+    const same = (await t.app.inject({ url: `/v1/reference/emergency-numbers?since=${full.version}` })).json();
+    expect(same).toEqual({ version: full.version, unchanged: true, numbers: [] });
+    const old = (await t.app.inject({ url: "/v1/reference/emergency-numbers?since=emergency-2000.01.1&country=PE" })).json();
+    expect(old.unchanged).toBe(false);
+    expect(old.numbers.every((n: { country: string }) => n.country === "PE")).toBe(true);
+  });
+
   it("la arquitectura es global: cualquier país se resuelve igual", async () => {
     const geo = (await t.app.inject({ url: "/v1/geo/country?lat=35.6762&lng=139.6503" })).json();
     expect(geo.country).toBe("JP");

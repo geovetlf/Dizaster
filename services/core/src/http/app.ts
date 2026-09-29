@@ -2,7 +2,7 @@ import Fastify, { type FastifyInstance, type FastifyRequest } from "fastify";
 import { z } from "zod";
 import {
   BBox, CreateCommentRequest, DevicePlatform, MEDIA_UPLOAD_LIMITS, MergeEventsRequest, NegativeState, RegisterPushTokenRequest, RevertMergeRequest,
-  SplitEventRequest, DATA_EXPORT_FORMAT, type AppConfig, type DataExport,
+  SplitEventRequest, DATA_EXPORT_FORMAT, type AppConfig, type DataExport, type EmergencyNumbersResponse,
 } from "@dizaster/contracts";
 import { LocalDiskStorage } from "../modules/media/index.js";
 import type { Container } from "../container.js";
@@ -97,13 +97,13 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
     return c.ref.categories;
   });
 
-  app.get("/v1/reference/emergency-numbers", async (req, reply) => {
-    const q = parse(z.object({ country: z.string().regex(/^[A-Z]{2}$/).optional() }), req.query);
+  app.get("/v1/reference/emergency-numbers", async (req, reply): Promise<EmergencyNumbersResponse> => {
+    const q = parse(z.object({ country: z.string().regex(/^[A-Z]{2}$/).optional(), since: z.string().max(64).optional() }), req.query);
+    const version = c.ref.emergency.version;
     reply.header("cache-control", "public, max-age=3600");
-    return {
-      version: c.ref.emergency.version,
-      numbers: q.country ? c.ref.emergencyNumbers(q.country) : c.ref.emergency.numbers,
-    };
+    // La app pregunta con la versión que tiene; si coincide no se repite el dataset (ADR 0039).
+    if (q.since === version) return { version, unchanged: true, numbers: [] };
+    return { version, unchanged: false, numbers: q.country ? c.ref.emergencyNumbers(q.country) : c.ref.emergency.numbers };
   });
 
   app.get("/v1/geo/country", async (req) => {

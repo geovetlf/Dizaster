@@ -2,7 +2,8 @@ import { readFileSync } from "node:fs";
 import type { EmergencyDataset, SubmitReportRequest } from "@dizaster/contracts";
 import { SubmitReportRequest as SubmitSchema } from "@dizaster/contracts";
 import { describe, expect, it } from "vitest";
-import { lookupEmergency } from "../src/lib/emergency";
+import { compareDatasetVersions } from "@dizaster/contracts";
+import { lookupEmergency, newestDataset, regionOf } from "../src/lib/emergency";
 import { OFFLINE_FALLBACK_STYLE, providerFromAppConfig } from "../src/lib/map/provider";
 import { toPresenceSignals } from "../src/lib/report/presence";
 import { MemoryQueueStorage, ReportQueue } from "../src/lib/report/queue";
@@ -75,5 +76,28 @@ describe("proveedor de mapa desacoplado", () => {
     expect(p?.styleUrl("dark")).toBe("D");
     expect(providerFromAppConfig(null)).toBeNull();
     expect(OFFLINE_FALLBACK_STYLE.layers[0]?.type).toBe("background");
+  });
+});
+
+describe("números de emergencia incrementales (ADR 0039)", () => {
+  it("compara versiones por tramos numéricos", () => {
+    expect(compareDatasetVersions("emergency-2026.09.10", "emergency-2026.09.9")).toBe(1);
+    expect(compareDatasetVersions("emergency-2026.09.1", "emergency-2026.10.1")).toBe(-1);
+    expect(compareDatasetVersions("emergency-2026.09.1", "emergency-2026.09.1")).toBe(0);
+  });
+
+  it("usa el descargado solo si es más nuevo que el empaquetado", () => {
+    const a = { version: "emergency-2026.09.1", numbers: [] };
+    const b = { version: "emergency-2026.10.1", numbers: [] };
+    expect(newestDataset(a, b)).toBe(b);
+    expect(newestDataset(b, a)).toBe(b);
+    expect(newestDataset(a, null)).toBe(a);
+  });
+
+  it("toma la región de los ajustes del teléfono", () => {
+    expect(regionOf("es-PE")).toBe("PE");
+    expect(regionOf("en_US")).toBe("US");
+    expect(regionOf("zh-Hant-TW")).toBe("TW");
+    expect(regionOf("es")).toBeNull();
   });
 });

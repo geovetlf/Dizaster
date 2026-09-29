@@ -1,13 +1,17 @@
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
+import { useEffect } from "react";
 import { t } from "../lib/i18n";
 import { useNotificationRouting } from "../lib/alerts/notifications";
+import { refreshEmergencyDataset } from "../lib/emergency-store";
 import { SessionProvider, useSession } from "../lib/session";
 import { colors } from "../theme";
 
 const header = { headerStyle: { backgroundColor: colors.bg }, headerTintColor: colors.text, headerTitleAlign: "center" as const, contentStyle: { backgroundColor: colors.bg } };
 
 export default function RootLayout() {
+  // Al abrir la app se comprueba si hay números de emergencia nuevos; así funcionan offline con la última versión.
+  useEffect(() => { void refreshEmergencyDataset(); }, []);
   return (
     <SessionProvider>
       <StatusBar style="light" />
