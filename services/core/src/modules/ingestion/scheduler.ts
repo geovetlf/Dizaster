@@ -1,3 +1,4 @@
+import { publish } from "../../platform/outbox.js";
 import type { Clock } from "../../platform/clock.js";
 import type { Db } from "../../platform/db.js";
 import { newId } from "../../platform/ids.js";
@@ -150,6 +151,10 @@ export class IngestionScheduler {
            consecutive_failures = 0, open_until = NULL, updated_at = now()`,
         [s.id, res.etag ?? null, res.lastModified ?? null, now],
       );
+      // Volvió una fuente urgente que estaba con el breaker abierto: se avisa igual que cuando cayó.
+      if (s.urgent_capable && (s.consecutive_failures ?? 0) >= BREAKER_THRESHOLD) {
+        await publish(this.db, "SourceHealthChanged", { sourceKey: s.key, state: "RECOVERED", failures: 0, error: null, retryAt: null });
+      }
       await this.db.query(
         `UPDATE ingestion.runs SET finished_at = now(), http_status = $2, items_seen = $3, items_new = $4, items_urgent = $5, status = $6 WHERE id = $1`,
         [runId, httpStatus, summary.itemsSeen, summary.itemsNew, summary.itemsUrgent, summary.status],
@@ -166,9 +171,13 @@ export class IngestionScheduler {
            open_until = CASE WHEN $3 > 0 THEN $4::timestamptz + make_interval(mins => $3) END, updated_at = now()`,
         [s.id, failures, openMinutes, now],
       );
-      await this.db.query(`UPDATE ingestion.runs SET finished_at = now(), status = 'FAILED', error = $2 WHERE id = $1`, [
-        runId, String(err instanceof Error ? err.message : err).slice(0, 2000),
-      ]);
+      const error = String(err instanceof Error ? err.message : err).slice(0, 2000);
+      await this.db.query(`UPDATE ingestion.runs SET finished_at = now(), status = 'FAILED', error = $2 WHERE id = $1`, [runId, error]);
+      // §9.2: el carril URGENT nunca se desactiva en silencio. Se avisa una vez, cuando el breaker se abre.
+      if (s.urgent_capable && failures === BREAKER_THRESHOLD) {
+        const retryAt = new Date(now.getTime() + openMinutes * 60_000).toISOString();
+        await publish(this.db, "SourceHealthChanged", { sourceKey: s.key, state: "DEGRADED", failures, error: error.slice(0, 200), retryAt });
+      }
     }
     return summary;
   }

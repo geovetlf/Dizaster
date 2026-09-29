@@ -141,7 +141,12 @@ describe("planificador NORMAL / URGENT", () => {
     fetcher.next = [{ status: 304 }];
     expect((await scheduler.tick())[0]).toMatchObject({ status: "NOT_MODIFIED" });
     const { rows } = await t.c.db.query(`SELECT consecutive_failures, open_until FROM ingestion.source_state`);
-    expect(rows[0]).toEqual({ consecutive_failures: 0, open_until: null });
+    expect(rows[0]).toEqual({ consecutive_failures: 0, open_until: null });    // ADR 0058: la caída y la recuperación de una fuente urgente se avisan, una vez cada una.
+    const health = await t.c.db.query<{ payload: { sourceKey: string; state: string; failures: number } }>(
+      `SELECT payload FROM platform.outbox WHERE type = 'SourceHealthChanged' ORDER BY occurred_at, (payload->>'state') = 'RECOVERED'`,
+    );
+    expect(health.rows.map((r) => [r.payload.sourceKey, r.payload.state])).toEqual([["usgs-earthquakes", "DEGRADED"], ["usgs-earthquakes", "RECOVERED"]]);
+    await t.c.dispatcher.drain();
   });
 
   it("las fuentes sin adapter o no activas no se consultan", async () => {

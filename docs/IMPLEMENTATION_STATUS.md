@@ -217,6 +217,7 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | Fuentes visibles en el evento con licencia y enlace (§9.3) | ✅ | ADR 0055, `GET /v1/events/:id/sources` |
 | Motivo práctico cuando un reporte baja a publicación o se rechaza (§8.2) | ✅ | ADR 0056, `lib/report/outcome.ts` |
 | Filtros del mapa y estilo por verificación (§11.4) | ✅ | ADR 0057 |
+| Aviso a administración cuando una fuente urgente cae o vuelve (§9.2) | ✅ | ADR 0058 |
 | Varios administradores por negocio | ⏳ | cuando haya demanda (`BusinessMember`) |
 
 ## Etapa 18 — Sesiones y dispositivos (hecha)
@@ -263,14 +264,13 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 
 Revisión del Blueprint del 2026-09-29 (tras ADR 0054), verificada contra el código:
 
-1. Aviso a administración cuando una fuente URGENT falla o queda desactualizada (§9.2).
-2. Ciclo de vida oficial: CAP Cancel/expiración cierran eventos solo oficiales (§5.7, §10.1).
-3. Búsqueda de eventos (RF-02, §5.3).
-4. Lectura sin conexión: últimos avisos y eventos cercanos en SQLite (§12.2).
-5. Adaptador FIRMS (VIIRS CSV → candidatos de incendio); activarlo espera la MAP_KEY (§9.3).
-6. Reputación por dispositivo: varias cuentas en un teléfono cuentan como una (§5.20, §13.3).
-7. Idioma de la app elegible en el perfil (§5.2).
-8. Cadena de suministro y respaldos: Dependabot, audit, SBOM, licencias; `pg_dump` con prueba de restauración (§13.1).
+1. Ciclo de vida oficial: CAP Cancel/expiración cierran eventos solo oficiales (§5.7, §10.1).
+2. Búsqueda de eventos (RF-02, §5.3).
+3. Lectura sin conexión: últimos avisos y eventos cercanos en SQLite (§12.2).
+4. Adaptador FIRMS (VIIRS CSV → candidatos de incendio); activarlo espera la MAP_KEY (§9.3).
+5. Reputación por dispositivo: varias cuentas en un teléfono cuentan como una (§5.20, §13.3).
+6. Idioma de la app elegible en el perfil (§5.2).
+7. Cadena de suministro y respaldos: Dependabot, audit, SBOM, licencias; `pg_dump` con prueba de restauración (§13.1).
 
 Requieren decisión del propietario: PTWC (tsunami) como fuente OFICIAL o EXTERNAL; días hasta archivar un evento
 RESUELTO y si sigue en el mapa; si el botón "Llamar" marca directo el número de la categoría; push por mención.

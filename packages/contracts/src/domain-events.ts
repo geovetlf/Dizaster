@@ -46,6 +46,8 @@ export interface DomainEventMap {
   };
   /** Un presupuesto cruzó el 50, 80 o 100 % en su periodo. Al 100 % la función se degrada (CostGuard deniega). */
   BudgetThresholdReached: { key: string; threshold: 50 | 80 | 100; periodStart: string; spentUsd: number; limitUsd: number };
+  /** Una fuente con carril URGENT dejó de consultarse (breaker abierto) o volvió (ADR 0058). Nunca en silencio. */
+  SourceHealthChanged: { sourceKey: string; state: "DEGRADED" | "RECOVERED"; failures: number; error: string | null; retryAt: string | null };
 }
 export type DomainEventType = keyof DomainEventMap;
 

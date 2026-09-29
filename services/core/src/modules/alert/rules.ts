@@ -211,6 +211,17 @@ const BUDGET_TEXT: Record<Lang, (key: string, pct: number, spent: string, limit:
   fr: (k, p, s, l) => ({ title: `Budget ${k} à ${p} %`, body: `Dépensé ${s} US$ sur ${l} US$.${p >= 100 ? " La fonction est arrêtée." : ""}` }),
 };
 
+const SOURCE_TEXT: Record<Lang, (key: string, down: boolean) => { title: string; body: string }> = {
+  es: (k, d) => d ? { title: `Fuente urgente caída: ${k}`, body: "Falló 3 veces seguidas; se reintentará sola. Revisa el panel de calidad." } : { title: `Fuente urgente recuperada: ${k}`, body: "Vuelve a consultarse con normalidad." },
+  en: (k, d) => d ? { title: `Urgent source down: ${k}`, body: "It failed 3 times in a row; it will retry on its own. Check the quality dashboard." } : { title: `Urgent source recovered: ${k}`, body: "It is being polled normally again." },
+  pt: (k, d) => d ? { title: `Fonte urgente fora do ar: ${k}`, body: "Falhou 3 vezes seguidas; tentará de novo sozinha. Veja o painel de qualidade." } : { title: `Fonte urgente recuperada: ${k}`, body: "Voltou a ser consultada normalmente." },
+  fr: (k, d) => d ? { title: `Source urgente en panne : ${k}`, body: "Trois échecs de suite ; nouvel essai automatique. Consultez le tableau de qualité." } : { title: `Source urgente rétablie : ${k}`, body: "Elle est de nouveau interrogée normalement." },
+};
+
+export function sourceAlertText(lang: Lang, s: { sourceKey: string; state: "DEGRADED" | "RECOVERED" }): { title: string; body: string } {
+  return SOURCE_TEXT[lang](s.sourceKey, s.state === "DEGRADED");
+}
+
 export function budgetAlertText(lang: Lang, b: { key: string; threshold: number; spentUsd: number; limitUsd: number }): { title: string; body: string } {
   return BUDGET_TEXT[lang](b.key, b.threshold, b.spentUsd.toFixed(2), b.limitUsd.toFixed(2));
 }

@@ -10,7 +10,7 @@ import { defaultDataDir } from "./platform/paths.js";
 import { CostService } from "./modules/cost/index.js";
 import { EventService } from "./modules/event/index.js";
 import { FeedService } from "./modules/feed/index.js";
-import { AlertService, ApnsSender, budgetAlertText, FcmSender, LogPushSender, PushGateway, type FcmServiceAccount, type PushSender } from "./modules/alert/index.js";
+import { AlertService, ApnsSender, budgetAlertText, sourceAlertText, FcmSender, LogPushSender, PushGateway, type FcmServiceAccount, type PushSender } from "./modules/alert/index.js";
 import { GeoService } from "./modules/geo/index.js";
 import { ModerationService } from "./modules/moderation/index.js";
 import { TrustService } from "./modules/trust/index.js";
@@ -103,6 +103,12 @@ export function buildContainer(env: AppEnv, overrides: { db?: Db; clock?: Clock;
   dispatcher.on("BudgetThresholdReached", "alert.notify-admins-budget", async (e) => {
     const admins = await identity.usersWithRole(db, "admin");
     await alerts.notifyAdmins(admins, (lang) => budgetAlertText(lang, e.payload), "dizaster://admin-cost", `budget:${e.payload.key}`);
+  });
+  // Fuentes urgentes caídas o recuperadas (ADR 0058): log estructurado y push a administración.
+  dispatcher.on("SourceHealthChanged", "alert.notify-admins-source", async (e) => {
+    console.warn(JSON.stringify({ msg: "ingestion.source.health", ...e.payload }));
+    const admins = await identity.usersWithRole(db, "admin");
+    await alerts.notifyAdmins(admins, (lang) => sourceAlertText(lang, e.payload), "dizaster://admin-quality", `source:${e.payload.sourceKey}`);
   });
   const composer = new PostComposer(db, social, media, events, business);
   const quality = new QualityService(db, clock, { cost, events, verification, alerts, ingestion, moderation });
