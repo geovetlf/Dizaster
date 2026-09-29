@@ -205,6 +205,8 @@ const base = {
     saveZone: "Guardar zona",
     costMonth: "mes",
     playVideo: "Reproducir video",
+    language: "Idioma",
+    languageSystem: "Del teléfono",
     offlineCopy: "Sin conexión: copia guardada",
     searchEvents: "Eventos",
     prefMentions: "Cuando alguien me menciona",
@@ -602,6 +604,8 @@ const base = {
     saveZone: "Save area",
     costMonth: "month",
     playVideo: "Play video",
+    language: "Language",
+    languageSystem: "Phone setting",
     offlineCopy: "Offline: saved copy",
     searchEvents: "Events",
     prefMentions: "When someone mentions me",
@@ -807,7 +811,11 @@ const base = {
 export type MessageKey = keyof (typeof base)["es"];
 const catalogs: Record<Lang, Record<MessageKey, string>> = { es: base.es, en: base.en, pt, fr };
 export const locale: string = Intl.DateTimeFormat().resolvedOptions().locale ?? "es";
-export const lang: Lang = langFromLocale(locale);
+/** Idioma de la interfaz: el del teléfono salvo que se elija otro en el perfil (ADR 0069). */
+export let lang: Lang = langFromLocale(locale);
+export function setLang(next: Lang): void {
+  lang = next;
+}
 export const t = (key: MessageKey): string => catalogs[lang][key];
 
 export const VERIFICATION_LABEL: Record<string, Record<Lang, string> & { color: string }> = {

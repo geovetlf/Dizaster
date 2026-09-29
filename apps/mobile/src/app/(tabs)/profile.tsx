@@ -8,7 +8,8 @@ import { Icon } from "../../components/icon";
 import { exportMyData } from "../../lib/account/export";
 import { api } from "../../lib/api";
 import { enablePush } from "../../lib/device/push";
-import { t } from "../../lib/i18n";
+import { lang, t } from "../../lib/i18n";
+import { LANGUAGE_NAMES } from "../../lib/language";
 import { reportQueue } from "../../lib/report/outbox";
 import { useSession } from "../../lib/session";
 import { colors, radius, space } from "../../theme";
@@ -74,6 +75,7 @@ export default function ProfileScreen() {
         <Row icon="cellphone-lock" label={t("sessionsTitle")} onPress={() => router.push("/sessions")} />
         <Row icon="download-outline" label={t("exportData")} value={exporting ? t("exportPreparing") : undefined} onPress={() => void onExport()} />
         <Row icon="account-remove-outline" label={t("deleteAccount")} onPress={() => router.push("/delete-account")} />
+        <Row icon="translate" label={t("language")} value={LANGUAGE_NAMES[lang]} onPress={() => router.push("/language")} />
         <Row icon="information-outline" label={t("aboutTitle")} onPress={() => router.push("/about")} />
         <Text style={styles.note}>{t("privacyNote")}</Text>
         <Text style={styles.version}>Dizaster {Application.nativeApplicationVersion ?? ""}</Text>
@@ -82,7 +84,7 @@ export default function ProfileScreen() {
   );
 }
 
-function Row({ icon, label, value, onPress }: { icon: "account-circle-outline" | "bell-outline" | "cloud-upload-outline" | "phone-alert" | "chart-bar" | "gauge" | "storefront-outline" | "cellphone-lock" | "gavel" | "shield-check-outline" | "account-remove-outline" | "download-outline" | "account-edit-outline" | "information-outline"; label: string; value?: string; onPress?: () => void }) {
+function Row({ icon, label, value, onPress }: { icon: "account-circle-outline" | "bell-outline" | "cloud-upload-outline" | "phone-alert" | "chart-bar" | "gauge" | "storefront-outline" | "cellphone-lock" | "gavel" | "shield-check-outline" | "account-remove-outline" | "download-outline" | "account-edit-outline" | "information-outline" | "translate"; label: string; value?: string; onPress?: () => void }) {
   return (
     <Pressable accessibilityRole={onPress ? "button" : "text"} disabled={!onPress} style={styles.row} onPress={onPress}>
       <Icon name={icon} size={22} color={colors.text} />

@@ -10,7 +10,7 @@ import { api } from "../lib/api";
 import { callTarget, label as serviceLabel, type CallTarget } from "../lib/emergency";
 import { localEmergencyDataset } from "../lib/emergency-store";
 import { countryOf } from "../lib/geo/country";
-import { locale, t, verificationLabel } from "../lib/i18n";
+import { lang, locale, t, verificationLabel } from "../lib/i18n";
 import { newId } from "../lib/ids";
 import { OFFLINE_FALLBACK_STYLE, providerFromAppConfig } from "../lib/map/provider";
 import { toPresenceSignals } from "../lib/report/presence";
@@ -22,7 +22,6 @@ import { colors } from "../theme";
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const catalog = require("../reference-data/categories.json") as CategoryCatalog;
-const lang = Intl.DateTimeFormat().resolvedOptions().locale.startsWith("en") ? "en" : "es";
 
 type Phase = "category" | "locating" | "compose";
 

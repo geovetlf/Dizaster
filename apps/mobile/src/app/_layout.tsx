@@ -1,11 +1,12 @@
 import { router, Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { t } from "../lib/i18n";
 import { useNotificationRouting } from "../lib/alerts/notifications";
 import { refreshEmergencyDataset } from "../lib/emergency-store";
 import { isAgeBlocked } from "../lib/account/age-gate";
 import { api } from "../lib/api";
+import { onLanguageChange } from "../lib/language-store";
 import { SessionProvider, useSession } from "../lib/session";
 import { colors } from "../theme";
 
@@ -14,10 +15,13 @@ const header = { headerStyle: { backgroundColor: colors.bg }, headerTintColor: c
 export default function RootLayout() {
   // Al abrir la app se comprueba si hay números de emergencia nuevos; así funcionan offline con la última versión.
   useEffect(() => { void refreshEmergencyDataset(); }, []);
+  // Cambiar el idioma vuelve a montar la navegación para que títulos y pantallas usen el nuevo (ADR 0069).
+  const [langKey, setLangKey] = useState(0);
+  useEffect(() => onLanguageChange(() => setLangKey((k) => k + 1)), []);
   return (
     <SessionProvider>
       <StatusBar style="light" />
-      <Stack screenOptions={header}>
+      <Stack key={langKey} screenOptions={header}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="report" options={{ title: t("report"), presentation: "modal" }} />
         <Stack.Screen name="emergency" options={{ title: t("emergency"), presentation: "modal" }} />
@@ -45,6 +49,7 @@ export default function RootLayout() {
         <Stack.Screen name="age-check" options={{ title: t("ageTitle"), presentation: "modal" }} />
         <Stack.Screen name="profile-edit" options={{ title: t("editProfile") }} />
         <Stack.Screen name="zone-edit" options={{ title: t("addZone") }} />
+        <Stack.Screen name="language" options={{ title: t("language"), presentation: "modal" }} />
       </Stack>
       <NotificationRouting />
       <AgeGate />
