@@ -1,4 +1,4 @@
-import type { AreaSearchResult, BusinessView, CategoryCatalog, EventSummary, ProfileSearchResult, TagView } from "@dizaster/contracts";
+import type { AreaSearchResult, BusinessView, CategoryCatalog, EventSummary, FeedPost, ProfileSearchResult, TagView } from "@dizaster/contracts";
 import { router } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import { Pressable, SectionList, StyleSheet, Text, TextInput, View } from "react-native";
@@ -6,6 +6,7 @@ import { Icon } from "../components/icon";
 import { api } from "../lib/api";
 import { lang, t, verificationLabel } from "../lib/i18n";
 import { BUSINESS_CATEGORY_LABEL } from "../lib/social/business";
+import { POST_SEARCH_MIN, postAuthorLabel, postSnippet } from "../lib/social/post-search";
 import { categoryStyle } from "../lib/ui/categories";
 import { areaRow, bboxParam, initials, timeAgo } from "../lib/ui/format";
 import { useCoarseLocation } from "../lib/ui/use-coarse-location";
@@ -22,6 +23,7 @@ type Row =
   | { type: "person"; person: ProfileSearchResult }
   | { type: "tag"; tag: TagView }
   | { type: "business"; business: BusinessView }
+  | { type: "post"; post: FeedPost }
   | { type: "category"; code: string; name: string };
 
 /**
@@ -35,6 +37,7 @@ export default function SearchScreen() {
   const [people, setPeople] = useState<ProfileSearchResult[]>([]);
   const [tags, setTags] = useState<TagView[]>([]);
   const [businesses, setBusinesses] = useState<BusinessView[]>([]);
+  const [posts, setPosts] = useState<FeedPost[]>([]);
   const location = useCoarseLocation();
   const near = location.point;
 
@@ -45,7 +48,7 @@ export default function SearchScreen() {
 
   useEffect(() => {
     const text = q.trim();
-    if (text.length < 2) { setEvents([]); setAreas([]); setPeople([]); setTags([]); setBusinesses([]); return; }
+    if (text.length < 2) { setEvents([]); setAreas([]); setPeople([]); setTags([]); setBusinesses([]); setPosts([]); return; }
     let live = true;
     // Espera a que el usuario deje de escribir: menos peticiones, menos coste.
     const timer = setTimeout(() => {
@@ -54,6 +57,9 @@ export default function SearchScreen() {
       api.searchProfiles(text).then((r) => { if (live) setPeople(r.profiles); }).catch(() => { if (live) setPeople([]); });
       api.searchTags(text).then((r) => { if (live) setTags(r.tags); }).catch(() => { if (live) setTags([]); });
       api.searchBusinesses(text).then((r) => { if (live) setBusinesses(r.businesses); }).catch(() => { if (live) setBusinesses([]); });
+      // Publicaciones por texto (ADR 0107): desde 3 letras, como el servidor.
+      if (text.length >= POST_SEARCH_MIN) api.searchPosts(text).then((r) => { if (live) setPosts(r.posts); }).catch(() => { if (live) setPosts([]); });
+      else setPosts([]);
     }, 300);
     return () => { live = false; clearTimeout(timer); };
   }, [q, near]);
@@ -63,6 +69,7 @@ export default function SearchScreen() {
     ...(areas.length ? [{ title: t("searchPlaces"), data: areas.map((area): Row => ({ type: "area", area })) }] : []),
     ...(people.length ? [{ title: t("searchPeople"), data: people.map((person): Row => ({ type: "person", person })) }] : []),
     ...(businesses.length ? [{ title: t("searchBusinesses"), data: businesses.map((business): Row => ({ type: "business", business })) }] : []),
+    ...(posts.length ? [{ title: t("searchPosts"), data: posts.map((post): Row => ({ type: "post", post })) }] : []),
     ...(tags.length ? [{ title: t("searchTags"), data: tags.map((tag): Row => ({ type: "tag", tag })) }] : []),
     {
       title: t("searchCategories"),
@@ -79,7 +86,7 @@ export default function SearchScreen() {
       <SectionList
         sections={sections}
         keyboardShouldPersistTaps="handled"
-        keyExtractor={(r) => (r.type === "event" ? `e:${r.event.id}` : r.type === "area" ? r.area.id : r.type === "person" ? `@${r.person.handle}` : r.type === "tag" ? `#${r.tag.tag}` : r.type === "business" ? `b:${r.business.handle}` : r.code)}
+        keyExtractor={(r) => (r.type === "event" ? `e:${r.event.id}` : r.type === "area" ? r.area.id : r.type === "person" ? `@${r.person.handle}` : r.type === "tag" ? `#${r.tag.tag}` : r.type === "business" ? `b:${r.business.handle}` : r.type === "post" ? `p:${r.post.id}` : r.code)}
         renderSectionHeader={({ section }) => <Text style={styles.note}>{section.title}</Text>}
         renderItem={({ item }) => {
           if (item.type === "event") {
@@ -129,6 +136,17 @@ export default function SearchScreen() {
                 <View style={styles.rowBody}>
                   <Text style={styles.rowText}>{item.business.name}</Text>
                   <Text style={styles.rowSub}>@{item.business.handle} · {BUSINESS_CATEGORY_LABEL[item.business.category][lang]}</Text>
+                </View>
+              </Pressable>
+            );
+          }
+          if (item.type === "post") {
+            return (
+              <Pressable accessibilityRole="link" style={styles.row} onPress={() => router.push(`/post/${item.post.id}`)}>
+                <Icon name="text-box-outline" size={22} color={colors.textMuted} />
+                <View style={styles.rowBody}>
+                  <Text style={styles.rowText} numberOfLines={2}>{postSnippet(item.post.text, q)}</Text>
+                  <Text style={styles.rowSub}>{postAuthorLabel(item.post.author, t("pseudonymousAuthor"))} · {timeAgo(item.post.createdAt, lang)}</Text>
                 </View>
               </Pressable>
             );

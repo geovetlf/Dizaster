@@ -128,6 +128,13 @@ export interface MyFollows {
   businesses: { handle: string; name: string }[];
 }
 
+/** Búsqueda de publicaciones por texto (ADR 0107): mismas reglas que el feed, por recientes. */
+export const PostSearchQuery = z.object({
+  q: z.string().trim().min(3).max(80),
+  cursor: z.string().max(200).optional(),
+  limit: z.coerce.number().int().min(1).max(30).default(15),
+});
+
 export const ProfilePostsQuery = z.object({
   cursor: z.string().max(200).optional(),
   limit: z.coerce.number().int().min(1).max(30).default(15),

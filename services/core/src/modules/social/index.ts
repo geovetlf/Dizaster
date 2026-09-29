@@ -73,6 +73,8 @@ export interface FeedFilter {
   eventId?: string;
   /** Posts concretos (los originales de lo compartido), sin ventana de tiempo. */
   ids?: string[];
+  /** Texto a buscar (ADR 0107), sin distinguir mayúsculas; usa el índice trigram de `lower(text)`. */
+  text?: string;
 }
 
 export type FollowType = "PROFILE" | "EVENT" | "PLACE" | "TAG" | "BUSINESS";
@@ -372,7 +374,8 @@ export class SocialService {
                    OR EXISTS (SELECT 1 FROM social.post_tags pt JOIN social.tags tg ON tg.id = pt.tag_id
                                WHERE pt.post_id = p.id AND tg.normalized IN ${followed("TAG")}))`);
     }
-    const ranked = f.tab === "for_you" && !f.authorProfileId && !f.authorBusinessId && !f.tag && !f.eventId && !f.ids;
+    if (f.text) where.push(`lower(p.text) LIKE $${params.push(`%${f.text.toLowerCase().replace(/[\\%_]/g, "\\$&")}%`)}`);
+    const ranked = f.tab === "for_you" && !f.authorProfileId && !f.authorBusinessId && !f.tag && !f.eventId && !f.ids && !f.text;
     if (ranked) where.push(`p.created_at > now() - make_interval(days => ${FOR_YOU_WINDOW_DAYS})`);
     const score = ranked ? rankSql(nearSql) : `extract(epoch FROM p.created_at) / 3600.0`;
     const cursor = f.cursor ? `WHERE (x.score, x.id) < ($${params.push(f.cursor.score)}::float8, $${params.push(f.cursor.id)}::uuid)` : "";

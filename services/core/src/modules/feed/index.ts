@@ -1,6 +1,7 @@
 import {
   FeedQuery,
   FollowTarget,
+  PostSearchQuery,
   ProfilePostsQuery,
   ProfileSearchQuery,
   TagParam,
@@ -110,6 +111,15 @@ export class FeedService {
     const f = parse(ProfilePostsQuery, rawQuery);
     const authorBusinessId = await this.business.idByHandle(q, handle);
     return this.page(q, { tab: "for_you", authorBusinessId, ...(f.cursor ? { cursor: decodeCursor(f.cursor) } : {}), limit: f.limit, viewerProfileId });
+  }
+
+  /**
+   * Búsqueda de publicaciones por texto (ADR 0107): las mismas reglas del feed (públicas, visibles, bloqueos,
+   * negocio activo, retraso de publicación), por recientes. Sin IA ni motor externo: trigram de PostgreSQL.
+   */
+  async searchPosts(q: Queryable, rawQuery: unknown, viewerProfileId: string | null): Promise<FeedResponse> {
+    const f = parse(PostSearchQuery, rawQuery);
+    return this.page(q, { tab: "for_you", text: f.q, ...(f.cursor ? { cursor: decodeCursor(f.cursor) } : {}), limit: f.limit, viewerProfileId });
   }
 
   /** Posts públicos con una etiqueta, por recientes. */

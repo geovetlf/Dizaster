@@ -335,6 +335,11 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
   // Fuentes externas y oficiales del evento, con licencia y enlace al original (ADR 0055).
   // Búsqueda de eventos (ADR 0065): pública como el mapa; solo datos públicos del EVENT.
   app.get("/v1/search/events", async (req): Promise<EventSearchResponse> => ({ events: await c.events.search(c.db, req.query) }));
+  // Búsqueda de publicaciones por texto (ADR 0107): mismas reglas que el feed.
+  app.get("/v1/search/posts", async (req, reply) => {
+    reply.header("cache-control", "no-store");
+    return c.feed.searchPosts(c.db, req.query, req.session?.profileId ?? null);
+  });
 
   app.get("/v1/events/:id/sources", async (req, reply) => {
     const refs = await c.events.sourceItemRefs(c.db, parse(IdParam, req.params).id);

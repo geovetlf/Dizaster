@@ -188,6 +188,7 @@ export const fr: Record<MessageKey, string> = {
   upholdAppeal: "Maintenir",
   reverseAppeal: "Annuler la décision",
   myModeration: "Avis de modération",
+  searchPosts: "Publications",
   showEarlier: "Voir les précédents",
   errRateLimited: "Trop de tentatives ; patientez un instant",
   errNotFound: "Introuvable",

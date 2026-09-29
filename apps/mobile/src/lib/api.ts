@@ -142,6 +142,7 @@ export const api = {
   profile: (handle: string) => request<ProfileView>(`/v1/profiles/${encodeURIComponent(handle)}`),
   profilePosts: (handle: string, cursor?: string | null) =>
     request<FeedResponse>(`/v1/profiles/${encodeURIComponent(handle)}/posts${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`),
+  searchPosts: (q: string) => request<FeedResponse>(`/v1/search/posts?${new URLSearchParams({ q, limit: "10" })}`),
   searchProfiles: (q: string) => request<{ profiles: ProfileSearchResult[] }>(`/v1/profiles?${new URLSearchParams({ q })}`),
   alertPreferences: () => request<AlertPreferences>("/v1/me/alert-preferences"),
   updateAlertPreferences: (patch: Partial<AlertPreferences>) =>
