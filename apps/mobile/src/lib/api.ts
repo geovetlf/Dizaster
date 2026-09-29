@@ -137,7 +137,10 @@ export const api = {
     request<{ eventId: string }>(`/v1/moderation/events/${id}/split`, { method: "POST", body: JSON.stringify({ evidenceIds, reason }) }),
   decideAppeal: (id: string, decision: "UPHOLD" | "REVERSE", reason: string) =>
     request<AppealView>(`/v1/moderation/appeals/${id}/decision`, { method: "POST", body: JSON.stringify({ decision, reason }) }),
-  account: () => request<{ roles: string[] }>("/v1/me/account"),
+  account: () => request<{ roles: string[]; ageConfirmed: boolean; minAge: number }>("/v1/me/account"),
+  /** Declarar la edad (ADR 0049). 403 UNDER_MIN_AGE por debajo del mínimo; el servidor no guarda la fecha. */
+  confirmAge: (body: { birthYear: number; birthMonth: number; country?: string }) =>
+    request<{ ok: true; minAge: number }>("/v1/me/age", { method: "POST", body: JSON.stringify(body) }),
   /** Copia de mis datos (ADR 0038). El servidor limita a una por minuto. */
   exportData: () => request<DataExport>("/v1/me/export"),
   costDashboard: (days = 30) => request<CostDashboard>(`/v1/admin/cost?days=${days}`),

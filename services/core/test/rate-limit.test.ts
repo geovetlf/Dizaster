@@ -16,7 +16,7 @@ describe("límite general de peticiones (ADR 0047)", () => {
 
   describe("en la API", () => {
     let t: TestContext;
-    beforeAll(async () => { t = await createTestContext({ env: { RATE_LIMIT_PER_MINUTE: "5", RATE_LIMIT_WRITES_PER_MINUTE: "2" } }); });
+    beforeAll(async () => { t = await createTestContext({ env: { RATE_LIMIT_PER_MINUTE: "5", RATE_LIMIT_WRITES_PER_MINUTE: "3" } }); });
     afterAll(async () => { await t.close(); });
 
     it("sin sesión limita por IP y responde 429 con retry-after; /health no cuenta", async () => {
@@ -31,6 +31,7 @@ describe("límite general de peticiones (ADR 0047)", () => {
     it("con sesión limita por cuenta y las escrituras tienen un cupo menor", async () => {
       const u = await createUser(t, "limite_a");
       const auth = { authorization: `Bearer ${u.token}` };
+      // createUser ya gastó una escritura (declarar la edad).
       const post = () => t.app.inject({ method: "POST", url: "/v1/posts", headers: auth, remoteAddress: "10.0.0.9", payload: { text: "hola" } });
       expect((await post()).statusCode).toBe(201);
       expect((await post()).statusCode).toBe(201);

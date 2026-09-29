@@ -1,8 +1,9 @@
 {
-  "version": "countries-2026.09.2",
+  "version": "countries-2026.09.3",
   "defaults": {
     "units": "metric",
-    "launchStatus": "AVAILABLE_READ_ONLY"
+    "launchStatus": "AVAILABLE_READ_ONLY",
+    "minAge": 16
   },
   "countries": [
     {

@@ -1,6 +1,6 @@
 import { createHash, randomBytes } from "node:crypto";
 import { SignJWT, jwtVerify } from "jose";
-import { PUSH_PROVIDER_BY_PLATFORM, type AttestationVerdict, type DevicePlatform, type RegisterPushTokenRequest, type SessionView } from "@dizaster/contracts";
+import { ageAt, PUSH_PROVIDER_BY_PLATFORM, type AttestationVerdict, type DevicePlatform, type RegisterPushTokenRequest, type SessionView } from "@dizaster/contracts";
 import type { Db, Queryable } from "../../platform/db.js";
 import { withTransaction } from "../../platform/db.js";
 import { DomainError } from "../../platform/errors.js";
@@ -67,7 +67,7 @@ const hashToken = (t: string) => createHash("sha256").update(t).digest("hex");
 
 export class IdentityService {
   private readonly key: Uint8Array;
-  private readonly statusCache = new Map<string, { status: string; at: number }>();
+  private readonly statusCache = new Map<string, { status: string; ageOk: boolean; at: number }>();
 
   constructor(
     private readonly db: Db,
@@ -110,17 +110,42 @@ export class IdentityService {
   }
 
   /** Una cuenta suspendida o borrada no puede escribir. Caché corta: una consulta por cuenta cada 30 s como mucho. */
-  async assertCanWrite(userId: string): Promise<void> {
+  async assertCanWrite(userId: string, opts: { requireAge?: boolean } = {}): Promise<void> {
     const now = Date.now();
     let cached = this.statusCache.get(userId);
     if (!cached || now - cached.at > 30_000) {
-      const { rows } = await this.db.query<{ status: string }>(`SELECT status FROM identity.users WHERE id = $1`, [userId]);
-      cached = { status: rows[0]?.status ?? "DELETED", at: now };
+      const { rows } = await this.db.query<{ status: string; age_ok: boolean }>(
+        `SELECT status, age_confirmed_at IS NOT NULL AS age_ok FROM identity.users WHERE id = $1`, [userId],
+      );
+      cached = { status: rows[0]?.status ?? "DELETED", ageOk: rows[0]?.age_ok ?? false, at: now };
       this.statusCache.set(userId, cached);
       if (this.statusCache.size > 10_000) this.statusCache.clear();
     }
     if (cached.status === "SUSPENDED") throw new DomainError("ACCOUNT_SUSPENDED", "Tu cuenta está suspendida. Puedes ver el motivo y apelar en Perfil.", 403);
     if (cached.status !== "ACTIVE") throw new DomainError("ACCOUNT_INACTIVE", "Cuenta no activa", 403);
+    // Edad mínima (D-13): sin declararla se puede leer, pero no publicar, reportar ni interactuar.
+    if (opts.requireAge && !cached.ageOk) throw new DomainError("AGE_CONFIRMATION_REQUIRED", "Confirma tu edad para publicar", 403);
+  }
+
+  /**
+   * Declarar la edad (ADR 0049). Solo se guarda que cumple el mínimo aplicado y cuándo se declaró. Por debajo del
+   * mínimo no se guarda nada y la cuenta sigue sin poder publicar.
+   */
+  async confirmAge(userId: string, birthYear: number, birthMonth: number, minAge: number, now = new Date()): Promise<{ ok: true; minAge: number }> {
+    if (ageAt(birthYear, birthMonth, now) < minAge) {
+      throw new DomainError("UNDER_MIN_AGE", `Dizaster es para mayores de ${minAge} años`, 403);
+    }
+    await this.db.query(
+      `UPDATE identity.users SET age_confirmed_min = GREATEST(coalesce(age_confirmed_min, 0), $2), age_confirmed_at = coalesce(age_confirmed_at, now()) WHERE id = $1`,
+      [userId, minAge],
+    );
+    this.statusCache.delete(userId);
+    return { ok: true, minAge };
+  }
+
+  async ageConfirmed(userId: string): Promise<boolean> {
+    const { rows } = await this.db.query<{ ok: boolean }>(`SELECT age_confirmed_at IS NOT NULL AS ok FROM identity.users WHERE id = $1`, [userId]);
+    return rows[0]?.ok ?? false;
   }
 
   async grantRole(userId: string, role: Exclude<Role, "user">): Promise<void> {

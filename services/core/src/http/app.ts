@@ -1,7 +1,7 @@
 import Fastify, { type FastifyInstance, type FastifyRequest } from "fastify";
 import { z } from "zod";
 import {
-  BBox, CreateCommentRequest, DevicePlatform, MEDIA_UPLOAD_LIMITS, MergeEventsRequest, NegativeState, ReactionKind, CommentReactionKind, RegisterPushTokenRequest, RevertMergeRequest,
+  BBox, CreateCommentRequest, DevicePlatform, MEDIA_UPLOAD_LIMITS, MergeEventsRequest, NegativeState, ReactionKind, CommentReactionKind, ConfirmAgeRequest, RegisterPushTokenRequest, RevertMergeRequest,
   SplitEventRequest, DATA_EXPORT_FORMAT, type AppConfig, type DataExport, type EmergencyNumbersResponse,
 } from "@dizaster/contracts";
 import { LocalDiskStorage } from "../modules/media/index.js";
@@ -34,6 +34,12 @@ function requireSession(req: FastifyRequest): Session {
 /** Escrituras permitidas a una cuenta suspendida: apelar, cerrar y renovar sesiones, borrar sus posts y borrar la cuenta. */
 const WRITE_ALLOWED_WHEN_SUSPENDED = /^(POST \/v1\/me\/moderation\/[^/]+\/appeal|POST \/v1\/auth\/(refresh|logout)|DELETE \/v1\/me|DELETE \/v1\/posts\/[^/]+|DELETE \/v1\/me\/sessions\/[^/]+|POST \/v1\/me\/sessions\/revoke-others)$/;
 
+/**
+ * Contenido público e interacción: exigen haber declarado la edad mínima (D-13, ADR 0049). Ajustes, dispositivos,
+ * alertas, bloqueos y denuncias no: son de seguridad o privados.
+ */
+const AGE_REQUIRED = /^(POST \/v1\/(posts|reports|businesses|media\/uploads)|POST \/v1\/posts\/[^/]+\/(comments|share)|PUT \/v1\/(posts|comments)\/[^/]+\/(like|reactions\/[^/]+)|PUT \/v1\/businesses\/[^/]+|PATCH \/v1\/me)$/;
+
 export async function buildApp(c: Container): Promise<FastifyInstance> {
   const app = Fastify({
     logger: c.env.NODE_ENV === "test" ? false : { level: "info", redact: ["req.headers.authorization"] },
@@ -60,7 +66,7 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
     }
     // Cuentas suspendidas: pueden leer, apelar, cerrar sesión y borrar su cuenta; no publicar ni interactuar.
     if (req.session && req.method !== "GET" && req.method !== "HEAD" && !WRITE_ALLOWED_WHEN_SUSPENDED.test(`${req.method} ${req.url.split("?")[0]}`)) {
-      await c.identity.assertCanWrite(req.session.userId);
+      await c.identity.assertCanWrite(req.session.userId, { requireAge: AGE_REQUIRED.test(`${req.method} ${req.url.split("?")[0]}`) });
     }
   });
 
@@ -307,7 +313,14 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
   app.get("/v1/me/account", async (req, reply) => {
     const session = requireSession(req);
     reply.header("cache-control", "no-store");
-    return { roles: session.roles };
+    return { roles: session.roles, ageConfirmed: await c.identity.ageConfirmed(session.userId), minAge: c.ref.minAge() };
+  });
+
+  // Edad mínima (D-13, ADR 0049). Permitido aunque aún no se pueda escribir: es el paso que lo habilita.
+  app.post("/v1/me/age", async (req) => {
+    const session = requireSession(req);
+    const body = parse(ConfirmAgeRequest, req.body);
+    return c.identity.confirmAge(session.userId, body.birthYear, body.birthMonth, c.ref.minAge(body.country));
   });
 
   // Borrar la cuenta desde la app (App Store 5.1.1(v) y Google Play). Irreversible: se pide confirmación explícita.

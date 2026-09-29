@@ -1,9 +1,11 @@
-import { Stack } from "expo-router";
+import { router, Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
 import { t } from "../lib/i18n";
 import { useNotificationRouting } from "../lib/alerts/notifications";
 import { refreshEmergencyDataset } from "../lib/emergency-store";
+import { isAgeBlocked } from "../lib/account/age-gate";
+import { api } from "../lib/api";
 import { SessionProvider, useSession } from "../lib/session";
 import { colors } from "../theme";
 
@@ -39,10 +41,12 @@ export default function RootLayout() {
         <Stack.Screen name="moderation/event/[id]" options={{ title: t("eventTools") }} />
         <Stack.Screen name="my-moderation" options={{ title: t("myModeration") }} />
         <Stack.Screen name="delete-account" options={{ title: t("deleteAccount") }} />
+        <Stack.Screen name="age-check" options={{ title: t("ageTitle"), presentation: "modal" }} />
         <Stack.Screen name="profile-edit" options={{ title: t("editProfile") }} />
         <Stack.Screen name="zone-edit" options={{ title: t("addZone") }} />
       </Stack>
       <NotificationRouting />
+      <AgeGate />
     </SessionProvider>
   );
 }
@@ -50,5 +54,17 @@ export default function RootLayout() {
 /** Abre el EVENT al tocar un aviso; espera a la sesión para que la pantalla pueda cargarlo. */
 function NotificationRouting() {
   useNotificationRouting(useSession().ready);
+  return null;
+}
+
+/** Edad mínima (ADR 0049): si la cuenta aún no la declaró, se pide una vez por arranque (salvo menores ya avisados). */
+function AgeGate() {
+  const { ready } = useSession();
+  useEffect(() => {
+    if (!ready) return;
+    Promise.all([api.account(), isAgeBlocked()])
+      .then(([a, blocked]) => { if (!a.ageConfirmed && !blocked) router.push("/age-check"); })
+      .catch(() => undefined);
+  }, [ready]);
   return null;
 }

@@ -1,12 +1,15 @@
 import { createHash } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { createTestContext, createUser, LIMA, offset, reportBody, seedGeoFixtures, submit, type TestContext, type TestUser } from "./helpers.js";
+import { confirmAge, createTestContext, createUser, LIMA, offset, reportBody, seedGeoFixtures, submit, type TestContext, type TestUser } from "./helpers.js";
 import { makeJpeg } from "./media-fixtures.js";
 
 let t: TestContext;
 const auth = (u: { token: string }) => ({ authorization: `Bearer ${u.token}` });
-const devSignIn = async (handle: string) =>
-  (await t.app.inject({ method: "POST", url: "/v1/auth/dev", payload: { handle, platform: "IOS" } })).json() as TestUser & { refreshToken: string; expiresIn: number };
+const devSignIn = async (handle: string) => {
+  const u = (await t.app.inject({ method: "POST", url: "/v1/auth/dev", payload: { handle, platform: "IOS" } })).json() as TestUser & { refreshToken: string; expiresIn: number };
+  await confirmAge(t, u);
+  return u;
+};
 const refresh = (refreshToken: string) => t.app.inject({ method: "POST", url: "/v1/auth/refresh", payload: { refreshToken } });
 
 beforeAll(async () => {

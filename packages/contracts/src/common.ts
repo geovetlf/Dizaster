@@ -30,3 +30,23 @@ export type LocalizedText = z.infer<typeof LocalizedText>;
 /** Categorías jerárquicas: "fire.wildfire", "accident.traffic". Son datos, no código. */
 export const CategoryCode = z.string().regex(/^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)*$/).max(64);
 export type CategoryCode = z.infer<typeof CategoryCode>;
+
+/** Edad mínima por defecto (D-13). Un país puede exigir más en `data/countries`. */
+export const DEFAULT_MIN_AGE = 16;
+
+/** Declarar la edad (ADR 0049): año y mes bastan; el servidor no los guarda. */
+export const ConfirmAgeRequest = z.object({
+  birthYear: z.number().int().min(1900).max(2100),
+  birthMonth: z.number().int().min(1).max(12),
+  /** País detectado en el teléfono: puede subir la edad mínima. */
+  country: z.string().regex(/^[A-Z]{2}$/).optional(),
+});
+export type ConfirmAgeRequest = z.infer<typeof ConfirmAgeRequest>;
+
+/**
+ * Edad cumplida con solo año y mes de nacimiento. Conservadora: el cumpleaños cuenta desde el mes siguiente, así nadie
+ * pasa el límite antes de tiempo (quien cumple ese mes espera, como mucho, unas semanas).
+ */
+export function ageAt(birthYear: number, birthMonth: number, now: Date): number {
+  return now.getUTCFullYear() - birthYear - (now.getUTCMonth() + 1 <= birthMonth ? 1 : 0);
+}

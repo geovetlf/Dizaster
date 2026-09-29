@@ -54,8 +54,8 @@ describe("Cost Optimization Layer", () => {
     expect((await t.app.inject({ url: "/v1/admin/cost", headers: auth(u.token) })).statusCode).toBe(403);
     expect((await t.app.inject({ url: "/v1/admin/cost" })).statusCode).toBe(401);
     expect((await t.app.inject({ method: "PUT", url: "/v1/admin/kill-switches/ai", headers: auth(u.token), payload: { killed: false } })).statusCode).toBe(403);
-    expect((await t.app.inject({ url: "/v1/me/account", headers: auth(adminToken) })).json()).toEqual({ roles: ["user", "admin"] });
-    expect((await t.app.inject({ url: "/v1/me/account", headers: auth(u.token) })).json()).toEqual({ roles: ["user"] });
+    expect((await t.app.inject({ url: "/v1/me/account", headers: auth(adminToken) })).json()).toMatchObject({ roles: ["user", "admin"], ageConfirmed: true, minAge: 16 });
+    expect((await t.app.inject({ url: "/v1/me/account", headers: auth(u.token) })).json()).toMatchObject({ roles: ["user"] });
   });
 
   it("mide peticiones por grupo de rutas y consultas geográficas", async () => {

@@ -58,8 +58,15 @@ export interface TestUser { token: string; userId: string; profileId: string; de
 export async function createUser(t: TestContext, handle: string, ageHours = 72): Promise<TestUser> {
   const res = await t.app.inject({ method: "POST", url: "/v1/auth/dev", payload: { handle, platform: "ANDROID" } });
   const body = res.json() as TestUser;
+  await confirmAge(t, body);
   await t.c.db.query(`UPDATE identity.users SET created_at = now() - make_interval(hours => $2) WHERE id = $1`, [body.userId, ageHours]);
   return body;
+}
+
+/** Declara una edad adulta (D-13): sin ella la cuenta no puede escribir. */
+export async function confirmAge(t: TestContext, u: { token: string }): Promise<void> {
+  const res = await t.app.inject({ method: "POST", url: "/v1/me/age", headers: { authorization: `Bearer ${u.token}` }, payload: { birthYear: 1990, birthMonth: 5 } });
+  if (res.statusCode !== 200) throw new Error(`confirmAge: ${res.statusCode} ${res.body}`);
 }
 
 export const LIMA = { lat: -12.0464, lng: -77.0428 };
