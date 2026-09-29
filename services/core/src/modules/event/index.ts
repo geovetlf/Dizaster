@@ -493,6 +493,18 @@ export class EventService {
   }
 
   /** Lo que moderación necesita para fusionar o dividir: evidencias (sin identidad de quien reportó) y fusiones. */
+  /** Ítems externos y oficiales que hoy respaldan un evento público (los movidos por una fusión incluidos). */
+  async sourceItemRefs(q: Queryable, eventId: string): Promise<string[]> {
+    await this.getEvent(q, eventId);
+    const { rows } = await q.query<{ ref_id: string }>(
+      `SELECT ref_id FROM event.evidence
+        WHERE event_id = $1 AND status = 'ACTIVE' AND evidence_type IN ('EXTERNAL_ITEM','OFFICIAL_ITEM','SENSOR')
+        ORDER BY observed_at DESC LIMIT 50`,
+      [eventId],
+    );
+    return rows.map((r) => r.ref_id);
+  }
+
   async moderatorDetail(q: Queryable, eventId: string): Promise<ModeratorEventDetail> {
     const ev = (await q.query<{ merged_into_id: string | null; status: EventStatus }>(`SELECT merged_into_id, status FROM event.events WHERE id = $1`, [eventId])).rows[0];
     if (!ev) throw notFound("Evento");

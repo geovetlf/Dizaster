@@ -37,6 +37,7 @@ export const OPERATIONS: Record<string, Operation> = {
   "GET /v1/events/:id": { summary: "Detalle de un evento", response: C.EventSummary },
   "GET /v1/events/:id/timeline": { summary: "Línea de tiempo de un evento" },
   "GET /v1/events/:id/posts": { summary: "Publicaciones de un evento", query: C.FeedQuery },
+  "GET /v1/events/:id/sources": { summary: "Fuentes externas y oficiales del evento, con licencia y enlace" },
   "GET /v1/events/:id/verification": { summary: "Estado de verificación explicado", response: C.VerificationView },
   "GET /v1/events/:id/media": { summary: "Fotos y videos de un evento" },
   "GET /v1/feed": { summary: "Feed", query: C.FeedQuery },

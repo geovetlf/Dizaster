@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import type { CategoryCode, EventCandidate, GeoPoint, LocalizedText } from "@dizaster/contracts";
+import type { CategoryCode, EventCandidate, EventSourceView, GeoPoint, LocalizedText } from "@dizaster/contracts";
 import type { Db, Queryable } from "../../platform/db.js";
 import { withTransaction } from "../../platform/db.js";
 import { DomainError } from "../../platform/errors.js";
@@ -20,6 +20,8 @@ export interface NormalizedItem {
   occurredAt: string;
   publishedAt: string | null;
   title: LocalizedText | null;
+  /** Enlace público al ítem original, si la fuente lo da (se muestra en la ficha del evento). */
+  link?: string | null;
   severity: number | null;
   /** NOT_OCCURRING = la fuente niega/desmiente el acontecimiento. */
   assertion: "OCCURRING" | "NOT_OCCURRING";
@@ -155,6 +157,33 @@ export class IngestionService {
     return new Map(rows.map((r) => [r.id, { trustTier: r.trust_tier, assertion: r.assertion }]));
   }
 
+  /**
+   * Vista pública de los ítems que respaldan un evento (ADR 0055): una fila por fuente, la publicación más reciente.
+   * Ítems viejos sin `link` usan el enlace crudo del adaptador (USGS `url`, GDACS `link`). Solo enlaces https.
+   */
+  async sourcesView(q: Queryable, itemIds: string[]): Promise<EventSourceView[]> {
+    if (itemIds.length === 0) return [];
+    const { rows } = await q.query<{
+      key: string; name: string; trust_tier: "EXTERNAL" | "OFFICIAL"; license: string | null; terms_url: string | null;
+      link: string | null; title: Record<string, string> | null; published_at: Date | null; assertion: "OCCURRING" | "NOT_OCCURRING";
+    }>(
+      `SELECT DISTINCT ON (s.id) s.key, s.name, s.trust_tier, s.license, s.terms_url,
+              coalesce(i.normalized->>'link', i.normalized->'raw'->>'url', i.normalized->'raw'->>'link') AS link,
+              i.normalized->'title' AS title, i.published_at, i.assertion
+         FROM ingestion.external_items i JOIN ingestion.sources s ON s.id = i.source_id
+        WHERE i.id = ANY($1) AND s.status IN ('ACTIVE','PAUSED')
+        ORDER BY s.id, i.published_at DESC NULLS LAST`,
+      [itemIds],
+    );
+    return rows
+      .map((r): EventSourceView => ({
+        sourceKey: r.key, sourceName: r.name, trustTier: r.trust_tier, license: r.license, termsUrl: safeLink(r.terms_url),
+        link: safeLink(r.link), title: r.title && typeof r.title === "object" ? r.title : null,
+        publishedAt: r.published_at?.toISOString() ?? null, assertion: r.assertion,
+      }))
+      .sort((a, b) => (a.trustTier === b.trustTier ? (b.publishedAt ?? "").localeCompare(a.publishedAt ?? "") : a.trustTier === "OFFICIAL" ? -1 : 1));
+  }
+
   // ───────────── Calidad (ADR 0026) ─────────────
 
   /** Salud de la ingesta: corridas fallidas y demora del carril urgente desde que la fuente publica. */
@@ -177,5 +206,16 @@ export class IngestionService {
       runs, failedRuns: failed, failureRate: runs > 0 ? Math.round((failed / runs) * 1000) / 1000 : null,
       urgentItems: u.rows[0]!.n, urgentLagP95Seconds: p95 === null ? null : Math.round(Number(p95) * 10) / 10,
     };
+  }
+}
+
+/** Solo enlaces https bien formados: el texto viene de fuentes externas. */
+export function safeLink(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  try {
+    const u = new URL(raw);
+    return u.protocol === "https:" ? u.toString() : null;
+  } catch {
+    return null;
   }
 }

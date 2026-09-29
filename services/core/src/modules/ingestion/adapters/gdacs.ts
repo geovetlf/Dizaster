@@ -45,6 +45,7 @@ export const gdacsAdapter: FeedAdapter = {
         occurredAt: from.toISOString(),
         publishedAt: published.toISOString(),
         title: { en: String(it["title"] ?? type) },
+        link: typeof it["link"] === "string" ? it["link"] : null,
         severity: SEVERITY_BY_ALERT[alert] ?? 2,
         assertion: "OCCURRING",
         raw: {

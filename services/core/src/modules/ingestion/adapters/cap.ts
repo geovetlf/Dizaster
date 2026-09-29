@@ -119,6 +119,7 @@ function normalizeAlert(alert: Node, config: CapConfig): NormalizedItem | null {
     occurredAt: occurred.toISOString(),
     publishedAt: sent.toISOString(),
     title: Object.keys(title).length > 0 ? title : null,
+    link: text(info["web"]) ?? null,
     severity: SEVERITY[severity] ?? 2,
     assertion: "OCCURRING",
     raw: {

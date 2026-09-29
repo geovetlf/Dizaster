@@ -157,6 +157,24 @@ export interface EventMergeView {
   revertedAt: string | null;
 }
 
+/**
+ * Una fuente externa u oficial que respalda un evento (Blueprint §9.3, §10.4; ADR 0055): quién lo publicó, con qué
+ * licencia y el enlace al original. Nunca incluye reportes ciudadanos (esos son seudónimos o personas).
+ */
+export interface EventSourceView {
+  sourceKey: string;
+  sourceName: string;
+  trustTier: "EXTERNAL" | "OFFICIAL";
+  license: string | null;
+  termsUrl: string | null;
+  /** Enlace al ítem original (solo https). */
+  link: string | null;
+  title: Record<string, string> | null;
+  publishedAt: string | null;
+  /** NOT_OCCURRING: la fuente desmiente o retiró el suceso. */
+  assertion: "OCCURRING" | "NOT_OCCURRING";
+}
+
 export interface EventStatusChangeView {
   from: EventStatus;
   to: EventStatus;

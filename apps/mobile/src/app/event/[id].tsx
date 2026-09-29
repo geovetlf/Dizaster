@@ -1,12 +1,12 @@
-import type { EventSummary, MediaView, TimelineEntryView, VerificationView } from "@dizaster/contracts";
+import type { EventSourceView, EventSummary, MediaView, TimelineEntryView, VerificationView } from "@dizaster/contracts";
 import { router, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Linking, Pressable, StyleSheet, Text, View } from "react-native";
 import { FeedList } from "../../components/feed-list";
 import { EventMedia } from "../../components/event-media";
 import { api } from "../../lib/api";
 import { lang, t, VERIFICATION_LABEL, verificationLabel } from "../../lib/i18n";
-import { eventTitle } from "../../lib/ui/format";
+import { eventTitle, timeAgo } from "../../lib/ui/format";
 import { evidenceLine, explainLines, timelineLabel } from "../../lib/verification/explain";
 import { followablePlace } from "../../lib/social/place";
 import { useFollows } from "../../lib/social/follows";
@@ -22,6 +22,7 @@ export default function EventScreen() {
   const [timeline, setTimeline] = useState<TimelineEntryView[]>([]);
   const [media, setMedia] = useState<MediaView[]>([]);
   const [verification, setVerification] = useState<VerificationView | null>(null);
+  const [sources, setSources] = useState<EventSourceView[]>([]);
   const [error, setError] = useState<string | null>(null);
   const follows = useFollows();
 
@@ -33,6 +34,7 @@ export default function EventScreen() {
     // La media es secundaria: si falla, el evento se muestra igual.
     api.eventMedia(id).then((r) => setMedia(r.media)).catch(() => setMedia([]));
     api.verification(id).then(setVerification).catch(() => setVerification(null));
+    api.eventSources(id).then((r) => setSources(r.sources)).catch(() => setSources([]));
   }, [id]);
 
   const fetchPage = useCallback((cursor: string | null) => api.eventPosts(id ?? "", cursor), [id]);
@@ -64,6 +66,20 @@ export default function EventScreen() {
           <Text style={styles.section}>{t("whyThisState")}</Text>
           {explainLines(verification, t).map((line) => <Text key={line} style={styles.whyLine}>• {line}</Text>)}
           <Text style={styles.meta}>{evidenceLine(verification, t)}</Text>
+        </View>
+      ) : null}
+      {sources.length > 0 ? (
+        <View style={styles.why}>
+          <Text style={styles.section}>{t("sourcesSection")}</Text>
+          {sources.map((s) => (
+            <Pressable key={s.sourceKey} accessibilityRole={s.link ? "link" : "text"} disabled={!s.link} style={styles.source}
+              onPress={() => { if (s.link) void Linking.openURL(s.link); }}>
+              <Text style={[styles.sourceName, s.link && styles.link]}>{s.sourceName} · {t(s.trustTier === "OFFICIAL" ? "tierOfficial" : "tierExternal")}</Text>
+              {s.title ? <Text style={styles.entry}>{s.title[lang] ?? Object.values(s.title)[0]}</Text> : null}
+              {s.assertion === "NOT_OCCURRING" ? <Text style={styles.retracted}>{t("sourceRetracted")}</Text> : null}
+              <Text style={styles.sourceMeta}>{[s.publishedAt ? timeAgo(s.publishedAt, lang) : null, s.license].filter(Boolean).join(" · ")}</Text>
+            </Pressable>
+          ))}
         </View>
       ) : null}
       <EventMedia media={media} />
@@ -108,5 +124,10 @@ const styles = StyleSheet.create({
   section: { fontSize: 16, fontWeight: "600", marginBottom: 8, color: colors.text },
   entry: { paddingVertical: 6, color: colors.text },
   why: { marginBottom: space.sm },
+  source: { backgroundColor: colors.surface, borderRadius: radius.md, padding: space.md, marginBottom: space.sm },
+  sourceName: { color: colors.text, fontWeight: "600" },
+  link: { color: colors.link },
+  retracted: { color: colors.accent, fontWeight: "600" },
+  sourceMeta: { color: colors.textMuted, fontSize: 12 },
   whyLine: { color: colors.text, marginBottom: 4 },
 });

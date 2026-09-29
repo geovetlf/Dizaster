@@ -47,6 +47,7 @@ export const usgsAdapter: FeedAdapter = {
         uncertaintyM: 10_000,
         occurredAt: new Date(p.time).toISOString(),
         publishedAt: new Date(p.updated ?? p.time).toISOString(),
+        link: p.url ?? null,
         title: { en: p.title ?? `M ${mag} earthquake`, es: `Sismo M${mag.toFixed(1)}${p.place ? ` · ${p.place}` : ""}` },
         severity: magnitudeToSeverity(mag),
         assertion: retracted ? "NOT_OCCURRING" : "OCCURRING",

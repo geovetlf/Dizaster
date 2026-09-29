@@ -279,6 +279,12 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
     reply.header("cache-control", "no-store");
     return c.feed.eventPosts(c.db, parse(IdParam, req.params).id, req.query, req.session?.profileId ?? null);
   });
+  // Fuentes externas y oficiales del evento, con licencia y enlace al original (ADR 0055).
+  app.get("/v1/events/:id/sources", async (req, reply) => {
+    const refs = await c.events.sourceItemRefs(c.db, parse(IdParam, req.params).id);
+    reply.header("cache-control", "public, max-age=60");
+    return { sources: await c.ingestion.sourcesView(c.db, refs) };
+  });
   app.get("/v1/events/:id/verification", async (req) => c.verification.view(c.db, parse(IdParam, req.params).id));
 
   // Media pública del evento: solo variantes saneadas; en categorías sensibles, solo la aprobada por moderación.

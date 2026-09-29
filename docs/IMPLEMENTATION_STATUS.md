@@ -214,6 +214,7 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | Moderación de negocios (retirar, restaurar, sanciones a quien lo administra) | ✅ | `ModerationService`, objetivo `BUSINESS` |
 | App: mis negocios, formulario, página de negocio, "Publicar como", búsqueda, iOS y Android | ✅ | `app/my-businesses.tsx`, `app/business-edit.tsx`, `app/b/[handle].tsx` |
 | Mencionar/bloquear negocios | ✅ | ADR 0054 |
+| Fuentes visibles en el evento con licencia y enlace (§9.3) | ✅ | ADR 0055, `GET /v1/events/:id/sources` |
 | Varios administradores por negocio | ⏳ | cuando haya demanda (`BusinessMember`) |
 
 ## Etapa 18 — Sesiones y dispositivos (hecha)
@@ -260,17 +261,16 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 
 Revisión del Blueprint del 2026-09-29 (tras ADR 0054), verificada contra el código:
 
-1. Fuentes visibles en el evento: nombre, licencia, enlace y hora de cada ítem externo u oficial (§9.3, §10.4).
-2. Motivo práctico cuando un reporte baja a publicación o se rechaza, en 4 idiomas (§8.2).
-3. Filtros del mapa (categoría, solo verificados/activos) y estilo por nivel de verificación (§11.4, §5.6).
-4. Aviso a administración cuando una fuente URGENT falla o queda desactualizada (§9.2).
-5. Ciclo de vida oficial: CAP Cancel/expiración cierran eventos solo oficiales (§5.7, §10.1).
-6. Búsqueda de eventos (RF-02, §5.3).
-7. Lectura sin conexión: últimos avisos y eventos cercanos en SQLite (§12.2).
-8. Adaptador FIRMS (VIIRS CSV → candidatos de incendio); activarlo espera la MAP_KEY (§9.3).
-9. Reputación por dispositivo: varias cuentas en un teléfono cuentan como una (§5.20, §13.3).
-10. Idioma de la app elegible en el perfil (§5.2).
-11. Cadena de suministro y respaldos: Dependabot, audit, SBOM, licencias; `pg_dump` con prueba de restauración (§13.1).
+1. Motivo práctico cuando un reporte baja a publicación o se rechaza, en 4 idiomas (§8.2).
+2. Filtros del mapa (categoría, solo verificados/activos) y estilo por nivel de verificación (§11.4, §5.6).
+3. Aviso a administración cuando una fuente URGENT falla o queda desactualizada (§9.2).
+4. Ciclo de vida oficial: CAP Cancel/expiración cierran eventos solo oficiales (§5.7, §10.1).
+5. Búsqueda de eventos (RF-02, §5.3).
+6. Lectura sin conexión: últimos avisos y eventos cercanos en SQLite (§12.2).
+7. Adaptador FIRMS (VIIRS CSV → candidatos de incendio); activarlo espera la MAP_KEY (§9.3).
+8. Reputación por dispositivo: varias cuentas en un teléfono cuentan como una (§5.20, §13.3).
+9. Idioma de la app elegible en el perfil (§5.2).
+10. Cadena de suministro y respaldos: Dependabot, audit, SBOM, licencias; `pg_dump` con prueba de restauración (§13.1).
 
 Requieren decisión del propietario: PTWC (tsunami) como fuente OFICIAL o EXTERNAL; días hasta archivar un evento
 RESUELTO y si sigue en el mapa; si el botón "Llamar" marca directo el número de la categoría; push por mención.

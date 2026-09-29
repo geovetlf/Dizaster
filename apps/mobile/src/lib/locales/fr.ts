@@ -198,6 +198,8 @@ export const fr: Record<MessageKey, string> = {
   saveZone: "Enregistrer la zone",
   costMonth: "mois",
   playVideo: "Lire la vidéo",
+  sourcesSection: "Sources",
+  sourceRetracted: "La source l'a retiré ou démenti",
   lifecycleSection: "État de l'événement",
   st_ACTIVE: "Actif",
   st_MONITORING: "En suivi",
