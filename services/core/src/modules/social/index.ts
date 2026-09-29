@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { detectPersonalData, extractMentions, extractTags, textFingerprintBase, type CommentView, type FeedTab, type GeoPoint, type PostAuthor, type ProfileSearchResult, type ReactionCounts, type ReactionKind, type ReactionState, type CommentReactionKind, type Units, type UpdateProfileRequest, type ProfileView, type TagView } from "@dizaster/contracts";
+import { detectLanguage, detectPersonalData, extractMentions, extractTags, textFingerprintBase, type CommentView, type FeedTab, type GeoPoint, type PostAuthor, type ProfileSearchResult, type ReactionCounts, type ReactionKind, type ReactionState, type CommentReactionKind, type Units, type UpdateProfileRequest, type ProfileView, type TagView } from "@dizaster/contracts";
 import type { Queryable } from "../../platform/db.js";
 import { publish, type OutboxDispatcher } from "../../platform/outbox.js";
 import { DomainError, notFound } from "../../platform/errors.js";
@@ -31,6 +31,8 @@ export interface FeedRow {
   kind: "STANDARD" | "REPORT" | "SHARE" | "OFFICIAL_UPDATE";
   author: PostAuthor;
   text: string | null;
+  /** Idioma detectado del texto (ADR 0091), o null si no hay un ganador claro. */
+  lang: string | null;
   createdAt: Date;
   categoryCode: string | null;
   eventId: string | null;
@@ -196,11 +198,13 @@ export class SocialService {
     const base = textFingerprintBase(input.text);
     const textHash = base ? createHash("sha256").update(base).digest("hex") : null;
     await tx.query(
-      `INSERT INTO social.posts (id, author_type, author_id, kind, author_visibility, text, category_code, public_point, text_hash, shared_post_id)
+      `INSERT INTO social.posts (id, author_type, author_id, kind, author_visibility, text, category_code, public_point, text_hash, shared_post_id, lang)
        VALUES ($1, $9, $2, $3, $4, $5, $8,
-               CASE WHEN $6::float8 IS NULL THEN NULL ELSE ST_SetSRID(ST_MakePoint($6, $7), 4326)::geography END, $10, $11)`,
+               CASE WHEN $6::float8 IS NULL THEN NULL ELSE ST_SetSRID(ST_MakePoint($6, $7), 4326)::geography END, $10, $11, $12)`,
       [id, input.businessId ?? input.authorProfileId, input.kind, input.businessId ? "PUBLIC" : input.authorVisibility, input.text,
-        input.publicPoint?.lng ?? null, input.publicPoint?.lat ?? null, input.categoryCode ?? null, input.businessId ? "BUSINESS" : "PROFILE", textHash, input.sharedPostId ?? null],
+        input.publicPoint?.lng ?? null, input.publicPoint?.lat ?? null, input.categoryCode ?? null, input.businessId ? "BUSINESS" : "PROFILE", textHash, input.sharedPostId ?? null,
+        // Idioma detectado en el servidor, sin modelo externo (ADR 0091).
+        detectLanguage(input.text)],
     );
     if (textHash) await this.detectDuplicateText(tx, textHash);
     // Un negocio publica su propio teléfono y correo a propósito: solo se revisan documentos y tarjetas.
@@ -357,14 +361,14 @@ export class SocialService {
     const cursor = f.cursor ? `WHERE (x.score, x.id) < ($${params.push(f.cursor.score)}::float8, $${params.push(f.cursor.id)}::uuid)` : "";
 
     const { rows } = await q.query<{
-      id: string; kind: FeedRow["kind"]; author_visibility: string; handle: string; display_name: string; text: string | null;
+      id: string; kind: FeedRow["kind"]; author_visibility: string; handle: string; display_name: string; text: string | null; lang: string | null;
       created_at: Date; category_code: string | null; event_id: string | null; distance_m: number | null; score: number;
       media: { id: string; kind: "IMAGE" | "VIDEO_RECORDED" }[] | null; reactions: ReactionCounts | null; my_reactions: ReactionKind[]; comment_count: number; shared_post_id: string | null; share_count: number;
       mentions: string[]; business_mentions: string[]; mine: boolean | null; business_verification: "UNVERIFIED" | "VERIFIED" | "INSTITUTIONAL_OFFICIAL" | null;
     }>(
       `WITH x AS (
          SELECT p.id, p.author_id, p.author_type, p.kind, p.author_visibility, coalesce(pr.handle, bp.handle) AS handle,
-                coalesce(pr.display_name, bp.name) AS display_name, bp.verification_status AS business_verification, p.text, p.created_at, p.category_code, le.event_id,
+                coalesce(pr.display_name, bp.name) AS display_name, bp.verification_status AS business_verification, p.text, p.lang, p.created_at, p.category_code, le.event_id,
                 p.shared_post_id,
                 ${nearSql ? `ST_Distance(p.public_point, ${nearSql})` : "NULL"}::float8 AS distance_m,
                 (${score})::float8 AS score
@@ -403,6 +407,7 @@ export class SocialService {
         ? { pseudonymous: true }
         : { pseudonymous: false, handle: r.handle, displayName: r.display_name, ...(r.business_verification ? { business: { verification: r.business_verification } } : {}) },
       text: r.text,
+      lang: r.lang,
       createdAt: r.created_at,
       categoryCode: r.category_code,
       eventId: r.event_id,

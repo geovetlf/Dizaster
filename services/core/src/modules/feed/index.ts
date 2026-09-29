@@ -215,6 +215,7 @@ export class FeedService {
         kind: r.kind,
         author: r.author,
         text: r.text,
+        lang: r.lang,
         createdAt: r.createdAt.toISOString(),
         categoryCode: r.categoryCode,
         event: r.eventId && state ? { id: r.eventId, publicVerificationState: state.publicVerificationState } : null,

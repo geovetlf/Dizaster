@@ -153,6 +153,7 @@ export const pt: Record<MessageKey, string> = {
   noAppeals: "Não há recursos pendentes.",
   actionReason: "Motivo (a pessoa afetada vai ver)",
   confirmSevere: "Aplicar esta ação? Ela fica registrada e a pessoa afetada poderá recorrer.",
+  writtenIn: "Escrito em",
   mfaTitle: "Verificação em duas etapas",
   mfaIntro: "As ferramentas de moderação exigem um código de um app autenticador.",
   mfaSetup: "Ativar",

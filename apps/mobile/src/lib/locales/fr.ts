@@ -153,6 +153,7 @@ export const fr: Record<MessageKey, string> = {
   noAppeals: "Aucun recours en attente.",
   actionReason: "Motif (la personne concernée le verra)",
   confirmSevere: "Appliquer cette action ? Elle est enregistrée et la personne concernée pourra faire recours.",
+  writtenIn: "Écrit en",
   mfaTitle: "Validation en deux étapes",
   mfaIntro: "Les outils de modération exigent un code d'une app d'authentification.",
   mfaSetup: "Activer",

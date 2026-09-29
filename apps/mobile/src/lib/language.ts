@@ -17,3 +17,12 @@ export function parseLanguagePref(raw: unknown): LanguagePref {
   const v = typeof raw === "string" ? raw.trim() : "";
   return (LANGUAGE_OPTIONS as readonly string[]).includes(v) ? (v as LanguagePref) : "system";
 }
+
+/**
+ * Nombre del idioma de un texto si no es el de la app (ADR 0091): "Escrito en English". Sin idioma detectado, o
+ * en uno que la app no conoce, no se dice nada. NO AI REQUIRED.
+ */
+export function foreignLanguageName(textLang: string | null | undefined, appLang: Lang): string | null {
+  if (!textLang || textLang === appLang) return null;
+  return (LANGUAGE_NAMES as Record<string, string>)[textLang] ?? null;
+}

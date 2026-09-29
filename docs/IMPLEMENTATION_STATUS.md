@@ -282,6 +282,7 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | Datos personales → cola de moderación | ✅ | ADR 0088 |
 | Acceso auditado a evidencia de presencia | ✅ | ADR 0089 |
 | MFA TOTP para moderación y administración | ✅ | ADR 0090 |
+| Detección local del idioma del contenido | ✅ | ADR 0091 |
 | Licencias, auditoría, SBOM, Dependabot; respaldo con prueba de restauración en CI | ✅ | ADR 0070, `scripts/supply-chain.mjs`, `scripts/db-restore-check.mjs` |
 | Idioma de la app elegible en el perfil (es/en/pt/fr o del teléfono) | ✅ | ADR 0069, `app/language.tsx` |
 | Varias cuentas en un teléfono corroboran como una (clave seudónima del teléfono) | ✅ | ADR 0068, migración 0036 |
@@ -311,8 +312,7 @@ Revisión del Blueprint del 2026-09-29 (tras ADR 0070): completada con ADR 0071�
 
 Revisión del Blueprint del 2026-09-29 (tras ADR 0080), verificada contra el código, sin bloqueos:
 
-1. Detección local del idioma del contenido (§5.15).
-2. Adapters del carril NORMAL (ReliefWeb, OMS, RSS de noticias), PLANNED hasta revisar términos (§9.3).
+1. Adapters del carril NORMAL (ReliefWeb, OMS, RSS de noticias), PLANNED hasta revisar términos (§9.3).
 
 Bloqueadas o en espera:
 

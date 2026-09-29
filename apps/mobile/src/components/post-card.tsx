@@ -10,6 +10,7 @@ import { verificationIcon } from "../lib/social/business";
 import { useMe } from "../lib/social/me";
 import { applyReaction, CONTEXT_REACTIONS } from "../lib/social/reactions";
 import { lang, t } from "../lib/i18n";
+import { foreignLanguageName } from "../lib/language";
 import { categoryStyle } from "../lib/ui/categories";
 import { duration, imageUri, initials, mediaLayout, postWhere } from "../lib/ui/format";
 import { colors, radius, space } from "../theme";
@@ -105,6 +106,7 @@ export function PostCard({ post, categoryName }: { post: FeedPost; categoryName:
       </View>
 
       {post.text ? <RichText text={post.text} mentions={post.mentions} businessMentions={post.businessMentions} style={styles.text} /> : null}
+      {foreignLanguageName(post.lang, lang) ? <Text style={styles.meta}>{t("writtenIn")} {foreignLanguageName(post.lang, lang)}</Text> : null}
       {post.share ? <SharedPost post={post.share.post} categoryName={categoryName} /> : null}
       <MediaGrid media={post.media} onOpen={post.event ? () => router.push(`/event/${post.event!.id}`) : undefined} />
       {post.hiddenMediaCount > 0 ? <Text style={styles.meta}>+{post.hiddenMediaCount} {t("hiddenMedia")}</Text> : null}

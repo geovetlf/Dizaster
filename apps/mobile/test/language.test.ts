@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { LANGUAGE_NAMES, LANGUAGE_OPTIONS, parseLanguagePref, resolveLang } from "../src/lib/language";
+import { foreignLanguageName, LANGUAGE_NAMES, LANGUAGE_OPTIONS, parseLanguagePref, resolveLang } from "../src/lib/language";
 
 describe("idioma elegible (ADR 0069)", () => {
   it("'del teléfono' sigue el idioma del sistema; si no está soportado, español", () => {
@@ -18,5 +18,14 @@ describe("idioma elegible (ADR 0069)", () => {
   it("todas las opciones tienen nombre en su propio idioma", () => {
     expect(LANGUAGE_OPTIONS[0]).toBe("system");
     for (const o of LANGUAGE_OPTIONS) if (o !== "system") expect(LANGUAGE_NAMES[o]).toBeTruthy();
+  });
+});
+
+describe("foreignLanguageName (ADR 0091)", () => {
+  it("solo nombra un idioma conocido y distinto al de la app", () => {
+    expect(foreignLanguageName("en", "es")).toBe("English");
+    expect(foreignLanguageName("es", "es")).toBeNull();
+    expect(foreignLanguageName(null, "es")).toBeNull();
+    expect(foreignLanguageName("de", "es")).toBeNull();
   });
 });

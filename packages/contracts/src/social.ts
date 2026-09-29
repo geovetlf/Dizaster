@@ -31,6 +31,8 @@ export interface FeedPost {
   kind: "STANDARD" | "REPORT" | "SHARE" | "OFFICIAL_UPDATE";
   author: PostAuthor;
   text: string | null;
+  /** Idioma detectado del texto (es, en, pt, fr) o null (ADR 0091). */
+  lang: string | null;
   createdAt: string;
   categoryCode: string | null;
   /** Evento vinculado y su estado público de verificación (si el post es un reporte o lo menciona). */
