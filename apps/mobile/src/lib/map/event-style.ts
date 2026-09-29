@@ -13,6 +13,11 @@ export const VERIFICATION_STROKE: Record<PublicVerificationState, { color: strin
   FALSE: { color: "#eb5757", width: 1, opacity: 0.4 },
 };
 
+/** Un evento RESOLVED sigue en el mapa unos días (D-ARCHIVE), más tenue, para distinguirlo de lo que sigue activo. */
+export function pointOpacity(state: PublicVerificationState, status: string): number {
+  return VERIFICATION_STROKE[state].opacity * (status === "RESOLVED" ? 0.45 : 1);
+}
+
 export interface MapFilter {
   /** Categoría raíz ("fire") o null para todas. */
   category: string | null;

@@ -60,7 +60,7 @@ export function buildContainer(env: AppEnv, overrides: { db?: Db; clock?: Clock;
   const geo = new GeoService(dataDir, ref, meter);
   const social = new SocialService();
   const identity = new IdentityService(db, social, env.AUTH_JWT_SECRET);
-  const events = new EventService(ref, geo);
+  const events = new EventService(ref, geo, { archiveAfterDays: env.EVENT_ARCHIVE_AFTER_DAYS });
   const ingestion = new IngestionService(db, events);
   const ingestionScheduler = new IngestionScheduler(db, ingestion, overrides.fetcher ?? new NodeHttpFetcher(), clock);
   const trust = new TrustService(db, identity, events);

@@ -220,6 +220,7 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | Aviso a administración cuando una fuente urgente cae o vuelve (§9.2) | ✅ | ADR 0058 |
 | Cancelación/expiración de la fuente cierran eventos solo de fuentes (§5.7) | ✅ | ADR 0059 |
 | Fuente oficial solo confirma dentro de su ámbito; PTWC registrado (D-PTWC) | ✅ | ADR 0060 |
+| Archivado de eventos resueltos a los 7 días (D-ARCHIVE) | ✅ | ADR 0061 |
 | Varios administradores por negocio | ⏳ | cuando haya demanda (`BusinessMember`) |
 
 ## Etapa 18 — Sesiones y dispositivos (hecha)
@@ -267,7 +268,7 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 Decisiones del propietario del 2026-09-29 (mensaje "Zero/minimum AI cost architecture"), primero:
 
 A. ✅ PTWC como fuente OFICIAL solo para tsunami (D-PTWC, ADR 0060; feed en PLANNED hasta validar formato).
-B. RESOLVED → ARCHIVED a los 7 días, configurable; fuera del mapa, accesible por enlace (D-ARCHIVE).
+B. ✅ RESOLVED → ARCHIVED a los 7 días, configurable; fuera del mapa, accesible por enlace (D-ARCHIVE, ADR 0061).
 C. "Llamar" marca directo el número de la categoría según el registro de servicios de emergencia (D-EMERGENCY-CALL).
 D. Push por mención con horas de silencio, preferencias, bloqueos y anti-spam (D-MENTION).
 E. Auditoría de IA y APIs externas; AI CORE único, opcional y desacoplado; interfaces de conectores (traducción, SMS,

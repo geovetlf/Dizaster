@@ -107,6 +107,7 @@ export class EventService {
   constructor(
     private readonly ref: ReferenceData,
     private readonly geo: GeoService,
+    private readonly opts: { archiveAfterDays: number } = { archiveAfterDays: 7 },
   ) {}
 
   registerHandlers(dispatcher: OutboxDispatcher): void {
@@ -623,7 +624,7 @@ export class EventService {
   async queryMap(q: Queryable, input: { bbox: [number, number, number, number]; zoom: number; categories?: string[]; verifiedOnly?: boolean }): Promise<EventMapResponse> {
     const [w, s, e, n] = input.bbox;
     const filters = `publication_state = 'PUBLISHED' AND negative_state <> 'FALSE' AND merged_into_id IS NULL
-      AND status IN ('ACTIVE','MONITORING')
+      AND status IN ('ACTIVE','MONITORING','RESOLVED')
       AND public_geom && ST_MakeEnvelope($1, $2, $3, $4, 4326)::geography
       AND ($5::text[] IS NULL OR category_code = ANY($5) OR split_part(category_code, '.', 1) = ANY($5))
       ${input.verifiedOnly ? "AND verification_level <> 'UNVERIFIED' AND negative_state = 'NONE'" : ""}`;
@@ -765,6 +766,25 @@ export class EventService {
       await q.query(`UPDATE event.events SET status = 'RESOLVED', updated_at = now() WHERE id = $1`, [r.id]);
       await this.addTimeline(q, r.id, "STATUS_CHANGED", { from: r.status, to: "RESOLVED", cause: withdrawn ? "SOURCE_WITHDRAWN" : "SOURCE_EXPIRED" });
       await publish(q, "EventLifecycleChanged", { eventId: r.id, to: "RESOLVED" }, { lane: "normal" });
+    }
+    return rows.length;
+  }
+
+  /**
+   * D-ARCHIVE (ADR 0061): un evento RESOLVED sigue en el mapa `archiveAfterDays` días y luego pasa a ARCHIVED. No se
+   * borra nada: reportes, fuentes, historial y verificación quedan, y sigue accesible por enlace. Moderación puede
+   * reactivarlo (ADR 0053).
+   */
+  async archiveResolved(q: Queryable, now: Date): Promise<number> {
+    const { rows } = await q.query<{ id: string }>(
+      `UPDATE event.events SET status = 'ARCHIVED', updated_at = now()
+        WHERE status = 'RESOLVED' AND resolved_at < $1::timestamptz - make_interval(days => $2)
+       RETURNING id`,
+      [now, this.opts.archiveAfterDays],
+    );
+    for (const r of rows) {
+      await this.addTimeline(q, r.id, "STATUS_CHANGED", { from: "RESOLVED", to: "ARCHIVED", cause: "ARCHIVE_AFTER_RESOLVED" });
+      await publish(q, "EventLifecycleChanged", { eventId: r.id, to: "ARCHIVED" }, { lane: "batch" });
     }
     return rows.length;
   }

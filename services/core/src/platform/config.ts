@@ -13,6 +13,8 @@ const Env = z.object({
   MAP_STYLE_URL_LIGHT: z.string().default("https://demotiles.maplibre.org/style.json"),
   MAP_STYLE_URL_DARK: z.string().default("https://demotiles.maplibre.org/style.json"),
   MAP_ATTRIBUTION: z.string().default("© OpenStreetMap contributors · MapLibre"),
+  /** D-ARCHIVE (ADR 0061): días que un evento RESOLVED sigue en el mapa antes de pasar a ARCHIVED. */
+  EVENT_ARCHIVE_AFTER_DAYS: z.coerce.number().int().min(1).max(365).default(7),
   REPORTS_PER_HOUR_LIMIT: z.coerce.number().int().positive().default(10),
   /** Límite general por persona (o por IP sin sesión), por minuto (ADR 0047). */
   RATE_LIMIT_PER_MINUTE: z.coerce.number().int().positive().default(300),

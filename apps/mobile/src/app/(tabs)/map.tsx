@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View, type NativeSyntheticEvent } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { categoryStyle, homeChips } from "../../lib/ui/categories";
-import { VERIFICATION_STROKE, mapFilterQuery, type MapFilter } from "../../lib/map/event-style";
+import { VERIFICATION_STROKE, mapFilterQuery, pointOpacity, type MapFilter } from "../../lib/map/event-style";
 import { parseBboxParam } from "../../lib/ui/format";
 import { useCoarseLocation } from "../../lib/ui/use-coarse-location";
 import { colors } from "../../theme";
@@ -65,7 +65,7 @@ export default function MapScreen() {
               id: e.id, count: 1, color: categoryStyle(e.categoryCode).color, severity: e.severity,
               stroke: VERIFICATION_STROKE[e.publicVerificationState].color,
               strokeWidth: VERIFICATION_STROKE[e.publicVerificationState].width,
-              opacity: VERIFICATION_STROKE[e.publicVerificationState].opacity,
+              opacity: pointOpacity(e.publicVerificationState, e.status),
             },
           }))
         : data.clusters.map((c) => ({

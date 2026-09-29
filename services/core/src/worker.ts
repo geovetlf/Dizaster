@@ -35,6 +35,7 @@ async function loop() {
       console.log(JSON.stringify({ msg: "events.lifecycle", ...(await c.events.applyLifecycle(c.db, c.clock.now())) }));
       const ended = await c.events.applySourceEnd(c.db, await c.ingestion.endedItems(c.db, c.clock.now()));
       console.log(JSON.stringify({ msg: "events.source-end", resolved: ended }));
+      console.log(JSON.stringify({ msg: "events.archive", archived: await c.events.archiveResolved(c.db, c.clock.now()) }));
     }
     if (Date.now() - lastMeterFlush > 60_000) {
       lastMeterFlush = Date.now();
