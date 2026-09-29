@@ -25,6 +25,8 @@ export const pt: Record<MessageKey, string> = {
   timeline: "Linha do tempo",
   reports: "reportes",
   sources: "fontes",
+  mediaPaused: "Fotos e vídeos estão pausados por enquanto. Seu reporte é enviado mesmo assim.",
+  videoPaused: "Os vídeos estão pausados por enquanto; você pode anexar fotos.",
   report_one: "reporte",
   source_one: "fonte",
   eventLocalTime: "hora local",

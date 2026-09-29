@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   CostDashboardQuery,
+  MEDIA_KILL_SWITCHES,
   UpdateBudgetRequest,
   UpdateKillSwitchRequest,
   type BudgetPeriod,
@@ -29,6 +30,8 @@ interface Prices {
 
 const THRESHOLDS = [50, 80, 100] as const;
 const KILL_CACHE_MS = 15_000;
+/** Funciones con interruptor remoto (ADR 0019, 0064, 0082). */
+export const KNOWN_KILL_SWITCHES = ["ai", "translation", "sms", MEDIA_KILL_SWITCHES.uploads, MEDIA_KILL_SWITCHES.video] as const;
 const GB = 1024 ** 3;
 /** Clave de presupuesto / funcionalidad: minúsculas, puntos y guiones ("ai", "sms", "translation"). */
 const Key = z.string().min(2).max(40).regex(/^[a-z][a-z0-9.-]*$/);
@@ -237,7 +240,12 @@ export class CostService implements CostGuard, UsageSink {
     const { rows } = await this.db.query<{ feature: string; killed: boolean; reason: string | null; updated_at: Date }>(
       `SELECT feature, killed, reason, updated_at FROM cost.kill_switches ORDER BY feature`,
     );
-    return rows.map((r) => ({ feature: r.feature, killed: r.killed, reason: r.reason, updatedAt: r.updated_at.toISOString() }));
+    const views: KillSwitchView[] = rows.map((r) => ({ feature: r.feature, killed: r.killed, reason: r.reason, updatedAt: r.updated_at.toISOString() }));
+    // Los interruptores conocidos aparecen aunque nunca se hayan tocado, para poder apagarlos desde el tablero.
+    for (const feature of KNOWN_KILL_SWITCHES) {
+      if (!views.some((v) => v.feature === feature)) views.push({ feature, killed: false, reason: null, updatedAt: null });
+    }
+    return views.sort((a, b) => a.feature.localeCompare(b.feature));
   }
 
   private async budget(q: Queryable, key: string): Promise<{ period: BudgetPeriod; limitUsd: number } | null> {

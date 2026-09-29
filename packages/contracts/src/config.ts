@@ -46,3 +46,12 @@ export type Attribution = z.infer<typeof Attribution>;
 
 export const AttributionsResponse = z.object({ attributions: z.array(Attribution) });
 export type AttributionsResponse = z.infer<typeof AttributionsResponse>;
+
+/** Kill switches de media (ADR 0082): claves en `AppConfig.killSwitches` y en el tablero de costos. */
+export const MEDIA_KILL_SWITCHES = { uploads: "media-upload", video: "video" } as const;
+
+/** Qué se puede adjuntar según los kill switches remotos. Un switch ausente cuenta como encendido. */
+export function mediaAvailability(killSwitches: Record<string, boolean> | undefined): { photo: boolean; video: boolean } {
+  const uploads = killSwitches?.[MEDIA_KILL_SWITCHES.uploads] !== true;
+  return { photo: uploads, video: uploads && killSwitches?.[MEDIA_KILL_SWITCHES.video] !== true };
+}

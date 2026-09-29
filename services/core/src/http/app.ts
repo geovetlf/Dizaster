@@ -1,3 +1,4 @@
+import { MEDIA_KILL_SWITCHES } from "@dizaster/contracts";
 import { isValidTile, tileBounds } from "@dizaster/geo-kit";
 import Fastify, { type FastifyInstance, type FastifyRequest } from "fastify";
 import { z } from "zod";
@@ -120,7 +121,11 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
         maxZoom: 18,
         offlineRegions: true,
       },
-      killSwitches: { ai: await c.cost.isKilled("ai"), translation: await c.cost.isKilled("translation"), sms: await c.cost.isKilled("sms") },
+      killSwitches: {
+        ai: await c.cost.isKilled("ai"), translation: await c.cost.isKilled("translation"), sms: await c.cost.isKilled("sms"),
+        [MEDIA_KILL_SWITCHES.uploads]: await c.cost.isKilled(MEDIA_KILL_SWITCHES.uploads),
+        [MEDIA_KILL_SWITCHES.video]: await c.cost.isKilled(MEDIA_KILL_SWITCHES.video),
+      },
       limits: { maxVideoSeconds: 60, maxReportsPerHour: c.env.REPORTS_PER_HOUR_LIMIT },
       referenceVersions: { categories: c.ref.categories.version, emergencyNumbers: c.ref.emergency.version },
     };
@@ -630,6 +635,12 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
   // ───────────── Media (subida directa al almacenamiento) ─────────────
   app.post("/v1/media/uploads", async (req, reply) => {
     const session = requireSession(req);
+    // Kill switches remotos (ADR 0082, §12.2): se cortan subidas o solo video sin desplegar. Los reportes siguen.
+    const kind = (req.body as { kind?: unknown } | null)?.kind;
+    if (await c.cost.isKilled(MEDIA_KILL_SWITCHES.uploads)) throw new DomainError("FEATURE_DISABLED", "Las fotos y videos están pausados por ahora", 503);
+    if (kind === "VIDEO_RECORDED" && (await c.cost.isKilled(MEDIA_KILL_SWITCHES.video))) {
+      throw new DomainError("FEATURE_DISABLED", "Los videos están pausados por ahora; puedes adjuntar fotos", 503);
+    }
     const dailyBytes = await c.trust.uploadBytesQuota(c.db, session.userId, c.env.MEDIA_DAILY_UPLOAD_MB);
     return reply.status(201).send(await c.media.createUpload(session.profileId, req.body, dailyBytes));
   });

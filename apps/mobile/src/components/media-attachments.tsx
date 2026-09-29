@@ -1,5 +1,7 @@
-import { useState } from "react";
+import { mediaAvailability } from "@dizaster/contracts";
+import { useEffect, useState } from "react";
 import { Image, Pressable, StyleSheet, Text, View } from "react-native";
+import { api } from "../lib/api";
 import { t, type MessageKey } from "../lib/i18n";
 import { captureMedia, discardLocal, type CaptureKind, type CaptureSource } from "../lib/media/capture";
 import { checkLimits, type LocalMedia } from "../lib/media/local-media";
@@ -18,6 +20,11 @@ export function MediaAttachments({ items, onChange, suggestRedaction = false }: 
   const [editing, setEditing] = useState<LocalMedia | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const full = items.length >= MAX_MEDIA_PER_REPORT;
+  // Kill switches remotos (ADR 0082): sin red se muestran las opciones y el servidor decide al subir.
+  const [avail, setAvail] = useState({ photo: true, video: true });
+  useEffect(() => {
+    api.config().then((c) => setAvail(mediaAvailability(c.killSwitches))).catch(() => undefined);
+  }, []);
 
   async function add(source: CaptureSource, kind: CaptureKind) {
     if (full) return setMessage(t("maxMedia"));
@@ -84,10 +91,11 @@ export function MediaAttachments({ items, onChange, suggestRedaction = false }: 
         ))}
       </View>
       <View style={styles.buttons}>
-        <Button label={t("addPhoto")} disabled={busy || full} onPress={() => void add("camera", "IMAGE")} />
-        <Button label={t("addVideo")} disabled={busy || full} onPress={() => void add("camera", "VIDEO_RECORDED")} />
-        <Button label={t("fromGallery")} disabled={busy || full} onPress={() => void add("library", "IMAGE")} />
+        {avail.photo ? <Button label={t("addPhoto")} disabled={busy || full} onPress={() => void add("camera", "IMAGE")} /> : null}
+        {avail.video ? <Button label={t("addVideo")} disabled={busy || full} onPress={() => void add("camera", "VIDEO_RECORDED")} /> : null}
+        {avail.photo ? <Button label={t("fromGallery")} disabled={busy || full} onPress={() => void add("library", "IMAGE")} /> : null}
       </View>
+      {!avail.photo ? <Text style={styles.note}>{t("mediaPaused")}</Text> : !avail.video ? <Text style={styles.note}>{t("videoPaused")}</Text> : null}
       {items.length > 0 ? <Text style={styles.note}>{t("graphicHint")}</Text> : null}
       {items.some((m) => m.kind === "IMAGE") ? <Text style={[styles.note, suggestRedaction && styles.warn]}>{t(suggestRedaction ? "redactSuggest" : "redactHint")}</Text> : null}
       {editing ? (

@@ -52,7 +52,8 @@ export interface KillSwitchView {
   feature: string;
   killed: boolean;
   reason: string | null;
-  updatedAt: string;
+  /** null: nunca se tocó (interruptor conocido, encendido). */
+  updatedAt: string | null;
 }
 
 export interface CostDashboard {

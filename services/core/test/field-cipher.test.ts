@@ -17,7 +17,9 @@ describe("cifrado por columna (ADR 0048)", () => {
     expect(rotated.encrypt("x", "a").startsWith("k2.")).toBe(true);
     expect(() => rotated.decrypt(sealed, "fila-2")).toThrow();
     const [kid, iv, tag, data] = sealed.split(".");
-    expect(() => rotated.decrypt([kid, iv, tag, `A${data!.slice(1)}`].join("."), "fila-1")).toThrow();
+    // Cambia siempre el primer carácter (si ya era "A", usa "B"): antes fallaba 1 de cada 64 veces.
+    const tampered = `${data!.startsWith("A") ? "B" : "A"}${data!.slice(1)}`;
+    expect(() => rotated.decrypt([kid, iv, tag, tampered].join("."), "fila-1")).toThrow();
     expect(() => new FieldCipher("k2", { k1 })).toThrow();
   });
 

@@ -82,7 +82,7 @@ describe("Cost Optimization Layer", () => {
   it("las funciones de pago empiezan apagadas y sin presupuesto; el kill switch es remoto", async () => {
     expect(await t.c.cost.check("ai", 0.01)).toBe(false);
     expect(await t.c.cost.check("desconocida", 0)).toBe(false);
-    expect((await t.app.inject({ url: "/v1/config" })).json().killSwitches).toEqual({ ai: true, translation: true, sms: true });
+    expect((await t.app.inject({ url: "/v1/config" })).json().killSwitches).toEqual({ ai: true, translation: true, sms: true, "media-upload": false, video: false });
     const res = await t.app.inject({ method: "PUT", url: "/v1/admin/kill-switches/ai", headers: auth(adminToken), payload: { killed: false, reason: "Piloto aprobado" } });
     expect(res.json()).toMatchObject({ feature: "ai", killed: false, reason: "Piloto aprobado" });
     expect((await t.app.inject({ url: "/v1/config" })).json().killSwitches.ai).toBe(false);
