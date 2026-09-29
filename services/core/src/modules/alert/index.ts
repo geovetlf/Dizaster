@@ -32,6 +32,8 @@ import type { SocialService } from "../social/index.js";
 import {
   DEFAULT_PREFERENCES,
   MATCH_PRIORITY,
+  MENTION_LIMITS,
+  mentionText,
   alertText,
   decideAlerts,
   groupText,
@@ -46,7 +48,7 @@ import type { PushMessage, PushSender } from "./push/types.js";
 export { ApnsSender, type ApnsConfig } from "./push/apns.js";
 export { FcmSender, type FcmConfig, type FcmServiceAccount } from "./push/fcm.js";
 export { LogPushSender, PushGateway, type PushMessage, type PushResult, type PushSender } from "./push/types.js";
-export { DEFAULT_PREFERENCES, alertText, budgetAlertText, sourceAlertText, decideAlerts, groupText, inQuietHours, localMinutes, wants } from "./rules.js";
+export { DEFAULT_PREFERENCES, MENTION_LIMITS, mentionText, alertText, budgetAlertText, sourceAlertText, decideAlerts, groupText, inQuietHours, localMinutes, wants } from "./rules.js";
 
 /** Distancia máxima a la costa para asignar un evento marino a un país en las suscripciones por país. */
 export const OFFSHORE_COUNTRY_RADIUS_M = 300_000;
@@ -57,11 +59,15 @@ export const NEAR_ME_RADIUS_M = 10_000;
 export const LAST_LOCATION_TTL_HOURS = 72;
 const FLUSH_BATCH = 1000;
 
+/** Deep link del aviso: el EVENT o, para una mención, el post. */
+const subjectUrl = (r: { event_id: string | null; post_id: string | null }) =>
+  r.event_id ? `dizaster://event/${r.event_id}` : `dizaster://post/${r.post_id}`;
+
 interface Recipient { profileId: string; userId: string; match: AlertMatch; prefs: AlertPreferences }
 
 interface PrefRow {
   profile_id: string; enabled: boolean; followed_events: boolean; followed_places: boolean; saved_zones: boolean; near_me: boolean;
-  categories: boolean; status_changes: boolean;
+  categories: boolean; status_changes: boolean; mentions: boolean;
   min_severity: number; max_per_hour: number; quiet_start: number | null; quiet_end: number | null; timezone: string; lang: Lang;
 }
 
@@ -70,7 +76,7 @@ const toPrefs = (r: PrefRow | undefined): AlertPreferences =>
     ? {
         enabled: r.enabled, followedEvents: r.followed_events, followedPlaces: r.followed_places, savedZones: r.saved_zones,
         nearMe: r.near_me, categories: r.categories,
-        statusChanges: r.status_changes, minSeverity: r.min_severity, maxPerHour: r.max_per_hour,
+        statusChanges: r.status_changes, mentions: r.mentions, minSeverity: r.min_severity, maxPerHour: r.max_per_hour,
         quietHours: r.quiet_start === null || r.quiet_end === null ? null : { start: r.quiet_start, end: r.quiet_end },
         timezone: r.timezone, lang: r.lang,
       }
@@ -106,9 +112,15 @@ export class AlertService {
     dispatcher.on("EventEvidenceAdded", "alert.evaluate.evidence", (e, tx) => run(e.payload.eventId, tx));
     dispatcher.on("VerificationChanged", "alert.evaluate.verification", (e, tx) => run(e.payload.eventId, tx));
     dispatcher.on("EventLifecycleChanged", "alert.evaluate.lifecycle", (e, tx) => run(e.payload.eventId, tx));
+    dispatcher.on("UserMentioned", "alert.mention", (e, tx) => this.mention(tx, e.payload).then(() => undefined));
     // Borrado de cuenta (ADR 0021): no queda rastro de qué zonas o temas seguía la persona.
     dispatcher.on("AccountDeleted", "alert.purge-account", async (e, tx) => {
       await tx.query(`DELETE FROM alert.notifications WHERE profile_id = $1`, [e.payload.profileId]);
+      // Menciones que escribió: sus avisos a otras personas se van con la cuenta.
+      await tx.query(
+        `DELETE FROM alert.notifications WHERE alert_id IN (SELECT id FROM alert.alerts WHERE actor_profile_id = $1)`, [e.payload.profileId],
+      );
+      await tx.query(`DELETE FROM alert.alerts WHERE actor_profile_id = $1`, [e.payload.profileId]);
       await tx.query(`DELETE FROM alert.subscriptions WHERE profile_id = $1`, [e.payload.profileId]);
       await tx.query(`DELETE FROM alert.preferences WHERE profile_id = $1`, [e.payload.profileId]);
       await tx.query(`DELETE FROM alert.zones WHERE profile_id = $1`, [e.payload.profileId]);
@@ -170,6 +182,59 @@ export class AlertService {
       await publish(tx, "AlertTriggered", { alertId, eventId, kind: d.kind }, { lane: d.critical ? "urgent" : "interactive" });
     }
     return created;
+  }
+
+  /**
+   * Aviso de mención (D-MENTION, ADR 0063). Pasa por la misma cola que los EVENTs, así que respeta horas de
+   * silencio, límite por hora, agrupación e idioma. Una alerta por post (clave única) y una notificación por
+   * persona: nunca dos avisos por la misma mención. Anti-spam por autor y por pareja autor→persona.
+   */
+  async mention(tx: Queryable, m: { postId: string; authorProfileId: string; profileIds: string[] }): Promise<number> {
+    const ctx = await this.social.mentionContext(tx, m.postId, m.profileIds);
+    if (!ctx || ctx.recipients.length === 0) return 0;
+    const now = this.clock.now();
+    const sent = await tx.query<{ profile_id: string; n: number }>(
+      `SELECT n.profile_id, count(*)::int AS n FROM alert.notifications n JOIN alert.alerts a ON a.id = n.alert_id
+        WHERE a.actor_profile_id = $1 AND a.kind = 'MENTION' AND a.created_at > $2::timestamptz - interval '24 hours'
+          AND a.post_id <> $3
+        GROUP BY n.profile_id`,
+      [m.authorProfileId, now, m.postId],
+    );
+    const lastHour = (await tx.query<{ n: number }>(
+      `SELECT count(*)::int AS n FROM alert.notifications n JOIN alert.alerts a ON a.id = n.alert_id
+        WHERE a.actor_profile_id = $1 AND a.kind = 'MENTION' AND a.created_at > $2::timestamptz - interval '1 hour' AND a.post_id <> $3`,
+      [m.authorProfileId, now, m.postId],
+    )).rows[0]!.n;
+    const perPair = new Map(sent.rows.map((r) => [r.profile_id, r.n]));
+    const room = Math.max(0, MENTION_LIMITS.perAuthorPerHour - lastHour);
+    const candidates = ctx.recipients.filter((p) => (perPair.get(p) ?? 0) < MENTION_LIMITS.perPairPerDay).slice(0, room);
+    if (candidates.length === 0) return 0;
+    const prefs = await this.prefsFor(tx, candidates);
+    const users = await this.social.userIdsForProfiles(tx, candidates);
+    const recipients = candidates
+      .map((profileId) => ({ profileId, userId: users.get(profileId), prefs: prefs.get(profileId) ?? DEFAULT_PREFERENCES }))
+      .filter((r): r is { profileId: string; userId: string; prefs: AlertPreferences } => !!r.userId && wants(r.prefs, "MENTION", "MENTIONED", 0));
+    if (recipients.length === 0) return 0;
+
+    const inserted = await tx.query<{ id: string }>(
+      `INSERT INTO alert.alerts (id, kind, dedup_key, post_id, actor_profile_id, critical)
+       VALUES ($1, 'MENTION', $2, $3, $4, false)
+       ON CONFLICT (dedup_key) DO UPDATE SET dedup_key = EXCLUDED.dedup_key RETURNING id`,
+      [newId(), `MENTION:${m.postId}`, m.postId, m.authorProfileId],
+    );
+    const alertId = inserted.rows[0]!.id;
+    const texts = Object.fromEntries(SUPPORTED_LANGS.map((l) => [l, mentionText(l, ctx.authorHandle)])) as Record<Lang, { title: string; body: string }>;
+    const res = await tx.query(
+      `INSERT INTO alert.notifications (id, alert_id, profile_id, user_id, match, title, body)
+       SELECT id, $1, p, u, 'MENTIONED', t, b FROM unnest($2::uuid[], $3::uuid[], $4::uuid[], $5::text[], $6::text[]) AS x(id, p, u, t, b)
+       ON CONFLICT (profile_id, alert_id) DO NOTHING`,
+      [
+        alertId, recipients.map(() => newId()), recipients.map((r) => r.profileId), recipients.map((r) => r.userId),
+        recipients.map((r) => texts[r.prefs.lang].title), recipients.map((r) => texts[r.prefs.lang].body),
+      ],
+    );
+    if (res.rowCount) await publish(tx, "AlertTriggered", { alertId, eventId: null, kind: "MENTION" }, { lane: "interactive" });
+    return res.rowCount ?? 0;
   }
 
   /** Quién recibe una alerta y por qué (el motivo más directo si hay varios), filtrado por sus preferencias. */
@@ -246,9 +311,9 @@ export class AlertService {
 
     await withTransaction(this.db, async (tx) => {
       const { rows } = await tx.query<{
-        id: string; profile_id: string; user_id: string; title: string; body: string; event_id: string; critical: boolean;
+        id: string; profile_id: string; user_id: string; title: string; body: string; event_id: string | null; post_id: string | null; critical: boolean;
       }>(
-        `SELECT n.id, n.profile_id, n.user_id, n.title, n.body, a.event_id, a.critical
+        `SELECT n.id, n.profile_id, n.user_id, n.title, n.body, a.event_id, a.post_id, a.critical
            FROM alert.notifications n JOIN alert.alerts a ON a.id = n.alert_id
           WHERE n.status = 'PENDING'
           ORDER BY a.critical DESC, n.created_at, n.id
@@ -299,8 +364,8 @@ export class AlertService {
         const single = items.length === 1 ? items[0]! : null;
         const groupId = single ? null : newId();
         const content = single ? { title: single.title, body: single.body } : groupText(lang, items.map((r) => r.title));
-        const url = single ? `dizaster://event/${single.event_id}` : "dizaster://alerts";
-        const groupKey = single ? `event-${single.event_id}` : "alerts-summary";
+        const url = single ? subjectUrl(single) : "dizaster://alerts";
+        const groupKey = single ? (single.event_id ? `event-${single.event_id}` : `post-${single.post_id}`) : "alerts-summary";
         set(items, single ? "SENT" : "GROUPED", groupId);
         units.push({
           ids: items.map((r) => r.id),
@@ -308,7 +373,10 @@ export class AlertService {
           messages: targets.map((t) => ({
             provider: t.provider, token: t.token, environment: t.environment, title: content.title, body: content.body, url, groupKey,
             badge: unread.get(profileId) ?? items.length, critical: items.some((r) => r.critical),
-            data: { ...(single ? { eventId: single.event_id, notificationId: single.id } : {}), kind: single ? "event" : "summary" },
+            data: {
+              ...(single ? { ...(single.event_id ? { eventId: single.event_id } : { postId: single.post_id! }), notificationId: single.id } : {}),
+              kind: single ? (single.event_id ? "event" : "mention") : "summary",
+            },
           })),
         });
       }
@@ -356,10 +424,10 @@ export class AlertService {
       cursor = `AND (n.created_at, n.id) < ($${params.push(at)}::timestamptz, $${params.push(id)}::uuid)`;
     }
     const { rows } = await q.query<{
-      id: string; kind: AlertKind; match: AlertMatch; event_id: string; category_code: string; title: string; body: string;
-      created_at: Date; read_at: Date | null; status: NotificationStatus;
+      id: string; kind: AlertKind; match: AlertMatch; event_id: string | null; post_id: string | null; category_code: string | null;
+      title: string; body: string; created_at: Date; read_at: Date | null; status: NotificationStatus;
     }>(
-      `SELECT n.id, a.kind, n.match, a.event_id, a.category_code, n.title, n.body, n.created_at, n.read_at, n.status
+      `SELECT n.id, a.kind, n.match, a.event_id, a.post_id, a.category_code, n.title, n.body, n.created_at, n.read_at, n.status
          FROM alert.notifications n JOIN alert.alerts a ON a.id = n.alert_id
         WHERE n.profile_id = $1 ${cursor}
         ORDER BY n.created_at DESC, n.id DESC LIMIT $2`,
@@ -369,8 +437,8 @@ export class AlertService {
       `SELECT count(*)::int AS n FROM alert.notifications WHERE profile_id = $1 AND read_at IS NULL`, [profileId],
     )).rows[0]!.n;
     const notifications: NotificationView[] = rows.map((r) => ({
-      id: r.id, kind: r.kind, match: r.match, eventId: r.event_id, categoryCode: r.category_code, title: r.title, body: r.body,
-      url: `dizaster://event/${r.event_id}`, createdAt: r.created_at.toISOString(), readAt: r.read_at?.toISOString() ?? null, delivery: r.status,
+      id: r.id, kind: r.kind, match: r.match, eventId: r.event_id, postId: r.post_id, categoryCode: r.category_code, title: r.title, body: r.body,
+      url: subjectUrl(r), createdAt: r.created_at.toISOString(), readAt: r.read_at?.toISOString() ?? null, delivery: r.status,
     }));
     const last = rows[rows.length - 1];
     return {
@@ -401,13 +469,13 @@ export class AlertService {
     const p = AlertPreferences.parse({ ...(await this.preferences(q, profileId)), ...patch });
     await q.query(
       `INSERT INTO alert.preferences (profile_id, enabled, followed_events, followed_places, categories, status_changes, min_severity,
-                                      max_per_hour, quiet_start, quiet_end, timezone, lang, saved_zones, near_me)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+                                      max_per_hour, quiet_start, quiet_end, timezone, lang, saved_zones, near_me, mentions)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
        ON CONFLICT (profile_id) DO UPDATE SET enabled = $2, followed_events = $3, followed_places = $4, categories = $5,
          status_changes = $6, min_severity = $7, max_per_hour = $8, quiet_start = $9, quiet_end = $10, timezone = $11, lang = $12,
-         saved_zones = $13, near_me = $14, updated_at = now()`,
+         saved_zones = $13, near_me = $14, mentions = $15, updated_at = now()`,
       [profileId, p.enabled, p.followedEvents, p.followedPlaces, p.categories, p.statusChanges, p.minSeverity, p.maxPerHour,
-        p.quietHours?.start ?? null, p.quietHours?.end ?? null, p.timezone, p.lang, p.savedZones, p.nearMe],
+        p.quietHours?.start ?? null, p.quietHours?.end ?? null, p.timezone, p.lang, p.savedZones, p.nearMe, p.mentions],
     );
     // Apagar "cerca de mí" borra en el acto la última ubicación guardada.
     if (!p.nearMe) await q.query(`DELETE FROM alert.last_locations WHERE profile_id = $1`, [profileId]);

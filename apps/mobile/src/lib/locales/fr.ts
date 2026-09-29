@@ -198,6 +198,7 @@ export const fr: Record<MessageKey, string> = {
   saveZone: "Enregistrer la zone",
   costMonth: "mois",
   playVideo: "Lire la vidéo",
+  prefMentions: "Quand quelqu’un me mentionne",
   callNow: "Appeler",
   allNumbers: "Voir tous les numéros d’urgence",
   verifiedOnly: "Vérifiés seulement",

@@ -80,7 +80,7 @@ export default function AlertsScreen() {
           loading ? <ActivityIndicator color={colors.textMuted} style={styles.empty} /> : <Text style={styles.empty}>{error ? t("loadError") : t("noAlerts")}</Text>
         }
         renderItem={({ item }) => {
-          const s = categoryStyle(item.categoryCode);
+          const s = item.categoryCode ? categoryStyle(item.categoryCode) : { icon: "at" as const, color: colors.accent };
           const note = deliveryNoteKey(item.delivery);
           return (
             <Pressable accessibilityRole="link" style={[styles.row, !item.readAt && styles.unread]} onPress={() => void openItem(item)}>

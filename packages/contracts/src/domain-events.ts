@@ -19,7 +19,12 @@ export interface DomainEventMap {
   VerificationChanged: { eventId: string; from: string; to: string; negativeState: string };
   EventLifecycleChanged: { eventId: string; to: "ACTIVE" | "MONITORING" | "RESOLVED" | "ARCHIVED" };
   /** Hay notificaciones nuevas por entregar (despierta al emisor push sin esperar al siguiente ciclo). */
-  AlertTriggered: { alertId: string; eventId: string; kind: string };
+  AlertTriggered: { alertId: string; eventId: string | null; kind: string };
+  /**
+   * Un post nuevo (o editado) mencionó a estas personas (ADR 0063). Solo las menciones recién enlazadas: editar un post
+   * no vuelve a avisar a quien ya estaba mencionado. Ya excluye a quien bloqueó al autor.
+   */
+  UserMentioned: { postId: string; authorProfileId: string; profileIds: string[] };
   ExternalItemIngested: { externalItemId: string; sourceId: string; lane: "NORMAL" | "URGENT" };
   MediaUploaded: { mediaId: string };
   MediaReady: { mediaId: string; phash?: string | null };

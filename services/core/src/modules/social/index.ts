@@ -423,15 +423,19 @@ export class SocialService {
       await tx.query(`INSERT INTO social.post_tags (post_id, tag_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`, [postId, rows[0]!.id]);
     }
     const handles = extractMentions(text);
-    const mentioned = handles.length === 0 ? [] : (await tx.query<{ handle: string }>(
+    const mentioned = handles.length === 0 ? [] : (await tx.query<{ profile_id: string; handle: string }>(
       `INSERT INTO social.post_mentions (post_id, profile_id)
        SELECT $1, pr.id FROM social.profiles pr
         WHERE lower(pr.handle) = ANY($2) AND pr.deleted_at IS NULL AND pr.id <> $3
           AND NOT EXISTS (SELECT 1 FROM social.blocks b WHERE b.blocker_profile_id = pr.id AND b.blocked_profile_id = $3)
        ON CONFLICT DO NOTHING
-       RETURNING (SELECT handle FROM social.profiles WHERE id = profile_id)`,
+       RETURNING profile_id, (SELECT handle FROM social.profiles WHERE id = profile_id) AS handle`,
       [postId, handles, authorProfileId],
     )).rows;
+    // Solo las menciones recién enlazadas: el Alert Engine decide si avisa (ADR 0063).
+    if (mentioned.length > 0) {
+      await publish(tx, "UserMentioned", { postId, authorProfileId, profileIds: mentioned.map((m) => m.profile_id) }, { lane: "interactive" });
+    }
     // Negocios (ADR 0054): el handle es único entre personas y negocios, así que no hay ambigüedad.
     const businesses = handles.length === 0 ? [] : (await tx.query<{ handle: string }>(
       `INSERT INTO social.post_business_mentions (post_id, business_id)
@@ -442,6 +446,32 @@ export class SocialService {
       [postId, handles],
     )).rows;
     return { tags: tags.map((t) => t.normalized), mentions: [...mentioned, ...businesses].map((m) => m.handle) };
+  }
+
+  /**
+   * Para el aviso de mención (ADR 0063): si el post sigue visible, cómo nombrar a quien lo escribió (null si es
+   * seudónimo: el aviso no lo revela) y cuáles de las personas mencionadas pueden recibirlo (siguen existiendo, no
+   * bloquearon a la persona ni al negocio autor).
+   */
+  async mentionContext(q: Queryable, postId: string, profileIds: string[]): Promise<{ authorHandle: string | null; recipients: string[] } | null> {
+    const { rows } = await q.query<{ author_type: string; author_id: string; author_visibility: string; handle: string | null }>(
+      `SELECT p.author_type, p.author_id, p.author_visibility, coalesce(pr.handle, bp.handle) AS handle
+         FROM social.posts p
+         LEFT JOIN social.profiles pr ON p.author_type = 'PROFILE' AND pr.id = p.author_id
+         LEFT JOIN social.business_profiles bp ON p.author_type = 'BUSINESS' AND bp.id = p.author_id
+        WHERE p.id = $1 AND p.deleted_at IS NULL AND p.moderation_state = 'VISIBLE' AND p.visibility = 'PUBLIC'`,
+      [postId],
+    );
+    const post = rows[0];
+    if (!post) return null;
+    const ok = await q.query<{ id: string }>(
+      `SELECT pr.id FROM social.profiles pr
+        WHERE pr.id = ANY($1) AND pr.deleted_at IS NULL
+          AND NOT ($2 = 'PROFILE' AND EXISTS (SELECT 1 FROM social.blocks b WHERE b.blocker_profile_id = pr.id AND b.blocked_profile_id = $3))
+          AND NOT ($2 = 'BUSINESS' AND EXISTS (SELECT 1 FROM social.business_blocks bb WHERE bb.blocker_profile_id = pr.id AND bb.business_id = $3))`,
+      [profileIds, post.author_type, post.author_id],
+    );
+    return { authorHandle: post.author_visibility === "PSEUDONYMOUS" ? null : post.handle, recipients: ok.rows.map((r) => r.id) };
   }
 
   async tag(q: Queryable, normalized: string, viewerProfileId: string | null): Promise<TagView> {

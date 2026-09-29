@@ -38,6 +38,7 @@ export const DEFAULT_PREFERENCES: AlertPreferences = {
   nearMe: false,
   categories: true,
   statusChanges: true,
+  mentions: true,
   minSeverity: 3,
   maxPerHour: 6,
   quietHours: null,
@@ -71,11 +72,12 @@ export function decideAlerts(prev: SeenState | null, snap: EventSnapshot): Alert
 }
 
 /** Prioridad cuando una persona coincide por varios motivos: se guarda el más directo. */
-export const MATCH_PRIORITY: AlertMatch[] = ["FOLLOWED_EVENT", "SAVED_ZONE", "NEAR_ME", "FOLLOWED_PLACE", "CATEGORY", "PREVIOUSLY_ALERTED"];
+export const MATCH_PRIORITY: AlertMatch[] = ["FOLLOWED_EVENT", "SAVED_ZONE", "NEAR_ME", "FOLLOWED_PLACE", "CATEGORY", "PREVIOUSLY_ALERTED", "MENTIONED"];
 
 /** ¿Quiere esta persona este aviso según sus preferencias? */
 export function wants(p: AlertPreferences, kind: AlertKind, match: AlertMatch, severity: number): boolean {
   if (!p.enabled) return false;
+  if (kind === "MENTION") return p.mentions;
   if (kind !== "NEW_EVENT") {
     if (!p.statusChanges) return false;
     return match === "FOLLOWED_EVENT" ? p.followedEvents : true;
@@ -193,6 +195,8 @@ export function alertText(
       return { title: t.severityUp(a.category), body: join(where, sev) };
     case "RESOLVED":
       return { title: t.over(a.category), body: where || state };
+    case "MENTION":
+      return mentionText(lang, null);
   }
 }
 
@@ -224,4 +228,27 @@ export function sourceAlertText(lang: Lang, s: { sourceKey: string; state: "DEGR
 
 export function budgetAlertText(lang: Lang, b: { key: string; threshold: number; spentUsd: number; limitUsd: number }): { title: string; body: string } {
   return BUDGET_TEXT[lang](b.key, b.threshold, b.spentUsd.toFixed(2), b.limitUsd.toFixed(2));
+}
+
+/**
+ * Anti-spam de menciones (ADR 0063). Por encima de estos topes la mención sigue en el post, pero no genera aviso:
+ * una cuenta no puede usar @ para inundar de notificaciones a nadie.
+ */
+export const MENTION_LIMITS = {
+  /** Personas distintas a las que una misma cuenta puede avisar por mención en una hora. */
+  perAuthorPerHour: 20,
+  /** Avisos de la misma cuenta a la misma persona en 24 h. */
+  perPairPerDay: 3,
+} as const;
+
+const MENTION_TEXT: Record<Lang, (who: string | null) => { title: string; body: string }> = {
+  es: (w) => ({ title: w ? `@${w} te mencionó` : "Te mencionaron en una publicación", body: "Toca para ver la publicación." }),
+  en: (w) => ({ title: w ? `@${w} mentioned you` : "You were mentioned in a post", body: "Tap to see the post." }),
+  pt: (w) => ({ title: w ? `@${w} mencionou você` : "Você foi mencionado em uma publicação", body: "Toque para ver a publicação." }),
+  fr: (w) => ({ title: w ? `@${w} vous a mentionné` : "Vous avez été mentionné dans une publication", body: "Touchez pour voir la publication." }),
+};
+
+/** Texto del aviso de mención. Nunca incluye el texto del post; un post seudónimo no nombra a su autor. */
+export function mentionText(lang: Lang, authorHandle: string | null): { title: string; body: string } {
+  return MENTION_TEXT[lang](authorHandle);
 }

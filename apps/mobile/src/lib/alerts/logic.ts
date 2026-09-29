@@ -4,16 +4,17 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
  * Ruta interna a la que lleva un aviso. Solo se aceptan los destinos que envía el servidor
- * (dizaster://event/<id>, dizaster://alerts y, para administración, dizaster://admin-cost): un aviso nunca
+ * (dizaster://event/<id>, dizaster://post/<id> para menciones, dizaster://alerts y, para administración,
+ * dizaster://admin-cost): un aviso nunca
  * puede abrir una ruta arbitraria.
  */
 export function routeForNotificationUrl(url: unknown): string | null {
   if (typeof url !== "string") return null;
-  const m = /^dizaster:\/\/(event\/([^/?#]+)|alerts|admin-cost)\/?$/.exec(url.trim());
+  const m = /^dizaster:\/\/((event|post)\/([^/?#]+)|alerts|admin-cost)\/?$/.exec(url.trim());
   if (!m) return null;
   if (m[1] === "alerts") return "/alerts";
   if (m[1] === "admin-cost") return "/admin-cost";
-  return m[2] && UUID.test(m[2]) ? `/event/${m[2].toLowerCase()}` : null;
+  return m[3] && UUID.test(m[3]) ? `/${m[2]}/${m[3].toLowerCase()}` : null;
 }
 
 /** Estado del permiso tal como lo necesita la interfaz: pedirlo, ya concedido, o solo desde Ajustes del sistema. */

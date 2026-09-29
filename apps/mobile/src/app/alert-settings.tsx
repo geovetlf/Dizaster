@@ -29,11 +29,12 @@ const categoryName = (code: string) => {
 
 const SEVERITIES = [1, 2, 3, 4, 5] as const;
 const PER_HOUR = [2, 4, 6, 10, 20] as const;
-const TOGGLES: { key: "followedEvents" | "followedPlaces" | "categories" | "statusChanges"; label: MessageKey }[] = [
+const TOGGLES: { key: "followedEvents" | "followedPlaces" | "categories" | "statusChanges" | "mentions"; label: MessageKey }[] = [
   { key: "followedEvents", label: "prefFollowedEvents" },
   { key: "followedPlaces", label: "prefFollowedPlaces" },
   { key: "categories", label: "prefCategories" },
   { key: "statusChanges", label: "prefStatusChanges" },
+  { key: "mentions", label: "prefMentions" },
 ];
 
 /** Qué alertas recibe esta persona. Todo se guarda en el servidor: vale para cualquier teléfono con su cuenta. */
