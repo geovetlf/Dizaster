@@ -95,3 +95,38 @@ export function eventTitle(e: { title: Record<string, string> | null; categoryCo
 export function blurPreviewUri(m: Pick<MediaView, "kind" | "url" | "thumbUrl">): string | null {
   return m.thumbUrl ?? (m.kind === "IMAGE" ? m.url : null);
 }
+
+/** Formatea en una zona horaria; null si el motor de JS no la soporta (el llamador cae a la hora del teléfono). */
+export function formatInZone(iso: string, lang: Lang, timeZone: string | undefined, style: "datetime" | "time"): string | null {
+  const opts: Intl.DateTimeFormatOptions = style === "time"
+    ? { hour: "2-digit", minute: "2-digit" }
+    : { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" };
+  try {
+    return new Date(iso).toLocaleString(lang === "pt" ? "pt-BR" : lang, timeZone ? { ...opts, timeZone } : opts);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Hora de algo que pasó en un evento (ADR 0079, Blueprint §5.15): en la zona del evento y, si la de la persona es
+ * otra, también en la suya: "14:05 hora local · 16:05 tu hora". Sin zona del evento, solo la del teléfono.
+ */
+export function eventTime(
+  iso: string, lang: Lang, eventTz: string | null | undefined, labels: { local: string; yours: string },
+  style: "datetime" | "time" = "datetime", deviceTz: string | undefined = deviceTimeZone(),
+): string {
+  const mine = formatInZone(iso, lang, deviceTz, style) ?? formatInZone(iso, lang, undefined, style) ?? iso;
+  if (!eventTz || eventTz === deviceTz) return mine;
+  const there = formatInZone(iso, lang, eventTz, style);
+  if (!there || there === mine) return mine;
+  return `${there} ${labels.local} · ${mine} ${labels.yours}`;
+}
+
+function deviceTimeZone(): string | undefined {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone;
+  } catch {
+    return undefined;
+  }
+}

@@ -8,8 +8,8 @@ import { OfflineNote } from "../../components/offline-note";
 import { api } from "../../lib/api";
 import { cacheKeys, readThrough } from "../../lib/offline/read-cache";
 import { readCache } from "../../lib/offline/sqlite-cache";
-import { lang, t, VERIFICATION_LABEL, verificationLabel } from "../../lib/i18n";
-import { eventTitle, timeAgo } from "../../lib/ui/format";
+import { lang, t, tCount, VERIFICATION_LABEL, verificationLabel } from "../../lib/i18n";
+import { eventTime, eventTitle, timeAgo } from "../../lib/ui/format";
 import { evidenceLine, explainLines, timelineLabel } from "../../lib/verification/explain";
 import { followablePlace } from "../../lib/social/place";
 import { useFollows } from "../../lib/social/follows";
@@ -65,7 +65,7 @@ export default function EventScreen() {
       </View>
       <Text style={[styles.badge, { backgroundColor: color }]}>{verificationLabel(event.publicVerificationState)}</Text>
       <Text style={styles.meta}>
-        {event.reportCount} {t("reports")} · {event.sourceCount} {t("sources")} · {new Date(event.firstSeenAt).toLocaleString()}
+        {tCount(event.reportCount, "report_one", "reports")} · {tCount(event.sourceCount, "source_one", "sources")} · {eventTime(event.firstSeenAt, lang, event.place?.timezone, zoneLabels())}
       </Text>
       {verification ? (
         <View style={styles.why}>
@@ -92,7 +92,7 @@ export default function EventScreen() {
       <Text style={styles.section}>{t("timeline")}</Text>
       {/* Lo más reciente primero; la historia completa vive en el servidor. */}
       {timeline.slice(-TIMELINE_SHOWN).reverse().map((item) => (
-        <Text key={item.id} style={styles.entry}>{new Date(item.at).toLocaleTimeString()} · {timelineLabel(item.type, t)}</Text>
+        <Text key={item.id} style={styles.entry}>{eventTime(item.at, lang, event?.place?.timezone, zoneLabels(), "time")} · {timelineLabel(item.type, t)}</Text>
       ))}
       <Text style={[styles.section, styles.postsTitle]}>{t("eventPosts")}</Text>
     </View>
@@ -137,3 +137,5 @@ const styles = StyleSheet.create({
   sourceMeta: { color: colors.textMuted, fontSize: 12 },
   whyLine: { color: colors.text, marginBottom: 4 },
 });
+
+const zoneLabels = () => ({ local: t("eventLocalTime"), yours: t("yourTime") });

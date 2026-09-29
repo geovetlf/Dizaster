@@ -270,6 +270,7 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | Fusión automática de duplicados, cola de posibles duplicados y métricas de reversión | ✅ | ADR 0076 |
 | Ítems de fuentes sin coordenadas ubicados por geocódigo exacto (UBIGEO, ISO 3166-2) | ✅ | ADR 0077 |
 | Mapa por teselas z/x/y cacheables en CDN, sin sesión | ✅ | ADR 0078 |
+| Horas en la zona del evento y plurales correctos en 4 idiomas | ✅ | ADR 0079 |
 | Licencias, auditoría, SBOM, Dependabot; respaldo con prueba de restauración en CI | ✅ | ADR 0070, `scripts/supply-chain.mjs`, `scripts/db-restore-check.mjs` |
 | Idioma de la app elegible en el perfil (es/en/pt/fr o del teléfono) | ✅ | ADR 0069, `app/language.tsx` |
 | Varias cuentas en un teléfono corroboran como una (clave seudónima del teléfono) | ✅ | ADR 0068, migración 0036 |
@@ -297,8 +298,7 @@ decisiones o credenciales del propietario (lista de abajo); mientras tanto se co
 
 Revisión del Blueprint del 2026-09-29 (tras ADR 0070), verificada contra el código, sin bloqueos:
 
-1. Horas en la zona del evento y plurales correctos en 4 idiomas (§5.15).
-2. Adaptador EMSC (PLANNED hasta revisar términos) (§9.3).
+1. Adaptador EMSC (PLANNED hasta revisar términos) (§9.3).
 
 
 Bloqueadas o en espera:

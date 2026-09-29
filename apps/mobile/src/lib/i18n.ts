@@ -1,6 +1,7 @@
 import { langFromLocale, type Lang } from "@dizaster/contracts";
 import { fr } from "./locales/fr";
 import { pt } from "./locales/pt";
+import { pluralCategory } from "./ui/plural";
 
 /**
  * Textos de la interfaz en los idiomas iniciales (Blueprint D-19): español, inglés, portugués y francés.
@@ -32,6 +33,10 @@ const base = {
     timeline: "Cronología",
     reports: "reportes",
     sources: "fuentes",
+    report_one: "reporte",
+    source_one: "fuente",
+    eventLocalTime: "hora local",
+    yourTime: "tu hora",
     adjustPin: "Toca el mapa para ajustar el pin (solo cerca de donde estás).",
     sameEvent: "¿Es alguno de estos?",
     newEvent: "No, es otro acontecimiento",
@@ -431,6 +436,10 @@ const base = {
     timeline: "Timeline",
     reports: "reports",
     sources: "sources",
+    report_one: "report",
+    source_one: "source",
+    eventLocalTime: "local time",
+    yourTime: "your time",
     adjustPin: "Tap the map to adjust the pin (only near where you are).",
     sameEvent: "Is it one of these?",
     newEvent: "No, it's something else",
@@ -817,6 +826,11 @@ export function setLang(next: Lang): void {
   lang = next;
 }
 export const t = (key: MessageKey): string => catalogs[lang][key];
+
+/** "1 reporte", "3 reportes", "0 signalement": número y palabra con el plural correcto del idioma (ADR 0079). */
+export function tCount(n: number, one: MessageKey, other: MessageKey): string {
+  return `${n} ${t(pluralCategory(n, lang) === "one" ? one : other)}`;
+}
 
 export const VERIFICATION_LABEL: Record<string, Record<Lang, string> & { color: string }> = {
   UNVERIFIED: { es: "Sin verificar", en: "Unverified", pt: "Não verificado", fr: "Non vérifié", color: "#8a94a6" },

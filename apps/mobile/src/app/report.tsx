@@ -10,7 +10,7 @@ import { api } from "../lib/api";
 import { callTarget, label as serviceLabel, type CallTarget } from "../lib/emergency";
 import { localEmergencyDataset } from "../lib/emergency-store";
 import { countryOf } from "../lib/geo/country";
-import { lang, locale, t, verificationLabel } from "../lib/i18n";
+import { lang, locale, t, tCount, verificationLabel } from "../lib/i18n";
 import { newId } from "../lib/ids";
 import { OFFLINE_FALLBACK_STYLE, providerFromAppConfig } from "../lib/map/provider";
 import { toPresenceSignals } from "../lib/report/presence";
@@ -207,7 +207,7 @@ export default function ReportScreen() {
           {nearby.map((e) => (
             <Pressable key={e.id} accessibilityRole="button" style={[styles.nearbyRow, target === e.id && styles.nearbySelected]} onPress={() => setTarget(e.id)}>
               <Text style={styles.rowText}>{e.title?.[lang] ?? e.title?.["es"] ?? e.categoryCode}</Text>
-              <Text style={styles.meta}>{e.distanceBucket} · {verificationLabel(e.publicVerificationState)} · {e.reportCount} {t("reports")}</Text>
+              <Text style={styles.meta}>{e.distanceBucket} · {verificationLabel(e.publicVerificationState)} · {tCount(e.reportCount, "report_one", "reports")}</Text>
             </Pressable>
           ))}
           <Pressable accessibilityRole="button" style={[styles.nearbyRow, target === null && styles.nearbySelected]} onPress={() => setTarget(null)}>
