@@ -37,6 +37,9 @@ export interface MediaLimits {
 /** Variante pública saneada (sin metadatos de ubicación). La única que sale por la API. */
 export const PUBLIC_VARIANT = "DISPLAY";
 export const THUMB_VARIANT = "THUMB_S";
+/** Fotograma de un video a tamaño de pantalla (ADR 0032). */
+export const POSTER_VARIANT = "POSTER";
+const posterKey = (originalKey: string) => `${originalKey}_poster`;
 /** Una foto casi idéntica a otra de otra persona subida hace más de esto se señala a moderación. */
 export const REUSE_MIN_AGE_HOURS = 1;
 
@@ -45,7 +48,7 @@ const EXT: Record<string, string> = { "image/jpeg": "jpg", "video/mp4": "mp4", "
 interface MediaRow {
   id: string; owner_profile_id: string; kind: MediaKind; state: string; mime: string; bytes: string; sha256: string;
   storage_key_original: string | null; width: number | null; height: number | null; duration_ms: number | null;
-  captured_in_app: boolean; upload_expires_at: Date | null;
+  captured_in_app: boolean; upload_expires_at: Date | null; poster_bytes: number | null; poster_sha256: string | null;
 }
 
 /**
@@ -89,15 +92,16 @@ export class MediaService {
   }
 
   private async purgeWhere(q: Queryable, where: string, param: unknown): Promise<number> {
-    const { rows } = await q.query<{ id: string; storage_key_original: string | null; keys: string[] }>(
-      `SELECT m.id, m.storage_key_original, COALESCE(array_agg(v.storage_key) FILTER (WHERE v.storage_key IS NOT NULL), '{}') AS keys
+    const { rows } = await q.query<{ id: string; storage_key_original: string | null; poster: boolean; keys: string[] }>(
+      `SELECT m.id, m.storage_key_original, m.poster_sha256 IS NOT NULL AS poster, COALESCE(array_agg(v.storage_key) FILTER (WHERE v.storage_key IS NOT NULL), '{}') AS keys
          FROM media.media m LEFT JOIN media.variants v ON v.media_id = m.id
         WHERE ${where} AND (m.state <> 'DELETED' OR m.storage_key_original IS NOT NULL OR v.media_id IS NOT NULL)
         GROUP BY m.id`,
       [param],
     );
     for (const r of rows) {
-      for (const key of [r.storage_key_original, ...r.keys]) if (key) await this.storage.delete(key);
+      const posterOriginal = r.poster && r.storage_key_original ? posterKey(r.storage_key_original) : null;
+      for (const key of [r.storage_key_original, posterOriginal, ...r.keys]) if (key) await this.storage.delete(key);
       await q.query(`DELETE FROM media.variants WHERE media_id = $1`, [r.id]);
       await q.query(
         `UPDATE media.media SET state = 'DELETED', storage_key_original = NULL, capture_h3_r9 = NULL, updated_at = now() WHERE id = $1`,
@@ -124,14 +128,17 @@ export class MediaService {
     const key = `originals/${now.toISOString().slice(0, 7)}/${id}`;
     const expiresAt = new Date(now.getTime() + this.limits.uploadUrlTtlSeconds * 1000);
     const upload = await this.storage.presignPut({ key, mime: req.mime, sizeBytes: req.sizeBytes, ttlSeconds: this.limits.uploadUrlTtlSeconds });
+    const posterUpload = req.poster
+      ? await this.storage.presignPut({ key: posterKey(key), mime: "image/jpeg", sizeBytes: req.poster.sizeBytes, ttlSeconds: this.limits.uploadUrlTtlSeconds })
+      : null;
     await this.db.query(
       `INSERT INTO media.media (id, owner_profile_id, kind, state, delivery, captured_in_app, captured_at, duration_ms, width, height,
-                                bytes, mime, sha256, storage_key_original, upload_expires_at)
-       VALUES ($1, $2, $3, 'PENDING_UPLOAD', 'FILE', $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+                                bytes, mime, sha256, storage_key_original, upload_expires_at, poster_bytes, poster_sha256)
+       VALUES ($1, $2, $3, 'PENDING_UPLOAD', 'FILE', $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
       [id, ownerProfileId, req.kind, req.capturedInApp, req.capturedAt ?? null, req.durationMs ?? null, req.width ?? null, req.height ?? null,
-        req.sizeBytes, req.mime, req.sha256, key, expiresAt],
+        req.sizeBytes, req.mime, req.sha256, key, expiresAt, req.poster?.sizeBytes ?? null, req.poster?.sha256 ?? null],
     );
-    return { mediaId: id, upload, expiresAt: expiresAt.toISOString() };
+    return { mediaId: id, upload, ...(posterUpload ? { posterUpload } : {}), expiresAt: expiresAt.toISOString() };
   }
 
   /** El dispositivo avisa de que terminó la subida. Idempotente. */
@@ -205,6 +212,7 @@ export class MediaService {
       await this.detectReuse(tx, mediaId, row.owner_profile_id, img.phash);
     } else {
       await variant(PUBLIC_VARIANT, `public/${mediaId}.${EXT[row.mime] ?? "bin"}`, result.data, row.mime);
+      if (row.poster_sha256) await this.processPoster(tx, row, variant);
     }
     await tx.query(
       `UPDATE media.media SET state = 'READY', sanitized = $2, processed_at = $3, updated_at = now() WHERE id = $1`,
@@ -212,6 +220,40 @@ export class MediaService {
     );
     const hash = (await tx.query<{ phash: string | null }>(`SELECT phash FROM media.media WHERE id = $1`, [mediaId])).rows[0]?.phash ?? null;
     await publish(tx, "MediaReady", { mediaId, phash: hash }, { lane: "interactive" });
+  }
+
+  /**
+   * Póster del video (ADR 0032): se trata como una foto (hash, re-codificación sin metadatos, miniatura) y su
+   * hash perceptual pasa a ser el del video, así un video reciclado también se detecta. Un póster ausente,
+   * alterado o ilegible no rechaza el video: solo se queda sin miniatura.
+   */
+  private async processPoster(
+    tx: Queryable, row: MediaRow, variant: (name: string, key: string, data: Uint8Array, mime: string) => Promise<void>,
+  ): Promise<void> {
+    const key = posterKey(row.storage_key_original!);
+    const stat = await this.storage.stat(key);
+    if (!stat || stat.size !== row.poster_bytes) return;
+    const data = await this.storage.get(key);
+    const img = await this.renderPoster(data, row.poster_sha256!);
+    // Solo se borra cuando ya no hace falta reintentar (un error inesperado deja el original para el reintento).
+    await this.storage.delete(key);
+    if (!img) return;
+    for (const v of img.variants) {
+      const name = v.variant === PUBLIC_VARIANT ? POSTER_VARIANT : v.variant;
+      await variant(name, `public/${row.id}_${name.toLowerCase()}.jpg`, v.data, "image/jpeg");
+    }
+    await tx.query(`UPDATE media.media SET phash = $2, phash_bands = $3 WHERE id = $1`, [row.id, img.phash, phashBands(img.phash)]);
+    await this.detectReuse(tx, row.id, row.owner_profile_id, img.phash);
+  }
+
+  private async renderPoster(data: Uint8Array, sha256: string) {
+    if (createHash("sha256").update(data).digest("hex") !== sha256 || sniffFamily(data.subarray(0, 16)) !== "image/jpeg") return null;
+    try {
+      return await renderImage(data);
+    } catch (err) {
+      if (err instanceof MalformedMediaError) return null;
+      throw err;
+    }
   }
 
   /**
@@ -276,21 +318,23 @@ export class MediaService {
     if (mediaIds.length === 0) return [];
     const { rows } = await q.query<{
       id: string; kind: MediaKind; mime: string; width: number | null; height: number | null; duration_ms: number | null;
-      captured_in_app: boolean; storage_key: string; thumb_key: string | null; display_mime: string;
+      captured_in_app: boolean; storage_key: string; thumb_key: string | null; poster_key: string | null; display_mime: string;
     }>(
       `SELECT m.id, m.kind, m.mime, m.width, m.height, m.duration_ms, m.captured_in_app, v.storage_key, v.mime AS display_mime,
-              t.storage_key AS thumb_key
+              t.storage_key AS thumb_key, po.storage_key AS poster_key
          FROM media.media m JOIN media.variants v ON v.media_id = m.id AND v.variant = $2
          LEFT JOIN media.variants t ON t.media_id = m.id AND t.variant = $4
+         LEFT JOIN media.variants po ON po.media_id = m.id AND po.variant = $5
         WHERE m.id = ANY($1) AND m.state = 'READY'
           AND (m.moderation_state = 'APPROVED' OR (m.moderation_state = 'PENDING' AND NOT $3))
         ORDER BY array_position($1::uuid[], m.id)`,
-      [mediaIds, PUBLIC_VARIANT, opts.requireApproval, THUMB_VARIANT],
+      [mediaIds, PUBLIC_VARIANT, opts.requireApproval, THUMB_VARIANT, POSTER_VARIANT],
     );
     return rows.map((r) => ({
       id: r.id, kind: r.kind, mime: r.display_mime, width: r.width, height: r.height, durationMs: r.duration_ms,
       capturedInApp: r.captured_in_app, url: this.storage.publicUrl(r.storage_key),
       thumbUrl: r.thumb_key ? this.storage.publicUrl(r.thumb_key) : null,
+      posterUrl: r.poster_key ? this.storage.publicUrl(r.poster_key) : null,
     }));
   }
 
@@ -325,6 +369,7 @@ export class MediaService {
     );
     for (const r of abandoned.rows) {
       await this.storage.delete(r.storage_key_original);
+      await this.storage.delete(posterKey(r.storage_key_original));
       await this.db.query(`UPDATE media.media SET state = 'DELETED', storage_key_original = NULL, updated_at = now() WHERE id = $1`, [r.id]);
     }
     const expired = await this.db.query<{ id: string; storage_key_original: string }>(
@@ -345,7 +390,7 @@ export class MediaService {
   private async row(q: Queryable, id: string): Promise<MediaRow | null> {
     const { rows } = await q.query<MediaRow>(
       `SELECT id, owner_profile_id, kind, state, mime, bytes, sha256, storage_key_original, width, height, duration_ms,
-              captured_in_app, upload_expires_at
+              captured_in_app, upload_expires_at, poster_bytes, poster_sha256
          FROM media.media WHERE id = $1`,
       [id],
     );

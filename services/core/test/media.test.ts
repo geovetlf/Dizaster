@@ -60,6 +60,45 @@ describe("subida directa firmada", () => {
     expect(copy.subarray(0, copy.indexOf(Buffer.from("mdat"))).includes(Buffer.from(ANDROID_LOCATION))).toBe(false);
   });
 
+  it("video con póster del teléfono: miniatura saneada, hash perceptual y sin original del póster", async () => {
+    const u = await createUser(t, "media_poster");
+    const file = makeMp4();
+    const poster = makeJpeg();
+    const res = await requestUpload(u, file, {
+      kind: "VIDEO_RECORDED", mime: "video/mp4", durationMs: 8_000, width: 1280, height: 720, poster: { sizeBytes: poster.length, sha256: sha(poster) },
+    });
+    expect(res.statusCode).toBe(201);
+    const { mediaId, upload, posterUpload } = res.json();
+    expect((await put(upload, file)).statusCode).toBe(200);
+    expect((await put(posterUpload, poster)).statusCode).toBe(200);
+    await t.app.inject({ method: "POST", url: `/v1/media/${mediaId}/complete`, headers: auth(u) });
+    await t.c.dispatcher.drain();
+
+    const variants = await t.c.db.query<{ variant: string; storage_key: string }>(`SELECT variant, storage_key FROM media.variants WHERE media_id = $1 ORDER BY variant`, [mediaId]);
+    expect(variants.rows.map((r) => r.variant)).toEqual(["DISPLAY", "POSTER", "THUMB_S"]);
+    const posterCopy = Buffer.from(await t.c.storage.get(variants.rows[1]!.storage_key));
+    expect(posterCopy.includes(Buffer.from("GPSLatitude"))).toBe(false);
+    const row = (await t.c.db.query<{ phash: string | null; key: string }>(`SELECT phash, storage_key_original AS key FROM media.media WHERE id = $1`, [mediaId])).rows[0]!;
+    expect(row.phash).toMatch(/^[0-9a-f]{16}$/);
+    expect(await t.c.storage.stat(`${row.key}_poster`)).toBeNull();
+    const [view] = await t.c.media.publicViews(t.c.db, [mediaId], { requireApproval: false });
+    expect(view).toMatchObject({ kind: "VIDEO_RECORDED", mime: "video/mp4" });
+    expect(view!.posterUrl).toContain(`${mediaId}_poster.jpg`);
+    expect(view!.thumbUrl).toContain(`${mediaId}_thumb_s.jpg`);
+  });
+
+  it("un póster que no llegó o no coincide no rechaza el video; solo las fotos no llevan póster", async () => {
+    const u = await createUser(t, "media_poster_missing");
+    const poster = makeJpeg();
+    const id = await uploadReady(u, makeMp4(), {
+      kind: "VIDEO_RECORDED", mime: "video/mp4", durationMs: 8_000, poster: { sizeBytes: poster.length, sha256: sha(poster) },
+    });
+    expect((await state(u, id)).state).toBe("READY");
+    const [view] = await t.c.media.publicViews(t.c.db, [id], { requireApproval: false });
+    expect(view).toMatchObject({ thumbUrl: null, posterUrl: null });
+    expect((await requestUpload(u, makeJpeg(), { poster: { sizeBytes: 10, sha256: sha(poster) } })).statusCode).toBe(400);
+  });
+
   it("valida el pedido: tipo, tamaño y duración", async () => {
     const u = await createUser(t, "media_limits");
     expect((await requestUpload(u, makeJpeg(), { mime: "image/png" })).statusCode).toBe(400);

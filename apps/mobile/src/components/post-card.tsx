@@ -135,11 +135,14 @@ function MediaGrid({ media, onOpen }: { media: MediaView[]; onOpen: (() => void)
   );
 }
 
-/** Miniatura: foto o, para video, un marco con botón de reproducción y duración (sin cargar el video). */
+/** Miniatura: foto o, para video, su póster (si lo hay) con botón de reproducción y duración (sin cargar el video). */
 function Tile({ m, style, small = false }: { m: MediaView; style: object; small?: boolean }) {
   if (m.kind === "IMAGE") return <Image source={{ uri: imageUri(m, small ? "small" : "large") }} style={[styles.tile, style]} resizeMode="cover" accessibilityIgnoresInvertColors />;
   return (
     <View style={[styles.tile, styles.videoTile, style]}>
+      {m.thumbUrl ? (
+        <Image source={{ uri: small ? m.thumbUrl : (m.posterUrl ?? m.thumbUrl) }} style={StyleSheet.absoluteFill} resizeMode="cover" accessibilityIgnoresInvertColors />
+      ) : null}
       <View style={styles.play}><Icon name="play" size={30} color={colors.white} /></View>
       <Text style={styles.duration}>{duration(m.durationMs)}</Text>
     </View>

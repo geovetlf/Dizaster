@@ -197,6 +197,7 @@ export const fr: Record<MessageKey, string> = {
   zonePrivacy: "Nous enregistrons un point approximatif (~500 m), pas votre adresse exacte. Personne d'autre ne voit vos zones.",
   saveZone: "Enregistrer la zone",
   costMonth: "mois",
+  playVideo: "Lire la vidéo",
   sessionsTitle: "Sessions et appareils",
   thisDevice: "cet appareil",
   unknownDevice: "Appareil",

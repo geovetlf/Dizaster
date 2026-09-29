@@ -1,6 +1,6 @@
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex } from "@noble/hashes/utils.js";
-import { MEDIA_UPLOAD_LIMITS, type CreateUploadRequest, type UploadableMediaKind } from "@dizaster/contracts";
+import { MEDIA_UPLOAD_LIMITS, VIDEO_POSTER_MAX_BYTES, type CreateUploadRequest, type UploadableMediaKind } from "@dizaster/contracts";
 
 /**
  * Foto o video preparado en el dispositivo, listo para subir. Lógica común a Android e iOS: solo la captura
@@ -18,7 +18,21 @@ export interface LocalMedia {
   durationMs: number | null;
   capturedInApp: boolean;
   capturedAt: string;
+  /** Solo videos: fotograma JPEG extraído en el teléfono (ADR 0032). Sin él, el video se ve con un marco genérico. */
+  poster?: LocalPoster | null;
 }
+
+export interface LocalPoster {
+  localUri: string;
+  sizeBytes: number;
+  sha256: string;
+}
+
+/** Póster: ancho máximo y calidad (una miniatura, no una foto de evidencia). */
+export const POSTER_MAX_WIDTH_PX = 720;
+export const POSTER_JPEG_QUALITY = 0.7;
+/** Segundo del que se toma el fotograma: el primero suele salir negro o movido. */
+export const POSTER_AT_SECONDS = 0.5;
 
 /** Parámetros de compresión en el dispositivo (cost-first: menos datos móviles y menos almacenamiento). */
 export const IMAGE_MAX_EDGE_PX = 1920;
@@ -70,5 +84,8 @@ export function toUploadRequest(m: LocalMedia): CreateUploadRequest {
     ...(m.durationMs ? { durationMs: Math.round(m.durationMs) } : {}),
     capturedAt: m.capturedAt,
     capturedInApp: m.capturedInApp,
+    ...(m.kind === "VIDEO_RECORDED" && m.poster && m.poster.sizeBytes <= VIDEO_POSTER_MAX_BYTES
+      ? { poster: { sizeBytes: m.poster.sizeBytes, sha256: m.poster.sha256 } }
+      : {}),
   };
 }

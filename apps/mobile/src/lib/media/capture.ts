@@ -1,8 +1,12 @@
 import { Directory, File, Paths } from "expo-file-system";
 import { ImageManipulator, SaveFormat } from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
+import { createVideoPlayer } from "expo-video";
 import { newId } from "../ids";
-import { fitWithin, IMAGE_JPEG_QUALITY, sha256OfChunks, videoMime, VIDEO_MAX_SECONDS, type LocalMedia } from "./local-media";
+import {
+  fitWithin, IMAGE_JPEG_QUALITY, POSTER_AT_SECONDS, POSTER_JPEG_QUALITY, POSTER_MAX_WIDTH_PX, sha256OfChunks, videoMime, VIDEO_MAX_SECONDS,
+  type LocalMedia, type LocalPoster,
+} from "./local-media";
 
 export type CaptureSource = "camera" | "library";
 export type CaptureKind = "IMAGE" | "VIDEO_RECORDED";
@@ -67,10 +71,33 @@ export async function captureMedia(source: CaptureSource, kind: CaptureKind): Pr
     });
   }
 
-  return persist(new File(asset.uri), {
+  const video = await persist(new File(asset.uri), {
     kind: "VIDEO_RECORDED", mime: videoMime(asset.uri, asset.mimeType), width: asset.width, height: asset.height,
     durationMs: asset.duration ?? null, capturedInApp: source === "camera", capturedAt,
   });
+  return { ...video, poster: await makePoster(video.localUri) };
+}
+
+/**
+ * Fotograma del video como JPEG (ADR 0032), en el teléfono: el servidor no decodifica video. Si el sistema no
+ * puede extraerlo, el video se envía igual sin póster.
+ */
+async function makePoster(videoUri: string): Promise<LocalPoster | null> {
+  const player = createVideoPlayer(videoUri);
+  try {
+    const [frame] = await player.generateThumbnailsAsync(POSTER_AT_SECONDS, { maxWidth: POSTER_MAX_WIDTH_PX });
+    if (!frame) return null;
+    const image = await ImageManipulator.manipulate(frame).renderAsync();
+    const saved = await image.saveAsync({ format: SaveFormat.JPEG, compress: POSTER_JPEG_QUALITY });
+    const dest = new File(pendingDir(), `${newId()}_poster.jpg`);
+    await new File(saved.uri).copy(dest);
+    const { hex, size } = await sha256OfChunks(readChunks(dest));
+    return { localUri: dest.uri, sizeBytes: size, sha256: hex };
+  } catch {
+    return null;
+  } finally {
+    player.release();
+  }
 }
 
 async function persist(src: File, meta: Omit<LocalMedia, "localUri" | "sizeBytes" | "sha256">): Promise<LocalMedia> {
@@ -82,11 +109,14 @@ async function persist(src: File, meta: Omit<LocalMedia, "localUri" | "sizeBytes
 }
 
 /** Borra la copia local cuando el reporte ya se envió (o se descartó). */
-export function discardLocal(m: Pick<LocalMedia, "localUri">): void {
-  try {
-    const f = new File(m.localUri);
-    if (f.exists) f.delete();
-  } catch {
-    // Si ya no existe, no hay nada que limpiar.
+export function discardLocal(m: Pick<LocalMedia, "localUri" | "poster">): void {
+  for (const uri of [m.localUri, m.poster?.localUri]) {
+    if (!uri) continue;
+    try {
+      const f = new File(uri);
+      if (f.exists) f.delete();
+    } catch {
+      // Si ya no existe, no hay nada que limpiar.
+    }
   }
 }

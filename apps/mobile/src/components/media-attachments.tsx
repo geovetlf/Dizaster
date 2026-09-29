@@ -48,7 +48,10 @@ export function MediaAttachments({ items, onChange }: { items: LocalMedia[]; onC
             {m.kind === "IMAGE" ? (
               <Image source={{ uri: m.localUri }} style={styles.image} accessibilityIgnoresInvertColors />
             ) : (
-              <View style={[styles.image, styles.video]}><Text style={styles.videoText}>▶ {Math.round((m.durationMs ?? 0) / 1000)} s</Text></View>
+              <View style={[styles.image, styles.video]}>
+                {m.poster ? <Image source={{ uri: m.poster.localUri }} style={StyleSheet.absoluteFill} accessibilityIgnoresInvertColors /> : null}
+                <Text style={styles.videoText}>▶ {Math.round((m.durationMs ?? 0) / 1000)} s</Text>
+              </View>
             )}
             <Pressable accessibilityRole="button" accessibilityLabel={t("remove")} style={styles.remove} onPress={() => remove(m)}>
               <Text style={styles.removeText}>✕</Text>

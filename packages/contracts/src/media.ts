@@ -36,6 +36,17 @@ export const MEDIA_UPLOAD_LIMITS = {
 
 export type UploadableMediaKind = keyof typeof MEDIA_UPLOAD_LIMITS;
 
+/**
+ * Póster de un video (ADR 0032): un fotograma JPEG que el teléfono extrae y sube junto al video. El servidor
+ * no decodifica video (sin ffmpeg): re-codifica el póster como una foto más y lo usa de miniatura.
+ */
+export const VIDEO_POSTER_MAX_BYTES = 1024 * 1024;
+export const VideoPoster = z.object({
+  sizeBytes: z.number().int().positive().max(VIDEO_POSTER_MAX_BYTES),
+  sha256: z.string().regex(/^[0-9a-f]{64}$/),
+});
+export type VideoPoster = z.infer<typeof VideoPoster>;
+
 export const CreateUploadRequest = z
   .object({
     kind: z.enum(["IMAGE", "VIDEO_RECORDED"]),
@@ -49,8 +60,11 @@ export const CreateUploadRequest = z
     capturedAt: z.iso.datetime().optional(),
     /** Capturada con la cámara dentro de la app (más valor probatorio que una foto de la galería). */
     capturedInApp: z.boolean().default(false),
+    /** Solo videos. Opcional: sin póster el video se muestra con un marco genérico. */
+    poster: VideoPoster.optional(),
   })
   .superRefine((v, ctx) => {
+    if (v.poster && v.kind !== "VIDEO_RECORDED") ctx.addIssue({ code: "custom", path: ["poster"], message: "Solo los videos llevan póster" });
     const limits = MEDIA_UPLOAD_LIMITS[v.kind];
     if (!(limits.mimes as readonly string[]).includes(v.mime)) ctx.addIssue({ code: "custom", path: ["mime"], message: `Tipo no admitido para ${v.kind}` });
     if (v.sizeBytes > limits.maxBytes) ctx.addIssue({ code: "custom", path: ["sizeBytes"], message: `Máximo ${limits.maxBytes} bytes` });
@@ -71,6 +85,8 @@ export interface UploadInstruction {
 export interface CreateUploadResponse {
   mediaId: string;
   upload: UploadInstruction;
+  /** Solo si se declaró un póster: se sube como image/jpeg antes de completar. */
+  posterUpload?: UploadInstruction;
   expiresAt: string;
 }
 
@@ -85,6 +101,8 @@ export interface MediaView {
   capturedInApp: boolean;
   /** Versión para pantalla (fotos: re-codificada, máx. 1600 px, sin metadatos). */
   url: string;
-  /** Miniatura (máx. 400 px) para listas y mosaicos; null en videos hasta que exista el póster. */
+  /** Miniatura (máx. 400 px) para listas y mosaicos; en videos, la del póster (null si no se subió). */
   thumbUrl: string | null;
+  /** Solo videos: fotograma a tamaño de pantalla para mostrar antes de reproducir. */
+  posterUrl: string | null;
 }

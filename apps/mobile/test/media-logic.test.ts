@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { SubmitReportRequest } from "@dizaster/contracts";
+import { CreateUploadRequest, SubmitReportRequest } from "@dizaster/contracts";
 import { describe, expect, it } from "vitest";
 import { checkLimits, fitWithin, sha256OfChunks, toUploadRequest, videoMime, type LocalMedia } from "../src/lib/media/local-media";
 import { MemoryQueueStorage, ReportQueue, type MediaUploader } from "../src/lib/report/queue";
@@ -49,6 +49,17 @@ describe("preparación de media en el dispositivo", () => {
     const req = toUploadRequest(photo(1));
     expect(JSON.stringify(req)).not.toContain("file://");
     expect(req).toMatchObject({ kind: "IMAGE", mime: "image/jpeg", capturedInApp: true });
+  });
+
+  it("el póster del video viaja solo como tamaño y hash; nunca en fotos ni si excede el límite", () => {
+    const poster = { localUri: "file:///doc/pending-media/p_poster.jpg", sizeBytes: 40_000, sha256: "b".repeat(64) };
+    const video: LocalMedia = { ...photo(3), kind: "VIDEO_RECORDED", mime: "video/mp4", durationMs: 9000, poster };
+    const req = toUploadRequest(video);
+    expect(req.poster).toEqual({ sizeBytes: 40_000, sha256: "b".repeat(64) });
+    expect(JSON.stringify(req)).not.toContain("file://");
+    expect(CreateUploadRequest.safeParse(req).success).toBe(true);
+    expect(toUploadRequest({ ...photo(4), poster }).poster).toBeUndefined();
+    expect(toUploadRequest({ ...video, poster: { ...poster, sizeBytes: 5 * 1024 * 1024 } }).poster).toBeUndefined();
   });
 });
 
