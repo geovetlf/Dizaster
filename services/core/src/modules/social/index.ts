@@ -93,6 +93,8 @@ export const RANK_BOOST_HOURS = {
   followedAuthor: 4,
   /** Autor con reputación baja (ADR 0031): sigue visible, pero medio día detrás en "Para ti". */
   lowTrustAuthor: -12,
+  /** Ciclo de vida del evento (ADR 0124): lo que ya pasó deja de competir con lo que está pasando. */
+  lifecycle: { ACTIVE: 0, MONITORING: -2, RESOLVED: -8, ARCHIVED: -24 },
 };
 
 /** Mismo texto de al menos tantas cuentas distintas dentro de la ventana → a revisión humana como posible spam. */
@@ -101,11 +103,13 @@ export const DUPLICATE_TEXT = { minAuthors: 3, windowHours: 24, maxPosts: 50 } a
 function rankSql(nearSql: string | null): string {
   const B = RANK_BOOST_HOURS;
   const state = Object.entries(B.state).map(([k, v]) => `WHEN '${k}' THEN ${v}`).join(" ");
+  const lifecycle = Object.entries(B.lifecycle).map(([k, v]) => `WHEN '${k}' THEN ${v}`).join(" ");
   const distance = nearSql
     ? `CASE WHEN p.public_point IS NULL THEN 0 ${B.distance.map(([m, h]) => `WHEN ST_DWithin(p.public_point, ${nearSql}, ${m}) THEN ${h}`).join(" ")} ELSE 0 END`
     : "0";
   return `extract(epoch FROM p.created_at) / 3600.0
     + CASE coalesce(s.public_state, 'UNVERIFIED') ${state} ELSE 0 END
+    + CASE coalesce(s.lifecycle, 'ACTIVE') ${lifecycle} ELSE 0 END
     + (coalesce(s.severity, 1) - 1) * ${B.perSeverityStep}
     + ${distance}
     + CASE WHEN p.author_visibility = 'PUBLIC' AND EXISTS (
@@ -735,18 +739,19 @@ export class SocialService {
 
   async upsertEventSignal(
     q: Queryable,
-    e: { eventId: string; severity?: number; publicState?: string; regionId?: string | null; districtId?: string | null },
+    e: { eventId: string; severity?: number; publicState?: string; regionId?: string | null; districtId?: string | null; lifecycle?: string },
   ): Promise<void> {
     await q.query(
-      `INSERT INTO social.event_signals (event_id, severity, public_state, region_id, district_id)
-       VALUES ($1, coalesce($2, 1), coalesce($3, 'UNVERIFIED'), $4, $5)
+      `INSERT INTO social.event_signals (event_id, severity, public_state, region_id, district_id, lifecycle)
+       VALUES ($1, coalesce($2, 1), coalesce($3, 'UNVERIFIED'), $4, $5, coalesce($7, 'ACTIVE'))
        ON CONFLICT (event_id) DO UPDATE SET
          severity = coalesce($2, social.event_signals.severity),
          public_state = coalesce($3, social.event_signals.public_state),
+         lifecycle = coalesce($7, social.event_signals.lifecycle),
          region_id = CASE WHEN $6 THEN $4 ELSE social.event_signals.region_id END,
          district_id = CASE WHEN $6 THEN $5 ELSE social.event_signals.district_id END,
          updated_at = now()`,
-      [e.eventId, e.severity ?? null, e.publicState ?? null, e.regionId ?? null, e.districtId ?? null, e.regionId !== undefined],
+      [e.eventId, e.severity ?? null, e.publicState ?? null, e.regionId ?? null, e.districtId ?? null, e.regionId !== undefined, e.lifecycle ?? null],
     );
   }
 

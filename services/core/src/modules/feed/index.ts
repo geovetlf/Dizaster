@@ -67,6 +67,10 @@ export class FeedService {
     };
     dispatcher.on("EventCreated", "feed.event-signals.created", (e, tx) => refresh(e.payload.eventId, tx));
     dispatcher.on("EventEvidenceAdded", "feed.event-signals.evidence", (e, tx) => refresh(e.payload.eventId, tx));
+    // Resuelto o archivado: sus posts dejan de empujar en "Para ti" (ADR 0124).
+    dispatcher.on("EventLifecycleChanged", "feed.event-signals.lifecycle", async (e, tx) => {
+      await this.social.upsertEventSignal(tx, { eventId: e.payload.eventId, lifecycle: e.payload.to });
+    });
     // El estado viene en el propio evento de dominio: no depende de que el espejo de event ya se haya aplicado.
     dispatcher.on("VerificationChanged", "feed.event-signals.verification", async (e, tx) => {
       const n = e.payload.negativeState;
