@@ -2,7 +2,7 @@ import Fastify, { type FastifyInstance, type FastifyRequest } from "fastify";
 import { z } from "zod";
 import {
   BBox, CreateCommentRequest, DevicePlatform, MEDIA_UPLOAD_LIMITS, MergeEventsRequest, NegativeState, ReactionKind, CommentReactionKind, ConfirmAgeRequest, RegisterPushTokenRequest, RevertMergeRequest,
-  SplitEventRequest, SetEventStatusRequest, DATA_EXPORT_FORMAT, type AppConfig, type Attribution, type AttributionsResponse, type DataExport, type EmergencyNumbersResponse,
+  SplitEventRequest, SetEventStatusRequest, DATA_EXPORT_FORMAT, type AppConfig, type Attribution, type AttributionsResponse, type DataExport, type EmergencyNumbersResponse, type EventSearchResponse,
 } from "@dizaster/contracts";
 import { LocalDiskStorage } from "../modules/media/index.js";
 import type { Container } from "../container.js";
@@ -283,6 +283,9 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
     return c.feed.eventPosts(c.db, parse(IdParam, req.params).id, req.query, req.session?.profileId ?? null);
   });
   // Fuentes externas y oficiales del evento, con licencia y enlace al original (ADR 0055).
+  // Búsqueda de eventos (ADR 0065): pública como el mapa; solo datos públicos del EVENT.
+  app.get("/v1/search/events", async (req): Promise<EventSearchResponse> => ({ events: await c.events.search(c.db, req.query) }));
+
   app.get("/v1/events/:id/sources", async (req, reply) => {
     const refs = await c.events.sourceItemRefs(c.db, parse(IdParam, req.params).id);
     reply.header("cache-control", "public, max-age=60");

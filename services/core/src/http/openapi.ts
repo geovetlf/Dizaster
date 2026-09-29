@@ -18,6 +18,7 @@ export const OPERATIONS: Record<string, Operation> = {
   "GET /v1/config": { summary: "Configuración remota: proveedor de mapa, interruptores y límites", response: C.AppConfig },
   "GET /v1/openapi.json": { summary: "Este contrato" },
   "GET /v1/reference/categories": { summary: "Catálogo de categorías", response: C.CategoryCatalog },
+  "GET /v1/search/events": { summary: "Buscar eventos por categoría, lugar o título (sin IA)", query: C.EventSearchQuery, response: C.EventSearchResponse },
   "GET /v1/reference/emergency-numbers": { summary: "Números de emergencia (con ?since para no descargar si no cambió)", response: C.EmergencyNumbersResponse },
   "GET /v1/geo/country": { summary: "País de un punto" },
   "GET /v1/geo/areas": { summary: "Búsqueda de lugares en el índice abierto propio", query: C.AreaSearchQuery },

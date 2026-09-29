@@ -89,6 +89,11 @@ export const api = {
   setCommentReaction: (commentId: string, kind: "LIKE" | "SUPPORT" | "USEFUL", on: boolean) =>
     request<ReactionState>(`/v1/comments/${commentId}/reactions/${kind}`, { method: on ? "PUT" : "DELETE" }),
   /** Lugares del índice geográfico propio. La ubicación, si se envía, va redondeada (~1 km) solo para ordenar. */
+  searchEvents: (q: string, near?: { lat: number; lng: number } | null) => {
+    const p = new URLSearchParams({ q });
+    if (near) { p.set("lat", near.lat.toFixed(2)); p.set("lng", near.lng.toFixed(2)); }
+    return request<{ events: EventSummary[] }>(`/v1/search/events?${p}`);
+  },
   areas: (q: string, near?: { lat: number; lng: number } | null) => {
     const p = new URLSearchParams({ q });
     if (near) { p.set("lat", near.lat.toFixed(2)); p.set("lng", near.lng.toFixed(2)); }

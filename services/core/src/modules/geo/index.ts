@@ -142,11 +142,48 @@ export class GeoService {
     return this.countryCodes.has(code);
   }
 
+  private readonly searchNames = new Map<string, string[]>();
+  /** Nombres del país en es y en, normalizados (en caché: se calculan una vez por país). */
+  private countrySearchNames(code: string): string[] {
+    let names = this.searchNames.get(code);
+    if (!names) {
+      names = [];
+      for (const lang of ["es", "en"]) {
+        try { names.push(searchKey(new Intl.DisplayNames([lang], { type: "region" }).of(code) ?? "")); } catch { /* código sin nombre */ }
+      }
+      this.searchNames.set(code, names);
+    }
+    return names;
+  }
+
   countryName(code: string): string {
     return this.countryNames.of(code) ?? code;
   }
 
   /** Búsqueda de lugares por nombre (sin tildes, por prefijo de palabra) para centrar el mapa. Sin geocodificador externo. */
+  /**
+   * Para buscar eventos por lugar (ADR 0065): ids de las áreas cuyo nombre coincide con la palabra, con todas sus
+   * subdivisiones (buscar "Lima" encuentra eventos de sus distritos), y países cuyo nombre en es/en coincide.
+   */
+  async placeMatches(q: Queryable, word: string): Promise<{ areaIds: string[]; countries: string[] }> {
+    const key = searchKey(word);
+    if (key.length < 2) return { areaIds: [], countries: [] };
+    const like = key.replace(/[\\%_]/g, "\\$&");
+    const { rows } = await q.query<{ id: string }>(
+      `WITH RECURSIVE hit AS (
+         SELECT id FROM geo.admin_areas WHERE search_key LIKE $1 || '%' OR search_key LIKE '% ' || $1 || '%' LIMIT 20
+       ), tree AS (
+         SELECT id FROM hit UNION SELECT a.id FROM geo.admin_areas a JOIN tree t ON a.parent_id = t.id
+       )
+       SELECT id FROM tree LIMIT 5000`,
+      [like],
+    );
+    const countries = [...this.countryCodes].filter((c) =>
+      /^[A-Z]{2}$/.test(c) && this.countrySearchNames(c).some((k) => k.startsWith(key) || k.includes(` ${key}`)),
+    );
+    return { areaIds: rows.map((r) => r.id), countries };
+  }
+
   async searchAreas(q: Queryable, raw: unknown): Promise<AreaSearchResult[]> {
     const parsed = AreaSearchQuery.safeParse(raw);
     if (!parsed.success) throw new DomainError("VALIDATION", parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; "));

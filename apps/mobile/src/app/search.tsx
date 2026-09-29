@@ -1,13 +1,13 @@
-import type { AreaSearchResult, BusinessView, CategoryCatalog, ProfileSearchResult, TagView } from "@dizaster/contracts";
+import type { AreaSearchResult, BusinessView, CategoryCatalog, EventSummary, ProfileSearchResult, TagView } from "@dizaster/contracts";
 import { router } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import { Pressable, SectionList, StyleSheet, Text, TextInput, View } from "react-native";
 import { Icon } from "../components/icon";
 import { api } from "../lib/api";
-import { lang, t } from "../lib/i18n";
+import { lang, t, verificationLabel } from "../lib/i18n";
 import { BUSINESS_CATEGORY_LABEL } from "../lib/social/business";
 import { categoryStyle } from "../lib/ui/categories";
-import { areaRow, bboxParam, initials } from "../lib/ui/format";
+import { areaRow, bboxParam, initials, timeAgo } from "../lib/ui/format";
 import { useCoarseLocation } from "../lib/ui/use-coarse-location";
 import { colors, radius, space } from "../theme";
 
@@ -17,6 +17,7 @@ const catalog = require("../reference-data/categories.json") as CategoryCatalog;
 const normalize = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 
 type Row =
+  | { type: "event"; event: EventSummary }
   | { type: "area"; area: AreaSearchResult }
   | { type: "person"; person: ProfileSearchResult }
   | { type: "tag"; tag: TagView }
@@ -24,11 +25,12 @@ type Row =
   | { type: "category"; code: string; name: string };
 
 /**
- * Búsqueda: lugares (índice geográfico propio, sin geocodificador comercial), personas, etiquetas y categorías (catálogo
- * empaquetado, funciona sin conexión).
+ * Búsqueda: eventos (categoría + lugar + título, ADR 0065), lugares (índice geográfico propio, sin geocodificador
+ * comercial), personas, etiquetas y categorías (catálogo empaquetado, funciona sin conexión).
  */
 export default function SearchScreen() {
   const [q, setQ] = useState("");
+  const [events, setEvents] = useState<EventSummary[]>([]);
   const [areas, setAreas] = useState<AreaSearchResult[]>([]);
   const [people, setPeople] = useState<ProfileSearchResult[]>([]);
   const [tags, setTags] = useState<TagView[]>([]);
@@ -43,10 +45,11 @@ export default function SearchScreen() {
 
   useEffect(() => {
     const text = q.trim();
-    if (text.length < 2) { setAreas([]); setPeople([]); setTags([]); setBusinesses([]); return; }
+    if (text.length < 2) { setEvents([]); setAreas([]); setPeople([]); setTags([]); setBusinesses([]); return; }
     let live = true;
     // Espera a que el usuario deje de escribir: menos peticiones, menos coste.
     const timer = setTimeout(() => {
+      api.searchEvents(text, near).then((r) => { if (live) setEvents(r.events); }).catch(() => { if (live) setEvents([]); });
       api.areas(text, near).then((r) => { if (live) setAreas(r.areas); }).catch(() => { if (live) setAreas([]); });
       api.searchProfiles(text).then((r) => { if (live) setPeople(r.profiles); }).catch(() => { if (live) setPeople([]); });
       api.searchTags(text).then((r) => { if (live) setTags(r.tags); }).catch(() => { if (live) setTags([]); });
@@ -56,6 +59,7 @@ export default function SearchScreen() {
   }, [q, near]);
 
   const sections = [
+    ...(events.length ? [{ title: t("searchEvents"), data: events.map((event): Row => ({ type: "event", event })) }] : []),
     ...(areas.length ? [{ title: t("searchPlaces"), data: areas.map((area): Row => ({ type: "area", area })) }] : []),
     ...(people.length ? [{ title: t("searchPeople"), data: people.map((person): Row => ({ type: "person", person })) }] : []),
     ...(businesses.length ? [{ title: t("searchBusinesses"), data: businesses.map((business): Row => ({ type: "business", business })) }] : []),
@@ -75,9 +79,22 @@ export default function SearchScreen() {
       <SectionList
         sections={sections}
         keyboardShouldPersistTaps="handled"
-        keyExtractor={(r) => (r.type === "area" ? r.area.id : r.type === "person" ? `@${r.person.handle}` : r.type === "tag" ? `#${r.tag.tag}` : r.type === "business" ? `b:${r.business.handle}` : r.code)}
+        keyExtractor={(r) => (r.type === "event" ? `e:${r.event.id}` : r.type === "area" ? r.area.id : r.type === "person" ? `@${r.person.handle}` : r.type === "tag" ? `#${r.tag.tag}` : r.type === "business" ? `b:${r.business.handle}` : r.code)}
         renderSectionHeader={({ section }) => <Text style={styles.note}>{section.title}</Text>}
         renderItem={({ item }) => {
+          if (item.type === "event") {
+            const s = categoryStyle(item.event.categoryCode);
+            const name = catalog.categories.find((c) => c.code === item.event.categoryCode)?.names;
+            return (
+              <Pressable accessibilityRole="link" style={styles.row} onPress={() => router.push(`/event/${item.event.id}`)}>
+                <Icon name={s.icon} size={22} color={s.color} />
+                <View style={styles.rowBody}>
+                  <Text style={styles.rowText}>{name?.[lang] ?? name?.["es"] ?? item.event.categoryCode}{item.event.place ? ` · ${item.event.place.label}` : ""}</Text>
+                  <Text style={styles.rowSub}>{verificationLabel(item.event.publicVerificationState)} · {timeAgo(item.event.lastActivityAt, lang)}</Text>
+                </View>
+              </Pressable>
+            );
+          }
           if (item.type === "area") {
             const row = areaRow(item.area);
             return (

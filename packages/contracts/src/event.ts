@@ -115,6 +115,22 @@ export type NearbyEvent = z.infer<typeof NearbyEvent>;
 export const NearbyEventsResponse = z.object({ events: z.array(NearbyEvent) });
 export type NearbyEventsResponse = z.infer<typeof NearbyEventsResponse>;
 
+/**
+ * Búsqueda de eventos (RF-02, ADR 0065). Determinista: cada palabra debe coincidir con la categoría (en cualquier
+ * idioma del catálogo), el lugar (índice geográfico propio) o el título de la fuente. Sin IA ni buscador externo.
+ */
+export const EventSearchQuery = z.object({
+  q: z.string().trim().min(2).max(80),
+  /** Ubicación aproximada del lector para ordenar por cercanía; se redondea a 2 decimales. */
+  lat: z.coerce.number().min(-90).max(90).optional(),
+  lng: z.coerce.number().min(-180).max(180).optional(),
+  /** "1" incluye los archivados (historial, ADR 0061). */
+  archived: z.enum(["0", "1"]).default("0"),
+  limit: z.coerce.number().int().min(1).max(30).default(20),
+});
+export const EventSearchResponse = z.object({ events: z.array(EventSummary) });
+export type EventSearchResponse = z.infer<typeof EventSearchResponse>;
+
 // ───────────── Fusión y división manual por moderación (Blueprint §5.7, §6.1; ADR 0034) ─────────────
 
 const ModeratorReason = z.string().trim().min(10).max(1000);

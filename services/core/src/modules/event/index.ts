@@ -16,7 +16,7 @@ import type {
   TrustTier,
   VerificationLevel,
 } from "@dizaster/contracts";
-import { publicVerificationState } from "@dizaster/contracts";
+import { EventSearchQuery, publicVerificationState } from "@dizaster/contracts";
 import {
   DEDUP_RULES,
   H3_RES,
@@ -32,7 +32,7 @@ import type { Queryable } from "../../platform/db.js";
 import { DomainError, notFound } from "../../platform/errors.js";
 import { newId } from "../../platform/ids.js";
 import { publish, type OutboxDispatcher } from "../../platform/outbox.js";
-import type { GeoService } from "../geo/index.js";
+import { searchKey, type GeoService } from "../geo/index.js";
 import type { ReferenceData } from "../reference/index.js";
 
 export type ResolutionResult =
@@ -651,6 +651,50 @@ export class EventService {
       events: [],
       clusters: rows.map((r) => ({ h3: r.cell, point: { lat: r.lat, lng: r.lng }, count: Number(r.count), maxSeverity: r.max_severity })),
     };
+  }
+
+  /**
+   * Búsqueda de eventos (RF-02, ADR 0065). Cada palabra (hasta 4) debe coincidir con algo del evento: su categoría
+   * (nombre en cualquier idioma del catálogo), su lugar (área del índice propio o subdivisión, o país) o el título que
+   * trajo la fuente. Solo eventos publicados y no falsos; los archivados solo si se piden. Orden: vigentes primero,
+   * luego cercanía (si se da ubicación) o actividad reciente. Todo en PostgreSQL, sin IA ni buscador externo.
+   */
+  async search(q: Queryable, raw: unknown): Promise<EventSummary[]> {
+    const parsed = EventSearchQuery.safeParse(raw);
+    if (!parsed.success) throw new DomainError("VALIDATION", parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; "));
+    const { q: text, lat, lng, archived, limit } = parsed.data;
+    const words = [...new Set(searchKey(text).split(" ").filter((w) => w.length >= 2))].slice(0, 4);
+    if (words.length === 0) return [];
+    const params: unknown[] = [];
+    const p = (v: unknown) => `$${params.push(v)}`;
+    const clauses: string[] = [];
+    for (const w of words) {
+      const codes = this.ref.categories.categories
+        .filter((c) => Object.values(c.names).some((n) => { const k = searchKey(n); return k.startsWith(w) || k.includes(` ${w}`); }))
+        .map((c) => c.code);
+      const place = await this.geo.placeMatches(q, w);
+      const like = `%${w.replace(/[\\%_]/g, "\\$&")}%`;
+      clauses.push(`(
+        e.category_code = ANY(${p(codes)}) OR split_part(e.category_code, '.', 1) = ANY(${p(codes)})
+        OR e.region_id = ANY(${p(place.areaIds)}) OR e.district_id = ANY(${p(place.areaIds)})
+        OR e.country_code = ANY(${p(place.countries)})
+        OR EXISTS (SELECT 1 FROM jsonb_each_text(coalesce(e.title, '{}')) t WHERE lower(t.value) LIKE ${p(like)})
+      )`);
+    }
+    const near = lat !== undefined && lng !== undefined ? { lat: Math.round(lat * 100) / 100, lng: Math.round(lng * 100) / 100 } : null;
+    const order = near
+      ? `e.public_geom <-> ST_SetSRID(ST_MakePoint(${p(near.lng)}, ${p(near.lat)}), 4326)::geography`
+      : "e.last_activity_at DESC";
+    const { rows } = await q.query<EventRow>(
+      `SELECT ${PUBLIC_EVENT_COLUMNS} FROM event.events e
+        WHERE e.publication_state = 'PUBLISHED' AND e.negative_state <> 'FALSE' AND e.merged_into_id IS NULL
+          AND e.status IN ('ACTIVE','MONITORING','RESOLVED'${archived === "1" ? ",'ARCHIVED'" : ""})
+          AND ${clauses.join(" AND ")}
+        ORDER BY (e.status IN ('ACTIVE','MONITORING')) DESC, ${order}, e.id
+        LIMIT ${p(limit)}`,
+      params,
+    );
+    return rows.map(toSummary);
   }
 
   /**
