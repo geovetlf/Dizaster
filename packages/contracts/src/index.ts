@@ -15,3 +15,4 @@ export * from "./alert.js";
 export * from "./cost.js";
 export * from "./moderation.js";
 export * from "./quality.js";
+export * from "./social-text.js";

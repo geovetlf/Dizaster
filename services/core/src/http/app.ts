@@ -25,8 +25,8 @@ function requireSession(req: FastifyRequest): Session {
 }
 
 
-/** Escrituras permitidas a una cuenta suspendida: apelar, cerrar sesión, renovar sesión y borrar la cuenta. */
-const WRITE_ALLOWED_WHEN_SUSPENDED = /^(POST \/v1\/me\/moderation\/[^/]+\/appeal|POST \/v1\/auth\/(refresh|logout)|DELETE \/v1\/me)$/;
+/** Escrituras permitidas a una cuenta suspendida: apelar, cerrar sesión, renovar sesión, borrar sus posts y borrar la cuenta. */
+const WRITE_ALLOWED_WHEN_SUSPENDED = /^(POST \/v1\/me\/moderation\/[^/]+\/appeal|POST \/v1\/auth\/(refresh|logout)|DELETE \/v1\/me|DELETE \/v1\/posts\/[^/]+)$/;
 
 export async function buildApp(c: Container): Promise<FastifyInstance> {
   const app = Fastify({
@@ -346,6 +346,34 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
     const session = requireSession(req);
     const p = parse(FollowParams, req.params);
     return c.feed.setFollow(c.db, session.profileId, p.target, p.id, false);
+  });
+
+  // ───────────── Publicaciones, etiquetas y menciones (ADR 0027) ─────────────
+  app.post("/v1/posts", async (req, reply) => {
+    const session = requireSession(req);
+    reply.status(201);
+    return c.composer.create(session.profileId, req.body);
+  });
+
+  app.delete("/v1/posts/:id", async (req, reply) => {
+    const session = requireSession(req);
+    await c.composer.delete(session.profileId, parse(IdParam, req.params).id);
+    return reply.status(204).send();
+  });
+
+  app.get("/v1/tags", async (req, reply) => {
+    reply.header("cache-control", "no-store");
+    return { tags: await c.feed.searchTags(c.db, req.query, req.session?.profileId ?? null) };
+  });
+
+  app.get("/v1/tags/:tag", async (req, reply) => {
+    reply.header("cache-control", "no-store");
+    return c.feed.tag(c.db, (req.params as { tag: string }).tag, req.session?.profileId ?? null);
+  });
+
+  app.get("/v1/tags/:tag/posts", async (req, reply) => {
+    reply.header("cache-control", "no-store");
+    return c.feed.tagPosts(c.db, (req.params as { tag: string }).tag, req.query, req.session?.profileId ?? null);
   });
 
   app.put("/v1/posts/:id/like", async (req) => {

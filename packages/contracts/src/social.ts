@@ -42,6 +42,10 @@ export interface FeedPost {
   likeCount: number;
   commentCount: number;
   likedByMe: boolean;
+  /** Handles mencionados que existen: solo esos se pintan como enlace. */
+  mentions: string[];
+  /** La persona que mira es quien lo escribió (puede borrarlo). Nunca revela la autoría de un post seudónimo a otros. */
+  mine: boolean;
 }
 
 export interface FeedResponse {
@@ -58,8 +62,8 @@ export interface CommentView {
   createdAt: string;
 }
 
-/** Qué se puede seguir en V1 (en la URL): personas, eventos y lugares del índice geográfico. */
-export const FollowTarget = z.enum(["profile", "event", "place"]);
+/** Qué se puede seguir en V1 (en la URL): personas, eventos, lugares del índice geográfico y etiquetas. */
+export const FollowTarget = z.enum(["profile", "event", "place", "tag"]);
 export type FollowTarget = z.infer<typeof FollowTarget>;
 
 /** Perfil público. Nunca incluye los posts seudónimos de la persona ni cuenta con ellos. */
@@ -92,6 +96,7 @@ export interface MyFollows {
   profiles: { handle: string; displayName: string }[];
   events: { id: string }[];
   places: { id: string; name: string; label: string }[];
+  tags: { tag: string; display: string }[];
 }
 
 export const ProfilePostsQuery = z.object({

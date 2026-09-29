@@ -28,3 +28,24 @@ export function openContentMenu(target: { type: FlagTargetType; id: string; bloc
     { text: t("cancel"), style: "cancel" },
   ], { cancelable: true });
 }
+
+/**
+ * Menú de un post propio: borrarlo (con confirmación). Un reporte no se borra desde aquí porque es evidencia de
+ * un evento: se retira borrando la cuenta o por moderación.
+ */
+export function openOwnPostMenu(post: { id: string; deletable: boolean }, onDeleted: () => void): void {
+  Alert.alert(t("options"), post.deletable ? undefined : t("reportNotDeletable"), [
+    ...(post.deletable
+      ? [{
+          text: t("deletePost"), style: "destructive" as const,
+          onPress: () => {
+            Alert.alert(t("deletePost"), t("deletePostConfirm"), [
+              { text: t("cancel"), style: "cancel" },
+              { text: t("deletePost"), style: "destructive", onPress: () => { api.deletePost(post.id).then(onDeleted).catch(() => undefined); } },
+            ]);
+          },
+        }]
+      : []),
+    { text: t("cancel"), style: "cancel" },
+  ], { cancelable: true });
+}

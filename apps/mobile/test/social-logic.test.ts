@@ -1,6 +1,7 @@
 import type { ContextualLocation } from "@dizaster/contracts";
 import { describe, expect, it } from "vitest";
 import { EMPTY_FOLLOWS, isFollowing, withFollow } from "../src/lib/social/follow-state";
+import { composeProblem } from "../src/lib/social/compose";
 import { followablePlace } from "../src/lib/social/place";
 
 describe("seguir (estado local)", () => {
@@ -32,5 +33,22 @@ describe("lugar que se puede seguir desde un evento", () => {
     expect(followablePlace(base)).toEqual({ id: "PE:150122", name: "Miraflores" });
     expect(followablePlace({ ...base, district: null, city: { id: "NEP:1", name: "Tokyo" } })).toEqual({ id: "PE:15", name: "Lima" });
     expect(followablePlace(null)).toBeNull();
+  });
+});
+
+describe("etiquetas y publicar", () => {
+  it("sigue etiquetas por su forma canónica", () => {
+    let my = withFollow(EMPTY_FOLLOWS, "tag", "Inundación", true, "Inundación");
+    expect(my.tags).toEqual([{ tag: "inundacion", display: "Inundación" }]);
+    expect(isFollowing(my, "tag", "INUNDACION")).toBe(true);
+    my = withFollow(my, "tag", "inundacion", false);
+    expect(my.tags).toEqual([]);
+  });
+
+  it("valida antes de enviar con las mismas reglas que el servidor", () => {
+    expect(composeProblem("   ", [])).toBe("composeEmpty");
+    expect(composeProblem("x".repeat(2001), [])).toBe("composeTooLong");
+    expect(composeProblem("ok", [{ kind: "VIDEO_RECORDED" }, { kind: "VIDEO_RECORDED" }])).toBe("composeOneVideo");
+    expect(composeProblem("ok #lima", [{ kind: "IMAGE" }, { kind: "VIDEO_RECORDED" }])).toBeNull();
   });
 });

@@ -5,13 +5,14 @@ import { Image, Pressable, Share, StyleSheet, Text, View } from "react-native";
 import { api } from "../lib/api";
 import { LINK_DOMAIN } from "../lib/config";
 import { canBlock } from "../lib/moderation/logic";
-import { openContentMenu } from "../lib/moderation/menu";
+import { openContentMenu, openOwnPostMenu } from "../lib/moderation/menu";
 import { useMe } from "../lib/social/me";
 import { lang, t } from "../lib/i18n";
 import { categoryStyle } from "../lib/ui/categories";
 import { duration, imageUri, initials, mediaLayout, postWhere } from "../lib/ui/format";
 import { colors, radius, space } from "../theme";
 import { Icon } from "./icon";
+import { RichText } from "./rich-text";
 
 /** Tarjeta de publicación (referencia visual: docs/design/referencia-inicio.jpg). */
 export function PostCard({ post, categoryName }: { post: FeedPost; categoryName: (code: string) => string }) {
@@ -77,7 +78,7 @@ export function PostCard({ post, categoryName }: { post: FeedPost; categoryName:
         ) : null}
       </View>
 
-      {post.text ? <Text style={styles.text}>{post.text}</Text> : null}
+      {post.text ? <RichText text={post.text} mentions={post.mentions} style={styles.text} /> : null}
       <MediaGrid media={post.media} onOpen={post.event ? () => router.push(`/event/${post.event!.id}`) : undefined} />
       {post.hiddenMediaCount > 0 ? <Text style={styles.meta}>+{post.hiddenMediaCount} {t("hiddenMedia")}</Text> : null}
 
@@ -99,7 +100,10 @@ export function PostCard({ post, categoryName }: { post: FeedPost; categoryName:
           accessibilityRole="button"
           accessibilityLabel={t("options")}
           hitSlop={8}
-          onPress={() => openContentMenu({ type: "POST", id: post.id, blockHandle: canBlock(post.author, me.handle) && !post.author.pseudonymous ? post.author.handle : null }, () => setHidden(true))}
+          onPress={() =>
+            post.mine
+              ? openOwnPostMenu({ id: post.id, deletable: post.kind !== "REPORT" }, () => setHidden(true))
+              : openContentMenu({ type: "POST", id: post.id, blockHandle: canBlock(post.author, me.handle) && !post.author.pseudonymous ? post.author.handle : null }, () => setHidden(true))}
         >
           <Icon name="dots-horizontal" size={24} color={colors.text} />
         </Pressable>

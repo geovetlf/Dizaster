@@ -19,7 +19,7 @@ import { LocalDiskStorage, MediaService, S3Storage, type StorageProvider } from 
 import { QualityService } from "./modules/quality/index.js";
 import { ReferenceData } from "./modules/reference/index.js";
 import { ReportService } from "./modules/report/index.js";
-import { SocialService } from "./modules/social/index.js";
+import { PostComposer, SocialService } from "./modules/social/index.js";
 import { VerificationService } from "./modules/verification/index.js";
 
 /** Raíz de composición: el único lugar que conoce todas las implementaciones concretas. */
@@ -45,6 +45,7 @@ export interface Container {
   moderation: ModerationService;
   trust: TrustService;
   quality: QualityService;
+  composer: PostComposer;
   meter: Meter;
 }
 
@@ -99,8 +100,9 @@ export function buildContainer(env: AppEnv, overrides: { db?: Db; clock?: Clock;
     const admins = await identity.usersWithRole(db, "admin");
     await alerts.notifyAdmins(admins, (lang) => budgetAlertText(lang, e.payload), "dizaster://admin-cost", `budget:${e.payload.key}`);
   });
+  const composer = new PostComposer(db, social, media, events);
   const quality = new QualityService(db, clock, { cost, events, verification, alerts, ingestion, moderation });
-  return { env, db, clock, ref, geo, social, identity, events, ingestion, ingestionScheduler, verification, media, storage, reports, feed, alerts, dispatcher, cost, moderation, trust, quality, meter };
+  return { env, db, clock, ref, geo, social, identity, events, ingestion, ingestionScheduler, verification, media, storage, reports, feed, alerts, dispatcher, cost, moderation, trust, quality, composer, meter };
 }
 
 /** APNs y FCM directos. Si falta la credencial de una plataforma, sus avisos quedan solo en el historial. */

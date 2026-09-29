@@ -79,12 +79,22 @@ export class MediaService {
    * Borrar un objeto es idempotente: si la transacción se reintenta, repetirlo no hace daño.
    */
   async purgeOwner(q: Queryable, ownerProfileId: string): Promise<number> {
+    return this.purgeWhere(q, "m.owner_profile_id = $1", ownerProfileId);
+  }
+
+  /** La persona borró el post: sus fotos y videos se eliminan igual que al borrar la cuenta (ADR 0027). */
+  async purgeMedia(q: Queryable, mediaIds: string[]): Promise<number> {
+    if (mediaIds.length === 0) return 0;
+    return this.purgeWhere(q, "m.id = ANY($1)", mediaIds);
+  }
+
+  private async purgeWhere(q: Queryable, where: string, param: unknown): Promise<number> {
     const { rows } = await q.query<{ id: string; storage_key_original: string | null; keys: string[] }>(
       `SELECT m.id, m.storage_key_original, COALESCE(array_agg(v.storage_key) FILTER (WHERE v.storage_key IS NOT NULL), '{}') AS keys
          FROM media.media m LEFT JOIN media.variants v ON v.media_id = m.id
-        WHERE m.owner_profile_id = $1 AND (m.state <> 'DELETED' OR m.storage_key_original IS NOT NULL OR v.media_id IS NOT NULL)
+        WHERE ${where} AND (m.state <> 'DELETED' OR m.storage_key_original IS NOT NULL OR v.media_id IS NOT NULL)
         GROUP BY m.id`,
-      [ownerProfileId],
+      [param],
     );
     for (const r of rows) {
       for (const key of [r.storage_key_original, ...r.keys]) if (key) await this.storage.delete(key);

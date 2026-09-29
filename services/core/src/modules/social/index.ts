@@ -1,4 +1,4 @@
-import type { CommentView, FeedTab, GeoPoint, PostAuthor, ProfileSearchResult, ProfileView } from "@dizaster/contracts";
+import { extractMentions, extractTags, type CommentView, type FeedTab, type GeoPoint, type PostAuthor, type ProfileSearchResult, type ProfileView, type TagView } from "@dizaster/contracts";
 import type { Queryable } from "../../platform/db.js";
 import type { OutboxDispatcher } from "../../platform/outbox.js";
 import { DomainError, notFound } from "../../platform/errors.js";
@@ -36,6 +36,8 @@ export interface FeedRow {
   likeCount: number;
   commentCount: number;
   likedByMe: boolean;
+  mentions: string[];
+  mine: boolean;
 }
 
 export interface FeedFilter {
@@ -49,9 +51,11 @@ export interface FeedFilter {
   viewerProfileId: string | null;
   /** Posts públicos de un perfil (su página). */
   authorProfileId?: string;
+  /** Etiqueta en forma canónica. */
+  tag?: string;
 }
 
-export type FollowType = "PROFILE" | "EVENT" | "PLACE";
+export type FollowType = "PROFILE" | "EVENT" | "PLACE" | "TAG";
 const MAX_FOLLOWS = 2000;
 /** "Para ti" ordena lo reciente: fuera de esta ventana, el contenido se encuentra por lugar, evento o perfil. */
 export const FOR_YOU_WINDOW_DAYS = 30;
@@ -105,6 +109,7 @@ export class SocialService {
     );
     await q.query(`UPDATE social.comments SET text = '-', deleted_at = COALESCE(deleted_at, now()) WHERE author_profile_id = $1`, [profileId]);
     await q.query(`DELETE FROM social.reactions WHERE profile_id = $1`, [profileId]);
+    await q.query(`DELETE FROM social.post_mentions WHERE profile_id = $1`, [profileId]);
     await q.query(`DELETE FROM social.follows WHERE follower_profile_id = $1 OR (target_type = 'PROFILE' AND target_id = $1::text)`, [profileId]);
     await q.query(`DELETE FROM social.blocks WHERE blocker_profile_id = $1 OR blocked_profile_id = $1`, [profileId]);
   }
@@ -208,15 +213,20 @@ export class SocialService {
       where.push(`(p.category_code = $${params.push(f.category)} OR p.category_code LIKE $${params.push(`${f.category}.%`)})`);
     }
     if (f.authorProfileId) where.push(`p.author_id = $${params.push(f.authorProfileId)}::uuid AND p.author_visibility = 'PUBLIC'`);
+    if (f.tag) {
+      where.push(`EXISTS (SELECT 1 FROM social.post_tags pt JOIN social.tags tg ON tg.id = pt.tag_id WHERE pt.post_id = p.id AND tg.normalized = $${params.push(f.tag)})`);
+    }
     if (f.tab === "nearby" && nearSql) where.push(`ST_DWithin(p.public_point, ${nearSql}, $${params.push(f.nearRadiusM ?? 25_000)})`);
     if (f.tab === "videos") where.push(`EXISTS (SELECT 1 FROM social.post_media v WHERE v.post_id = p.id AND v.kind = 'VIDEO_RECORDED')`);
     if (f.tab === "following") {
       const followed = (type: string) => `(SELECT target_id FROM social.follows WHERE follower_profile_id = $2 AND target_type = '${type}')`;
       where.push(`((p.author_visibility = 'PUBLIC' AND p.author_id::text IN ${followed("PROFILE")})
                    OR le.event_id::text IN ${followed("EVENT")}
-                   OR s.region_id IN ${followed("PLACE")} OR s.district_id IN ${followed("PLACE")})`);
+                   OR s.region_id IN ${followed("PLACE")} OR s.district_id IN ${followed("PLACE")}
+                   OR EXISTS (SELECT 1 FROM social.post_tags pt JOIN social.tags tg ON tg.id = pt.tag_id
+                               WHERE pt.post_id = p.id AND tg.normalized IN ${followed("TAG")}))`);
     }
-    const ranked = f.tab === "for_you" && !f.authorProfileId;
+    const ranked = f.tab === "for_you" && !f.authorProfileId && !f.tag;
     if (ranked) where.push(`p.created_at > now() - make_interval(days => ${FOR_YOU_WINDOW_DAYS})`);
     const score = ranked ? rankSql(nearSql) : `extract(epoch FROM p.created_at) / 3600.0`;
     const cursor = f.cursor ? `WHERE (x.score, x.id) < ($${params.push(f.cursor.score)}::float8, $${params.push(f.cursor.id)}::uuid)` : "";
@@ -225,9 +235,10 @@ export class SocialService {
       id: string; kind: FeedRow["kind"]; author_visibility: string; handle: string; display_name: string; text: string | null;
       created_at: Date; category_code: string | null; event_id: string | null; distance_m: number | null; score: number;
       media: { id: string; kind: "IMAGE" | "VIDEO_RECORDED" }[] | null; like_count: number; comment_count: number; liked: boolean;
+      mentions: string[]; mine: boolean | null;
     }>(
       `WITH x AS (
-         SELECT p.id, p.kind, p.author_visibility, pr.handle, pr.display_name, p.text, p.created_at, p.category_code, le.event_id,
+         SELECT p.id, p.author_id, p.kind, p.author_visibility, pr.handle, pr.display_name, p.text, p.created_at, p.category_code, le.event_id,
                 ${nearSql ? `ST_Distance(p.public_point, ${nearSql})` : "NULL"}::float8 AS distance_m,
                 (${score})::float8 AS score
            FROM social.posts p
@@ -241,7 +252,10 @@ export class SocialService {
                  FROM social.post_media m WHERE m.post_id = x.id) AS media,
               (SELECT count(*) FROM social.reactions r WHERE r.post_id = x.id)::int AS like_count,
               (SELECT count(*) FROM social.comments c WHERE c.post_id = x.id AND c.deleted_at IS NULL AND c.moderation_state = 'VISIBLE')::int AS comment_count,
-              EXISTS (SELECT 1 FROM social.reactions r WHERE r.post_id = x.id AND r.profile_id = $2) AS liked
+              EXISTS (SELECT 1 FROM social.reactions r WHERE r.post_id = x.id AND r.profile_id = $2) AS liked,
+              (SELECT coalesce(array_agg(mp.handle ORDER BY mp.handle), '{}') FROM social.post_mentions pm
+                 JOIN social.profiles mp ON mp.id = pm.profile_id WHERE pm.post_id = x.id AND mp.deleted_at IS NULL) AS mentions,
+              (x.author_id = $2) AS mine
          FROM x ${cursor}
         ORDER BY x.score DESC, x.id DESC
         LIMIT $1`,
@@ -261,7 +275,84 @@ export class SocialService {
       likeCount: r.like_count,
       commentCount: r.comment_count,
       likedByMe: r.liked,
+      mentions: r.mentions,
+      mine: r.mine === true,
     }));
+  }
+
+  // ───────────── Etiquetas y menciones (ADR 0027) ─────────────
+
+  /**
+   * Indexa las etiquetas y menciones del texto de un post. Solo se enlazan menciones a perfiles existentes y que
+   * no hayan bloqueado al autor; la persona que escribe no se menciona a sí misma.
+   */
+  async indexPostText(tx: Queryable, postId: string, authorProfileId: string, text: string | null): Promise<{ tags: string[]; mentions: string[] }> {
+    const tags = extractTags(text);
+    for (const t of tags) {
+      const { rows } = await tx.query<{ id: string }>(
+        `INSERT INTO social.tags (id, normalized, display) VALUES ($1, $2, $3)
+         ON CONFLICT (normalized) DO UPDATE SET normalized = EXCLUDED.normalized RETURNING id`,
+        [newId(), t.normalized, t.display],
+      );
+      await tx.query(`INSERT INTO social.post_tags (post_id, tag_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`, [postId, rows[0]!.id]);
+    }
+    const handles = extractMentions(text);
+    const mentioned = handles.length === 0 ? [] : (await tx.query<{ handle: string }>(
+      `INSERT INTO social.post_mentions (post_id, profile_id)
+       SELECT $1, pr.id FROM social.profiles pr
+        WHERE lower(pr.handle) = ANY($2) AND pr.deleted_at IS NULL AND pr.id <> $3
+          AND NOT EXISTS (SELECT 1 FROM social.blocks b WHERE b.blocker_profile_id = pr.id AND b.blocked_profile_id = $3)
+       ON CONFLICT DO NOTHING
+       RETURNING (SELECT handle FROM social.profiles WHERE id = profile_id)`,
+      [postId, handles, authorProfileId],
+    )).rows;
+    return { tags: tags.map((t) => t.normalized), mentions: mentioned.map((m) => m.handle) };
+  }
+
+  async tag(q: Queryable, normalized: string, viewerProfileId: string | null): Promise<TagView> {
+    // Una etiqueta que nadie ha usado aún existe igual: se puede seguir antes del primer post.
+    const { rows } = await q.query<{ display: string | null; posts: number; followers: number; followed: boolean }>(
+      `SELECT (SELECT display FROM social.tags WHERE normalized = $1) AS display,
+              (SELECT count(*) FROM social.post_tags pt JOIN social.tags t ON t.id = pt.tag_id JOIN social.posts p ON p.id = pt.post_id
+                WHERE t.normalized = $1 AND p.deleted_at IS NULL AND p.visibility = 'PUBLIC' AND p.moderation_state = 'VISIBLE')::int AS posts,
+              (SELECT count(*) FROM social.follows f WHERE f.target_type = 'TAG' AND f.target_id = $1)::int AS followers,
+              EXISTS (SELECT 1 FROM social.follows f WHERE f.target_type = 'TAG' AND f.target_id = $1 AND f.follower_profile_id = $2) AS followed`,
+      [normalized, viewerProfileId],
+    );
+    const r = rows[0]!;
+    return { tag: normalized, display: r.display ?? normalized, postCount: r.posts, followerCount: r.followers, followedByMe: r.followed };
+  }
+
+  /** Búsqueda por prefijo, las más usadas primero (índice text_pattern_ops). */
+  async searchTags(q: Queryable, prefix: string, viewerProfileId: string | null, limit: number): Promise<TagView[]> {
+    const { rows } = await q.query<{ normalized: string }>(
+      `SELECT t.normalized FROM social.tags t
+        WHERE t.normalized LIKE $1 || '%'
+        ORDER BY (SELECT count(*) FROM social.post_tags pt WHERE pt.tag_id = t.id) DESC, t.normalized
+        LIMIT $2`,
+      [prefix.replace(/[\\%_]/g, "\\$&"), limit],
+    );
+    return Promise.all(rows.map((r) => this.tag(q, r.normalized, viewerProfileId)));
+  }
+
+  /**
+   * La persona borra su post. Solo los posts sin reporte: un REPORT es evidencia de un EVENT y se retira por
+   * moderación o al borrar la cuenta. Devuelve la media adjunta para que el Media Engine la elimine.
+   */
+  async deletePost(q: Queryable, postId: string, profileId: string): Promise<{ mediaIds: string[] }> {
+    const { rows } = await q.query<{ author_id: string; kind: string; deleted: boolean }>(
+      `SELECT author_id, kind, deleted_at IS NOT NULL AS deleted FROM social.posts WHERE id = $1 FOR UPDATE`,
+      [postId],
+    );
+    const r = rows[0];
+    if (!r || r.deleted || r.author_id !== profileId) throw notFound("Post");
+    if (r.kind === "REPORT") throw new DomainError("REPORT_POST", "Un reporte no se borra desde aquí: forma parte de la evidencia de un evento", 409);
+    await q.query(`UPDATE social.posts SET text = NULL, public_point = NULL, deleted_at = now(), updated_at = now() WHERE id = $1`, [postId]);
+    await q.query(`DELETE FROM social.post_tags WHERE post_id = $1`, [postId]);
+    await q.query(`DELETE FROM social.post_mentions WHERE post_id = $1`, [postId]);
+    await q.query(`DELETE FROM social.reactions WHERE post_id = $1`, [postId]);
+    const media = await q.query<{ media_id: string }>(`SELECT media_id FROM social.post_media WHERE post_id = $1`, [postId]);
+    return { mediaIds: media.rows.map((m) => m.media_id) };
   }
 
   // ───────────── Seguir ─────────────
@@ -283,9 +374,10 @@ export class SocialService {
 
   async follows(q: Queryable, profileId: string): Promise<{ type: FollowType; targetId: string; handle: string | null; displayName: string | null }[]> {
     const { rows } = await q.query<{ target_type: FollowType; target_id: string; handle: string | null; display_name: string | null }>(
-      `SELECT f.target_type, f.target_id, pr.handle, pr.display_name
+      `SELECT f.target_type, f.target_id, pr.handle, coalesce(pr.display_name, tg.display) AS display_name
          FROM social.follows f
          LEFT JOIN social.profiles pr ON f.target_type = 'PROFILE' AND pr.id::text = f.target_id
+         LEFT JOIN social.tags tg ON f.target_type = 'TAG' AND tg.normalized = f.target_id
         WHERE f.follower_profile_id = $1
         ORDER BY f.created_at DESC`,
       [profileId],
@@ -501,3 +593,5 @@ export class SocialService {
     if (!rowCount) throw notFound("Post");
   }
 }
+
+export { POSTS_PER_HOUR, PostComposer } from "./composer.js";

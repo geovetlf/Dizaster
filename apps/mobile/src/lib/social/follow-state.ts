@@ -1,11 +1,12 @@
-import type { FollowTarget, MyFollows } from "@dizaster/contracts";
+import { normalizeTag, type FollowTarget, type MyFollows } from "@dizaster/contracts";
 
-export const EMPTY_FOLLOWS: MyFollows = { profiles: [], events: [], places: [] };
+export const EMPTY_FOLLOWS: MyFollows = { profiles: [], events: [], places: [], tags: [] };
 
 /** ¿Sigo este destino? (perfil por handle, evento por id, lugar por id del índice geográfico). */
 export function isFollowing(my: MyFollows, target: FollowTarget, id: string): boolean {
   if (target === "profile") return my.profiles.some((p) => p.handle.toLowerCase() === id.toLowerCase());
   if (target === "event") return my.events.some((e) => e.id === id);
+  if (target === "tag") return my.tags.some((x) => x.tag === normalizeTag(id));
   return my.places.some((p) => p.id === id);
 }
 
@@ -19,6 +20,11 @@ export function withFollow(my: MyFollows, target: FollowTarget, id: string, on: 
   if (target === "event") {
     const rest = drop(my.events, "id") as MyFollows["events"];
     return { ...my, events: on ? [{ id }, ...rest] : rest };
+  }
+  if (target === "tag") {
+    const tag = normalizeTag(id);
+    const rest = my.tags.filter((x) => x.tag !== tag);
+    return { ...my, tags: on ? [{ tag, display: name }, ...rest] : rest };
   }
   const rest = drop(my.places, "id") as MyFollows["places"];
   return { ...my, places: on ? [{ id, name, label: name }, ...rest] : rest };

@@ -1,5 +1,5 @@
 import type { EventSummary, MediaView, TimelineEntryView } from "@dizaster/contracts";
-import { useLocalSearchParams } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import { EventMedia } from "../../components/event-media";
@@ -41,6 +41,7 @@ export default function EventScreen() {
         {place ? (
           <FollowChip label={`${t("followPlace")} ${place.name}`} on={follows.following("place", place.id)} onPress={() => void follows.toggle("place", place.id, place.name)} />
         ) : null}
+        <FollowChip label={t("postAboutThis")} on={false} onPress={() => router.push({ pathname: "/compose", params: { eventId: event.id } })} />
         <FollowChip label={t("flag")} on={false} onPress={() => openFlag("EVENT", event.id)} />
       </View>
       <Text style={[styles.badge, { backgroundColor: color }]}>{verificationLabel(event.publicVerificationState)}</Text>

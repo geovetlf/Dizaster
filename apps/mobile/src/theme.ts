@@ -12,6 +12,8 @@ export const colors = {
   accent: "#E5262E",
   accentSoft: "#3A1416",
   like: "#F0434B",
+  // Etiquetas y menciones tocables (contraste AA sobre surface).
+  link: "#6CB4FF",
   white: "#FFFFFF",
 } as const;
 

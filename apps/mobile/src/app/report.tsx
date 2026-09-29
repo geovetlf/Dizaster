@@ -113,6 +113,10 @@ export default function ReportScreen() {
     return (
       <View style={styles.container}>
         <Text style={styles.title}>{t("chooseCategory")}</Text>
+        <Pressable accessibilityRole="button" style={styles.row} onPress={() => router.replace("/compose")}>
+          <Text style={styles.rowText}>{t("postWithoutReport")}</Text>
+          <Text style={styles.meta}>{t("postWithoutReportHint")}</Text>
+        </Pressable>
         <FlatList
           data={categories}
           keyExtractor={(c) => c.code}

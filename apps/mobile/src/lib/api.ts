@@ -1,4 +1,4 @@
-import type { SavedZone, SavedZoneInput, AppealView, CaseDetail, CaseSummary, CreateFlagRequest, ModerationActionType, ModerationNotice, CostDashboard, KillSwitchView, QualityReport, AlertPreferences, CategorySubscription, CategorySubscriptionInput, NotificationsResponse, AppConfig, AreaSearchResult, FollowTarget, MyFollows, ProfileSearchResult, ProfileView, CommentView, CreateUploadRequest, FeedResponse, FeedTab, CreateUploadResponse, DevicePlatform, MediaView, RegisterPushTokenRequest, EventMapResponse, EventSummary, NearbyEventsResponse, SubmitReportRequest, SubmitReportResponse, TimelineEntryView } from "@dizaster/contracts";
+import type { SavedZone, SavedZoneInput, AppealView, CaseDetail, CaseSummary, CreateFlagRequest, ModerationActionType, ModerationNotice, CostDashboard, KillSwitchView, QualityReport, CreatePostRequest, TagView, AlertPreferences, CategorySubscription, CategorySubscriptionInput, NotificationsResponse, AppConfig, AreaSearchResult, FollowTarget, MyFollows, ProfileSearchResult, ProfileView, CommentView, CreateUploadRequest, FeedResponse, FeedTab, CreateUploadResponse, DevicePlatform, MediaView, RegisterPushTokenRequest, EventMapResponse, EventSummary, NearbyEventsResponse, SubmitReportRequest, SubmitReportResponse, TimelineEntryView } from "@dizaster/contracts";
 import { canRetryWithRefresh, singleFlight } from "./auth/refresh";
 import { API_URL } from "./config";
 import type { Sender } from "./report/queue";
@@ -132,6 +132,13 @@ export const api = {
   myFollows: () => request<MyFollows>("/v1/me/follows"),
   follow: (target: FollowTarget, id: string, on: boolean) =>
     request<{ following: boolean }>(`/v1/follows/${target}/${encodeURIComponent(id)}`, { method: on ? "PUT" : "DELETE" }),
+  createPost: (body: Partial<CreatePostRequest> & { text: string }) =>
+    request<{ postId: string; eventId: string | null; tags: string[]; mentions: string[] }>("/v1/posts", { method: "POST", body: JSON.stringify(body) }),
+  deletePost: (postId: string) => request<void>(`/v1/posts/${postId}`, { method: "DELETE" }),
+  tag: (tag: string) => request<TagView>(`/v1/tags/${encodeURIComponent(tag)}`),
+  tagPosts: (tag: string, cursor: string | null) =>
+    request<FeedResponse>(`/v1/tags/${encodeURIComponent(tag)}/posts${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`),
+  searchTags: (q: string) => request<{ tags: TagView[] }>(`/v1/tags?${new URLSearchParams({ q })}`),
   submitReport: (body: SubmitReportRequest) => request<SubmitReportResponse>("/v1/reports", { method: "POST", body: JSON.stringify(body) }),
 };
 

@@ -1,4 +1,4 @@
-import type { AreaSearchResult, CategoryCatalog, ProfileSearchResult } from "@dizaster/contracts";
+import type { AreaSearchResult, CategoryCatalog, ProfileSearchResult, TagView } from "@dizaster/contracts";
 import { router } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import { Pressable, SectionList, StyleSheet, Text, TextInput, View } from "react-native";
@@ -18,16 +18,18 @@ const normalize = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLo
 type Row =
   | { type: "area"; area: AreaSearchResult }
   | { type: "person"; person: ProfileSearchResult }
+  | { type: "tag"; tag: TagView }
   | { type: "category"; code: string; name: string };
 
 /**
- * Búsqueda: lugares (índice geográfico propio, sin geocodificador comercial), personas y categorías (catálogo
+ * Búsqueda: lugares (índice geográfico propio, sin geocodificador comercial), personas, etiquetas y categorías (catálogo
  * empaquetado, funciona sin conexión).
  */
 export default function SearchScreen() {
   const [q, setQ] = useState("");
   const [areas, setAreas] = useState<AreaSearchResult[]>([]);
   const [people, setPeople] = useState<ProfileSearchResult[]>([]);
+  const [tags, setTags] = useState<TagView[]>([]);
   const location = useCoarseLocation();
   const near = location.point;
 
@@ -38,12 +40,13 @@ export default function SearchScreen() {
 
   useEffect(() => {
     const text = q.trim();
-    if (text.length < 2) { setAreas([]); setPeople([]); return; }
+    if (text.length < 2) { setAreas([]); setPeople([]); setTags([]); return; }
     let live = true;
     // Espera a que el usuario deje de escribir: menos peticiones, menos coste.
     const timer = setTimeout(() => {
       api.areas(text, near).then((r) => { if (live) setAreas(r.areas); }).catch(() => { if (live) setAreas([]); });
       api.searchProfiles(text).then((r) => { if (live) setPeople(r.profiles); }).catch(() => { if (live) setPeople([]); });
+      api.searchTags(text).then((r) => { if (live) setTags(r.tags); }).catch(() => { if (live) setTags([]); });
     }, 300);
     return () => { live = false; clearTimeout(timer); };
   }, [q, near]);
@@ -51,6 +54,7 @@ export default function SearchScreen() {
   const sections = [
     ...(areas.length ? [{ title: t("searchPlaces"), data: areas.map((area): Row => ({ type: "area", area })) }] : []),
     ...(people.length ? [{ title: t("searchPeople"), data: people.map((person): Row => ({ type: "person", person })) }] : []),
+    ...(tags.length ? [{ title: t("searchTags"), data: tags.map((tag): Row => ({ type: "tag", tag })) }] : []),
     {
       title: t("searchCategories"),
       data: categories.map((c): Row => ({ type: "category", code: c.code, name: c.names[lang] ?? c.names["es"] ?? c.code })),
@@ -66,7 +70,7 @@ export default function SearchScreen() {
       <SectionList
         sections={sections}
         keyboardShouldPersistTaps="handled"
-        keyExtractor={(r) => (r.type === "area" ? r.area.id : r.type === "person" ? `@${r.person.handle}` : r.code)}
+        keyExtractor={(r) => (r.type === "area" ? r.area.id : r.type === "person" ? `@${r.person.handle}` : r.type === "tag" ? `#${r.tag.tag}` : r.code)}
         renderSectionHeader={({ section }) => <Text style={styles.note}>{section.title}</Text>}
         renderItem={({ item }) => {
           if (item.type === "area") {
@@ -92,6 +96,17 @@ export default function SearchScreen() {
                 <View style={styles.rowBody}>
                   <Text style={styles.rowText}>{item.person.displayName}</Text>
                   <Text style={styles.rowSub}>@{item.person.handle} · {item.person.followerCount} {t("followers")}</Text>
+                </View>
+              </Pressable>
+            );
+          }
+          if (item.type === "tag") {
+            return (
+              <Pressable accessibilityRole="link" style={styles.row} onPress={() => router.push(`/tag/${encodeURIComponent(item.tag.tag)}`)}>
+                <Icon name="pound" size={22} color={colors.textMuted} />
+                <View style={styles.rowBody}>
+                  <Text style={styles.rowText}>#{item.tag.display}</Text>
+                  <Text style={styles.rowSub}>{item.tag.postCount} {t("postsCount")} · {item.tag.followerCount} {t("followers")}</Text>
                 </View>
               </Pressable>
             );

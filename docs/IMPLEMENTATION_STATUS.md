@@ -192,11 +192,22 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | App: pantalla de calidad para administración, iOS y Android | ✅ | `apps/mobile/src/app/admin-quality.tsx` |
 | Push a administración al cruzar 50/80/100 % de un presupuesto | ✅ | `AlertService.notifyAdmins`, `budgetAlertText` |
 
+## Etapa 16 — Publicar, etiquetas y menciones (hecha)
+
+| Área | Estado | Dónde |
+|---|---|---|
+| Publicar sin reporte, con mención opcional de un EVENT (D-03), sin ubicación | ✅ | `social/composer.ts`, `POST /v1/posts`, ADR 0027 |
+| Etiquetas canónicas, búsqueda, página y seguir etiquetas (feed "Siguiendo") | ✅ | `social.tags`, `/v1/tags`, `/v1/follows/tag/:tag` |
+| Menciones a perfiles existentes, respetando bloqueos | ✅ | `social.post_mentions`, `FeedPost.mentions` |
+| Borrar un post propio (texto, etiquetas y media) | ✅ | `DELETE /v1/posts/:id`, `MediaService.purgeMedia` |
+| App: redactar, `#` y `@` tocables, pantalla de etiqueta, etiquetas en búsqueda, iOS y Android | ✅ | `app/compose.tsx`, `app/tag/[tag].tsx`, `components/rich-text.tsx` |
+| Aviso push por mención | ⏳ | decisión de producto (hoy solo se avisa de EVENTs) |
+
 ## Siguiente etapa (en orden)
 
 1. **BLOQUEADA** — Identity real: Sign in with Apple, Google y email; App Attest / Play Integrity. Falta: cuentas de
    Apple Developer y Google (client IDs, Service ID, Team ID) y un proveedor de email aprobado (gasto).
-2. Social: negocios, etiquetas y menciones.
+2. Social: perfiles de negocio (sin verificación de pago; D-04: no crean reportes ciudadanos).
 
 ## Requiere acción humana
 

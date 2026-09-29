@@ -3,7 +3,11 @@ import {
   FollowTarget,
   ProfilePostsQuery,
   ProfileSearchQuery,
+  TagParam,
+  TagSearchQuery,
+  normalizeTag,
   type FeedPost,
+  type TagView,
   type FeedResponse,
   type MediaView,
   type MyFollows,
@@ -24,7 +28,7 @@ import type { FeedFilter, FeedRow, FollowType, SocialService } from "../social/i
 /** Radio de "cerca de ti" (sobre ubicaciones públicas ya generalizadas). */
 export const NEARBY_RADIUS_M = 25_000;
 
-const FOLLOW_TYPE: Record<FollowTarget, FollowType> = { profile: "PROFILE", event: "EVENT", place: "PLACE" };
+const FOLLOW_TYPE: Record<FollowTarget, FollowType> = { profile: "PROFILE", event: "EVENT", place: "PLACE", tag: "TAG" };
 
 /**
  * Feed: compone posts (social), estado de verificación (event), lugar (event/geo) y media saneada (media) sin que
@@ -80,6 +84,22 @@ export class FeedService {
     });
   }
 
+  /** Posts públicos con una etiqueta, por recientes. */
+  async tagPosts(q: Queryable, rawTag: string, rawQuery: unknown, viewerProfileId: string | null): Promise<FeedResponse> {
+    const tag = normalizeTag(parse(TagParam, { tag: rawTag }).tag);
+    const f = parse(ProfilePostsQuery, rawQuery);
+    return this.page(q, { tab: "for_you", tag, ...(f.cursor ? { cursor: decodeCursor(f.cursor) } : {}), limit: f.limit, viewerProfileId });
+  }
+
+  async tag(q: Queryable, rawTag: string, viewerProfileId: string | null): Promise<TagView> {
+    return this.social.tag(q, normalizeTag(parse(TagParam, { tag: rawTag }).tag), viewerProfileId);
+  }
+
+  async searchTags(q: Queryable, rawQuery: unknown, viewerProfileId: string | null): Promise<TagView[]> {
+    const f = parse(TagSearchQuery, rawQuery);
+    return this.social.searchTags(q, normalizeTag(f.q.replace(/^#/, "")), viewerProfileId, f.limit);
+  }
+
   async profile(q: Queryable, handle: string, viewerProfileId: string | null): Promise<ProfileView> {
     const { id: _id, ...view } = await this.social.profile(q, handle, viewerProfileId);
     return view;
@@ -98,9 +118,11 @@ export class FeedService {
   async setFollow(q: Queryable, followerProfileId: string, rawTarget: unknown, rawId: string, follow: boolean): Promise<{ following: boolean }> {
     const target = parse(FollowTarget, rawTarget);
     let targetId = rawId;
+    if (!follow && target === "tag") targetId = normalizeTag(rawId);
     if (follow || target === "profile") {
       if (target === "profile") targetId = await this.social.profileIdByHandle(q, rawId);
       else if (target === "event") await this.events.getEvent(q, parse(FollowTargetId.event, rawId));
+      else if (target === "tag") targetId = normalizeTag(parse(TagParam, { tag: rawId }).tag);
       else if ((await this.geo.areasByIds(q, [parse(FollowTargetId.place, rawId)])).length === 0) throw new DomainError("NOT_FOUND", "Lugar no encontrado", 404);
     }
     await this.social.setFollow(q, followerProfileId, FOLLOW_TYPE[target], targetId, follow);
@@ -114,6 +136,7 @@ export class FeedService {
       profiles: rows.flatMap((r) => (r.type === "PROFILE" && r.handle ? [{ handle: r.handle, displayName: r.displayName ?? r.handle }] : [])),
       events: rows.flatMap((r) => (r.type === "EVENT" ? [{ id: r.targetId }] : [])),
       places,
+      tags: rows.flatMap((r) => (r.type === "TAG" ? [{ tag: r.targetId, display: r.displayName ?? r.targetId }] : [])),
     };
   }
 
@@ -151,6 +174,8 @@ export class FeedService {
         likeCount: r.likeCount,
         commentCount: r.commentCount,
         likedByMe: r.likedByMe,
+        mentions: r.mentions,
+        mine: r.mine,
       };
     });
   }
