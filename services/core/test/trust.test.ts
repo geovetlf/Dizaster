@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { coordinatedWeights, reportQuota, tierFor, type ReputationSignals } from "../src/modules/trust/index.js";
+import { coordinatedWeights, coordinationLinks, reportQuota, tierFor, type ReputationSignals } from "../src/modules/trust/index.js";
 import { withTransaction } from "../src/platform/db.js";
 import { publish } from "../src/platform/outbox.js";
 import { createTestContext, createUser, offset, reportBody, submit, type TestContext, type TestUser } from "./helpers.js";
@@ -37,6 +37,12 @@ describe("reglas de reputación (puras)", () => {
     expect(out.get("b")).toBe(1.5);
     expect(out.get("a")).toBe(0);
     expect(out.get("d")).toBe(1);
+  });
+
+  it("creadas juntas: basta un evento en común; solo la fecha de alta no enlaza (ADR 0142)", () => {
+    const ages = new Map([["a", 72], ["b", 72 + 5 / 60], ["c", 80], ["d", 72]]);
+    const pairs = [{ a: "a", b: "b", sharedEvents: 1 }, { a: "a", b: "c", sharedEvents: 1 }, { a: "c", b: "d", sharedEvents: 2 }, { a: "a", b: "d", sharedEvents: 0 }];
+    expect(coordinationLinks(pairs, ages)).toEqual([["a", "b"], ["c", "d"]]);
   });
 });
 

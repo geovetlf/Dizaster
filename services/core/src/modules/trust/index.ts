@@ -2,9 +2,9 @@ import { withTransaction, type Db, type Queryable } from "../../platform/db.js";
 import { publish, type OutboxDispatcher } from "../../platform/outbox.js";
 import type { EventService } from "../event/index.js";
 import type { IdentityService } from "../identity/index.js";
-import { SOCIAL_LIMITS, TIER_WEIGHT, TRUST, coordinatedWeights, reportQuota, tierFor, withPhone, type PhoneSignals, type ReputationSignals, type TrustTier } from "./rules.js";
+import { SOCIAL_LIMITS, TIER_WEIGHT, TRUST, coordinatedWeights, coordinationLinks, reportQuota, tierFor, withPhone, type PhoneSignals, type ReputationSignals, type TrustTier } from "./rules.js";
 
-export { REPORTS_PER_DAY_FACTOR, SOCIAL_LIMITS, PHONE_TAMPER_LIMIT, PHONE_TAMPER_REASONS, TIER_WEIGHT, TRUST, TRUST_RULES_VERSION, coordinatedWeights, reportQuota, tierFor, withPhone, type PhoneSignals, type ReputationSignals, type TrustTier } from "./rules.js";
+export { REPORTS_PER_DAY_FACTOR, SOCIAL_LIMITS, PHONE_TAMPER_LIMIT, PHONE_TAMPER_REASONS, TIER_WEIGHT, TRUST, TRUST_RULES_VERSION, coordinatedWeights, coordinationLinks, reportQuota, tierFor, withPhone, type PhoneSignals, type ReputationSignals, type TrustTier } from "./rules.js";
 
 /** Acciones de moderación que cuentan en contra de la reputación de la persona afectada. */
 const SANCTIONS = new Set(["HIDE", "REMOVE", "SUSPEND_USER"]);
@@ -140,7 +140,8 @@ export class TrustService {
 
   /**
    * Peso de cada persona que aporta a un mismo EVENT: su reputación, y si varias forman un grupo coordinado
-   * (cuentas jóvenes que ya co-reportaron en otros eventos recientes), el grupo cuenta como una.
+   * (cuentas jóvenes que ya co-reportaron en otros eventos recientes; basta uno si además se crearon juntas, ADR
+   * 0142), el grupo cuenta como una.
    */
   async contributionWeights(q: Queryable, userIds: string[], eventId: string): Promise<Map<string, number>> {
     const tiers = await this.tiers(q, userIds);
@@ -149,16 +150,16 @@ export class TrustService {
     const ages = await this.identity.accountAgeHours(q, userIds);
     const young = userIds.filter((u) => (ages.get(u) ?? 0) < TRUST.coordinationMaxAgeDays * 24);
     if (young.length < 2) return weights;
-    const { rows } = await q.query<{ a: string; b: string }>(
-      `SELECT c1.user_id AS a, c2.user_id AS b
+    const { rows } = await q.query<{ a: string; b: string; n: number }>(
+      `SELECT c1.user_id AS a, c2.user_id AS b, count(DISTINCT c1.event_id)::int AS n
          FROM trust.contributions c1
          JOIN trust.contributions c2 ON c2.event_id = c1.event_id AND c2.user_id > c1.user_id
         WHERE c1.user_id = ANY($1) AND c2.user_id = ANY($1) AND c1.event_id <> $2
           AND c1.created_at > now() - make_interval(days => $3)
-        GROUP BY 1, 2 HAVING count(DISTINCT c1.event_id) >= $4`,
-      [young, eventId, TRUST.coordinationWindowDays, TRUST.coordinationMinSharedEvents],
+        GROUP BY 1, 2`,
+      [young, eventId, TRUST.coordinationWindowDays],
     );
-    return coordinatedWeights(weights, rows.map((r) => [r.a, r.b]));
+    return coordinatedWeights(weights, coordinationLinks(rows.map((r) => ({ a: r.a, b: r.b, sharedEvents: r.n })), ages));
   }
 
   /** Reportes por hora permitidos a esta persona. */

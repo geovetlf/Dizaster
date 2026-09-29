@@ -332,6 +332,7 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | 0139 | Registro auditado de requerimientos de autoridades: solo registro (estados con nota, historial de solo inserción, referencias internas), pantalla admin, conteo en transparencia; sin entrega de datos | ✅ |
 | 0140 | Hora de fin del evento (occurred_end): la fija el trigger de estado o la fuente oficial, se borra al reactivar; "Terminó …" en la ficha | ✅ |
 | 0141 | Avisos push de moderación y apelaciones: tipo MODERATION por la cola de avisos, lleva a "mis avisos", nunca nombra a quien denunció | ✅ |
+| 0142 | Anti-coordinación trust-2: cuentas jóvenes creadas con ≤ 10 min de diferencia se agrupan con 1 evento en común (antes 2); sin IP | ✅ |
 | Licencias, auditoría, SBOM, Dependabot; respaldo con prueba de restauración en CI | ✅ | ADR 0070, `scripts/supply-chain.mjs`, `scripts/db-restore-check.mjs` |
 | Idioma de la app elegible en el perfil (es/en/pt/fr o del teléfono) | ✅ | ADR 0069, `app/language.tsx` |
 | Varias cuentas en un teléfono corroboran como una (clave seudónima del teléfono) | ✅ | ADR 0068, migración 0036 |
@@ -371,16 +372,18 @@ Revisión del Blueprint del 2026-09-29 (tras ADR 0112): completada con ADR 0113�
 
 Revisión del Blueprint del 2026-09-29 (tras ADR 0139), verificada contra el código, sin bloqueos:
 
-1. Anti-coordinación: cuentas nuevas creadas juntas (§10.2)
-2. Reportes retirados por moderación dejan de contar para el evento (§6.2)
-3. Área oficial afectada visible en la ficha y el mapa del evento (§7.3, ADR 0087)
+1. Reportes ocultos o retirados por moderación dejan de contar para el evento; Restaurar los devuelve (§6.2)
+2. Área oficial afectada visible en la ficha y el mapa del evento (§7.3, ADR 0087)
+3. Lista de hashes de contenido retirado: una subida que coincide queda oculta y va a moderación, nunca se rechaza (§5.12)
+4. Comentarios con 5 o más denuncias de personas establecidas quedan ocultos hasta revisión (ADR 0020)
+5. Notas de moderación en la línea de tiempo del evento, visibles solo para moderación (§7.3 MODERATOR_NOTE)
+6. Listas de términos por idioma que envían contenido a revisión, inicialmente vacías (§5.12)
 
 
 Bloqueadas o en espera:
 
-- **EN ESPERA** — Lista propia de hashes de contenido retirado (§5.12): falta decidir si una subida que coincide se
-  rechaza o queda oculta y va a moderación.
-- **EN ESPERA** — Ocultar automáticamente comentarios con muchas denuncias (ADR 0020): falta decisión del propietario.
+- **EN ESPERA (decisión del propietario 2026-09-29)** — Hash del prefijo de red para anti-coordinación: NO se guarda
+  hasta contar con asesoría legal.
 
 - **BLOQUEADA** — Identity real: Sign in with Apple, Google y email; App Attest / Play Integrity. Falta: cuentas de
   Apple Developer y Google (client IDs, Service ID, Team ID) y un proveedor de email aprobado (gasto).

@@ -15,7 +15,7 @@ export interface ReputationSignals {
   suspensions: number;
 }
 
-export const TRUST_RULES_VERSION = "trust-1";
+export const TRUST_RULES_VERSION = "trust-2";
 
 export const TRUST = {
   newAccountHours: 24,
@@ -28,7 +28,27 @@ export const TRUST = {
   coordinationMaxAgeDays: 30,
   coordinationMinSharedEvents: 2,
   coordinationWindowDays: 7,
+  /**
+   * Cuentas jóvenes creadas con menos de estos minutos de diferencia (§10.2 "cuentas nuevas creadas juntas", ADR
+   * 0142): basta UN evento previo en común para tratarlas como grupo. Solas no se enlazan: con muchas altas por día
+   * (y en un desastre, todas a la vez) coincidir en el minuto de alta no dice nada por sí mismo.
+   */
+  coordinationCreatedTogetherMinutes: 10,
 } as const;
+
+/**
+ * Pares de cuentas jóvenes que se tratan como grupo (ADR 0031, 0142): co-reportaron en suficientes otros eventos, o
+ * en al menos uno si además se crearon con pocos minutos de diferencia. `ageHours`: edad de cada cuenta. NO AI REQUIRED.
+ */
+export function coordinationLinks(
+  pairs: { a: string; b: string; sharedEvents: number }[], ageHours: Map<string, number>,
+  rules: { minShared: number; togetherMinutes: number } = { minShared: TRUST.coordinationMinSharedEvents, togetherMinutes: TRUST.coordinationCreatedTogetherMinutes },
+): [string, string][] {
+  return pairs
+    .filter((p) => p.sharedEvents >= rules.minShared
+      || (p.sharedEvents >= 1 && Math.abs((ageHours.get(p.a) ?? -1e9) - (ageHours.get(p.b) ?? 1e9)) * 60 <= rules.togetherMinutes))
+    .map((p): [string, string] => [p.a, p.b]);
+}
 
 /** Peso al corroborar. Dos personas TRUSTED con presencia alta alcanzan el umbral 3 (Blueprint §9, "2 HIGH + reputación alta"). */
 export const TIER_WEIGHT: Record<TrustTier, number> = { NEW: 0.5, LOW: 0.25, STANDARD: 1, TRUSTED: 1.5 };
