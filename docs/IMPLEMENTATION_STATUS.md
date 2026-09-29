@@ -336,6 +336,7 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | 0143 | Reportes ocultos o retirados por moderación dejan de contar (evidencia MODERATED); Restaurar los devuelve y el evento recupera su publicación | ✅ |
 | 0144 | Área oficial afectada en la ficha (mapa estático) y guardada por evidencia: fusión, reversión y división la recalculan | ✅ |
 | 0145 | Lista de hashes de contenido retirado: REMOVE agrega la media, una subida igual queda HELD y va a la cola (nunca se rechaza); RESTORE la quita | ✅ |
+| 0146 | Comentarios con 5 denuncias de personas establecidas se ocultan hasta revisión (HIDE por regla, apelable) | ✅ |
 | Licencias, auditoría, SBOM, Dependabot; respaldo con prueba de restauración en CI | ✅ | ADR 0070, `scripts/supply-chain.mjs`, `scripts/db-restore-check.mjs` |
 | Idioma de la app elegible en el perfil (es/en/pt/fr o del teléfono) | ✅ | ADR 0069, `app/language.tsx` |
 | Varias cuentas en un teléfono corroboran como una (clave seudónima del teléfono) | ✅ | ADR 0068, migración 0036 |
@@ -375,9 +376,8 @@ Revisión del Blueprint del 2026-09-29 (tras ADR 0112): completada con ADR 0113�
 
 Revisión del Blueprint del 2026-09-29 (tras ADR 0139), verificada contra el código, sin bloqueos:
 
-1. Comentarios con 5 o más denuncias de personas establecidas quedan ocultos hasta revisión (ADR 0020)
-2. Notas de moderación en la línea de tiempo del evento, visibles solo para moderación (§7.3 MODERATOR_NOTE)
-3. Listas de términos por idioma que envían contenido a revisión, inicialmente vacías (§5.12)
+1. Notas de moderación en la línea de tiempo del evento, visibles solo para moderación (§7.3 MODERATOR_NOTE)
+2. Listas de términos por idioma que envían contenido a revisión, inicialmente vacías (§5.12)
 
 
 Bloqueadas o en espera:

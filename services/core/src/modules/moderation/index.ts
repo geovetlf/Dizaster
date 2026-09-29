@@ -171,6 +171,7 @@ export class ModerationService {
       if (!inserted.rowCount) return;
       await this.reprioritize(tx, caseId);
       if (f.targetType === "POST") await this.autoLimit(tx, caseId, targetId);
+      if (f.targetType === "COMMENT") await this.autoHideComment(tx, caseId, targetId);
     });
   }
 
@@ -209,6 +210,21 @@ export class ModerationService {
     await this.social.setPostModeration(tx, postId, "LIMITED");
     await this.log(tx, { caseId, targetType: "POST", targetId: postId, affectedUserId: t.authorUserId, action: "LIMIT", actor: "RULE", moderatorUserId: null,
       reason: `Limitado automáticamente tras ${n} denuncias de personas distintas, a la espera de revisión.` });
+  }
+
+  /**
+   * Misma regla para comentarios (ADR 0146, decisión del propietario): con `AUTO_LIMIT_FLAGGERS` personas
+   * establecidas denunciándolo, el comentario se oculta hasta la revisión (un comentario no tiene estado "limitado").
+   * Queda como acción de la regla, apelable; Restaurar lo devuelve.
+   */
+  private async autoHideComment(tx: Queryable, caseId: string, commentId: string): Promise<void> {
+    const n = (await tx.query<{ n: number }>(`SELECT count(*)::int AS n FROM moderation.flags WHERE case_id = $1 AND reporter_weight >= 1 AND reporter_profile_id <> '${SYSTEM_REPORTER}'`, [caseId])).rows[0]!.n;
+    if (n < AUTO_LIMIT_FLAGGERS) return;
+    const t = await this.social.moderationTarget(tx, "COMMENT", commentId);
+    if (!t || t.state !== "VISIBLE") return;
+    await this.social.setCommentModeration(tx, commentId, "HIDDEN");
+    await this.log(tx, { caseId, targetType: "COMMENT", targetId: commentId, affectedUserId: t.authorUserId, action: "HIDE", actor: "RULE", moderatorUserId: null,
+      reason: `Oculto automáticamente tras ${n} denuncias de personas distintas, a la espera de revisión.` });
   }
 
   // ───────────── Cola y casos (rol moderator) ─────────────
