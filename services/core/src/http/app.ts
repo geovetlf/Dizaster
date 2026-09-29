@@ -1,8 +1,12 @@
 import Fastify, { type FastifyInstance, type FastifyRequest } from "fastify";
 import { z } from "zod";
-import { BBox, CreateCommentRequest, DevicePlatform, MEDIA_UPLOAD_LIMITS, NegativeState, RegisterPushTokenRequest, type AppConfig } from "@dizaster/contracts";
+import {
+  BBox, CreateCommentRequest, DevicePlatform, MEDIA_UPLOAD_LIMITS, MergeEventsRequest, NegativeState, RegisterPushTokenRequest, RevertMergeRequest,
+  SplitEventRequest, type AppConfig,
+} from "@dizaster/contracts";
 import { LocalDiskStorage } from "../modules/media/index.js";
 import type { Container } from "../container.js";
+import { withTransaction } from "../platform/db.js";
 import { DomainError, forbidden } from "../platform/errors.js";
 import { latencyMetric } from "../platform/metrics.js";
 import type { Session } from "../modules/identity/index.js";
@@ -584,6 +588,35 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
   app.post("/v1/moderation/appeals/:id/decision", async (req) => {
     const session = requireModerator(req);
     return c.moderation.decideAppeal(parse(IdParam, req.params).id, session.userId, req.body);
+  });
+  // Fusión y división de eventos (ADR 0034). La auditoría vive en event.merge_log y event.split_log.
+  app.get("/v1/moderation/events/:id", async (req, reply) => {
+    requireModerator(req);
+    reply.header("cache-control", "no-store");
+    return c.events.moderatorDetail(c.db, parse(IdParam, req.params).id);
+  });
+  app.post("/v1/moderation/events/:id/merge", async (req) => {
+    const session = requireModerator(req);
+    const { id } = parse(IdParam, req.params);
+    const b = parse(MergeEventsRequest, req.body);
+    const mergeIds = await withTransaction(c.db, async (tx) => {
+      const out: string[] = [];
+      for (const sourceId of new Set(b.sourceEventIds)) out.push(await c.events.merge(tx, id, sourceId, session.userId, b.reason));
+      return out;
+    });
+    return { mergeIds, event: await c.events.moderatorDetail(c.db, id) };
+  });
+  app.post("/v1/moderation/merges/:id/revert", async (req) => {
+    const session = requireModerator(req);
+    const { reason } = parse(RevertMergeRequest, req.body);
+    return withTransaction(c.db, (tx) => c.events.revertMerge(tx, parse(IdParam, req.params).id, session.userId, reason));
+  });
+  app.post("/v1/moderation/events/:id/split", async (req, reply) => {
+    const session = requireModerator(req);
+    const { id } = parse(IdParam, req.params);
+    const b = parse(SplitEventRequest, req.body);
+    const eventId = await withTransaction(c.db, (tx) => c.events.split(tx, id, b.evidenceIds, session.userId, b.reason));
+    return reply.status(201).send({ eventId });
   });
   app.post("/v1/moderation/events/:id/negative-state", async (req) => {
     const session = requireModerator(req);

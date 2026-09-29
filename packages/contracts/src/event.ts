@@ -113,3 +113,52 @@ export const NearbyEvent = EventSummary.extend({ matchScore: z.number(), distanc
 export type NearbyEvent = z.infer<typeof NearbyEvent>;
 export const NearbyEventsResponse = z.object({ events: z.array(NearbyEvent) });
 export type NearbyEventsResponse = z.infer<typeof NearbyEventsResponse>;
+
+// ───────────── Fusión y división manual por moderación (Blueprint §5.7, §6.1; ADR 0034) ─────────────
+
+const ModeratorReason = z.string().trim().min(10).max(1000);
+
+/** Unir duplicados en el evento destino. Cada fusión queda registrada y se puede revertir. */
+export const MergeEventsRequest = z.object({
+  sourceEventIds: z.array(z.uuid()).min(1).max(10),
+  reason: ModeratorReason,
+});
+export type MergeEventsRequest = z.infer<typeof MergeEventsRequest>;
+
+/** Sacar evidencias a un evento nuevo (dos sucesos distintos que se unieron por error). */
+export const SplitEventRequest = z.object({
+  evidenceIds: z.array(z.uuid()).min(1).max(200),
+  reason: ModeratorReason,
+});
+export type SplitEventRequest = z.infer<typeof SplitEventRequest>;
+
+export const RevertMergeRequest = z.object({ reason: ModeratorReason });
+export type RevertMergeRequest = z.infer<typeof RevertMergeRequest>;
+
+/** Evidencia vista por moderación: sin la identidad de quien reportó. */
+export interface ModeratorEvidenceView {
+  id: string;
+  evidenceType: EvidenceType;
+  trustTier: "CITIZEN" | "EXTERNAL" | "OFFICIAL";
+  assertion: "OCCURRING" | "NOT_OCCURRING";
+  presenceBand: string | null;
+  matchConfidence: string;
+  observedAt: string;
+}
+
+export interface EventMergeView {
+  id: string;
+  targetEventId: string;
+  mergedEventId: string;
+  reason: string;
+  movedEvidence: number;
+  at: string;
+  revertedAt: string | null;
+}
+
+export interface ModeratorEventDetail {
+  eventId: string;
+  mergedIntoId: string | null;
+  evidence: ModeratorEvidenceView[];
+  merges: EventMergeView[];
+}

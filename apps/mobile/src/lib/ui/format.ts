@@ -73,3 +73,8 @@ export function mediaLayout(media: MediaView[]): { main: MediaView | null; side:
  * lo que ocupa el ancho de la pantalla usa la versión de pantalla. Menos datos para quien mira y menos CDN.
  */
 export const imageUri = (m: Pick<MediaView, "url" | "thumbUrl">, size: "small" | "large") => (size === "small" ? (m.thumbUrl ?? m.url) : m.url);
+
+/** Título de un evento en el idioma de la app; si no existe, el primero disponible y, al final, la categoría. */
+export function eventTitle(e: { title: Record<string, string> | null; categoryCode: string }, lang: string): string {
+  return e.title?.[lang] ?? (e.title ? Object.values(e.title)[0] : undefined) ?? e.categoryCode;
+}

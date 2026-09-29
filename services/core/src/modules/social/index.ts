@@ -103,6 +103,20 @@ export class SocialService {
       await this.anonymizeProfile(tx, e.payload.profileId);
       await this.deleteBusinessesOf(tx, e.payload.userId);
     });
+    // Fusión de eventos (ADR 0034): los posts del duplicado pasan al destino y vuelven si se revierte.
+    dispatcher.on("EventMerged", "social.redirect-event-links", async (e, tx) => {
+      await tx.query(
+        `UPDATE social.post_event_links l SET event_id = $1, via_merge = $2
+          WHERE l.event_id = $2 AND NOT EXISTS (SELECT 1 FROM social.post_event_links x WHERE x.post_id = l.post_id AND x.event_id = $1)`,
+        [e.payload.targetEventId, e.payload.mergedEventId],
+      );
+    });
+    dispatcher.on("EventMergeReverted", "social.restore-event-links", async (e, tx) => {
+      await tx.query(
+        `UPDATE social.post_event_links SET event_id = $2, via_merge = NULL WHERE event_id = $1 AND via_merge = $2`,
+        [e.payload.targetEventId, e.payload.restoredEventId],
+      );
+    });
     dispatcher.on("AuthorStandingChanged", "social.author-standing", async (e, tx) => {
       await tx.query(`UPDATE social.profiles SET low_trust = $2 WHERE user_id = $1`, [e.payload.userId, e.payload.lowTrust]);
     });
@@ -215,6 +229,12 @@ export class SocialService {
       `INSERT INTO social.post_event_links (post_id, event_id, link_type) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`,
       [postId, eventId, linkType],
     );
+  }
+
+  /** División de un evento: los posts de los reportes separados pasan al evento nuevo. */
+  async relinkPosts(tx: Queryable, postIds: string[], fromEventId: string, toEventId: string): Promise<void> {
+    if (postIds.length === 0) return;
+    await tx.query(`UPDATE social.post_event_links SET event_id = $3 WHERE post_id = ANY($1) AND event_id = $2`, [postIds, fromEventId, toEventId]);
   }
 
   /** Vista pública de un post: si es seudónimo, no revela el autor. */

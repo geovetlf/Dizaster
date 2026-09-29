@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import { EventMedia } from "../../components/event-media";
 import { api } from "../../lib/api";
-import { t, VERIFICATION_LABEL, verificationLabel } from "../../lib/i18n";
+import { lang, t, VERIFICATION_LABEL, verificationLabel } from "../../lib/i18n";
+import { eventTitle } from "../../lib/ui/format";
 import { followablePlace } from "../../lib/social/place";
 import { useFollows } from "../../lib/social/follows";
 import { openFlag } from "../../lib/moderation/menu";
@@ -34,7 +35,7 @@ export default function EventScreen() {
   const place = followablePlace(event.place);
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>{event.title?.["es"] ?? event.categoryCode}</Text>
+      <Text style={styles.title}>{eventTitle(event, lang)}</Text>
       {event.place ? <Text style={styles.place}>{event.place.label}</Text> : null}
       <View style={styles.follows}>
         <FollowChip label={t("followEvent")} on={follows.following("event", event.id)} onPress={() => void follows.toggle("event", event.id)} />

@@ -4,7 +4,9 @@ import type {
   NearbyEvent,
   EventCandidate,
   EventMapResponse,
+  EventMergeView,
   EventSummary,
+  ModeratorEventDetail,
   GeoPoint,
   NegativeState,
   PublicVerificationState,
@@ -26,7 +28,7 @@ import {
   type DedupCandidateEvent,
 } from "@dizaster/geo-kit";
 import type { Queryable } from "../../platform/db.js";
-import { notFound } from "../../platform/errors.js";
+import { DomainError, notFound } from "../../platform/errors.js";
 import { newId } from "../../platform/ids.js";
 import { publish, type OutboxDispatcher } from "../../platform/outbox.js";
 import type { GeoService } from "../geo/index.js";
@@ -301,7 +303,7 @@ export class EventService {
   }
 
   /** Geometría y contadores agregados. Una fuente oficial prevalece; si no, mediana ponderada (robusta a pines atípicos). */
-  private async recomputeAggregates(tx: Queryable, eventId: string, c: EventCandidate): Promise<void> {
+  private async recomputeAggregates(tx: Queryable, eventId: string, c: Pick<EventCandidate, "observedAt" | "severityHint">): Promise<void> {
     const { rows } = await tx.query<{ lat: number; lng: number; weight: number; trust_tier: TrustTier; contributor_user_id: string | null; observed_at: Date }>(
       `SELECT ST_Y(point::geometry) AS lat, ST_X(point::geometry) AS lng, weight, trust_tier, contributor_user_id, observed_at
          FROM event.evidence WHERE event_id = $1 AND status = 'ACTIVE' AND assertion = 'OCCURRING'`,
@@ -339,6 +341,159 @@ export class EventService {
         place?.region?.id ?? null, place?.district?.id ?? null, place ? JSON.stringify(place) : null,
       ],
     );
+  }
+
+  // ───────────── Fusión y división manual (moderación, ADR 0034) ─────────────
+
+  /**
+   * Une un duplicado en el destino: sus evidencias activas y sus fotos pasan al destino, el duplicado queda
+   * redirigido (`merged_into_id`) y todo se anota en `merge_log` para poder revertirlo. Para los consumidores la
+   * fusión equivale a que el destino recibe evidencia nueva (verificación, alertas, feed y reputación se recalculan).
+   */
+  async merge(tx: Queryable, targetId: string, sourceId: string, moderatorUserId: string, reason: string): Promise<string> {
+    if (targetId === sourceId) throw new DomainError("VALIDATION", "Un evento no se puede fusionar consigo mismo");
+    const { rows } = await tx.query<{ id: string; merged_into_id: string | null; severity: number; last_activity_at: Date; keywords: string[]; media_hashes: string[] }>(
+      `SELECT id, merged_into_id, severity, last_activity_at, keywords, media_hashes FROM event.events WHERE id = ANY($1) ORDER BY id FOR UPDATE`,
+      [[targetId, sourceId]],
+    );
+    const target = rows.find((r) => r.id === targetId);
+    const source = rows.find((r) => r.id === sourceId);
+    if (!target || !source) throw notFound("Evento");
+    if (target.merged_into_id || source.merged_into_id) throw new DomainError("EVENT_ALREADY_MERGED", "Uno de los eventos ya fue fusionado en otro", 409);
+
+    const mergeId = newId();
+    const moved = await tx.query<{ id: string }>(
+      `UPDATE event.evidence SET event_id = $1 WHERE event_id = $2 AND status = 'ACTIVE' RETURNING id`, [targetId, sourceId],
+    );
+    await tx.query(
+      `UPDATE event.timeline SET event_id = $1, payload = payload || jsonb_build_object('viaMerge', $3::text)
+        WHERE event_id = $2 AND type = 'MEDIA_ADDED'`,
+      [targetId, sourceId, mergeId],
+    );
+    await tx.query(`UPDATE event.events SET merged_into_id = $1, updated_at = now() WHERE id = $2`, [targetId, sourceId]);
+    await this.addFingerprint(tx, targetId, source.keywords, source.media_hashes);
+    await this.recomputeAggregates(tx, targetId, { observedAt: source.last_activity_at.toISOString(), severityHint: source.severity });
+    await tx.query(
+      `INSERT INTO event.merge_log (id, target_event_id, merged_event_id, reason, actor, moved_evidence) VALUES ($1, $2, $3, $4, $5, $6)`,
+      [mergeId, targetId, sourceId, reason, `MODERATOR:${moderatorUserId}`, moved.rows.map((r) => r.id)],
+    );
+    await this.addTimeline(tx, targetId, "MERGED", { mergedEventId: sourceId });
+    await this.addTimeline(tx, sourceId, "MERGED", { intoEventId: targetId });
+    await publish(tx, "EventMerged", { mergeId, targetEventId: targetId, mergedEventId: sourceId });
+    if (moved.rows[0]) await publish(tx, "EventEvidenceAdded", { eventId: targetId, evidenceId: moved.rows[0].id, evidenceType: "MERGE" });
+    return mergeId;
+  }
+
+  /** Deshace una fusión: vuelven las evidencias movidas que sigan en el destino y el duplicado reaparece. */
+  async revertMerge(tx: Queryable, mergeId: string, moderatorUserId: string, reason: string): Promise<{ targetEventId: string; restoredEventId: string }> {
+    const log = (await tx.query<{ target_event_id: string; merged_event_id: string; moved_evidence: string[]; reverted_at: Date | null }>(
+      `SELECT target_event_id, merged_event_id, moved_evidence, reverted_at FROM event.merge_log WHERE id = $1 FOR UPDATE`, [mergeId],
+    )).rows[0];
+    if (!log) throw notFound("Fusión");
+    if (log.reverted_at) throw new DomainError("MERGE_ALREADY_REVERTED", "La fusión ya fue revertida", 409);
+    const targetId = log.target_event_id, restoredId = log.merged_event_id;
+    const back = await tx.query<{ id: string; ref_id: string }>(
+      `UPDATE event.evidence SET event_id = $1 WHERE id = ANY($2) AND event_id = $3 RETURNING id, ref_id`, [restoredId, log.moved_evidence, targetId],
+    );
+    await tx.query(
+      `UPDATE event.timeline SET event_id = $1, payload = payload - 'viaMerge' WHERE event_id = $2 AND type = 'MEDIA_ADDED' AND payload->>'viaMerge' = $3`,
+      [restoredId, targetId, mergeId],
+    );
+    await tx.query(`UPDATE event.events SET merged_into_id = NULL, updated_at = now() WHERE id = $1`, [restoredId]);
+    const neutral = { observedAt: new Date(0).toISOString() };
+    await this.recomputeAggregates(tx, targetId, neutral);
+    await this.recomputeAggregates(tx, restoredId, neutral);
+    await tx.query(`UPDATE event.merge_log SET reverted_at = now(), reverted_by = $2, revert_reason = $3 WHERE id = $1`, [mergeId, `MODERATOR:${moderatorUserId}`, reason]);
+    await this.addTimeline(tx, targetId, "SPLIT", { restoredEventId: restoredId });
+    await this.addTimeline(tx, restoredId, "SPLIT", { fromEventId: targetId });
+    await publish(tx, "EventMergeReverted", { mergeId, targetEventId: targetId, restoredEventId: restoredId, evidenceRefIds: back.rows.map((r) => r.ref_id) });
+    for (const eventId of [targetId, restoredId]) {
+      await publish(tx, "EventEvidenceAdded", { eventId, evidenceId: back.rows[0]?.id ?? mergeId, evidenceType: "MERGE_REVERTED" });
+    }
+    return { targetEventId: targetId, restoredEventId: restoredId };
+  }
+
+  /**
+   * Separa evidencias a un evento nuevo de la misma categoría (dos sucesos que se unieron por error). El evento
+   * original conserva al menos una evidencia; las fotos de los reportes movidos se van con ellos.
+   */
+  async split(tx: Queryable, sourceId: string, evidenceIds: string[], moderatorUserId: string, reason: string): Promise<string> {
+    const source = (await tx.query<{ merged_into_id: string | null; category_code: string }>(
+      `SELECT merged_into_id, category_code FROM event.events WHERE id = $1 FOR UPDATE`, [sourceId],
+    )).rows[0];
+    if (!source) throw notFound("Evento");
+    if (source.merged_into_id) throw new DomainError("EVENT_ALREADY_MERGED", "El evento fue fusionado en otro", 409);
+    const ids = [...new Set(evidenceIds)];
+    const { rows: picked } = await tx.query<{ id: string; ref_id: string; observed_at: Date }>(
+      `SELECT id, ref_id, observed_at FROM event.evidence WHERE id = ANY($1) AND event_id = $2 AND status = 'ACTIVE'`, [ids, sourceId],
+    );
+    if (picked.length !== ids.length) throw new DomainError("VALIDATION", "Alguna evidencia no pertenece al evento o ya no está activa");
+    const remaining = await tx.query(`SELECT 1 FROM event.evidence WHERE event_id = $1 AND status = 'ACTIVE' AND NOT (id = ANY($2)) LIMIT 1`, [sourceId, ids]);
+    if (!remaining.rowCount) throw new DomainError("SPLIT_WOULD_EMPTY", "El evento original debe conservar al menos una evidencia", 409);
+
+    const newId_ = newId();
+    const times = picked.map((p) => p.observed_at.getTime());
+    await tx.query(
+      `INSERT INTO event.events
+         (id, category_code, title, geom, public_geom, public_h3, h3_r7, h3_r9, sensitivity, uncertainty_m, country_code,
+          occurred_start, first_seen_at, last_activity_at, severity, publication_state, region_id, district_id, place)
+       SELECT $1, category_code, title, geom, public_geom, public_h3, h3_r7, h3_r9, sensitivity, uncertainty_m, country_code,
+              $2, now(), $3, severity, publication_state, region_id, district_id, place
+         FROM event.events WHERE id = $4`,
+      [newId_, new Date(Math.min(...times)), new Date(Math.max(...times)), sourceId],
+    );
+    await tx.query(`UPDATE event.evidence SET event_id = $1 WHERE id = ANY($2)`, [newId_, ids]);
+    const refIds = picked.map((p) => p.ref_id);
+    await tx.query(
+      `UPDATE event.timeline SET event_id = $1 WHERE event_id = $2 AND type = 'MEDIA_ADDED' AND payload->>'reportId' = ANY($3)`,
+      [newId_, sourceId, refIds],
+    );
+    const neutral = { observedAt: new Date(0).toISOString() };
+    await this.recomputeAggregates(tx, newId_, neutral);
+    await this.recomputeAggregates(tx, sourceId, neutral);
+    await tx.query(
+      `INSERT INTO event.split_log (id, source_event_id, new_event_id, evidence_ids, reason, actor) VALUES ($1, $2, $3, $4, $5, $6)`,
+      [newId(), sourceId, newId_, ids, reason, `MODERATOR:${moderatorUserId}`],
+    );
+    await this.addTimeline(tx, newId_, "CREATED", { origin: "SPLIT", fromEventId: sourceId });
+    await this.addTimeline(tx, sourceId, "SPLIT", { newEventId: newId_ });
+    await publish(tx, "EventCreated", { eventId: newId_, categoryCode: source.category_code });
+    await publish(tx, "EventSplit", { sourceEventId: sourceId, newEventId: newId_, evidenceRefIds: refIds });
+    for (const eventId of [newId_, sourceId]) {
+      await publish(tx, "EventEvidenceAdded", { eventId, evidenceId: picked[0]!.id, evidenceType: "SPLIT" });
+    }
+    return newId_;
+  }
+
+  /** Lo que moderación necesita para fusionar o dividir: evidencias (sin identidad de quien reportó) y fusiones. */
+  async moderatorDetail(q: Queryable, eventId: string): Promise<ModeratorEventDetail> {
+    const ev = (await q.query<{ merged_into_id: string | null }>(`SELECT merged_into_id FROM event.events WHERE id = $1`, [eventId])).rows[0];
+    if (!ev) throw notFound("Evento");
+    const evidence = await q.query<{
+      id: string; evidence_type: ModeratorEventDetail["evidence"][number]["evidenceType"]; trust_tier: TrustTier; assertion: "OCCURRING" | "NOT_OCCURRING";
+      presence_band: string | null; match_confidence: string; observed_at: Date;
+    }>(
+      `SELECT id, evidence_type, trust_tier, assertion, presence_band, match_confidence, observed_at
+         FROM event.evidence WHERE event_id = $1 AND status = 'ACTIVE' ORDER BY observed_at, id LIMIT 500`,
+      [eventId],
+    );
+    const merges = await q.query<{ id: string; target_event_id: string; merged_event_id: string; reason: string; moved: number; at: Date; reverted_at: Date | null }>(
+      `SELECT id, target_event_id, merged_event_id, reason, cardinality(moved_evidence) AS moved, at, reverted_at
+         FROM event.merge_log WHERE target_event_id = $1 OR merged_event_id = $1 ORDER BY at DESC LIMIT 50`,
+      [eventId],
+    );
+    return {
+      eventId,
+      mergedIntoId: ev.merged_into_id,
+      evidence: evidence.rows.map((r) => ({
+        id: r.id, evidenceType: r.evidence_type, trustTier: r.trust_tier, assertion: r.assertion, presenceBand: r.presence_band,
+        matchConfidence: r.match_confidence, observedAt: r.observed_at.toISOString(),
+      })),
+      merges: merges.rows.map((r): EventMergeView => ({
+        id: r.id, targetEventId: r.target_event_id, mergedEventId: r.merged_event_id, reason: r.reason, movedEvidence: r.moved,
+        at: r.at.toISOString(), revertedAt: r.reverted_at?.toISOString() ?? null,
+      })),
+    };
   }
 
   async addTimeline(tx: Queryable, eventId: string, type: TimelineEntryView["type"], payload: Record<string, unknown>, visibility: "PUBLIC" | "INTERNAL" = "PUBLIC"): Promise<void> {
@@ -412,7 +567,11 @@ export class EventService {
       `SELECT id, type, at, payload FROM event.timeline WHERE event_id = $1 AND visibility = 'PUBLIC' ORDER BY at, id`,
       [eventId],
     );
-    return rows.map((r) => ({ id: r.id, type: r.type, at: r.at.toISOString(), payload: r.payload }));
+    // Marcas internas (de qué reporte o fusión viene una foto) no salen en la timeline pública.
+    return rows.map((r) => {
+      const { reportId: _r, viaMerge: _m, ...payload } = r.payload;
+      return { id: r.id, type: r.type, at: r.at.toISOString(), payload };
+    });
   }
 
   async queryMap(q: Queryable, input: { bbox: [number, number, number, number]; zoom: number; categories?: string[] }): Promise<EventMapResponse> {

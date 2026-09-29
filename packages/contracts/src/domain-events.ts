@@ -10,7 +10,12 @@ export interface DomainEventMap {
   ReportDowngradedToPost: { postId: string; reasons: string[] };
   EventCreated: { eventId: string; categoryCode: string };
   EventEvidenceAdded: { eventId: string; evidenceId: string; evidenceType: string };
-  EventMerged: { targetEventId: string; mergedEventId: string };
+  /** Un moderador unió un duplicado (ADR 0034). Los consumidores redirigen sus referencias al destino. */
+  EventMerged: { mergeId: string; targetEventId: string; mergedEventId: string };
+  /** Fusión revertida: las evidencias movidas (por su ref: reporte o ítem externo) vuelven al evento restaurado. */
+  EventMergeReverted: { mergeId: string; targetEventId: string; restoredEventId: string; evidenceRefIds: string[] };
+  /** Evidencias separadas a un evento nuevo. */
+  EventSplit: { sourceEventId: string; newEventId: string; evidenceRefIds: string[] };
   VerificationChanged: { eventId: string; from: string; to: string; negativeState: string };
   EventLifecycleChanged: { eventId: string; to: "ACTIVE" | "MONITORING" | "RESOLVED" };
   /** Hay notificaciones nuevas por entregar (despierta al emisor push sin esperar al siguiente ciclo). */

@@ -2,7 +2,7 @@ import type { CategoryCatalog, MediaView } from "@dizaster/contracts";
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { categoryStyle, homeChips, MORE_CODE } from "../src/lib/ui/categories";
-import { areaRow, bboxParam, distanceLabel, duration, imageUri, initials, mediaLayout, parseBboxParam, postWhere, timeAgo } from "../src/lib/ui/format";
+import { areaRow, bboxParam, distanceLabel, duration, eventTitle, imageUri, initials, mediaLayout, parseBboxParam, postWhere, timeAgo } from "../src/lib/ui/format";
 
 const catalog = JSON.parse(readFileSync(new URL("../../../data/categories/categories.json", import.meta.url), "utf8")) as CategoryCatalog;
 
@@ -85,5 +85,13 @@ describe("lugar contextual", () => {
     expect(parseBboxParam("1,2,3")).toBeNull();
     expect(parseBboxParam("0,10,1,5")).toBeNull();
     expect(parseBboxParam(undefined)).toBeNull();
+  });
+});
+
+describe("título de evento", () => {
+  it("usa el idioma de la app, luego cualquiera, luego la categoría", () => {
+    expect(eventTitle({ title: { es: "Incendio", en: "Fire" }, categoryCode: "fire.structure" }, "en")).toBe("Fire");
+    expect(eventTitle({ title: { es: "Incendio" }, categoryCode: "fire.structure" }, "fr")).toBe("Incendio");
+    expect(eventTitle({ title: null, categoryCode: "fire.structure" }, "es")).toBe("fire.structure");
   });
 });

@@ -1,5 +1,5 @@
 import type { CaseDetail, ModerationActionType } from "@dizaster/contracts";
-import { useLocalSearchParams } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { api } from "../../lib/api";
@@ -46,6 +46,11 @@ export default function CaseScreen() {
       <Text style={styles.author}>{c.target.authorHandle ? `@${c.target.authorHandle}` : t("pseudonymousAuthor")}</Text>
       <Text style={styles.text}>{c.target.text ?? "—"}</Text>
       <Text style={styles.meta}>{reasonSummary(c.reasons, (r) => t(`reason_${r}`))}</Text>
+      {c.target.type === "EVENT" ? (
+        <Pressable accessibilityRole="button" style={[styles.action, styles.tools]} onPress={() => router.push(`/moderation/event/${c.target.id}`)}>
+          <Text style={styles.actionText}>{t("eventTools")}</Text>
+        </Pressable>
+      ) : null}
       {c.notes.map((n, i) => <Text key={i} style={styles.note}>“{n.note}” · {t(`reason_${n.reason}`)}</Text>)}
 
       {c.actions.length ? <Text style={styles.section}>{t("timeline")}</Text> : null}
@@ -82,6 +87,7 @@ const styles = StyleSheet.create({
   action: { backgroundColor: colors.surfaceAlt, borderRadius: radius.pill, paddingHorizontal: space.md, paddingVertical: space.sm },
   severe: { backgroundColor: colors.accent },
   disabled: { opacity: 0.4 },
+  tools: { alignSelf: "flex-start", marginTop: space.sm },
   actionText: { color: colors.white, fontWeight: "600" },
   error: { color: colors.accent, padding: space.sm },
 });

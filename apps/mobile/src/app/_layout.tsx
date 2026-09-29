@@ -32,6 +32,7 @@ export default function RootLayout() {
         <Stack.Screen name="flag" options={{ title: t("flag"), presentation: "modal" }} />
         <Stack.Screen name="moderation/index" options={{ title: t("moderation") }} />
         <Stack.Screen name="moderation/[id]" options={{ title: t("moderation") }} />
+        <Stack.Screen name="moderation/event/[id]" options={{ title: t("eventTools") }} />
         <Stack.Screen name="my-moderation" options={{ title: t("myModeration") }} />
         <Stack.Screen name="delete-account" options={{ title: t("deleteAccount") }} />
         <Stack.Screen name="zone-edit" options={{ title: t("addZone") }} />

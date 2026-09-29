@@ -132,7 +132,7 @@ export class ReportService {
       if (eventId) {
         await this.d.social.linkPostToEvent(tx, postId, eventId, "REPORT");
         if (req.mediaIds.length > 0) {
-          await this.d.events.addTimeline(tx, eventId, "MEDIA_ADDED", { mediaIds: req.mediaIds, mediaCount: req.mediaIds.length });
+          await this.d.events.addTimeline(tx, eventId, "MEDIA_ADDED", { mediaIds: req.mediaIds, mediaCount: req.mediaIds.length, reportId });
         }
         const created = await this.d.events.wasCreatedBy(tx, eventId, reportId);
         result = { outcome: created ? "CREATED_EVENT" : "ATTACHED_TO_EVENT", reportId, postId, eventId, presenceBand: presence.band };
@@ -197,6 +197,22 @@ export class ReportService {
         [e.payload.userId],
       );
       await tx.query(`UPDATE report.reports SET device_id = NULL WHERE author_user_id = $1`, [e.payload.userId]);
+    });
+    // Fusión y división de eventos (ADR 0034): cada reporte apunta al evento donde está su evidencia.
+    dispatcher.on("EventMerged", "report.follow-merge", async (e, tx) => {
+      await tx.query(`UPDATE report.reports SET event_id = $1 WHERE event_id = $2`, [e.payload.targetEventId, e.payload.mergedEventId]);
+    });
+    dispatcher.on("EventMergeReverted", "report.follow-merge-revert", async (e, tx) => {
+      await tx.query(`UPDATE report.reports SET event_id = $1 WHERE id = ANY($2) AND event_id = $3`, [
+        e.payload.restoredEventId, e.payload.evidenceRefIds, e.payload.targetEventId,
+      ]);
+    });
+    dispatcher.on("EventSplit", "report.follow-split", async (e, tx) => {
+      const { rows } = await tx.query<{ post_id: string }>(
+        `UPDATE report.reports SET event_id = $1 WHERE id = ANY($2) AND event_id = $3 RETURNING post_id`,
+        [e.payload.newEventId, e.payload.evidenceRefIds, e.payload.sourceEventId],
+      );
+      await this.d.social.relinkPosts(tx, rows.map((r) => r.post_id), e.payload.sourceEventId, e.payload.newEventId);
     });
   }
 
