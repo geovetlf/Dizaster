@@ -303,6 +303,7 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | PTWC externa; violencia 5 min editable por admin (ADR 0109) | Hecho | Decisiones del propietario 2026-09-29; migración 0046. NO AI REQUIRED |
 | Catálogo de capacidades y registro de uso del AI Core (ADR 0110) | Hecho | 10 capacidades opcionales con regla sin IA; `cost.ai_calls` sin contenido (migración 0047); visión/embeddings/emergencias apagados |
 | Retraso de publicación editable en la app (ADR 0111) | Hecho | Pantalla admin-delays para categorías HIGHLY_SENSITIVE. NO AI REQUIRED |
+| USGS y GDACS como fuentes externas (ADR 0112) | Hecho | Decisión del propietario; solo instituciones autorizadas confirman |
 | Licencias, auditoría, SBOM, Dependabot; respaldo con prueba de restauración en CI | ✅ | ADR 0070, `scripts/supply-chain.mjs`, `scripts/db-restore-check.mjs` |
 | Idioma de la app elegible en el perfil (es/en/pt/fr o del teléfono) | ✅ | ADR 0069, `app/language.tsx` |
 | Varias cuentas en un teléfono corroboran como una (clave seudónima del teléfono) | ✅ | ADR 0068, migración 0036 |

@@ -27,7 +27,7 @@ describe("fuentes visibles en el evento (ADR 0055)", () => {
     const sources = res.json().sources as EventSourceView[];
     expect(sources).toHaveLength(1);
     expect(sources[0]).toMatchObject({
-      sourceKey: "usgs-earthquakes", trustTier: "OFFICIAL", link: "https://earthquake.usgs.gov/earthquakes/eventpage/us-src-1",
+      sourceKey: "usgs-earthquakes", trustTier: "EXTERNAL", link: "https://earthquake.usgs.gov/earthquakes/eventpage/us-src-1",
       title: { es: "Sismo M5.1" }, assertion: "OCCURRING",
     });
     expect(sources[0]!.license).toBeTruthy();

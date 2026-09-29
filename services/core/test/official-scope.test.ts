@@ -21,7 +21,7 @@ describe("ámbito de una fuente oficial (D-PTWC, ADR 0060)", () => {
     beforeAll(async () => {
       t = await createTestContext();
       await t.c.ingestion.syncRegistry(t.c.ref.sources);
-      await t.c.db.query(`UPDATE ingestion.sources SET status = 'ACTIVE' WHERE key IN ('ptwc-tsunami', 'usgs-earthquakes')`);
+      await t.c.db.query(`UPDATE ingestion.sources SET status = 'ACTIVE' WHERE key IN ('ptwc-tsunami', 'usgs-earthquakes', 'pe-igp-sismos')`);
     });
     afterAll(() => t.close());
     const item = (externalId: string, categoryCode: string, point: { lat: number; lng: number }): NormalizedItem => ({
@@ -38,15 +38,22 @@ describe("ámbito de una fuente oficial (D-PTWC, ADR 0060)", () => {
       expect(await level(id)).toBe("EXTERNALLY_CORROBORATED");
     });
 
-    it("una fuente oficial confirma dentro de su ámbito", async () => {
-      const r = await t.c.ingestion.ingest("usgs-earthquakes", item("usgs-1", "natural.earthquake", offset(LIMA, 500_000)), "URGENT");
+    it("USGS también es externa: corrobora un sismo, no lo confirma", async () => {
+      const r = await t.c.ingestion.ingest("usgs-earthquakes", item("usgs-0", "natural.earthquake", offset(LIMA, 700_000)), "URGENT");
+      await t.c.dispatcher.drain();
+      const id = r.resolution && "eventId" in r.resolution ? r.resolution.eventId : "";
+      expect(await level(id)).toBe("EXTERNALLY_CORROBORATED");
+    });
+
+    it("una fuente oficial registrada confirma dentro de su ámbito", async () => {
+      const r = await t.c.ingestion.ingest("pe-igp-sismos", item("igp-1", "natural.earthquake", offset(LIMA, 500_000)), "URGENT");
       await t.c.dispatcher.drain();
       const id = r.resolution && "eventId" in r.resolution ? r.resolution.eventId : "";
       expect(await level(id)).toBe("OFFICIALLY_CONFIRMED");
     });
 
     it("una fuente oficial fuera de su categoría solo corrobora externamente", async () => {
-      const r = await t.c.ingestion.ingest("usgs-earthquakes", item("usgs-2", "natural.tsunami", offset(LIMA, 300_000)), "URGENT");
+      const r = await t.c.ingestion.ingest("pe-igp-sismos", item("igp-2", "natural.tsunami", offset(LIMA, 300_000)), "URGENT");
       await t.c.dispatcher.drain();
       const id = r.resolution && "eventId" in r.resolution ? r.resolution.eventId : "";
       expect(await level(id)).toBe("EXTERNALLY_CORROBORATED");

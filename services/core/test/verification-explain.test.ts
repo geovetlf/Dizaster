@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { NormalizedItem } from "../src/modules/ingestion/index.js";
 import { sourceParams, withStateLines } from "../src/modules/verification/index.js";
-import { LIMA, createTestContext, createUser, offset, reportBody, submit, type TestContext } from "./helpers.js";
+import { actAsOfficial, LIMA, createTestContext, createUser, offset, reportBody, submit, type TestContext } from "./helpers.js";
 
 // Explicación legible completa (Blueprint §10.4, ADR 0086). NO AI REQUIRED.
 let t: TestContext;
@@ -9,6 +9,7 @@ beforeAll(async () => {
   t = await createTestContext();
   await t.c.ingestion.setSourceStatus("nasa-firms", "ACTIVE");
   await t.c.ingestion.setSourceStatus("usgs-earthquakes", "ACTIVE");
+  await actAsOfficial(t, "usgs-earthquakes");
 });
 afterAll(async () => { await t.close(); });
 

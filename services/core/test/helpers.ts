@@ -131,3 +131,11 @@ export async function withoutPublishDelay(t: TestContext, category: string): Pro
      ON CONFLICT (category_code) DO UPDATE SET publish_delay_minutes = 0`, [category],
   );
 }
+
+/**
+ * Fija una fuente del registro como OFICIAL solo en esta base de pruebas (D-PTWC-2, ADR 0112): en producción USGS,
+ * GDACS y PTWC son externas; aquí USGS hace de "fuente oficial registrada" porque tiene adaptador y muestras reales.
+ */
+export async function actAsOfficial(t: TestContext, key: string): Promise<void> {
+  await t.c.db.query(`UPDATE ingestion.sources SET type = 'OFFICIAL', trust_tier = 'OFFICIAL' WHERE key = $1`, [key]);
+}

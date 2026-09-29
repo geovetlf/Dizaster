@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { FEED_ADAPTERS, IngestionScheduler, lastScheduledAt, type FetchResult, type HttpFetcher } from "../src/modules/ingestion/index.js";
-import { createTestContext, type TestContext } from "./helpers.js";
+import { actAsOfficial, createTestContext, type TestContext } from "./helpers.js";
 
 const fixture = (f: string) => readFileSync(new URL(`./fixtures/${f}`, import.meta.url), "utf8");
 const usgs = FEED_ADAPTERS.get("usgs-geojson")!;
@@ -95,6 +95,7 @@ describe("planificador NORMAL / URGENT", () => {
   beforeAll(async () => {
     t = await createTestContext();
     await t.c.ingestion.setSourceStatus("usgs-earthquakes", "ACTIVE");
+    await actAsOfficial(t, "usgs-earthquakes");
   });
   afterAll(async () => { await t.close(); });
   beforeEach(() => {
