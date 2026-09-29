@@ -253,12 +253,15 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
       z.object({
         bbox: z.string().transform((s) => s.split(",").map(Number)).pipe(BBox),
         zoom: z.coerce.number().min(0).max(22),
-        categories: z.string().optional().transform((s) => (s ? s.split(",").filter(Boolean) : undefined)),
+        categories: z.string().optional().transform((s) => (s ? s.split(",").filter(Boolean).slice(0, 20) : undefined)),
+        verified: z.enum(["0", "1"]).optional(),
       }),
       req.query,
     );
     reply.header("cache-control", "public, max-age=30");
-    return c.events.queryMap(c.db, { bbox: q.bbox as [number, number, number, number], zoom: q.zoom, ...(q.categories ? { categories: q.categories } : {}) });
+    return c.events.queryMap(c.db, {
+      bbox: q.bbox as [number, number, number, number], zoom: q.zoom, ...(q.categories ? { categories: q.categories } : {}), verifiedOnly: q.verified === "1",
+    });
   });
 
   // "¿Es este el mismo evento?" — requiere sesión: solo quien está reportando lo consulta.

@@ -619,12 +619,14 @@ export class EventService {
     });
   }
 
-  async queryMap(q: Queryable, input: { bbox: [number, number, number, number]; zoom: number; categories?: string[] }): Promise<EventMapResponse> {
+  /** `verifiedOnly` (ADR 0057): solo corroborados o confirmados y sin disputa. */
+  async queryMap(q: Queryable, input: { bbox: [number, number, number, number]; zoom: number; categories?: string[]; verifiedOnly?: boolean }): Promise<EventMapResponse> {
     const [w, s, e, n] = input.bbox;
     const filters = `publication_state = 'PUBLISHED' AND negative_state <> 'FALSE' AND merged_into_id IS NULL
       AND status IN ('ACTIVE','MONITORING')
       AND public_geom && ST_MakeEnvelope($1, $2, $3, $4, 4326)::geography
-      AND ($5::text[] IS NULL OR category_code = ANY($5) OR split_part(category_code, '.', 1) = ANY($5))`;
+      AND ($5::text[] IS NULL OR category_code = ANY($5) OR split_part(category_code, '.', 1) = ANY($5))
+      ${input.verifiedOnly ? "AND verification_level <> 'UNVERIFIED' AND negative_state = 'NONE'" : ""}`;
     const params = [w, s, e, n, input.categories?.length ? input.categories : null];
     const res = clusterResolutionForZoom(input.zoom);
     if (res === null) {

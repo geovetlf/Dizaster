@@ -1,25 +1,34 @@
 import { Camera, GeoJSONSource, Layer, Map, type CameraRef, type ViewStateChangeEvent } from "@maplibre/maplibre-react-native";
-import type { EventMapResponse } from "@dizaster/contracts";
+import type { CategoryCatalog, EventMapResponse } from "@dizaster/contracts";
 import { router, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Pressable, StyleSheet, Text, View, type NativeSyntheticEvent } from "react-native";
-import { categoryStyle } from "../../lib/ui/categories";
+import { Pressable, ScrollView, StyleSheet, Text, View, type NativeSyntheticEvent } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { categoryStyle, homeChips } from "../../lib/ui/categories";
+import { VERIFICATION_STROKE, mapFilterQuery, type MapFilter } from "../../lib/map/event-style";
 import { parseBboxParam } from "../../lib/ui/format";
 import { useCoarseLocation } from "../../lib/ui/use-coarse-location";
 import { colors } from "../../theme";
 import { api } from "../../lib/api";
 import { limitAmbientCache } from "../../lib/map/offline";
-import { t } from "../../lib/i18n";
+import { lang, t } from "../../lib/i18n";
 import { OFFLINE_FALLBACK_STYLE, providerFromAppConfig, type MapProvider } from "../../lib/map/provider";
+
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const catalog = require("../../reference-data/categories.json") as CategoryCatalog;
+const { chips } = homeChips(catalog);
 
 /**
  * Mapa completo: el mapa base viene del proveedor configurado (estilo oscuro, como la referencia); la capa de
- * eventos viene de la API. Los puntos se colorean por categoría; los clusters, en rojo.
+ * eventos viene de la API. El relleno de un punto es su categoría y el borde, su verificación; los clusters, en rojo.
+ * Filtros por categoría raíz y "solo verificados" (ADR 0057).
  */
 export default function MapScreen() {
   const location = useCoarseLocation();
   const [provider, setProvider] = useState<MapProvider | null>(null);
   const [data, setData] = useState<EventMapResponse | null>(null);
+  const [filter, setFilter] = useState<MapFilter>({ category: null, verifiedOnly: false });
+  const view = useRef<{ bounds: [number, number, number, number]; zoom: number } | null>(null);
   // Desde la búsqueda de lugares: /map?bbox=w,s,e,n encuadra el área elegida.
   const { bbox } = useLocalSearchParams<{ bbox?: string }>();
   const target = useMemo(() => parseBboxParam(bbox), [bbox]);
@@ -33,10 +42,16 @@ export default function MapScreen() {
     void limitAmbientCache();
   }, []);
 
+  const load = useCallback((f: MapFilter) => {
+    if (!view.current) return;
+    api.events(view.current.bounds, view.current.zoom, mapFilterQuery(f)).then(setData).catch(() => undefined);
+  }, []);
   const onRegionDidChange = useCallback((e: NativeSyntheticEvent<ViewStateChangeEvent>) => {
     const { bounds, zoom } = e.nativeEvent;
-    api.events(bounds, zoom).then(setData).catch(() => undefined);
-  }, []);
+    view.current = { bounds, zoom };
+    load(filter);
+  }, [filter, load]);
+  const applyFilter = (f: MapFilter) => { setFilter(f); load(f); };
 
   const geojson = useMemo<GeoJSON.FeatureCollection>(() => {
     if (!data) return { type: "FeatureCollection", features: [] };
@@ -46,12 +61,17 @@ export default function MapScreen() {
             type: "Feature",
             id: e.id,
             geometry: { type: "Point", coordinates: [e.point.lng, e.point.lat] },
-            properties: { id: e.id, count: 1, color: categoryStyle(e.categoryCode).color, severity: e.severity },
+            properties: {
+              id: e.id, count: 1, color: categoryStyle(e.categoryCode).color, severity: e.severity,
+              stroke: VERIFICATION_STROKE[e.publicVerificationState].color,
+              strokeWidth: VERIFICATION_STROKE[e.publicVerificationState].width,
+              opacity: VERIFICATION_STROKE[e.publicVerificationState].opacity,
+            },
           }))
         : data.clusters.map((c) => ({
             type: "Feature",
             geometry: { type: "Point", coordinates: [c.point.lng, c.point.lat] },
-            properties: { count: c.count, color: colors.accent, severity: c.maxSeverity },
+            properties: { count: c.count, color: colors.accent, severity: c.maxSeverity, stroke: "#ffffff", strokeWidth: 2, opacity: 1 },
           }));
     return { type: "FeatureCollection", features };
   }, [data]);
@@ -86,12 +106,30 @@ export default function MapScreen() {
             paint={{
               "circle-color": ["get", "color"],
               "circle-radius": ["interpolate", ["linear"], ["get", "count"], 1, 7, 50, 22],
-              "circle-stroke-width": 2,
-              "circle-stroke-color": "#ffffff",
+              "circle-stroke-width": ["get", "strokeWidth"],
+              "circle-stroke-color": ["get", "stroke"],
+              "circle-opacity": ["get", "opacity"],
             }}
           />
         </GeoJSONSource>
       </Map>
+      <SafeAreaView edges={["top"]} style={styles.filters} pointerEvents="box-none">
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
+          <Pressable accessibilityRole="button" accessibilityState={{ selected: filter.verifiedOnly }}
+            style={[styles.chip, filter.verifiedOnly && styles.chipOn]} onPress={() => applyFilter({ ...filter, verifiedOnly: !filter.verifiedOnly })}>
+            <Text style={styles.chipText}>{filter.verifiedOnly ? "✓ " : ""}{t("verifiedOnly")}</Text>
+          </Pressable>
+          {chips.map((c) => {
+            const on = filter.category === c.code;
+            return (
+              <Pressable key={c.code ?? "all"} accessibilityRole="button" accessibilityState={{ selected: on }}
+                style={[styles.chip, on && styles.chipOn]} onPress={() => applyFilter({ ...filter, category: c.code })}>
+                <Text style={styles.chipText}>{c.label[lang]}</Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+      </SafeAreaView>
       {provider ? <Text style={styles.attribution}>{provider.attribution}</Text> : null}
       <View style={styles.actions}>
         <Pressable accessibilityRole="button" style={[styles.button, styles.sos]} onPress={() => router.push("/emergency")}>
@@ -105,6 +143,11 @@ export default function MapScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   map: { flex: 1 },
+  filters: { position: "absolute", top: 0, left: 0, right: 0 },
+  chipRow: { gap: 8, paddingHorizontal: 12, paddingVertical: 8 },
+  chip: { backgroundColor: "#0B0F14CC", borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6, borderWidth: 1, borderColor: colors.border },
+  chipOn: { backgroundColor: colors.accent, borderColor: colors.accent },
+  chipText: { color: "#fff", fontWeight: "600" },
   attribution: { position: "absolute", bottom: 88, left: 8, fontSize: 10, color: colors.textMuted, backgroundColor: "#0B0F14AA", paddingHorizontal: 4 },
   actions: { position: "absolute", bottom: 24, left: 16, right: 16, flexDirection: "row", gap: 12 },
   button: { flex: 1, borderRadius: 12, paddingVertical: 16, alignItems: "center" },

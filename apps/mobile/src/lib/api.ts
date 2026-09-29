@@ -60,8 +60,8 @@ export const api = {
   deleteAccount: () => request<{ status: string }>("/v1/me", { method: "DELETE", body: JSON.stringify({ confirm: "DELETE" }) }),
   registerPushToken: (deviceId: string, body: RegisterPushTokenRequest) =>
     request<void>(`/v1/devices/${deviceId}/push-token`, { method: "PUT", body: JSON.stringify(body) }),
-  events: (bbox: [number, number, number, number], zoom: number) =>
-    request<EventMapResponse>(`/v1/events?bbox=${bbox.map((n) => n.toFixed(5)).join(",")}&zoom=${Math.round(zoom)}`),
+  events: (bbox: [number, number, number, number], zoom: number, filter = "") =>
+    request<EventMapResponse>(`/v1/events?bbox=${bbox.map((n) => n.toFixed(5)).join(",")}&zoom=${Math.round(zoom)}${filter}`),
   event: (id: string) => request<EventSummary>(`/v1/events/${id}`),
   verification: (id: string) => request<VerificationView>(`/v1/events/${id}/verification`),
   eventSources: (id: string) => request<{ sources: EventSourceView[] }>(`/v1/events/${id}/sources`),
