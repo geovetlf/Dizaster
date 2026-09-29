@@ -6,6 +6,7 @@ import { Meter } from "./platform/metrics.js";
 import { fieldCipherFromEnv } from "./platform/field-cipher.js";
 import { createPool, type Db } from "./platform/db.js";
 import { OutboxDispatcher } from "./platform/outbox.js";
+import { buildConnectors, type ConnectorOverrides, type Connectors } from "./platform/connectors/index.js";
 import { defaultDataDir } from "./platform/paths.js";
 import { CostService } from "./modules/cost/index.js";
 import { EventService } from "./modules/event/index.js";
@@ -43,6 +44,7 @@ export interface Container {
   alerts: AlertService;
   dispatcher: OutboxDispatcher;
   cost: CostService;
+  connectors: Connectors;
   moderation: ModerationService;
   trust: TrustService;
   quality: QualityService;
@@ -51,7 +53,7 @@ export interface Container {
   meter: Meter;
 }
 
-export function buildContainer(env: AppEnv, overrides: { db?: Db; clock?: Clock; attestation?: AttestationVerifier; fetcher?: HttpFetcher; storage?: StorageProvider; push?: PushSender } = {}): Container {
+export function buildContainer(env: AppEnv, overrides: { db?: Db; clock?: Clock; attestation?: AttestationVerifier; fetcher?: HttpFetcher; storage?: StorageProvider; push?: PushSender; connectors?: ConnectorOverrides } = {}): Container {
   const db = overrides.db ?? createPool(env.DATABASE_URL);
   const clock = overrides.clock ?? systemClock;
   const meter = new Meter(() => clock.now());
@@ -94,6 +96,8 @@ export function buildContainer(env: AppEnv, overrides: { db?: Db; clock?: Clock;
   trust.registerHandlers(dispatcher);
   // Presupuestos y kill switches persistidos: las funciones de pago empiezan a 0 y apagadas (migración 0009).
   const cost = new CostService(db, identity, media, clock, dataDir);
+  // Conectores (ADR 0064): IA, traducción, SMS y voz detrás de interfaces; apagados por defecto, costo cero.
+  const connectors = buildConnectors(env, cost, overrides.connectors);
   const moderation = new ModerationService(db, social, identity, events, verification, trust, media);
   moderation.registerHandlers(dispatcher);
   dispatcher.on("BudgetThresholdReached", "cost.log-threshold", async (e) => {
@@ -112,7 +116,7 @@ export function buildContainer(env: AppEnv, overrides: { db?: Db; clock?: Clock;
   });
   const composer = new PostComposer(db, social, media, events, business);
   const quality = new QualityService(db, clock, { cost, events, verification, alerts, ingestion, moderation });
-  return { env, db, clock, ref, geo, social, identity, events, ingestion, ingestionScheduler, verification, media, storage, reports, feed, alerts, dispatcher, cost, moderation, trust, quality, composer, business, meter };
+  return { env, db, clock, ref, geo, social, identity, events, ingestion, ingestionScheduler, verification, media, storage, reports, feed, alerts, dispatcher, cost, moderation, trust, quality, composer, business, meter, connectors };
 }
 
 /** APNs y FCM directos. Si falta la credencial de una plataforma, sus avisos quedan solo en el historial. */

@@ -262,6 +262,7 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | Pantalla "Acerca de / licencias" con atribuciones ODbL (§11.3) | ✅ | ADR 0051, `GET /v1/about/attributions`, `app/about.tsx` |
 | Contrato OpenAPI 3.1 desde los contratos zod y trazas OpenTelemetry opcionales (§4.3, §5.22) | ✅ | ADR 0052, `GET /v1/openapi.json`, `src/telemetry.ts` |
 | Moderación cambia el ciclo de vida de un evento, auditado (§5.7) | ✅ | ADR 0053, `POST /v1/moderation/events/:id/status` |
+| AI CORE opcional + conectores (IA, traducción, SMS, voz) + modo costo cero | ✅ | ADR 0064, `platform/connectors/`, `docs/ENGINES_AND_CONNECTORS.md` |
 | Push por @mención (silencio, preferencia, bloqueos, seudónimo, anti-spam, dedup) | ✅ | ADR 0063, `AlertService.mention`, migración 0035 |
 | Llamada directa según registro de servicios de emergencia (país/subdivisión/categoría/servicio/disponibilidad), sin IA | ✅ | ADR 0062, `directEmergencyNumber`, `routes` en `emergency-numbers.json` |
 
@@ -273,8 +274,9 @@ A. ✅ PTWC como fuente OFICIAL solo para tsunami (D-PTWC, ADR 0060; feed en PLA
 B. ✅ RESOLVED → ARCHIVED a los 7 días, configurable; fuera del mapa, accesible por enlace (D-ARCHIVE, ADR 0061).
 C. ✅ "Llamar" marca directo el número de la categoría según el registro de servicios de emergencia; si no hay, lista (D-EMERGENCY-CALL, ADR 0062).
 D. ✅ Push por mención con horas de silencio, preferencias, bloqueos y anti-spam (D-MENTION, ADR 0063).
-E. Auditoría de IA y APIs externas; AI CORE único, opcional y desacoplado; interfaces de conectores (traducción, SMS,
-   voz, video en vivo); modo desarrollo costo cero; tabla AI_REQUIRED/COSTO por función.
+E. ✅ Auditoría de IA y APIs externas (ninguna en uso); AI CORE único, opcional y apagado; interfaces de conectores
+   (traducción, SMS, voz; video en vivo ya existía); modo costo cero; tabla por función en
+   `docs/ENGINES_AND_CONNECTORS.md` (ADR 0064). Elegir proveedor de IA/SMS/traducción: BLOQUEADA (propietario).
 
 Revisión del Blueprint del 2026-09-29 (tras ADR 0054), verificada contra el código:
 
