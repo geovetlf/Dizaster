@@ -17,4 +17,4 @@ COPY --from=build /out /app
 COPY --from=build /data /data
 USER node
 EXPOSE 8080
-CMD ["node", "dist/server.js"]
+CMD ["node", "--import", "./dist/telemetry.js", "dist/server.js"]

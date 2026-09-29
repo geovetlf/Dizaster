@@ -31,7 +31,7 @@ services:
 
   worker:
     build: { context: ., dockerfile: infra/docker/core.Dockerfile }
-    command: ["node", "dist/worker.js"]
+    command: ["node", "--import", "./dist/telemetry.js", "dist/worker.js"]
     environment: *coreenv
     depends_on: { migrate: { condition: service_completed_successfully } }
 

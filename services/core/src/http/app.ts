@@ -12,6 +12,7 @@ import { withTransaction } from "../platform/db.js";
 import { DomainError, forbidden } from "../platform/errors.js";
 import { latencyMetric } from "../platform/metrics.js";
 import { FixedWindowLimiter } from "../platform/rate-limit.js";
+import { buildOpenApi } from "./openapi.js";
 import type { Session } from "../modules/identity/index.js";
 
 declare module "fastify" {
@@ -41,6 +42,9 @@ const WRITE_ALLOWED_WHEN_SUSPENDED = /^(POST \/v1\/me\/moderation\/[^/]+\/appeal
  */
 const AGE_REQUIRED = /^(POST \/v1\/(posts|reports|businesses|media\/uploads)|POST \/v1\/posts\/[^/]+\/(comments|share)|PUT \/v1\/(posts|comments)\/[^/]+\/(like|reactions\/[^/]+)|PUT \/v1\/businesses\/[^/]+|PATCH \/v1\/me)$/;
 
+/** Versión del contrato publicada en OpenAPI; subirla al cambiar la forma de una respuesta. */
+export const API_VERSION = "1.0.0";
+
 export async function buildApp(c: Container): Promise<FastifyInstance> {
   const app = Fastify({
     logger: c.env.NODE_ENV === "test" ? false : { level: "info", redact: ["req.headers.authorization"] },
@@ -51,6 +55,12 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
   // Límite general (ADR 0047): por cuenta con sesión, por IP sin ella. Las escrituras tienen un cupo menor.
   const allLimiter = new FixedWindowLimiter(c.env.RATE_LIMIT_PER_MINUTE);
   const writeLimiter = new FixedWindowLimiter(c.env.RATE_LIMIT_WRITES_PER_MINUTE);
+
+  // Rutas registradas, para el contrato OpenAPI (ADR 0052). HEAD lo añade Fastify a cada GET.
+  const routes: string[] = [];
+  app.addHook("onRoute", (r) => {
+    for (const m of [r.method].flat()) if (m !== "HEAD") routes.push(`${m} ${r.url}`);
+  });
 
   app.decorateRequest("session", null);
   app.addHook("onRequest", async (req) => {
@@ -115,6 +125,13 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
     };
     reply.header("cache-control", "public, max-age=300");
     return body;
+  });
+
+  let openapi: Record<string, unknown> | null = null;
+  app.get("/v1/openapi.json", async (_req, reply) => {
+    openapi ??= buildOpenApi(routes, API_VERSION);
+    reply.header("cache-control", "public, max-age=3600");
+    return openapi;
   });
 
   // ───────────── Datos de referencia (cacheables en CDN) ─────────────
