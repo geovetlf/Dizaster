@@ -126,10 +126,22 @@ export class SocialService {
           WHERE l.event_id = $2 AND NOT EXISTS (SELECT 1 FROM social.post_event_links x WHERE x.post_id = l.post_id AND x.event_id = $1)`,
         [e.payload.targetEventId, e.payload.mergedEventId],
       );
+      // Quien seguía el duplicado sigue ahora el destino (ADR 0093). NO AI REQUIRED.
+      await tx.query(
+        `INSERT INTO social.follows (follower_profile_id, target_type, target_id, via_merge)
+         SELECT follower_profile_id, 'EVENT', $1, $2::text::uuid FROM social.follows WHERE target_type = 'EVENT' AND target_id = $2::text
+         ON CONFLICT DO NOTHING`,
+        [e.payload.targetEventId, e.payload.mergedEventId],
+      );
     });
     dispatcher.on("EventMergeReverted", "social.restore-event-links", async (e, tx) => {
       await tx.query(
         `UPDATE social.post_event_links SET event_id = $2, via_merge = NULL WHERE event_id = $1 AND via_merge = $2`,
+        [e.payload.targetEventId, e.payload.restoredEventId],
+      );
+      // El seguimiento original del duplicado nunca se borró: basta quitar el copiado.
+      await tx.query(
+        `DELETE FROM social.follows WHERE target_type = 'EVENT' AND target_id = $1::text AND via_merge = $2::text::uuid`,
         [e.payload.targetEventId, e.payload.restoredEventId],
       );
     });
@@ -558,7 +570,8 @@ export class SocialService {
     const { rows } = await q.query<{ n: number }>(`SELECT count(*)::int AS n FROM social.follows WHERE follower_profile_id = $1`, [followerProfileId]);
     if (rows[0]!.n >= MAX_FOLLOWS) throw new DomainError("LIMIT_REACHED", `Puedes seguir hasta ${MAX_FOLLOWS} perfiles, eventos o lugares`, 409);
     await q.query(
-      `INSERT INTO social.follows (follower_profile_id, target_type, target_id) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`,
+      `INSERT INTO social.follows (follower_profile_id, target_type, target_id) VALUES ($1, $2, $3)
+       ON CONFLICT (follower_profile_id, target_type, target_id) DO UPDATE SET via_merge = NULL`,
       [followerProfileId, type, targetId],
     );
   }

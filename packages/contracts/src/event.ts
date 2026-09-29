@@ -88,6 +88,9 @@ export const EventSummary = z.object({
 });
 export type EventSummary = z.infer<typeof EventSummary>;
 
+/** GET /v1/events/:id: si el evento se fusionó, `mergedIntoId` es el destino al que la app redirige (ADR 0093). */
+export type EventDetail = EventSummary & { mergedIntoId: string | null; publicationState: string };
+
 export const TimelineEntryView = z.object({
   id: z.uuid(),
   type: TimelineEntryType,

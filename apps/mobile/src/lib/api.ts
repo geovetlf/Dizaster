@@ -1,4 +1,4 @@
-import type { MfaEnrollResponse, MfaStatus, PresenceReview, EventSourceView, EventStatus, MyProfile, UpdateProfileRequest, ReactionKind, ReactionState, DataExport, VerificationView, ModeratorEventDetail, SavedZone, SavedZoneInput, AppealView, CaseDetail, CaseSummary, CreateFlagRequest, ModerationActionType, ModerationNotice, CostDashboard, KillSwitchView, QualityReport, CreatePostRequest, TagView, BusinessView, SessionView, CreateBusinessRequest, UpdateBusinessRequest, AlertPreferences, CategorySubscription, CategorySubscriptionInput, NotificationsResponse, AppConfig, AttributionsResponse, AreaSearchResult, FollowTarget, MyFollows, ProfileSearchResult, ProfileView, CommentView, CreateUploadRequest, FeedPost, FeedResponse, FeedTab, CreateUploadResponse, DevicePlatform, MediaView, RegisterPushTokenRequest, EventMapResponse, EventSummary, NearbyEventsResponse, SubmitReportRequest, SubmitReportResponse, TimelineEntryView } from "@dizaster/contracts";
+import type { MfaEnrollResponse, MfaStatus, PresenceReview, EventSourceView, EventStatus, MyProfile, UpdateProfileRequest, ReactionKind, ReactionState, DataExport, VerificationView, ModeratorEventDetail, SavedZone, SavedZoneInput, AppealView, CaseDetail, CaseSummary, CreateFlagRequest, ModerationActionType, ModerationNotice, CostDashboard, KillSwitchView, QualityReport, CreatePostRequest, TagView, BusinessView, SessionView, CreateBusinessRequest, UpdateBusinessRequest, AlertPreferences, CategorySubscription, CategorySubscriptionInput, NotificationsResponse, AppConfig, AttributionsResponse, AreaSearchResult, FollowTarget, MyFollows, ProfileSearchResult, ProfileView, CommentView, CreateUploadRequest, FeedPost, FeedResponse, FeedTab, CreateUploadResponse, DevicePlatform, MediaView, RegisterPushTokenRequest, EventMapResponse, EventDetail, EventSummary, NearbyEventsResponse, SubmitReportRequest, SubmitReportResponse, TimelineEntryView } from "@dizaster/contracts";
 import { mergeMapTiles, tilesForView } from "@dizaster/geo-kit";
 import { canRetryWithRefresh, singleFlight } from "./auth/refresh";
 import { API_URL } from "./config";
@@ -91,7 +91,7 @@ export const api = {
     );
     return mergeMapTiles(parts);
   },
-  event: (id: string) => request<EventSummary>(`/v1/events/${id}`),
+  event: (id: string) => request<EventDetail>(`/v1/events/${id}`),
   post: (id: string) => request<FeedPost>(`/v1/posts/${id}`),
   verification: (id: string) => request<VerificationView>(`/v1/events/${id}/verification`),
   eventSources: (id: string) => request<{ sources: EventSourceView[] }>(`/v1/events/${id}/sources`),

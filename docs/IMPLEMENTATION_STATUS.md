@@ -284,6 +284,7 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | MFA TOTP para moderación y administración | ✅ | ADR 0090 |
 | Detección local del idioma del contenido | ✅ | ADR 0091 |
 | Adapters NORMAL: ReliefWeb, OMS DON y RSS de noticias (PLANNED) | ✅ (activación en espera: términos) | ADR 0092 |
+| Redirección de EVENT fusionado y de sus seguidores | ✅ | ADR 0093 |
 | Licencias, auditoría, SBOM, Dependabot; respaldo con prueba de restauración en CI | ✅ | ADR 0070, `scripts/supply-chain.mjs`, `scripts/db-restore-check.mjs` |
 | Idioma de la app elegible en el perfil (es/en/pt/fr o del teléfono) | ✅ | ADR 0069, `app/language.tsx` |
 | Varias cuentas en un teléfono corroboran como una (clave seudónima del teléfono) | ✅ | ADR 0068, migración 0036 |
@@ -311,7 +312,19 @@ decisiones o credenciales del propietario (lista de abajo); mientras tanto se co
 
 Revisión del Blueprint del 2026-09-29 (tras ADR 0070): completada con ADR 0071–0080.
 
-Revisión del Blueprint del 2026-09-29 (tras ADR 0080), verificada contra el código, sin bloqueos:
+Revisión del Blueprint del 2026-09-29 (tras ADR 0080): completada con ADR 0081–0092.
+
+Revisión del Blueprint del 2026-09-29 (tras ADR 0092), verificada contra el código, sin bloqueos:
+
+1. "Mis reportes": consultar el estado de los propios reportes y retirarlos (§6.1 `getReport`, §13.2).
+2. Confirmación por perfil institucional oficial dentro de su ámbito (§10.2, D-04).
+3. Herramientas de moderación en la app: marcar DISPUTED/FALSE y revisar duplicados (§5.21, ADR 0076).
+4. "Personas bloqueadas" y "Lo que sigo" en la app (§5.3).
+5. Herramientas de administración en la app: verificación de negocios, presupuestos, registro de presencia (§13.1).
+6. Retraso de publicación configurable para categorías HIGHLY_SENSITIVE (§8.5); por defecto 0.
+7. Promoción NORMAL→URGENT por regla configurable por fuente (§9.2).
+8. Roles verificador y operador (§13.1 RBAC).
+9. Preparación para idiomas RTL (§5.15).
 
 
 Bloqueadas o en espera:

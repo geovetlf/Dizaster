@@ -13,6 +13,7 @@ import { eventTime, eventTitle, formatInZone, timeAgo } from "../../lib/ui/forma
 import { evidenceLine, explainLines, timelineLabel } from "../../lib/verification/explain";
 import { followablePlace } from "../../lib/social/place";
 import { useFollows } from "../../lib/social/follows";
+import { mergedTarget } from "../../lib/events/merged";
 import { openFlag } from "../../lib/moderation/menu";
 import { colors, radius, space } from "../../theme";
 
@@ -20,7 +21,7 @@ const TIMELINE_SHOWN = 12;
 
 /** Pantalla de evento. También es el destino de los deep links: dizaster://event/<id> y https://<dominio>/e/<id>. */
 export default function EventScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, hops } = useLocalSearchParams<{ id: string; hops?: string }>();
   const [event, setEvent] = useState<EventSummary | null>(null);
   const [timeline, setTimeline] = useState<TimelineEntryView[]>([]);
   const [media, setMedia] = useState<MediaView[]>([]);
@@ -34,13 +35,18 @@ export default function EventScreen() {
     if (!id) return;
     // Sin red se muestra la última versión guardada del evento (ADR 0066).
     readThrough(readCache(), cacheKeys.event(id), () => Promise.all([api.event(id), api.timeline(id)]))
-      .then(({ value: [e, tl], savedAt }) => { setEvent(e); setTimeline(tl.entries); setSavedAt(savedAt); })
+      .then(({ value: [e, tl], savedAt }) => {
+        // Evento fusionado (ADR 0093): enlaces, avisos y seguidos antiguos llevan al evento que queda.
+        const target = mergedTarget(e, Number(hops ?? 0));
+        if (target) { router.replace(`/event/${target}?hops=${Number(hops ?? 0) + 1}`); return; }
+        setEvent(e); setTimeline(tl.entries); setSavedAt(savedAt);
+      })
       .catch((e: Error) => setError(e.message));
     // La media es secundaria: si falla, el evento se muestra igual.
     api.eventMedia(id).then((r) => setMedia(r.media)).catch(() => setMedia([]));
     api.verification(id).then(setVerification).catch(() => setVerification(null));
     api.eventSources(id).then((r) => setSources(r.sources)).catch(() => setSources([]));
-  }, [id]);
+  }, [id, hops]);
 
   const fetchPage = useCallback((cursor: string | null) => api.eventPosts(id ?? "", cursor), [id]);
 
