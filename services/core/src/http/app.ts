@@ -185,11 +185,15 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
   if (c.env.DEV_AUTH_ENABLED) {
     app.post("/v1/auth/dev", async (req) => {
       const b = parse(
-        z.object({ handle: z.string().min(2).max(40), platform: DevicePlatform.optional(), deviceId: z.uuid().optional() }),
+        z.object({
+          handle: z.string().min(2).max(40), platform: DevicePlatform.optional(), deviceId: z.uuid().optional(),
+          /** Resumen (hash) del identificador de instalación del sistema, calculado en el teléfono (ADR 0068). */
+          hardwareId: z.string().regex(/^[A-Za-z0-9_-]{16,128}$/).optional(),
+        }),
         req.body,
       );
       const session = await c.identity.signIn("DEV", b.handle.toLowerCase(), b.handle);
-      const deviceId = b.platform ? await c.identity.registerDevice(session.userId, b.platform, "dev", b.deviceId) : null;
+      const deviceId = b.platform ? await c.identity.registerDevice(session.userId, b.platform, "dev", b.deviceId, b.hardwareId) : null;
       const pair = await c.identity.startSession(session, deviceId);
       return { ...pair, userId: session.userId, profileId: session.profileId, deviceId };
     });

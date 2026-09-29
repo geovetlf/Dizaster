@@ -3,6 +3,7 @@ import { Platform } from "react-native";
 import { api, onSessionEvents, setSession } from "./api";
 import { ensureAlertChannel, registerPushIfPermitted, watchPushTokenRotation } from "./device/push";
 import { clearIdentity, loadIdentity, saveIdentity, type StoredIdentity } from "./device/secure-session";
+import { hardwareId } from "./device/hardware-id";
 import { newId } from "./ids";
 import { readCache } from "./offline/sqlite-cache";
 import { startAutoFlush } from "./report/outbox";
@@ -42,7 +43,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     };
 
     async function signIn(handle: string, deviceId: string | null | undefined) {
-      const s = await api.devSignIn(handle, platform, deviceId);
+      const s = await api.devSignIn(handle, platform, deviceId, await hardwareId());
       setSession(s);
       identity.current = { handle, deviceId: s.deviceId, refreshToken: s.refreshToken };
       persist({});

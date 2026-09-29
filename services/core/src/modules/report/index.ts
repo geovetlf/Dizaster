@@ -103,7 +103,8 @@ export class ReportService {
           observedAt: req.capturedAt,
           trustTier: "CITIZEN",
           weight: presence.score,
-          contributor: { userId: session.userId, deviceId: device?.id ?? null },
+          // El teléfono, no la cuenta: dos cuentas en el mismo teléfono corroboran como una (ADR 0068).
+          contributor: { userId: session.userId, deviceId: device?.phoneId ?? null },
           ...(req.targetEventId ? { userSelectedEventId: req.targetEventId } : {}),
           // Un testimonio tardío (offline fuera de tolerancia) solo puede sumarse a un evento existente.
           mayCreateEvent: req.assertion === "OCCURRING" && !presence.lateOffline,

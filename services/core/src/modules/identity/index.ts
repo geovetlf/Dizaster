@@ -1,4 +1,4 @@
-import { createHash, randomBytes } from "node:crypto";
+import { createHash, createHmac, randomBytes } from "node:crypto";
 import { SignJWT, jwtVerify } from "jose";
 import { ageAt, PUSH_PROVIDER_BY_PLATFORM, type AttestationVerdict, type DevicePlatform, type RegisterPushTokenRequest, type SessionView } from "@dizaster/contracts";
 import type { Db, Queryable } from "../../platform/db.js";
@@ -75,6 +75,14 @@ export class IdentityService {
     jwtSecret: string,
   ) {
     this.key = new TextEncoder().encode(jwtSecret);
+    this.hardwareSecret = createHmac("sha256", jwtSecret).update("device-hardware-key:v1").digest();
+  }
+
+  private readonly hardwareSecret: Buffer;
+
+  /** Clave seudónima del teléfono (ADR 0068): HMAC con secreto del servidor; sin el secreto no se puede revertir ni cruzar. */
+  hardwareKey(platform: DevicePlatform, hardwareId: string): string {
+    return createHmac("sha256", this.hardwareSecret).update(`${platform}:${hardwareId}`).digest("base64url");
   }
 
   /** Alta o login con una identidad externa ya verificada. Crea usuario y perfil personal la primera vez. */
@@ -156,18 +164,19 @@ export class IdentityService {
    * Registra un dispositivo o, si el cliente ya tiene uno propio de la misma plataforma, lo reutiliza.
    * Reutilizar evita que cada arranque cree un "dispositivo nuevo" y diluya el anti-abuso por dispositivo.
    */
-  async registerDevice(userId: string, platform: DevicePlatform, appVersion: string | null, existingId?: string): Promise<string> {
+  async registerDevice(userId: string, platform: DevicePlatform, appVersion: string | null, existingId?: string, hardwareId?: string): Promise<string> {
+    const hwKey = hardwareId ? this.hardwareKey(platform, hardwareId) : null;
     if (existingId) {
       const { rows } = await this.db.query<{ id: string }>(
-        `UPDATE identity.devices SET last_seen_at = now(), app_version = COALESCE($4, app_version)
+        `UPDATE identity.devices SET last_seen_at = now(), app_version = COALESCE($4, app_version), hardware_key = COALESCE($5, hardware_key)
           WHERE id = $1 AND user_id = $2 AND platform = $3 RETURNING id`,
-        [existingId, userId, platform, appVersion],
+        [existingId, userId, platform, appVersion, hwKey],
       );
       if (rows[0]) return rows[0].id;
     }
     const id = newId();
-    await this.db.query(`INSERT INTO identity.devices (id, user_id, platform, app_version) VALUES ($1, $2, $3, $4)`, [
-      id, userId, platform, appVersion,
+    await this.db.query(`INSERT INTO identity.devices (id, user_id, platform, app_version, hardware_key) VALUES ($1, $2, $3, $4, $5)`, [
+      id, userId, platform, appVersion, hwKey,
     ]);
     return id;
   }
@@ -226,12 +235,16 @@ export class IdentityService {
   }
 
   /** Devuelve el dispositivo solo si pertenece al usuario (un usuario no puede usar dispositivos ajenos). */
-  async ownedDevice(q: Queryable, userId: string, deviceId: string): Promise<{ id: string; platform: DevicePlatform } | null> {
-    const { rows } = await q.query<{ id: string; platform: DevicePlatform }>(
-      `SELECT id, platform FROM identity.devices WHERE id = $1 AND user_id = $2`,
+  async ownedDevice(q: Queryable, userId: string, deviceId: string): Promise<{ id: string; platform: DevicePlatform; phoneId: string } | null> {
+    // phoneId: el primer registro de este mismo teléfono, sea de la cuenta que sea (ADR 0068). Sin clave, el propio.
+    const { rows } = await q.query<{ id: string; platform: DevicePlatform; phone_id: string }>(
+      `SELECT d.id, d.platform,
+              coalesce((SELECT o.id FROM identity.devices o WHERE o.hardware_key = d.hardware_key ORDER BY o.created_at, o.id LIMIT 1), d.id) AS phone_id
+         FROM identity.devices d WHERE d.id = $1 AND d.user_id = $2`,
       [deviceId, userId],
     );
-    return rows[0] ?? null;
+    const r = rows[0];
+    return r ? { id: r.id, platform: r.platform, phoneId: r.phone_id } : null;
   }
 
   /** Cuentas activas desde `since` (un dispositivo suyo se conectó): denominador del costo por 1.000 usuarios. */

@@ -49,10 +49,10 @@ async function request<T>(path: string, init: RequestInit = {}, retried = false)
 export const api = {
   config: () => request<AppConfig>("/v1/config"),
   attributions: () => request<AttributionsResponse>("/v1/about/attributions"),
-  devSignIn: (handle: string, platform: DevicePlatform, deviceId?: string | null) =>
+  devSignIn: (handle: string, platform: DevicePlatform, deviceId?: string | null, hardwareId?: string | null) =>
     request<TokenPair & { deviceId: string | null }>("/v1/auth/dev", {
       method: "POST",
-      body: JSON.stringify({ handle, platform, ...(deviceId ? { deviceId } : {}) }),
+      body: JSON.stringify({ handle, platform, ...(deviceId ? { deviceId } : {}), ...(hardwareId ? { hardwareId } : {}) }),
     }),
   refresh: (refreshToken: string) => request<TokenPair>("/v1/auth/refresh", { method: "POST", body: JSON.stringify({ refreshToken }) }),
   logout: (refreshToken: string) => request<void>("/v1/auth/logout", { method: "POST", body: JSON.stringify({ refreshToken }) }),
