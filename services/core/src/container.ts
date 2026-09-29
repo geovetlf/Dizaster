@@ -9,13 +9,14 @@ import { defaultDataDir } from "./platform/paths.js";
 import { CostService } from "./modules/cost/index.js";
 import { EventService } from "./modules/event/index.js";
 import { FeedService } from "./modules/feed/index.js";
-import { AlertService, ApnsSender, FcmSender, LogPushSender, PushGateway, type FcmServiceAccount, type PushSender } from "./modules/alert/index.js";
+import { AlertService, ApnsSender, budgetAlertText, FcmSender, LogPushSender, PushGateway, type FcmServiceAccount, type PushSender } from "./modules/alert/index.js";
 import { GeoService } from "./modules/geo/index.js";
 import { ModerationService } from "./modules/moderation/index.js";
 import { TrustService } from "./modules/trust/index.js";
 import { DevAttestationVerifier, IdentityService, type AttestationVerifier } from "./modules/identity/index.js";
 import { IngestionScheduler, IngestionService, NodeHttpFetcher, type HttpFetcher } from "./modules/ingestion/index.js";
 import { LocalDiskStorage, MediaService, S3Storage, type StorageProvider } from "./modules/media/index.js";
+import { QualityService } from "./modules/quality/index.js";
 import { ReferenceData } from "./modules/reference/index.js";
 import { ReportService } from "./modules/report/index.js";
 import { SocialService } from "./modules/social/index.js";
@@ -43,6 +44,7 @@ export interface Container {
   cost: CostService;
   moderation: ModerationService;
   trust: TrustService;
+  quality: QualityService;
   meter: Meter;
 }
 
@@ -92,7 +94,13 @@ export function buildContainer(env: AppEnv, overrides: { db?: Db; clock?: Clock;
   dispatcher.on("BudgetThresholdReached", "cost.log-threshold", async (e) => {
     console.warn(JSON.stringify({ msg: "cost.budget.threshold", ...e.payload }));
   });
-  return { env, db, clock, ref, geo, social, identity, events, ingestion, ingestionScheduler, verification, media, storage, reports, feed, alerts, dispatcher, cost, moderation, trust, meter };
+  // Aviso push a administración (ADR 0026). Idempotente por umbral y periodo: cost solo publica una vez cada uno.
+  dispatcher.on("BudgetThresholdReached", "alert.notify-admins-budget", async (e) => {
+    const admins = await identity.usersWithRole(db, "admin");
+    await alerts.notifyAdmins(admins, (lang) => budgetAlertText(lang, e.payload), "dizaster://admin-cost", `budget:${e.payload.key}`);
+  });
+  const quality = new QualityService(db, clock, { cost, events, verification, alerts, ingestion, moderation });
+  return { env, db, clock, ref, geo, social, identity, events, ingestion, ingestionScheduler, verification, media, storage, reports, feed, alerts, dispatcher, cost, moderation, trust, quality, meter };
 }
 
 /** APNs y FCM directos. Si falta la credencial de una plataforma, sus avisos quedan solo en el historial. */

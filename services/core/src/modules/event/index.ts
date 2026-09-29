@@ -516,4 +516,22 @@ export class EventService {
   }
 
   readonly dedupRuleVersion = DEDUP_RULES_V1.version;
+
+  // ───────────── Calidad (ADR 0026) ─────────────
+
+  /** EVENTs creados en el periodo y cuántos terminaron fusionados en otro (duplicados que la resolución no evitó). */
+  async qualityStats(q: Queryable, from: Date, to: Date): Promise<{ created: number; merged: number }> {
+    const { rows } = await q.query<{ created: number; merged: number }>(
+      `SELECT count(*)::int AS created, count(*) FILTER (WHERE merged_into_id IS NOT NULL)::int AS merged
+         FROM event.events WHERE created_at >= $1 AND created_at < $2`,
+      [from, to],
+    );
+    return rows[0]!;
+  }
+
+  async createdAt(q: Queryable, ids: string[]): Promise<Map<string, Date>> {
+    if (ids.length === 0) return new Map();
+    const { rows } = await q.query<{ id: string; created_at: Date }>(`SELECT id, created_at FROM event.events WHERE id = ANY($1)`, [ids]);
+    return new Map(rows.map((r) => [r.id, r.created_at]));
+  }
 }

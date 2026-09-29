@@ -153,4 +153,28 @@ export class IngestionService {
     );
     return new Map(rows.map((r) => [r.id, { trustTier: r.trust_tier, assertion: r.assertion }]));
   }
+
+  // ───────────── Calidad (ADR 0026) ─────────────
+
+  /** Salud de la ingesta: corridas fallidas y demora del carril urgente desde que la fuente publica. */
+  async qualityStats(q: Queryable, from: Date, to: Date) {
+    const r = await q.query<{ runs: number; failed: number }>(
+      `SELECT count(*)::int AS runs, count(*) FILTER (WHERE status = 'FAILED')::int AS failed
+         FROM ingestion.runs WHERE started_at >= $1 AND started_at < $2 AND status <> 'SKIPPED_CIRCUIT_OPEN'`,
+      [from, to],
+    );
+    const u = await q.query<{ n: number; p95: number | null }>(
+      `SELECT count(*)::int AS n,
+              percentile_cont(0.95) WITHIN GROUP (ORDER BY EXTRACT(EPOCH FROM (fetched_at - published_at)))
+                FILTER (WHERE published_at IS NOT NULL AND published_at <= fetched_at) AS p95
+         FROM ingestion.external_items WHERE lane = 'URGENT' AND fetched_at >= $1 AND fetched_at < $2`,
+      [from, to],
+    );
+    const { runs, failed } = r.rows[0]!;
+    const p95 = u.rows[0]!.p95;
+    return {
+      runs, failedRuns: failed, failureRate: runs > 0 ? Math.round((failed / runs) * 1000) / 1000 : null,
+      urgentItems: u.rows[0]!.n, urgentLagP95Seconds: p95 === null ? null : Math.round(Number(p95) * 10) / 10,
+    };
+  }
 }

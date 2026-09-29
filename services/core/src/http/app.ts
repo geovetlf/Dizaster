@@ -4,6 +4,7 @@ import { BBox, CreateCommentRequest, DevicePlatform, MEDIA_UPLOAD_LIMITS, Negati
 import { LocalDiskStorage } from "../modules/media/index.js";
 import type { Container } from "../container.js";
 import { DomainError, forbidden } from "../platform/errors.js";
+import { latencyMetric } from "../platform/metrics.js";
 import type { Session } from "../modules/identity/index.js";
 
 declare module "fastify" {
@@ -49,6 +50,7 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
     c.meter.add("http", "requests", 1, group);
     const len = Number(reply.getHeader("content-length") ?? 0);
     if (len > 0) c.meter.add("http", "response_bytes", len, group);
+    c.meter.add("http", latencyMetric(reply.elapsedTime), 1);
   });
 
   app.setErrorHandler((err, req, reply) => {
@@ -420,6 +422,12 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
     await c.meter.flush(c.cost);
     reply.header("cache-control", "no-store");
     return c.cost.dashboard(req.query);
+  });
+  app.get("/v1/admin/quality", async (req, reply) => {
+    requireAdmin(req);
+    await c.meter.flush(c.cost);
+    reply.header("cache-control", "no-store");
+    return c.quality.report(req.query);
   });
   app.put("/v1/admin/cost/budgets/:key", async (req) => {
     const session = requireAdmin(req);

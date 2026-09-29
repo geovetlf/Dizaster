@@ -57,3 +57,29 @@ export class Meter {
     };
   }
 }
+
+/**
+ * Latencia de la API como histograma por tramos dentro del mismo medidor: 11 filas por día como máximo, sin
+ * tabla nueva ni una escritura por petición. La métrica "latency_le_<ms>" cuenta respuestas de hasta ese tiempo.
+ */
+export const LATENCY_BUCKETS_MS = [25, 50, 100, 200, 300, 500, 1000, 2000, 5000] as const;
+export const LATENCY_OVERFLOW_METRIC = "latency_gt_5000";
+
+export function latencyMetric(ms: number): string {
+  const b = LATENCY_BUCKETS_MS.find((x) => ms <= x);
+  return b === undefined ? LATENCY_OVERFLOW_METRIC : `latency_le_${b}`;
+}
+
+/** Percentil desde el histograma: devuelve el límite superior del tramo que lo contiene (estimación conservadora). */
+export function histogramPercentile(counts: Map<string, number>, p: number): number | null {
+  const total = [...counts.values()].reduce((s, n) => s + n, 0);
+  if (total === 0) return null;
+  const rank = Math.ceil(p * total);
+  let seen = 0;
+  for (const b of LATENCY_BUCKETS_MS) {
+    seen += counts.get(`latency_le_${b}`) ?? 0;
+    if (seen >= rank) return b;
+  }
+  // Por encima del último tramo no hay techo conocido: se informa como "más de 5 s".
+  return Number.POSITIVE_INFINITY;
+}

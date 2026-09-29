@@ -259,6 +259,15 @@ export class CostService implements CostGuard, UsageSink {
     const d = this.today();
     return period === "DAILY" ? d : `${d.slice(0, 7)}-01`;
   }
+
+  /** Unidades medidas por métrica de un módulo en un rango de días (para calidad: histograma de latencia). */
+  async usageByMetric(q: Queryable, module: string, fromDay: string, toDay: string): Promise<Map<string, number>> {
+    const { rows } = await q.query<{ metric: string; units: number }>(
+      `SELECT metric, sum(units)::float8 AS units FROM cost.usage_daily WHERE module = $1 AND day BETWEEN $2 AND $3 GROUP BY metric`,
+      [module, fromDay, toDay],
+    );
+    return new Map(rows.map((r) => [r.metric, Number(r.units)]));
+  }
 }
 
 const round = (n: number, digits = 4) => Math.round(n * 10 ** digits) / 10 ** digits;

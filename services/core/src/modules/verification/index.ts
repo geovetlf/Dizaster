@@ -248,4 +248,58 @@ export class VerificationService {
       },
     };
   }
+
+  // ───────────── Calidad (ADR 0026) ─────────────
+
+  /**
+   * Cuántos EVENTs alcanzaron por primera vez cada estado en el periodo, y cuánto tardó la primera corroboración
+   * desde que el EVENT existe. Un EVENT que baja y vuelve a subir no cuenta dos veces.
+   */
+  async qualityStats(q: Queryable, from: Date, to: Date) {
+    const { rows } = await q.query<{ state: string; event_id: string; first_at: Date }>(
+      `WITH firsts AS (
+         SELECT to_level AS state, event_id, min(at) AS first_at FROM verification.transitions
+          WHERE to_level <> 'UNVERIFIED' GROUP BY 1, 2
+         UNION ALL
+         SELECT to_negative AS state, event_id, min(at) FROM verification.transitions
+          WHERE to_negative <> 'NONE' GROUP BY 1, 2
+       )
+       SELECT state, event_id, first_at FROM firsts WHERE first_at >= $1 AND first_at < $2`,
+      [from, to],
+    );
+    const count = (s: string) => rows.filter((r) => r.state === s).length;
+    // Primera subida de nivel por EVENT (cualquier nivel positivo) dentro del periodo.
+    const firstUp = new Map<string, Date>();
+    for (const r of rows) {
+      if (!["COMMUNITY_CORROBORATED", "EXTERNALLY_CORROBORATED", "OFFICIALLY_CONFIRMED"].includes(r.state)) continue;
+      const cur = firstUp.get(r.event_id);
+      if (!cur || r.first_at < cur) firstUp.set(r.event_id, r.first_at);
+    }
+    // Una subida anterior al periodo no es la primera: se descarta.
+    const earlier = await q.query<{ event_id: string }>(
+      `SELECT DISTINCT event_id FROM verification.transitions WHERE event_id = ANY($1) AND to_level <> 'UNVERIFIED' AND at < $2`,
+      [[...firstUp.keys()], from],
+    );
+    for (const r of earlier.rows) firstUp.delete(r.event_id);
+    const created = await this.events.createdAt(q, [...firstUp.keys()]);
+    const minutes = [...firstUp.entries()].flatMap(([id, at]) => {
+      const c = created.get(id);
+      return c ? [Math.max(0, (at.getTime() - c.getTime()) / 60_000)] : [];
+    });
+    return {
+      communityCorroborated: count("COMMUNITY_CORROBORATED"),
+      externallyCorroborated: count("EXTERNALLY_CORROBORATED"),
+      officiallyConfirmed: count("OFFICIALLY_CONFIRMED"),
+      disputed: count("DISPUTED"),
+      markedFalse: count("FALSE"),
+      medianMinutesToCorroboration: median(minutes),
+    };
+  }
+}
+
+function median(xs: number[]): number | null {
+  if (xs.length === 0) return null;
+  const s = [...xs].sort((a, b) => a - b);
+  const m = Math.floor(s.length / 2);
+  return Math.round((s.length % 2 ? s[m]! : (s[m - 1]! + s[m]!) / 2) * 10) / 10;
 }

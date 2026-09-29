@@ -46,7 +46,7 @@ import type { PushMessage, PushSender } from "./push/types.js";
 export { ApnsSender, type ApnsConfig } from "./push/apns.js";
 export { FcmSender, type FcmConfig, type FcmServiceAccount } from "./push/fcm.js";
 export { LogPushSender, PushGateway, type PushMessage, type PushResult, type PushSender } from "./push/types.js";
-export { DEFAULT_PREFERENCES, alertText, decideAlerts, groupText, inQuietHours, localMinutes, wants } from "./rules.js";
+export { DEFAULT_PREFERENCES, alertText, budgetAlertText, decideAlerts, groupText, inQuietHours, localMinutes, wants } from "./rules.js";
 
 /** Distancia máxima a la costa para asignar un evento marino a un país en las suscripciones por país. */
 export const OFFSHORE_COUNTRY_RADIUS_M = 300_000;
@@ -506,6 +506,59 @@ export class AlertService {
 
   async removeSubscription(q: Queryable, profileId: string, id: string): Promise<void> {
     await q.query(`DELETE FROM alert.subscriptions WHERE id = $1 AND profile_id = $2`, [id, profileId]);
+  }
+
+  // ───────────── Calidad y avisos a administración (ADR 0026) ─────────────
+
+  /** Alertas del periodo, destino de cada aviso y cuánto tardó en salir el push desde que se decidió la alerta. */
+  async qualityStats(q: Queryable, from: Date, to: Date) {
+    const a = await q.query<{ alerts: number; critical: number }>(
+      `SELECT count(*)::int AS alerts, count(*) FILTER (WHERE critical)::int AS critical FROM alert.alerts WHERE created_at >= $1 AND created_at < $2`,
+      [from, to],
+    );
+    const n = await q.query<{ status: string; n: number }>(
+      `SELECT status, count(*)::int AS n FROM alert.notifications WHERE created_at >= $1 AND created_at < $2 GROUP BY status`,
+      [from, to],
+    );
+    const lat = await q.query<{ p50: number | null; p95: number | null; cp95: number | null }>(
+      `SELECT percentile_cont(0.5) WITHIN GROUP (ORDER BY s) AS p50, percentile_cont(0.95) WITHIN GROUP (ORDER BY s) AS p95,
+              percentile_cont(0.95) WITHIN GROUP (ORDER BY s) FILTER (WHERE critical) AS cp95
+         FROM (SELECT EXTRACT(EPOCH FROM (n.pushed_at - a.created_at)) AS s, a.critical
+                 FROM alert.notifications n JOIN alert.alerts a ON a.id = n.alert_id
+                WHERE n.pushed_at IS NOT NULL AND a.created_at >= $1 AND a.created_at < $2) x`,
+      [from, to],
+    );
+    const l = lat.rows[0]!;
+    const sec = (v: number | null) => (v === null ? null : Math.round(Number(v) * 10) / 10);
+    return {
+      alerts: a.rows[0]!.alerts,
+      critical: a.rows[0]!.critical,
+      notifications: Object.fromEntries(n.rows.map((r) => [r.status, r.n])),
+      pushP50Seconds: sec(l.p50),
+      pushP95Seconds: sec(l.p95),
+      criticalPushP95Seconds: sec(l.cp95),
+    };
+  }
+
+  /**
+   * Aviso operativo a quienes administran (p. ej. un presupuesto llegó a un umbral). Va directo a sus
+   * dispositivos, en el idioma de cada persona, y no entra al historial de alertas públicas.
+   */
+  async notifyAdmins(userIds: string[], text: (lang: Lang) => { title: string; body: string }, url: string, groupKey: string): Promise<number> {
+    const targets = await this.identity.pushTargets(this.db, userIds);
+    if (targets.length === 0) return 0;
+    const langs = new Map<string, Lang>();
+    for (const userId of new Set(targets.map((t) => t.userId))) {
+      const profile = await this.social.profileForUser(this.db, userId);
+      langs.set(userId, (await this.preferences(this.db, profile.id)).lang);
+    }
+    const messages: PushMessage[] = targets.map((t) => ({
+      provider: t.provider, token: t.token, environment: t.environment, ...text(langs.get(t.userId) ?? "es"),
+      url, groupKey, badge: 0, critical: false, data: { kind: "ADMIN" },
+    }));
+    const results = await this.push.send(messages);
+    for (const [i, r] of results.entries()) if (r.invalidToken) await this.identity.dropPushToken(this.db, messages[i]!.provider, messages[i]!.token);
+    return results.filter((r) => r.ok).length;
   }
 }
 

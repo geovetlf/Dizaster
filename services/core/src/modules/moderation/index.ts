@@ -364,6 +364,35 @@ export class ModerationService {
     if (!t) throw notFound("Objeto");
     return { type, id, text: t.text, authorHandle: t.authorHandle, state: t.state, categoryCode: t.categoryCode };
   }
+
+  // ───────────── Calidad (ADR 0026) ─────────────
+
+  /** Cola de moderación: lo abierto (y lo más antiguo), cuánto tarda resolver y cuántas apelaciones se revierten. */
+  async qualityStats(q: Queryable, from: Date, to: Date, now: Date) {
+    const open = await q.query<{ n: number; oldest: Date | null }>(
+      `SELECT count(*)::int AS n, min(opened_at) AS oldest FROM moderation.cases WHERE status = 'OPEN'`,
+    );
+    const res = await q.query<{ n: number; med: number | null }>(
+      `SELECT count(*)::int AS n, percentile_cont(0.5) WITHIN GROUP (ORDER BY EXTRACT(EPOCH FROM (resolved_at - opened_at)) / 3600) AS med
+         FROM moderation.cases WHERE status <> 'OPEN' AND resolved_at >= $1 AND resolved_at < $2`,
+      [from, to],
+    );
+    const ap = await q.query<{ decided: number; reversed: number }>(
+      `SELECT count(*)::int AS decided, count(*) FILTER (WHERE status = 'REVERSED')::int AS reversed
+         FROM moderation.appeals WHERE decided_at >= $1 AND decided_at < $2`,
+      [from, to],
+    );
+    const oldest = open.rows[0]!.oldest;
+    const h = (v: number | null) => (v === null ? null : Math.round(Number(v) * 10) / 10);
+    return {
+      openCases: open.rows[0]!.n,
+      oldestOpenHours: oldest ? h(Math.max(0, (now.getTime() - oldest.getTime()) / 3_600_000)) : null,
+      resolvedCases: res.rows[0]!.n,
+      medianResolutionHours: h(res.rows[0]!.med),
+      appealsDecided: ap.rows[0]!.decided,
+      appealsReversed: ap.rows[0]!.reversed,
+    };
+  }
 }
 
 function actionView(r: ActionRow): ModerationActionView {

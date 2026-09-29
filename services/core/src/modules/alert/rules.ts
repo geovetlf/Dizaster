@@ -202,3 +202,15 @@ export function groupText(lang: Lang, titles: string[]): { title: string; body: 
   const shown = titles.slice(0, 3).join(" · ");
   return { title: PHRASES[lang].newAlerts(n), body: n > 3 ? `${shown} ${PHRASES[lang].more(n - 3)}` : shown };
 }
+
+/** Aviso a administración cuando un presupuesto llega a un umbral (ADR 0026). Montos en USD, sin datos personales. */
+const BUDGET_TEXT: Record<Lang, (key: string, pct: number, spent: string, limit: string) => { title: string; body: string }> = {
+  es: (k, p, s, l) => ({ title: `Presupuesto ${k} al ${p}%`, body: `Gastado US$ ${s} de US$ ${l}.${p >= 100 ? " La función se detuvo." : ""}` }),
+  en: (k, p, s, l) => ({ title: `Budget ${k} at ${p}%`, body: `Spent US$ ${s} of US$ ${l}.${p >= 100 ? " The feature has stopped." : ""}` }),
+  pt: (k, p, s, l) => ({ title: `Orçamento ${k} em ${p}%`, body: `Gasto US$ ${s} de US$ ${l}.${p >= 100 ? " A função foi interrompida." : ""}` }),
+  fr: (k, p, s, l) => ({ title: `Budget ${k} à ${p} %`, body: `Dépensé ${s} US$ sur ${l} US$.${p >= 100 ? " La fonction est arrêtée." : ""}` }),
+};
+
+export function budgetAlertText(lang: Lang, b: { key: string; threshold: number; spentUsd: number; limitUsd: number }): { title: string; body: string } {
+  return BUDGET_TEXT[lang](b.key, b.threshold, b.spentUsd.toFixed(2), b.limitUsd.toFixed(2));
+}

@@ -22,6 +22,7 @@ export default function RootLayout() {
         <Stack.Screen name="alerts" options={{ title: t("alertsTitle") }} />
         <Stack.Screen name="alert-settings" options={{ title: t("alertSettings") }} />
         <Stack.Screen name="admin-cost" options={{ title: t("costTitle") }} />
+        <Stack.Screen name="admin-quality" options={{ title: t("qualityTitle") }} />
         <Stack.Screen name="flag" options={{ title: t("flag"), presentation: "modal" }} />
         <Stack.Screen name="moderation/index" options={{ title: t("moderation") }} />
         <Stack.Screen name="moderation/[id]" options={{ title: t("moderation") }} />

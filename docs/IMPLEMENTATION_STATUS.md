@@ -182,12 +182,21 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | App: miniaturas en el mosaico del feed | ✅ | `components/post-card.tsx` |
 | Póster de video, `sim_media` en deduplicación, difuminado (D-08) | ⏳ | siguientes iteraciones |
 
+## Etapa 15 — Métricas de calidad y avisos a administración (hecha)
+
+| Área | Estado | Dónde |
+|---|---|---|
+| Tablero de calidad (API, EVENTs, verificación, alertas, ingesta, moderación) con objetivos | ✅ | `services/core/src/modules/quality`, `GET /v1/admin/quality`, ADR 0026 |
+| Latencia de la API en histograma por tramos, sin tabla nueva | ✅ | `platform/metrics.ts`, `cost.usage_daily` |
+| CLI `pnpm quality:report` | ✅ | `services/core/src/quality-report-cli.ts` |
+| App: pantalla de calidad para administración, iOS y Android | ✅ | `apps/mobile/src/app/admin-quality.tsx` |
+| Push a administración al cruzar 50/80/100 % de un presupuesto | ✅ | `AlertService.notifyAdmins`, `budgetAlertText` |
+
 ## Siguiente etapa (en orden)
 
-1. Métricas de calidad del producto (duplicados, tiempo hasta verificación) y aviso push de umbrales a administración.
-2. **BLOQUEADA** — Identity real: Sign in with Apple, Google y email; App Attest / Play Integrity. Falta: cuentas de
+1. **BLOQUEADA** — Identity real: Sign in with Apple, Google y email; App Attest / Play Integrity. Falta: cuentas de
    Apple Developer y Google (client IDs, Service ID, Team ID) y un proveedor de email aprobado (gasto).
-3. Social: negocios, etiquetas y menciones.
+2. Social: negocios, etiquetas y menciones.
 
 ## Requiere acción humana
 

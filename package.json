@@ -16,6 +16,7 @@
     "db:migrate": "pnpm --filter @dizaster/core run build && pnpm --filter @dizaster/core run migrate",
     "geo:import": "pnpm --filter @dizaster/core run build && pnpm --filter @dizaster/core run geo:import",
     "cost:report": "pnpm --filter @dizaster/core run build && pnpm --filter @dizaster/core run cost:report",
+    "quality:report": "pnpm --filter @dizaster/core run build && pnpm --filter @dizaster/core run quality:report",
     "grant-role": "pnpm --filter @dizaster/core run build && pnpm --filter @dizaster/core run grant-role"
   },
   "devDependencies": {

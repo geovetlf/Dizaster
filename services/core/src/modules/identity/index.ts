@@ -314,4 +314,10 @@ export class IdentityService {
       throw new DomainError("UNAUTHENTICATED", "Sesión inválida o expirada", 401);
     }
   }
+
+  /** Personas con un rol (p. ej. administración, para avisos operativos). Excluye cuentas suspendidas o borradas. */
+  async usersWithRole(q: Queryable, role: Exclude<Role, "user">): Promise<string[]> {
+    const { rows } = await q.query<{ id: string }>(`SELECT id FROM identity.users WHERE $1 = ANY(roles) AND status = 'ACTIVE'`, [role]);
+    return rows.map((r) => r.id);
+  }
 }
