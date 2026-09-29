@@ -189,6 +189,8 @@ export class FeedService {
         likeCount: r.likeCount,
         commentCount: r.commentCount,
         likedByMe: r.likedByMe,
+        reactions: r.reactions,
+        myReactions: r.myReactions,
         mentions: r.mentions,
         mine: r.mine,
       };

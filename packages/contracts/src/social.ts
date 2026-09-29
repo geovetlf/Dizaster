@@ -45,6 +45,10 @@ export interface FeedPost {
   likeCount: number;
   commentCount: number;
   likedByMe: boolean;
+  /** Totales por tipo de reacción (ADR 0040). Solo aparecen los tipos con al menos una. */
+  reactions: ReactionCounts;
+  /** Reacciones de quien mira (vacío sin sesión). */
+  myReactions: ReactionKind[];
   /** Handles mencionados que existen: solo esos se pintan como enlace. */
   mentions: string[];
   /** La persona que mira es quien lo escribió (puede borrarlo). Nunca revela la autoría de un post seudónimo a otros. */
@@ -107,3 +111,16 @@ export const ProfilePostsQuery = z.object({
   cursor: z.string().max(200).optional(),
   limit: z.coerce.number().int().min(1).max(30).default(15),
 });
+
+/**
+ * Reacciones de contexto (ADR 0040). "Yo también lo vi" solo existe en posts ligados a un evento y es una señal
+ * social: nunca suma evidencia ni cambia la verificación (para eso está el reporte).
+ */
+export const ReactionKind = z.enum(["LIKE", "SUPPORT", "USEFUL", "SEEN_TOO"]);
+export type ReactionKind = z.infer<typeof ReactionKind>;
+export type ReactionCounts = Partial<Record<ReactionKind, number>>;
+export interface ReactionState { reactions: ReactionCounts; myReactions: ReactionKind[] }
+/** Tipos que se ofrecen según el post: sin evento no hay "yo también lo vi". */
+export function reactionKindsFor(post: { event: unknown }): ReactionKind[] {
+  return post.event ? ["LIKE", "SUPPORT", "USEFUL", "SEEN_TOO"] : ["LIKE", "SUPPORT", "USEFUL"];
+}

@@ -1,7 +1,7 @@
 import Fastify, { type FastifyInstance, type FastifyRequest } from "fastify";
 import { z } from "zod";
 import {
-  BBox, CreateCommentRequest, DevicePlatform, MEDIA_UPLOAD_LIMITS, MergeEventsRequest, NegativeState, RegisterPushTokenRequest, RevertMergeRequest,
+  BBox, CreateCommentRequest, DevicePlatform, MEDIA_UPLOAD_LIMITS, MergeEventsRequest, NegativeState, ReactionKind, RegisterPushTokenRequest, RevertMergeRequest,
   SplitEventRequest, DATA_EXPORT_FORMAT, type AppConfig, type DataExport, type EmergencyNumbersResponse,
 } from "@dizaster/contracts";
 import { LocalDiskStorage } from "../modules/media/index.js";
@@ -472,6 +472,20 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
   app.delete("/v1/posts/:id/like", async (req) => {
     const session = requireSession(req);
     return c.social.setLike(c.db, parse(IdParam, req.params).id, session.profileId, false);
+  });
+
+  // Reacciones de contexto (ADR 0040).
+  const ReactionParams = IdParam.extend({ kind: ReactionKind });
+  app.put("/v1/posts/:id/reactions/:kind", async (req) => {
+    const session = requireSession(req);
+    const p = parse(ReactionParams, req.params);
+    return c.social.setReaction(c.db, p.id, session.profileId, p.kind, true);
+  });
+
+  app.delete("/v1/posts/:id/reactions/:kind", async (req) => {
+    const session = requireSession(req);
+    const p = parse(ReactionParams, req.params);
+    return c.social.setReaction(c.db, p.id, session.profileId, p.kind, false);
   });
 
   app.get("/v1/posts/:id/comments", async (req) => ({ comments: await c.social.comments(c.db, parse(IdParam, req.params).id, req.session?.profileId ?? null) }));

@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { extractMentions, extractTags, textFingerprintBase, type CommentView, type FeedTab, type GeoPoint, type PostAuthor, type ProfileSearchResult, type ProfileView, type TagView } from "@dizaster/contracts";
+import { extractMentions, extractTags, textFingerprintBase, type CommentView, type FeedTab, type GeoPoint, type PostAuthor, type ProfileSearchResult, type ReactionCounts, type ReactionKind, type ReactionState, type ProfileView, type TagView } from "@dizaster/contracts";
 import type { Queryable } from "../../platform/db.js";
 import { publish, type OutboxDispatcher } from "../../platform/outbox.js";
 import { DomainError, notFound } from "../../platform/errors.js";
@@ -39,6 +39,8 @@ export interface FeedRow {
   likeCount: number;
   commentCount: number;
   likedByMe: boolean;
+  reactions: ReactionCounts;
+  myReactions: ReactionKind[];
   mentions: string[];
   mine: boolean;
 }
@@ -315,7 +317,7 @@ export class SocialService {
     const { rows } = await q.query<{
       id: string; kind: FeedRow["kind"]; author_visibility: string; handle: string; display_name: string; text: string | null;
       created_at: Date; category_code: string | null; event_id: string | null; distance_m: number | null; score: number;
-      media: { id: string; kind: "IMAGE" | "VIDEO_RECORDED" }[] | null; like_count: number; comment_count: number; liked: boolean;
+      media: { id: string; kind: "IMAGE" | "VIDEO_RECORDED" }[] | null; reactions: ReactionCounts | null; my_reactions: ReactionKind[]; comment_count: number;
       mentions: string[]; mine: boolean | null; business_verification: "UNVERIFIED" | "VERIFIED" | "INSTITUTIONAL_OFFICIAL" | null;
     }>(
       `WITH x AS (
@@ -333,9 +335,10 @@ export class SocialService {
        SELECT x.*,
               (SELECT json_agg(json_build_object('id', m.media_id, 'kind', m.kind) ORDER BY m.position)
                  FROM social.post_media m WHERE m.post_id = x.id) AS media,
-              (SELECT count(*) FROM social.reactions r WHERE r.post_id = x.id)::int AS like_count,
+              (SELECT json_object_agg(g.kind, g.n) FROM (SELECT r.kind, count(*)::int AS n FROM social.reactions r
+                 WHERE r.post_id = x.id GROUP BY r.kind) g) AS reactions,
               (SELECT count(*) FROM social.comments c WHERE c.post_id = x.id AND c.deleted_at IS NULL AND c.moderation_state = 'VISIBLE')::int AS comment_count,
-              EXISTS (SELECT 1 FROM social.reactions r WHERE r.post_id = x.id AND r.profile_id = $2) AS liked,
+              (SELECT coalesce(array_agg(r.kind ORDER BY r.kind), '{}') FROM social.reactions r WHERE r.post_id = x.id AND r.profile_id = $2) AS my_reactions,
               (SELECT coalesce(array_agg(mp.handle ORDER BY mp.handle), '{}') FROM social.post_mentions pm
                  JOIN social.profiles mp ON mp.id = pm.profile_id WHERE pm.post_id = x.id AND mp.deleted_at IS NULL) AS mentions,
               CASE WHEN x.author_type = 'PROFILE' THEN x.author_id = $2
@@ -359,9 +362,11 @@ export class SocialService {
       distanceM: r.distance_m,
       score: r.score,
       media: r.media ?? [],
-      likeCount: r.like_count,
+      likeCount: r.reactions?.LIKE ?? 0,
       commentCount: r.comment_count,
-      likedByMe: r.liked,
+      likedByMe: r.my_reactions.includes("LIKE"),
+      reactions: r.reactions ?? {},
+      myReactions: r.my_reactions,
       mentions: r.mentions,
       mine: r.mine === true,
     }));
@@ -567,14 +572,33 @@ export class SocialService {
 
   /** Me gusta: idempotente en ambos sentidos. Devuelve el total actualizado. */
   async setLike(q: Queryable, postId: string, profileId: string, liked: boolean): Promise<{ likeCount: number; likedByMe: boolean }> {
+    const r = await this.setReaction(q, postId, profileId, "LIKE", liked);
+    return { likeCount: r.reactions.LIKE ?? 0, likedByMe: r.myReactions.includes("LIKE") };
+  }
+
+  /**
+   * Reacción de contexto (ADR 0040), idempotente. "Yo también lo vi" solo en posts ligados a un evento. Es social:
+   * no publica evidencia ni toca la verificación.
+   */
+  async setReaction(q: Queryable, postId: string, profileId: string, kind: ReactionKind, on: boolean): Promise<ReactionState> {
     await this.assertVisible(q, postId);
-    if (liked) {
-      await q.query(`INSERT INTO social.reactions (post_id, profile_id, kind) VALUES ($1, $2, 'LIKE') ON CONFLICT DO NOTHING`, [postId, profileId]);
-    } else {
-      await q.query(`DELETE FROM social.reactions WHERE post_id = $1 AND profile_id = $2 AND kind = 'LIKE'`, [postId, profileId]);
+    if (on && kind === "SEEN_TOO") {
+      const linked = await q.query(`SELECT 1 FROM social.post_event_links WHERE post_id = $1 LIMIT 1`, [postId]);
+      if (linked.rowCount === 0) throw new DomainError("REACTION_NOT_APPLICABLE", "Solo se puede marcar en publicaciones sobre un evento", 422);
     }
-    const { rows } = await q.query<{ n: number }>(`SELECT count(*)::int AS n FROM social.reactions WHERE post_id = $1`, [postId]);
-    return { likeCount: rows[0]!.n, likedByMe: liked };
+    if (on) {
+      await q.query(`INSERT INTO social.reactions (post_id, profile_id, kind) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`, [postId, profileId, kind]);
+    } else {
+      await q.query(`DELETE FROM social.reactions WHERE post_id = $1 AND profile_id = $2 AND kind = $3`, [postId, profileId, kind]);
+    }
+    const { rows } = await q.query<{ kind: ReactionKind; n: number; mine: boolean }>(
+      `SELECT kind, count(*)::int AS n, bool_or(profile_id = $2) AS mine FROM social.reactions WHERE post_id = $1 GROUP BY kind`,
+      [postId, profileId],
+    );
+    return {
+      reactions: Object.fromEntries(rows.map((r) => [r.kind, r.n])) as ReactionCounts,
+      myReactions: rows.filter((r) => r.mine).map((r) => r.kind).sort(),
+    };
   }
 
   async addComment(q: Queryable, postId: string, profileId: string, text: string): Promise<CommentView> {

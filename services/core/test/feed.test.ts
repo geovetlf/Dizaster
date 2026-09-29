@@ -113,6 +113,33 @@ describe("feed", () => {
     expect((await t.app.inject({ method: "POST", url: `/v1/posts/${post.id}/comments`, payload: { text: "x" } })).statusCode).toBe(401);
   });
 
+  it("reacciones de contexto: por tipo, idempotentes y sin tocar la verificación", async () => {
+    const reader = await createUser(t, "feed_ctx");
+    const post = (await feed("tab=for_you")).posts.find((p) => p.text === "Robo")!;
+    const react = (kind: string, method: "PUT" | "DELETE" = "PUT", u = reader) =>
+      t.app.inject({ method, url: `/v1/posts/${post.id}/reactions/${kind}`, headers: auth(u) });
+    const before = (await t.app.inject({ url: `/v1/events/${post.event!.id}` })).json();
+    expect((await react("SUPPORT")).json()).toEqual({ reactions: { SUPPORT: 1 }, myReactions: ["SUPPORT"] });
+    expect((await react("SEEN_TOO")).json()).toEqual({ reactions: { SEEN_TOO: 1, SUPPORT: 1 }, myReactions: ["SEEN_TOO", "SUPPORT"] });
+    expect((await react("SEEN_TOO")).json().reactions.SEEN_TOO).toBe(1);
+    await t.c.dispatcher.drain();
+    const after = (await t.app.inject({ url: `/v1/events/${post.event!.id}` })).json();
+    expect(after).toMatchObject({ reportCount: before.reportCount, publicVerificationState: before.publicVerificationState });
+
+    const seen = (await feed("tab=for_you", reader)).posts.find((p) => p.id === post.id)!;
+    expect(seen).toMatchObject({ reactions: { SEEN_TOO: 1, SUPPORT: 1 }, myReactions: ["SEEN_TOO", "SUPPORT"], likeCount: 0, likedByMe: false });
+    expect((await feed("tab=for_you")).posts.find((p) => p.id === post.id)!.myReactions).toEqual([]);
+    expect((await react("SUPPORT", "DELETE")).json()).toEqual({ reactions: { SEEN_TOO: 1 }, myReactions: ["SEEN_TOO"] });
+    expect((await react("ANGRY")).statusCode).toBe(400);
+    expect((await t.app.inject({ method: "PUT", url: `/v1/posts/${post.id}/reactions/USEFUL` })).statusCode).toBe(401);
+
+    // Sin evento no hay "yo también lo vi".
+    const plain = await t.app.inject({ method: "POST", url: "/v1/posts", headers: auth(reader), payload: { text: "Un post sin evento" } });
+    const res = await t.app.inject({ method: "PUT", url: `/v1/posts/${plain.json().postId}/reactions/SEEN_TOO`, headers: auth(reader) });
+    expect(res.statusCode).toBe(422);
+    expect((await t.app.inject({ method: "PUT", url: `/v1/posts/${plain.json().postId}/reactions/USEFUL`, headers: auth(reader) })).statusCode).toBe(200);
+  });
+
   it("los posts ocultos por moderación no aparecen ni aceptan interacción", async () => {
     const u = await createUser(t, "feed_mod");
     const r = await submit(t, u, reportBody(u, { pin: offset(LIMA, 9000), text: "ocultar" }));

@@ -72,3 +72,17 @@ describe("negocios", () => {
     expect(withFollow(my, "business", "farmacia_sol", false).businesses).toEqual([]);
   });
 });
+
+describe("reacciones de contexto (ADR 0040)", () => {
+  it("aplica y retira de forma optimista sin contar dos veces", async () => {
+    const { applyReaction } = await import("../src/lib/social/reactions");
+    const { reactionKindsFor } = await import("@dizaster/contracts");
+    const s0 = { reactions: { USEFUL: 2 }, myReactions: [] as ("LIKE" | "SUPPORT" | "USEFUL" | "SEEN_TOO")[] };
+    const s1 = applyReaction(s0, "USEFUL", true);
+    expect(s1).toEqual({ reactions: { USEFUL: 3 }, myReactions: ["USEFUL"] });
+    expect(applyReaction(s1, "USEFUL", true)).toBe(s1);
+    expect(applyReaction(applyReaction(s0, "SUPPORT", true), "SUPPORT", false)).toEqual({ reactions: { USEFUL: 2 }, myReactions: [] });
+    expect(reactionKindsFor({ event: null })).not.toContain("SEEN_TOO");
+    expect(reactionKindsFor({ event: { id: "e" } })).toContain("SEEN_TOO");
+  });
+});

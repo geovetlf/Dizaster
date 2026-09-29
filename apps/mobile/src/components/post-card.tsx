@@ -1,13 +1,14 @@
-import type { FeedPost, MediaView } from "@dizaster/contracts";
+import { reactionKindsFor, type FeedPost, type MediaView, type ReactionKind, type ReactionState } from "@dizaster/contracts";
 import { router } from "expo-router";
 import { useState } from "react";
-import { Image, Pressable, Share, StyleSheet, Text, View } from "react-native";
+import { Alert, Image, Pressable, Share, StyleSheet, Text, View } from "react-native";
 import { api } from "../lib/api";
 import { LINK_DOMAIN } from "../lib/config";
 import { canBlock } from "../lib/moderation/logic";
 import { openContentMenu, openOwnPostMenu } from "../lib/moderation/menu";
 import { verificationIcon } from "../lib/social/business";
 import { useMe } from "../lib/social/me";
+import { applyReaction, CONTEXT_REACTIONS } from "../lib/social/reactions";
 import { lang, t } from "../lib/i18n";
 import { categoryStyle } from "../lib/ui/categories";
 import { duration, imageUri, initials, mediaLayout, postWhere } from "../lib/ui/format";
@@ -18,8 +19,7 @@ import { SensitiveCover } from "./sensitive-cover";
 
 /** Tarjeta de publicación (referencia visual: docs/design/referencia-inicio.jpg). */
 export function PostCard({ post, categoryName }: { post: FeedPost; categoryName: (code: string) => string }) {
-  const [liked, setLiked] = useState(post.likedByMe);
-  const [likes, setLikes] = useState(post.likeCount);
+  const [react, setReact] = useState<ReactionState>({ reactions: post.reactions, myReactions: post.myReactions });
   const [hidden, setHidden] = useState(false);
   const me = useMe();
   const style = categoryStyle(post.categoryCode);
@@ -27,17 +27,26 @@ export function PostCard({ post, categoryName }: { post: FeedPost; categoryName:
   const where = postWhere(post, lang);
   const badge = post.author.pseudonymous ? null : verificationIcon(post.author.business?.verification);
 
-  async function toggleLike() {
-    const next = !liked;
-    setLiked(next);
-    setLikes((n) => n + (next ? 1 : -1));
+  const liked = react.myReactions.includes("LIKE");
+  const offered = reactionKindsFor(post);
+
+  async function toggle(kind: ReactionKind) {
+    const on = !react.myReactions.includes(kind);
+    const before = react;
+    setReact((s) => applyReaction(s, kind, on));
     try {
-      const r = await api.setLike(post.id, next);
-      setLiked(r.likedByMe);
-      setLikes(r.likeCount);
+      setReact(await api.setReaction(post.id, kind, on));
     } catch {
-      setLiked(!next);
-      setLikes((n) => n + (next ? -1 : 1));
+      setReact(before);
+      return;
+    }
+    // "Yo también lo vi" no verifica nada: si la persona está allí, se le ofrece reportar para que cuente.
+    if (on && kind === "SEEN_TOO" && post.event && post.categoryCode) {
+      const params = { eventId: post.event.id, category: post.categoryCode };
+      Alert.alert(t("reactSeenToo"), t("seenTooReportHint"), [
+        { text: t("notNow"), style: "cancel" },
+        { text: t("report"), onPress: () => router.push({ pathname: "/report", params }) },
+      ]);
     }
   }
 
@@ -88,10 +97,24 @@ export function PostCard({ post, categoryName }: { post: FeedPost; categoryName:
       <MediaGrid media={post.media} onOpen={post.event ? () => router.push(`/event/${post.event!.id}`) : undefined} />
       {post.hiddenMediaCount > 0 ? <Text style={styles.meta}>+{post.hiddenMediaCount} {t("hiddenMedia")}</Text> : null}
 
+      <View style={styles.context}>
+        {CONTEXT_REACTIONS.filter((r) => offered.includes(r.kind)).map((r) => {
+          const on = react.myReactions.includes(r.kind);
+          const n = react.reactions[r.kind] ?? 0;
+          return (
+            <Pressable key={r.kind} accessibilityRole="button" accessibilityLabel={t(r.label)} accessibilityState={{ selected: on }}
+              onPress={() => void toggle(r.kind)} style={[styles.chip, on && styles.chipOn]}>
+              <Icon name={on ? r.icon[1] : r.icon[0]} size={16} color={on ? colors.white : colors.textMuted} />
+              <Text style={[styles.chipText, on && styles.chipTextOn]}>{n > 0 ? `${t(r.label)} · ${n}` : t(r.label)}</Text>
+            </Pressable>
+          );
+        })}
+      </View>
+
       <View style={styles.actions}>
-        <Pressable accessibilityRole="button" accessibilityState={{ selected: liked }} style={styles.action} onPress={() => void toggleLike()}>
+        <Pressable accessibilityRole="button" accessibilityState={{ selected: liked }} style={styles.action} onPress={() => void toggle("LIKE")}>
           <Icon name={liked ? "heart" : "heart-outline"} size={24} color={liked ? colors.like : colors.text} />
-          <Text style={styles.count}>{likes}</Text>
+          <Text style={styles.count}>{react.reactions.LIKE ?? 0}</Text>
         </Pressable>
         <Pressable accessibilityRole="button" style={styles.action} onPress={() => router.push(`/post/${post.id}`)}>
           <Icon name="comment-outline" size={22} color={colors.text} />
@@ -179,6 +202,11 @@ const styles = StyleSheet.create({
   videoTile: { alignItems: "center", justifyContent: "center", backgroundColor: "#11161D" },
   play: { width: 52, height: 52, borderRadius: 26, backgroundColor: "#000000AA", alignItems: "center", justifyContent: "center" },
   duration: { position: "absolute", right: 8, bottom: 8, color: colors.white, backgroundColor: "#000000AA", paddingHorizontal: 6, borderRadius: 4, fontSize: 12 },
+  context: { flexDirection: "row", flexWrap: "wrap", gap: space.sm, marginTop: space.md },
+  chip: { flexDirection: "row", alignItems: "center", gap: 4, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, borderRadius: radius.pill, paddingHorizontal: 10, paddingVertical: 4 },
+  chipOn: { backgroundColor: colors.accent, borderColor: colors.accent },
+  chipText: { color: colors.textMuted, fontSize: 13 },
+  chipTextOn: { color: colors.white },
   actions: { flexDirection: "row", alignItems: "center", gap: space.xl, marginTop: space.md },
   action: { flexDirection: "row", alignItems: "center", gap: 6 },
   count: { color: colors.text, fontSize: 14 },

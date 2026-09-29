@@ -1,4 +1,4 @@
-import type { DataExport, VerificationView, ModeratorEventDetail, SavedZone, SavedZoneInput, AppealView, CaseDetail, CaseSummary, CreateFlagRequest, ModerationActionType, ModerationNotice, CostDashboard, KillSwitchView, QualityReport, CreatePostRequest, TagView, BusinessView, SessionView, CreateBusinessRequest, UpdateBusinessRequest, AlertPreferences, CategorySubscription, CategorySubscriptionInput, NotificationsResponse, AppConfig, AreaSearchResult, FollowTarget, MyFollows, ProfileSearchResult, ProfileView, CommentView, CreateUploadRequest, FeedResponse, FeedTab, CreateUploadResponse, DevicePlatform, MediaView, RegisterPushTokenRequest, EventMapResponse, EventSummary, NearbyEventsResponse, SubmitReportRequest, SubmitReportResponse, TimelineEntryView } from "@dizaster/contracts";
+import type { ReactionKind, ReactionState, DataExport, VerificationView, ModeratorEventDetail, SavedZone, SavedZoneInput, AppealView, CaseDetail, CaseSummary, CreateFlagRequest, ModerationActionType, ModerationNotice, CostDashboard, KillSwitchView, QualityReport, CreatePostRequest, TagView, BusinessView, SessionView, CreateBusinessRequest, UpdateBusinessRequest, AlertPreferences, CategorySubscription, CategorySubscriptionInput, NotificationsResponse, AppConfig, AreaSearchResult, FollowTarget, MyFollows, ProfileSearchResult, ProfileView, CommentView, CreateUploadRequest, FeedResponse, FeedTab, CreateUploadResponse, DevicePlatform, MediaView, RegisterPushTokenRequest, EventMapResponse, EventSummary, NearbyEventsResponse, SubmitReportRequest, SubmitReportResponse, TimelineEntryView } from "@dizaster/contracts";
 import { canRetryWithRefresh, singleFlight } from "./auth/refresh";
 import { API_URL } from "./config";
 import type { Sender } from "./report/queue";
@@ -77,8 +77,9 @@ export const api = {
     if (p.cursor) q.set("cursor", p.cursor);
     return request<FeedResponse>(`/v1/feed?${q}`);
   },
-  setLike: (postId: string, liked: boolean) =>
-    request<{ likeCount: number; likedByMe: boolean }>(`/v1/posts/${postId}/like`, { method: liked ? "PUT" : "DELETE" }),
+  /** Reacción de contexto (ADR 0040). */
+  setReaction: (postId: string, kind: ReactionKind, on: boolean) =>
+    request<ReactionState>(`/v1/posts/${postId}/reactions/${kind}`, { method: on ? "PUT" : "DELETE" }),
   comments: (postId: string) => request<{ comments: CommentView[] }>(`/v1/posts/${postId}/comments`),
   addComment: (postId: string, text: string) =>
     request<CommentView>(`/v1/posts/${postId}/comments`, { method: "POST", body: JSON.stringify({ text }) }),
