@@ -1,9 +1,12 @@
 import { XMLParser } from "fast-xml-parser";
 import type { NormalizedItem } from "../index.js";
-import type { FeedAdapter } from "./types.js";
+import { categoryMap, type FeedAdapter } from "./types.js";
 
-/** Tipos de evento GDACS → taxonomía de Dizaster. Tipos desconocidos se ignoran (no se inventa categoría). */
-const CATEGORY_BY_TYPE: Record<string, string> = {
+/**
+ * Tipos de evento GDACS → taxonomía de Dizaster, por defecto (el registro puede traer su `categoryMap`, ADR 0122).
+ * Tipos desconocidos se ignoran (no se inventa categoría).
+ */
+export const GDACS_CATEGORY_MAP: Readonly<Record<string, string>> = {
   EQ: "natural.earthquake",
   TC: "natural.storm",
   FL: "natural.flood",
@@ -22,7 +25,8 @@ const SEVERITY_BY_ALERT: Record<string, number> = { green: 2, orange: 4, red: 5 
 export const gdacsAdapter: FeedAdapter = {
   adapterType: "gdacs-rss",
 
-  parse(body) {
+  parse(body, config) {
+    const map = categoryMap(config, GDACS_CATEGORY_MAP);
     const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: "@", removeNSPrefix: true, parseTagValue: true });
     const doc = parser.parse(body) as { rss?: { channel?: { item?: unknown } } };
     const raw = doc.rss?.channel?.item;
@@ -30,7 +34,7 @@ export const gdacsAdapter: FeedAdapter = {
     const items: NormalizedItem[] = [];
     for (const it of list) {
       const type = String(it["eventtype"] ?? "").toUpperCase();
-      const category = CATEGORY_BY_TYPE[type];
+      const category = map[type];
       const eventId = it["eventid"];
       const point = it["Point"] as { lat?: number; long?: number } | undefined;
       if (!category || eventId === undefined || typeof point?.lat !== "number" || typeof point?.long !== "number") continue;

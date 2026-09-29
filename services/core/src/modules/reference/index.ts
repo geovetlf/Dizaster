@@ -60,6 +60,7 @@ export class ReferenceData {
         throw new Error(`Override ${o.category}/${o.country}: el retraso de publicación es solo para HIGHLY_SENSITIVE`);
       }
     }
+    validateSourceCategoryMaps(this.sources, (code) => this.byCode.has(code) && this.isLeaf(code));
   }
 
   /** Configuración efectiva de una categoría para un país (aplica overrides regionales). */
@@ -88,5 +89,26 @@ export class ReferenceData {
 
   country(iso2: string): CountryConfigEntry | undefined {
     return this.countries.get(iso2);
+  }
+}
+
+/**
+ * Mapeos de categoría del registro de fuentes (§9.4, ADR 0122): `config.categoryMap` (tipo → categoría) y
+ * `config.eventMap` de CAP. Cada destino debe ser una categoría hoja del catálogo y estar entre las declaradas por
+ * la fuente: un error de datos no puede crear eventos en categorías inventadas o que la fuente no cubre.
+ */
+export function validateSourceCategoryMaps(sources: Array<Record<string, unknown>>, isLeafCategory: (code: string) => boolean): void {
+  for (const s of sources) {
+    const config = (s["config"] ?? {}) as Record<string, unknown>;
+    const declared = new Set((s["categories"] as string[] | undefined) ?? []);
+    const map = config["categoryMap"];
+    const targets = [
+      ...(map && typeof map === "object" ? Object.values(map as Record<string, unknown>) : []),
+      ...(Array.isArray(config["eventMap"]) ? (config["eventMap"] as { category?: unknown }[]).map((m) => m.category) : []),
+    ];
+    for (const t of targets) {
+      if (typeof t !== "string" || !isLeafCategory(t)) throw new Error(`Fuente ${String(s["key"])}: el mapeo apunta a una categoría inexistente: ${String(t)}`);
+      if (!declared.has(t)) throw new Error(`Fuente ${String(s["key"])}: el mapeo apunta a ${t}, que la fuente no declara en "categories"`);
+    }
   }
 }

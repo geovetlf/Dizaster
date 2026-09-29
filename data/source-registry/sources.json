@@ -1,5 +1,5 @@
 {
- "version": "sources-2026.09.9",
+ "version": "sources-2026.09.10",
  "sources": [
   {
    "key": "usgs-earthquakes",
@@ -77,7 +77,16 @@
    ],
    "adapter": "gdacs-rss",
    "config": {
-    "url": "https://www.gdacs.org/xml/rss.xml"
+    "url": "https://www.gdacs.org/xml/rss.xml",
+    "categoryMap": {
+     "EQ": "natural.earthquake",
+     "TC": "natural.storm",
+     "FL": "natural.flood",
+     "VO": "natural.volcano",
+     "DR": "natural.drought",
+     "WF": "fire.wildfire",
+     "TS": "natural.tsunami"
+    }
    },
    "license": "Revisar términos antes de producción",
    "termsUrl": "https://www.gdacs.org/About/termsofuse.aspx",
@@ -132,7 +141,39 @@
    ],
    "adapter": "copernicus-ems-georss",
    "config": {
-    "url": "https://emergency.copernicus.eu/mapping/activations-rapid/feed"
+    "url": "https://emergency.copernicus.eu/mapping/activations-rapid/feed",
+    "categoryMap": {
+     "wildfire": "fire.wildfire",
+     "wild fire": "fire.wildfire",
+     "forest fire": "fire.wildfire",
+     "bushfire": "fire.wildfire",
+     "bush fire": "fire.wildfire",
+     "vegetation fire": "fire.wildfire",
+     "tsunami": "natural.tsunami",
+     "earthquake": "natural.earthquake",
+     "seismic": "natural.earthquake",
+     "flood": "natural.flood",
+     "flooding": "natural.flood",
+     "flash flood": "natural.flood",
+     "inundation": "natural.flood",
+     "landslide": "natural.landslide",
+     "mass movement": "natural.landslide",
+     "mudslide": "natural.landslide",
+     "debris flow": "natural.landslide",
+     "volcano": "natural.volcano",
+     "volcanic": "natural.volcano",
+     "eruption": "natural.volcano",
+     "storm": "natural.storm",
+     "cyclone": "natural.storm",
+     "hurricane": "natural.storm",
+     "typhoon": "natural.storm",
+     "tornado": "natural.storm",
+     "windstorm": "natural.storm",
+     "drought": "natural.drought",
+     "cold wave": "natural.cold_wave",
+     "snow": "natural.cold_wave",
+     "frost": "natural.cold_wave"
+    }
    },
    "license": "Por confirmar (política de datos de Copernicus; revisar la atribución exigida antes de activar)",
    "termsUrl": "https://emergency.copernicus.eu/",
@@ -254,7 +295,24 @@
    ],
    "adapter": "reliefweb-disasters-json",
    "config": {
-    "url": "https://api.reliefweb.int/v2/disasters?appname=dizaster&profile=list&preset=latest&limit=100&fields[include][]=primary_country&fields[include][]=primary_type&fields[include][]=date&fields[include][]=glide&fields[include][]=url&fields[include][]=status"
+    "url": "https://api.reliefweb.int/v2/disasters?appname=dizaster&profile=list&preset=latest&limit=100&fields[include][]=primary_country&fields[include][]=primary_type&fields[include][]=date&fields[include][]=glide&fields[include][]=url&fields[include][]=status",
+    "categoryMap": {
+     "EQ": "natural.earthquake",
+     "TS": "natural.tsunami",
+     "FL": "natural.flood",
+     "FF": "natural.flood",
+     "SS": "natural.flood",
+     "LS": "natural.landslide",
+     "MS": "natural.landslide",
+     "TC": "natural.storm",
+     "ST": "natural.storm",
+     "EC": "natural.storm",
+     "VO": "natural.volcano",
+     "DR": "natural.drought",
+     "CW": "natural.cold_wave",
+     "WF": "fire.wildfire",
+     "EP": "health.outbreak"
+    }
    },
    "license": "Por confirmar: términos de la API de ReliefWeb (requiere appname aprobado)",
    "termsUrl": "https://apidoc.reliefweb.int/",

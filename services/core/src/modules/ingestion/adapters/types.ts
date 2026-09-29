@@ -14,3 +14,12 @@ export interface FeedAdapter {
 }
 
 export const num = (v: unknown, fallback: number): number => (typeof v === "number" && Number.isFinite(v) ? v : fallback);
+
+/**
+ * Mapeo "tipo de la fuente → categoría de Dizaster" (§9.4, ADR 0122). Es dato del registro (`config.categoryMap`),
+ * validado al cargar el registro; el del código solo es el valor por defecto de cada formato.
+ */
+export function categoryMap(config: Record<string, unknown>, defaults: Readonly<Record<string, string>>): Readonly<Record<string, string>> {
+  const m = config["categoryMap"];
+  return m && typeof m === "object" && !Array.isArray(m) ? (m as Record<string, string>) : defaults;
+}

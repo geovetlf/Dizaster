@@ -1,8 +1,8 @@
 import type { NormalizedItem } from "../index.js";
-import type { FeedAdapter } from "./types.js";
+import { categoryMap, type FeedAdapter } from "./types.js";
 
-/** Tipos de desastre de ReliefWeb (GLIDE) → taxonomía de Dizaster. Los demás se ignoran. */
-const CATEGORY_BY_TYPE: Record<string, string> = {
+/** Tipos de desastre de ReliefWeb (GLIDE) → taxonomía de Dizaster, por defecto (ADR 0122). Los demás se ignoran. */
+export const RELIEFWEB_CATEGORY_MAP: Readonly<Record<string, string>> = {
   EQ: "natural.earthquake", TS: "natural.tsunami", FL: "natural.flood", FF: "natural.flood", SS: "natural.flood",
   LS: "natural.landslide", MS: "natural.landslide", TC: "natural.storm", ST: "natural.storm", EC: "natural.storm",
   VO: "natural.volcano", DR: "natural.drought", CW: "natural.cold_wave", WF: "fire.wildfire", EP: "health.outbreak",
@@ -28,14 +28,15 @@ interface RwDisaster {
 export const reliefwebAdapter: FeedAdapter = {
   adapterType: "reliefweb-disasters-json",
 
-  parse(body) {
+  parse(body, config) {
+    const map = categoryMap(config, RELIEFWEB_CATEGORY_MAP);
     const doc = JSON.parse(body) as { data?: RwDisaster[] };
     if (!Array.isArray(doc.data)) throw new Error("ReliefWeb: formato inesperado");
     const items: NormalizedItem[] = [];
     for (const d of doc.data) {
       const f = d.fields ?? {};
       const type = (f.primary_type?.code ?? f.type?.[0]?.code ?? "").toUpperCase();
-      const category = CATEGORY_BY_TYPE[type];
+      const category = map[type];
       const country = f.primary_country ?? f.country?.find((c) => c.primary) ?? f.country?.[0];
       const lat = country?.location?.lat;
       const lng = country?.location?.lon;

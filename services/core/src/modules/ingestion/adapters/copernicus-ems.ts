@@ -1,23 +1,27 @@
 import { XMLParser } from "fast-xml-parser";
 import type { NormalizedItem } from "../index.js";
-import type { FeedAdapter } from "./types.js";
+import { categoryMap, type FeedAdapter } from "./types.js";
 
 /**
- * Tipo de peligro de una activación → taxonomía de Dizaster. Se busca en la categoría del ítem y, si no hay, en el
- * título ("[EMSR812] Peru: Flood in Piura"). Solo incendios forestales: un incendio industrial no es "fire.wildfire". Lo
- * que no encaja (accidentes industriales, crisis humanitarias...) se ignora: no se inventa categoría.
+ * Palabras de peligro de una activación → taxonomía de Dizaster, por defecto (el registro puede traer su
+ * `categoryMap`, ADR 0122). Se busca como palabra completa, sin mayúsculas, en la categoría del ítem y, si no hay,
+ * en el título ("[EMSR812] Peru: Flood in Piura"); gana la primera de la lista. Solo incendios forestales: un
+ * incendio industrial no es "fire.wildfire". Lo que no encaja (accidentes industriales, crisis humanitarias...) se
+ * ignora: no se inventa categoría.
  */
-const HAZARDS: [RegExp, string][] = [
-  [/\b(wild ?fire|forest fire|bush ?fire|vegetation fire)\b/i, "fire.wildfire"],
-  [/\btsunami\b/i, "natural.tsunami"],
-  [/\b(earthquake|seismic)\b/i, "natural.earthquake"],
-  [/\b(flood|flooding|flash flood|inundation)\b/i, "natural.flood"],
-  [/\b(landslide|mass movement|mudslide|debris flow)\b/i, "natural.landslide"],
-  [/\b(volcan\w*|eruption)\b/i, "natural.volcano"],
-  [/\b(storm|cyclone|hurricane|typhoon|tornado|windstorm)\b/i, "natural.storm"],
-  [/\bdrought\b/i, "natural.drought"],
-  [/\b(cold wave|snow|frost)\b/i, "natural.cold_wave"],
-];
+export const COPERNICUS_CATEGORY_MAP: Readonly<Record<string, string>> = {
+  "wildfire": "fire.wildfire", "wild fire": "fire.wildfire", "forest fire": "fire.wildfire", "bushfire": "fire.wildfire",
+  "bush fire": "fire.wildfire", "vegetation fire": "fire.wildfire",
+  "tsunami": "natural.tsunami",
+  "earthquake": "natural.earthquake", "seismic": "natural.earthquake",
+  "flood": "natural.flood", "flooding": "natural.flood", "flash flood": "natural.flood", "inundation": "natural.flood",
+  "landslide": "natural.landslide", "mass movement": "natural.landslide", "mudslide": "natural.landslide", "debris flow": "natural.landslide",
+  "volcano": "natural.volcano", "volcanic": "natural.volcano", "eruption": "natural.volcano",
+  "storm": "natural.storm", "cyclone": "natural.storm", "hurricane": "natural.storm", "typhoon": "natural.storm",
+  "tornado": "natural.storm", "windstorm": "natural.storm",
+  "drought": "natural.drought",
+  "cold wave": "natural.cold_wave", "snow": "natural.cold_wave", "frost": "natural.cold_wave",
+};
 
 const EMSR = /\bEMSR\d{2,5}\b/i;
 
@@ -31,7 +35,8 @@ const EMSR = /\bEMSR\d{2,5}\b/i;
 export const copernicusEmsAdapter: FeedAdapter = {
   adapterType: "copernicus-ems-georss",
 
-  parse(body) {
+  parse(body, config) {
+    const hazards = compile(categoryMap(config, COPERNICUS_CATEGORY_MAP));
     const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: "@", removeNSPrefix: true, parseTagValue: false });
     const doc = parser.parse(body) as { rss?: { channel?: { item?: unknown } | "" } };
     if (doc.rss?.channel === undefined) throw new Error("Copernicus EMS: el documento no es un canal RSS");
@@ -42,7 +47,7 @@ export const copernicusEmsAdapter: FeedAdapter = {
       const title = text(it["title"]);
       const code = (text(it["guid"]) + " " + title + " " + text(it["link"])).match(EMSR)?.[0]?.toUpperCase();
       const categories = (Array.isArray(it["category"]) ? it["category"] : [it["category"]]).map(text).join(" ");
-      const category = hazard(categories) ?? hazard(title);
+      const category = hazard(hazards, categories) ?? hazard(hazards, title);
       const where = location(it);
       if (!code || !category || !where) continue;
       const published = parseDate(it["pubDate"]);
@@ -70,8 +75,12 @@ export const copernicusEmsAdapter: FeedAdapter = {
   },
 };
 
-function hazard(s: string): string | null {
-  for (const [re, code] of HAZARDS) if (re.test(s)) return code;
+const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const compile = (map: Readonly<Record<string, string>>): [RegExp, string][] =>
+  Object.entries(map).map(([word, code]) => [new RegExp(`\\b${escape(word).replace(/ /g, "\\s+")}\\b`, "i"), code]);
+
+function hazard(hazards: [RegExp, string][], s: string): string | null {
+  for (const [re, code] of hazards) if (re.test(s)) return code;
   return null;
 }
 
