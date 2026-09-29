@@ -34,6 +34,7 @@ export const OPERATIONS: Record<string, Operation> = {
   "DELETE /v1/devices/:id/push-token": { summary: "Quitar el token de avisos" },
   "POST /v1/reports": { summary: "Enviar un reporte con prueba de presencia", body: C.SubmitReportRequest, response: C.SubmitReportResponse },
   "GET /v1/events": { summary: "Eventos del mapa por bbox y zoom", response: C.EventMapResponse },
+  "GET /v1/events/tiles/:z/:x/:y": { summary: "Eventos del mapa por tesela z/x/y, cacheable en CDN (ADR 0078)", response: C.EventMapResponse },
   "GET /v1/events/nearby": { summary: "Eventos cercanos a un punto", response: C.NearbyEventsResponse },
   "GET /v1/events/:id": { summary: "Detalle de un evento", response: C.EventSummary },
   "GET /v1/events/:id/timeline": { summary: "Línea de tiempo de un evento" },

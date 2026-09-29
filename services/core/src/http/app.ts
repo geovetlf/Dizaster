@@ -1,3 +1,4 @@
+import { isValidTile, tileBounds } from "@dizaster/geo-kit";
 import Fastify, { type FastifyInstance, type FastifyRequest } from "fastify";
 import { z } from "zod";
 import {
@@ -265,6 +266,23 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
     reply.header("cache-control", "public, max-age=30");
     return c.events.queryMap(c.db, {
       bbox: q.bbox as [number, number, number, number], zoom: q.zoom, ...(q.categories ? { categories: q.categories } : {}), verifiedOnly: q.verified === "1",
+    });
+  });
+
+  // Misma capa, por teselas z/x/y (ADR 0078): URLs iguales para la misma zona → la CDN las comparte entre usuarios.
+  app.get("/v1/events/tiles/:z/:x/:y", async (req, reply) => {
+    const tile = parse(z.object({ z: z.coerce.number().int(), x: z.coerce.number().int(), y: z.coerce.number().int() }), req.params);
+    if (!isValidTile(tile)) throw new DomainError("VALIDATION", "Tesela inválida");
+    const q = parse(
+      z.object({
+        categories: z.string().optional().transform((s) => (s ? [...new Set(s.split(",").filter(Boolean))].sort().slice(0, 20) : undefined)),
+        verified: z.enum(["0", "1"]).optional(),
+      }),
+      req.query,
+    );
+    reply.header("cache-control", "public, max-age=30, s-maxage=60, stale-while-revalidate=30");
+    return c.events.queryMap(c.db, {
+      bbox: tileBounds(tile), zoom: tile.z, ...(q.categories ? { categories: q.categories } : {}), verifiedOnly: q.verified === "1",
     });
   });
 

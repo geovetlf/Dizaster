@@ -51,7 +51,7 @@ export default function MapScreen() {
     // Sin red, el mapa muestra la última vista guardada en lugar de quedar vacío (ADR 0066). Solo se guarda la vista
     // sin filtros, que es la que sirve de respaldo.
     const q = mapFilterQuery(f);
-    const fetcher = () => api.events(view.current!.bounds, view.current!.zoom, q);
+    const fetcher = () => api.eventTiles(view.current!.bounds, view.current!.zoom, q);
     (q ? fetcher().then((value) => ({ value, savedAt: null })) : readThrough(readCache(), cacheKeys.map, fetcher))
       .then(({ value, savedAt }) => { setData(value); setSavedAt(savedAt); })
       .catch(() => undefined);

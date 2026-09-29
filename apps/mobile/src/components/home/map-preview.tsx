@@ -26,7 +26,7 @@ export function MapPreview({ center, category, onLocate }: { center: { lat: numb
 
   useEffect(() => {
     const bbox: [number, number, number, number] = [c.lng - HALF_SPAN.lng, c.lat - HALF_SPAN.lat, c.lng + HALF_SPAN.lng, c.lat + HALF_SPAN.lat];
-    api.events(bbox, ZOOM).then(setData).catch(() => setData(null));
+    api.eventTiles(bbox, ZOOM).then(setData).catch(() => setData(null));
   }, [c.lat, c.lng]);
 
   const features = useMemo<GeoJSON.FeatureCollection>(() => {

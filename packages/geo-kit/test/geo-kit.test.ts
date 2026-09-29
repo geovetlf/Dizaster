@@ -6,6 +6,11 @@ import {
   computePresence,
   PRESENCE_RULES_V1,
   textFingerprint,
+  tileBounds,
+  tilesForView,
+  isValidTile,
+  mergeMapTiles,
+  MAX_TILES_PER_VIEW,
   decideDedup,
   DEDUP_RULES,
   hammingHex,
@@ -270,5 +275,47 @@ describe("huella de texto (ADR 0074)", () => {
     expect(textFingerprint("Incendio en el almacén central")).toBe("incendio en el almacen central");
     expect(textFingerprint("hay humo")).toBeNull();
     expect(textFingerprint(undefined)).toBeNull();
+  });
+});
+
+describe("teselas del mapa (ADR 0078)", () => {
+  it("límites XYZ y validación", () => {
+    expect(tileBounds({ z: 0, x: 0, y: 0 }).map((v) => Math.round(v))).toEqual([-180, -85, 180, 85]);
+    const [w, s, e, n] = tileBounds({ z: 1, x: 0, y: 1 });
+    expect([w, e, n]).toEqual([-180, 0, 0]);
+    expect(s).toBeCloseTo(-85.0511, 3);
+    expect(isValidTile({ z: 2, x: 3, y: 3 })).toBe(true);
+    expect(isValidTile({ z: 2, x: 4, y: 0 })).toBe(false);
+    expect(isValidTile({ z: 25, x: 0, y: 0 })).toBe(false);
+  });
+
+  it("la misma zona da las mismas teselas aunque el bbox cambie un poco; baja el zoom si son demasiadas", () => {
+    const a = tilesForView([-77.1, -12.1, -76.95, -11.98], 12);
+    const b = tilesForView([-77.099, -12.098, -76.951, -11.981], 12.3);
+    expect(a).toEqual(b);
+    expect(a.every((t) => t.z === 12)).toBe(true);
+    for (const t of a) {
+      const [w, s, e, n] = tileBounds(t);
+      expect(w < -76.95 && e > -77.1 && s < -11.98 && n > -12.1).toBe(true);
+    }
+    const wide = tilesForView([-82, -19, -68, 0], 12);
+    expect(wide.length).toBeLessThanOrEqual(MAX_TILES_PER_VIEW);
+    expect(wide[0]!.z).toBeLessThan(12);
+    // Cruce del antimeridiano.
+    const fiji = tilesForView([177, -20, -178, -15], 5);
+    expect(new Set(fiji.map((t) => t.x))).toEqual(new Set([31, 0]));
+  });
+
+  it("une teselas: evento repetido en el borde una vez, cluster partido sumado", () => {
+    const ev = { id: "e1" } as never;
+    expect(mergeMapTiles([
+      { mode: "points", events: [ev], clusters: [] },
+      { mode: "points", events: [ev], clusters: [] },
+    ]).events).toHaveLength(1);
+    const c = (count: number, sev: number) => ({ h3: "8a", point: { lat: 0, lng: 0 }, count, maxSeverity: sev });
+    expect(mergeMapTiles([
+      { mode: "clusters", events: [], clusters: [c(2, 1)] },
+      { mode: "clusters", events: [], clusters: [c(3, 4)] },
+    ]).clusters).toEqual([c(5, 4)]);
   });
 });

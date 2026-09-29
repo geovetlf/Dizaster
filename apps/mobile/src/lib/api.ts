@@ -1,4 +1,5 @@
 import type { EventSourceView, EventStatus, MyProfile, UpdateProfileRequest, ReactionKind, ReactionState, DataExport, VerificationView, ModeratorEventDetail, SavedZone, SavedZoneInput, AppealView, CaseDetail, CaseSummary, CreateFlagRequest, ModerationActionType, ModerationNotice, CostDashboard, KillSwitchView, QualityReport, CreatePostRequest, TagView, BusinessView, SessionView, CreateBusinessRequest, UpdateBusinessRequest, AlertPreferences, CategorySubscription, CategorySubscriptionInput, NotificationsResponse, AppConfig, AttributionsResponse, AreaSearchResult, FollowTarget, MyFollows, ProfileSearchResult, ProfileView, CommentView, CreateUploadRequest, FeedResponse, FeedTab, CreateUploadResponse, DevicePlatform, MediaView, RegisterPushTokenRequest, EventMapResponse, EventSummary, NearbyEventsResponse, SubmitReportRequest, SubmitReportResponse, TimelineEntryView } from "@dizaster/contracts";
+import { mergeMapTiles, tilesForView } from "@dizaster/geo-kit";
 import { canRetryWithRefresh, singleFlight } from "./auth/refresh";
 import { API_URL } from "./config";
 import type { Sender } from "./report/queue";
@@ -33,8 +34,14 @@ const renew = singleFlight(async (): Promise<boolean> => {
   }
 });
 
+/**
+ * Rutas que viajan sin sesión: las de autenticación y las teselas del mapa, que así la CDN puede compartir entre
+ * todos (una petición con `Authorization` no se cachea en una CDN compartida, ADR 0078).
+ */
+const NO_AUTH_PREFIXES = ["/v1/auth/", "/v1/events/tiles/"];
+
 async function request<T>(path: string, init: RequestInit = {}, retried = false): Promise<T> {
-  const auth: Record<string, string> = token && !path.startsWith("/v1/auth/") ? { authorization: `Bearer ${token}` } : {};
+  const auth: Record<string, string> = token && !NO_AUTH_PREFIXES.some((p) => path.startsWith(p)) ? { authorization: `Bearer ${token}` } : {};
   const res = await fetch(`${API_URL}${path}`, {
     ...init,
     // Sin cuerpo no se declara JSON: el servidor rechaza un cuerpo JSON vacío (p. ej. DELETE o POST .../complete).
@@ -62,6 +69,14 @@ export const api = {
     request<void>(`/v1/devices/${deviceId}/push-token`, { method: "PUT", body: JSON.stringify(body) }),
   events: (bbox: [number, number, number, number], zoom: number, filter = "") =>
     request<EventMapResponse>(`/v1/events?bbox=${bbox.map((n) => n.toFixed(5)).join(",")}&zoom=${Math.round(zoom)}${filter}`),
+  /** Capa del mapa por teselas z/x/y (ADR 0078): URLs iguales para la misma zona, cacheables en la CDN. */
+  eventTiles: async (bbox: [number, number, number, number], zoom: number, filter = ""): Promise<EventMapResponse> => {
+    const qs = filter ? `?${filter.replace(/^&/, "")}` : "";
+    const parts = await Promise.all(
+      tilesForView(bbox, zoom).map((t) => request<EventMapResponse>(`/v1/events/tiles/${t.z}/${t.x}/${t.y}${qs}`)),
+    );
+    return mergeMapTiles(parts);
+  },
   event: (id: string) => request<EventSummary>(`/v1/events/${id}`),
   verification: (id: string) => request<VerificationView>(`/v1/events/${id}/verification`),
   eventSources: (id: string) => request<{ sources: EventSourceView[] }>(`/v1/events/${id}/sources`),
