@@ -115,4 +115,24 @@ describe("tablero de calidad", () => {
     // Un aviso operativo no entra al historial de alertas públicas.
     expect((await t.c.db.query(`SELECT 1 FROM alert.notifications WHERE user_id = $1`, [adminUserId])).rowCount).toBe(0);
   });
+
+  it("alerta operativa: avisa al incumplirse y al recuperarse, no en cada chequeo (ADR 0130)", async () => {
+    const id = v7();
+    // Un evento interno retenido 10 min (con reintento a futuro, para que el worker de prueba no lo tome).
+    await t.c.db.query(
+      `INSERT INTO platform.outbox (id, type, payload, lane, occurred_at, available_at) VALUES ($1, 'ReportSubmitted', '{}', 'normal', now() - interval '10 minutes', now() + interval '1 hour')`, [id]);
+    const outbox = <T extends { key: string }>(x: T[]) => x.filter((a) => a.key === "outbox_oldest_pending");
+    const first = await t.c.quality.checkOperational();
+    expect(outbox(first)).toMatchObject([{ breached: true, target: 300, unit: "s" }]);
+    expect(outbox(first)[0]!.observed).toBeGreaterThanOrEqual(600);
+    const sent = push.sent.filter((m) => m.groupKey === "ops:outbox_oldest_pending");
+    expect(sent).toHaveLength(1);
+    expect(sent[0]).toMatchObject({ title: "Target missed: Pending internal events", url: "dizaster://admin-quality", critical: false });
+    expect(outbox(await t.c.quality.checkOperational())).toEqual([]);
+    await t.c.db.query(`UPDATE platform.outbox SET processed_at = now() WHERE id = $1`, [id]);
+    expect(outbox(await t.c.quality.checkOperational())).toMatchObject([{ breached: false }]);
+    expect(push.sent.filter((m) => m.groupKey === "ops:outbox_oldest_pending").map((m) => m.title)).toEqual([
+      "Target missed: Pending internal events", "Target recovered: Pending internal events",
+    ]);
+  });
 });

@@ -92,6 +92,17 @@ export class OutboxDispatcher {
     return processed;
   }
 
+  /** Pendientes y antigüedad del más viejo (ADR 0130): si crece, el worker no da abasto o un consumidor falla. */
+  async backlog(): Promise<{ pending: number; oldestPendingSeconds: number | null; failing: number }> {
+    const { rows } = await this.db.query<{ pending: number; oldest: number | null; failing: number }>(
+      `SELECT count(*)::int AS pending, extract(epoch FROM now() - min(occurred_at))::float8 AS oldest,
+              count(*) FILTER (WHERE attempts > 0)::int AS failing
+         FROM platform.outbox WHERE processed_at IS NULL`,
+    );
+    const r = rows[0]!;
+    return { pending: r.pending, oldestPendingSeconds: r.oldest === null ? null : Math.round(r.oldest), failing: r.failing };
+  }
+
   /** Procesa hasta vaciar la cola (tests y arranque). */
   async drain(): Promise<number> {
     let total = 0;

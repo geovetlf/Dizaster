@@ -12,6 +12,7 @@ let lastDaily = 0;
 let lastHourly = 0;
 let lastIngestionTick = 0;
 let lastMeterFlush = Date.now();
+let lastOpsCheck = 0;
 
 async function loop() {
   while (!stopping) {
@@ -31,6 +32,12 @@ async function loop() {
         c.meter.add("ingestion", "items_new", run.itemsNew, run.sourceKey);
         console.log(JSON.stringify({ msg: "ingestion.run", ...run }));
       }
+    }
+    // Alertas operativas (ADR 0130): SLO y cola de eventos; avisa solo al cambiar de estado.
+    if (Date.now() - lastOpsCheck > 5 * 60_000) {
+      lastOpsCheck = Date.now();
+      const changed = await c.quality.checkOperational().catch((e: Error) => { console.warn(JSON.stringify({ msg: "ops.check", error: e.message })); return []; });
+      for (const t of changed) console.warn(JSON.stringify({ msg: "ops.alert", ...t }));
     }
     if (Date.now() - lastHourly > 3600_000) {
       lastHourly = Date.now();

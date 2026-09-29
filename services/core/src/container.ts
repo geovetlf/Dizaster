@@ -130,7 +130,7 @@ export function buildContainer(env: AppEnv, overrides: { db?: Db; clock?: Clock;
     await institutions.retire(tx, await business.idsOwnedBy(tx, e.payload.userId));
   });
   const composer = new PostComposer(db, social, media, events, business);
-  const quality = new QualityService(db, clock, { cost, events, verification, alerts, ingestion, moderation });
+  const quality = new QualityService(db, clock, { cost, events, verification, alerts, ingestion, moderation, ops: { identity, backlog: () => dispatcher.backlog() } });
   return { env, db, clock, ref, geo, social, identity, mfa, events, ingestion, ingestionScheduler, verification, media, storage, reports, feed, alerts, dispatcher, cost, moderation, trust, quality, composer, business, institutions, meter, connectors };
 }
 

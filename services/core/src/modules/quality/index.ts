@@ -3,7 +3,8 @@ import type { Clock } from "../../platform/clock.js";
 import type { Db } from "../../platform/db.js";
 import { DomainError } from "../../platform/errors.js";
 import { histogramPercentile } from "../../platform/metrics.js";
-import type { AlertService } from "../alert/index.js";
+import { opsAlertText, type AlertService, type OpsAlertKey } from "../alert/index.js";
+import type { IdentityService } from "../identity/index.js";
 import type { CostService } from "../cost/index.js";
 import type { EventService } from "../event/index.js";
 import type { IngestionService } from "../ingestion/index.js";
@@ -18,6 +19,11 @@ import type { VerificationService } from "../verification/index.js";
  */
 export const SLO_TARGETS = { apiP95Ms: 300, urgentChainP95Seconds: 120, moderationOldestOpenHours: 24 } as const;
 
+/** Alerta operativa extra (ADR 0130): un evento interno sin procesar más de 5 min indica worker caído o consumidor roto. */
+export const OPS_TARGETS = { outboxOldestPendingSeconds: 300 } as const;
+
+export interface OpsTransition { key: OpsAlertKey; breached: boolean; observed: number; target: number; unit: string }
+
 /**
  * Tablero de calidad del producto. Módulo sin datos propios: pide a cada módulo sus agregados por su interfaz
  * pública y los junta. Solo cifras agregadas: nada de personas ni ubicaciones.
@@ -29,8 +35,46 @@ export class QualityService {
     private readonly deps: {
       cost: CostService; events: EventService; verification: VerificationService; alerts: AlertService;
       ingestion: IngestionService; moderation: ModerationService;
+      /** Para las alertas operativas (ADR 0130); opcional para no acoplar el tablero. */
+      ops?: { identity: IdentityService; backlog: () => Promise<{ oldestPendingSeconds: number | null }> };
     },
   ) {}
+
+  /**
+   * Alertas operativas (Blueprint §5.22, ADR 0130): juzga los SLO del último día y la cola de eventos internos, y avisa
+   * por push a administración y operación solo cuando un objetivo pasa de cumplido a incumplido o al revés (el estado
+   * queda en `quality.ops_alert_state`). Sin datos no se juzga. Lo llama el worker cada 5 min. NO AI REQUIRED.
+   */
+  async checkOperational(): Promise<OpsTransition[]> {
+    const ops = this.deps.ops;
+    if (!ops) return [];
+    const r = await this.report({ days: 1 });
+    const observed: { key: OpsAlertKey; observed: number | null; target: number; unit: string }[] = r.slos.map((s) => ({ key: s.key, observed: s.observed, target: s.target, unit: s.unit }));
+    observed.push({ key: "outbox_oldest_pending", observed: (await ops.backlog()).oldestPendingSeconds ?? 0, target: OPS_TARGETS.outboxOldestPendingSeconds, unit: "s" });
+
+    const prior = new Map((await this.db.query<{ key: string; breached: boolean }>(`SELECT key, breached FROM quality.ops_alert_state`)).rows.map((x) => [x.key, x.breached]));
+    const transitions: OpsTransition[] = [];
+    for (const o of observed) {
+      if (o.observed === null) continue;
+      const breached = o.observed > o.target;
+      // Lo nunca visto solo avisa si arranca incumplido; recuperarse de algo que no se avisó no es noticia.
+      if ((prior.get(o.key) ?? false) !== breached) transitions.push({ key: o.key, breached, observed: o.observed, target: o.target, unit: o.unit });
+      await this.db.query(
+        `INSERT INTO quality.ops_alert_state (key, breached, observed, changed_at) VALUES ($1, $2, $3, now())
+         ON CONFLICT (key) DO UPDATE SET observed = $3,
+           changed_at = CASE WHEN quality.ops_alert_state.breached = $2 THEN quality.ops_alert_state.changed_at ELSE now() END, breached = $2`,
+        [o.key, breached, o.observed],
+      );
+    }
+    if (transitions.length > 0) {
+      const { identity } = ops;
+      const to = [...new Set([...(await identity.usersWithRole(this.db, "admin")), ...(await identity.usersWithRole(this.db, "operator"))])];
+      for (const t of transitions) {
+        await this.deps.alerts.notifyAdmins(to, (lang) => opsAlertText(lang, t), "dizaster://admin-quality", `ops:${t.key}`);
+      }
+    }
+    return transitions;
+  }
 
   async report(rawQuery: unknown): Promise<QualityReport> {
     const parsed = QualityQuery.safeParse(rawQuery ?? {});

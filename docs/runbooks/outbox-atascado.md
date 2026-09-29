@@ -1,6 +1,7 @@
 # Eventos de dominio atascados
 
-Síntoma: los reportes entran pero la verificación, las alertas o el feed no se actualizan.
+Síntoma: los reportes entran pero la verificación, las alertas o el feed no se actualizan. Si un evento interno lleva
+más de 5 min sin procesarse, administración y operación reciben el push "Eventos internos pendientes" (ADR 0130).
 
 ```sql
 -- Pendientes por carril y el más antiguo
