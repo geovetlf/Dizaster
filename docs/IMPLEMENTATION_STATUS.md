@@ -265,6 +265,7 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | Duración (≤ 60 s) y tamaño del video leídos del archivo en el servidor | ✅ | ADR 0071, `videoInfo` |
 | Cuota diaria de MB subidos por cuenta según reputación | ✅ | ADR 0072 |
 | Bonificación de presencia por foto/video capturado en la app (presence-2) | ✅ | ADR 0073 |
+| Textos idénticos entre reportes cuentan como un solo corroborador | ✅ | ADR 0074 |
 | Licencias, auditoría, SBOM, Dependabot; respaldo con prueba de restauración en CI | ✅ | ADR 0070, `scripts/supply-chain.mjs`, `scripts/db-restore-check.mjs` |
 | Idioma de la app elegible en el perfil (es/en/pt/fr o del teléfono) | ✅ | ADR 0069, `app/language.tsx` |
 | Varias cuentas en un teléfono corroboran como una (clave seudónima del teléfono) | ✅ | ADR 0068, migración 0036 |
@@ -292,13 +293,12 @@ decisiones o credenciales del propietario (lista de abajo); mientras tanto se co
 
 Revisión del Blueprint del 2026-09-29 (tras ADR 0070), verificada contra el código, sin bloqueos:
 
-1. Textos idénticos entre reportes de un mismo evento cuentan como uno al corroborar (§10.2, §13.3).
-2. Guardar el crudo de cada fuente para auditoría (`raw_ref`) con retención (§9.3).
-3. Fusión automática de duplicados con umbrales, cola de posibles duplicados y métricas de reversión (§5.7, §8.4).
-4. Ubicar ítems de fuentes sin coordenadas con el índice geográfico local (geocódigos exactos) (§9.4).
-5. Consultas del mapa alineadas a teselas para que la caché se comparta (§11.4).
-6. Horas en la zona del evento y plurales correctos en 4 idiomas (§5.15).
-7. Adaptador EMSC (PLANNED hasta revisar términos) (§9.3).
+1. Guardar el crudo de cada fuente para auditoría (`raw_ref`) con retención (§9.3).
+2. Fusión automática de duplicados con umbrales, cola de posibles duplicados y métricas de reversión (§5.7, §8.4).
+3. Ubicar ítems de fuentes sin coordenadas con el índice geográfico local (geocódigos exactos) (§9.4).
+4. Consultas del mapa alineadas a teselas para que la caché se comparta (§11.4).
+5. Horas en la zona del evento y plurales correctos en 4 idiomas (§5.15).
+6. Adaptador EMSC (PLANNED hasta revisar términos) (§9.3).
 
 
 Bloqueadas o en espera:

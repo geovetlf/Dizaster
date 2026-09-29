@@ -148,3 +148,22 @@ export function extractKeywords(text: string | undefined | null): string[] {
     ),
   ].slice(0, 30);
 }
+
+/** Mínimo de palabras para que dos textos iguales se consideren "copiados" y no una coincidencia natural. */
+export const TEXT_FINGERPRINT_MIN_WORDS = 4;
+
+/**
+ * Huella de un texto para detectar copias entre reportes (ADR 0074, Blueprint §10.2 "patrones idénticos"): sin
+ * mayúsculas, tildes, signos ni espacios extra. Los textos cortos ("choque", "hay humo") no llevan huella: es normal
+ * que varias personas reales escriban lo mismo. Devuelve el texto normalizado; quien lo guarde lo resume con un hash.
+ */
+export function textFingerprint(text: string | undefined | null): string | null {
+  if (!text) return null;
+  const words = text
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .split(/[^a-z0-9ñ]+/)
+    .filter(Boolean);
+  return words.length >= TEXT_FINGERPRINT_MIN_WORDS ? words.join(" ") : null;
+}

@@ -5,6 +5,7 @@ import {
   clampToRadius,
   computePresence,
   PRESENCE_RULES_V1,
+  textFingerprint,
   decideDedup,
   DEDUP_RULES,
   hammingHex,
@@ -260,5 +261,14 @@ describe("presencia: bonificación por media capturada en la app (ADR 0073)", ()
     const r = computePresence({ ...weak(), mediaProofs: [photo("2026-09-29T10:00:00Z")] }, PRESENCE_RULES_V1);
     expect(r.band).toBe("MEDIUM");
     expect(r.ruleVersion).toBe("presence-1");
+  });
+});
+
+describe("huella de texto (ADR 0074)", () => {
+  it("normaliza mayúsculas, tildes y signos; ignora textos cortos", () => {
+    expect(textFingerprint("¡Choque GRAVE en la Avenida!")).toBe(textFingerprint("choque grave en la avenida"));
+    expect(textFingerprint("Incendio en el almacén central")).toBe("incendio en el almacen central");
+    expect(textFingerprint("hay humo")).toBeNull();
+    expect(textFingerprint(undefined)).toBeNull();
   });
 });

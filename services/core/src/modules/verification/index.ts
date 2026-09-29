@@ -170,22 +170,23 @@ export class VerificationService {
   /**
    * Peso de corroboración INDEPENDIENTE: solo presencia HIGH, una vez por persona y una vez por dispositivo
    * (dos cuentas en el mismo teléfono cuentan como una). Cada persona pesa según su reputación (nueva 0,5,
-   * con mal historial 0,25, normal 1, de confianza 1,5) y un grupo coordinado cuenta como una sola.
+   * con mal historial 0,25, normal 1, de confianza 1,5) y un grupo coordinado cuenta como una sola. Quienes
+   * escribieron exactamente el mismo texto (≥ 4 palabras, ADR 0074) también cuentan como una sola: pesa el mayor.
    */
   private async independentWeight(tx: Queryable, eventId: string, evidence: EvidenceForVerification[]): Promise<number> {
     const high = evidence.filter((e) => e.presenceBand === "HIGH" && e.contributorUserId);
     const seenUsers = new Set<string>();
     const seenDevices = new Set<string>();
-    const counted: string[] = [];
+    const counted: { userId: string; textHash: string | null }[] = [];
     for (const e of high) {
       if (seenUsers.has(e.contributorUserId!)) continue;
       if (e.contributorDeviceId && seenDevices.has(e.contributorDeviceId)) continue;
       seenUsers.add(e.contributorUserId!);
       if (e.contributorDeviceId) seenDevices.add(e.contributorDeviceId);
-      counted.push(e.contributorUserId!);
+      counted.push({ userId: e.contributorUserId!, textHash: e.textHash });
     }
-    const weights = await this.trust.contributionWeights(tx, counted, eventId);
-    return counted.reduce((sum, u) => sum + (weights.get(u) ?? 0), 0);
+    const weights = await this.trust.contributionWeights(tx, counted.map((c) => c.userId), eventId);
+    return sameTextCountsOnce(counted, weights);
   }
 
   /**
@@ -302,4 +303,17 @@ function median(xs: number[]): number | null {
   const s = [...xs].sort((a, b) => a - b);
   const m = Math.floor(s.length / 2);
   return Math.round((s.length % 2 ? s[m]! : (s[m - 1]! + s[m]!) / 2) * 10) / 10;
+}
+
+/** Suma de pesos donde cada grupo de textos idénticos aporta solo su mayor peso (ADR 0074). NO AI REQUIRED. */
+export function sameTextCountsOnce(counted: { userId: string; textHash: string | null }[], weights: Map<string, number>): number {
+  const byText = new Map<string, number>();
+  let sum = 0;
+  for (const c of counted) {
+    const w = weights.get(c.userId) ?? 0;
+    if (!c.textHash) sum += w;
+    else byText.set(c.textHash, Math.max(byText.get(c.textHash) ?? 0, w));
+  }
+  for (const w of byText.values()) sum += w;
+  return sum;
 }

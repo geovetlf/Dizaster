@@ -45,6 +45,22 @@ describe("Verification Engine", () => {
     expect((await verification(eventId)).level).toBe("UNVERIFIED");
   });
 
+  it("reportes con el mismo texto copiado cuentan como uno (ADR 0074)", async () => {
+    const pin = offset(LIMA, 0, 90000);
+    const users = await Promise.all(["copia1", "copia2", "copia3"].map((h) => createUser(t, h)));
+    const texts = ["Choque grave en la avenida, hay heridos!", "choque grave en la AVENIDA hay heridos", "Choque grave en la avenida — hay heridos."];
+    let eventId = "";
+    for (const [i, u] of users.entries()) eventId = (await submit(t, u, reportBody(u, { pin: offset(pin, i * 15), text: texts[i] }))).body.eventId!;
+    await drain();
+    expect((await verification(eventId)).level).toBe("UNVERIFIED");
+    // Textos cortos iguales son normales entre testigos reales y no se agrupan.
+    const pin2 = offset(LIMA, 0, 100000);
+    const others = await Promise.all(["corto1", "corto2", "corto3"].map((h) => createUser(t, h)));
+    for (const [i, u] of others.entries()) eventId = (await submit(t, u, reportBody(u, { pin: offset(pin2, i * 15), text: "Hay humo" }))).body.eventId!;
+    await drain();
+    expect((await verification(eventId)).level).toBe("COMMUNITY_CORROBORATED");
+  });
+
   it("la misma persona reportando varias veces cuenta una sola vez", async () => {
     const pin = offset(LIMA, 0, 80000);
     const u = await createUser(t, "insistente");

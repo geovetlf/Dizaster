@@ -52,6 +52,8 @@ export interface EvidenceForVerification {
   presenceBand: string | null;
   contributorUserId: string | null;
   contributorDeviceId: string | null;
+  /** Huella del texto del reporte (ADR 0074); null si no tenía texto o era corto. */
+  textHash: string | null;
   observedAt: Date;
 }
 
@@ -264,12 +266,13 @@ export class EventService {
     await tx.query(
       `INSERT INTO event.evidence
          (id, event_id, evidence_type, ref_id, trust_tier, assertion, point, weight, presence_band,
-          contributor_user_id, contributor_device_id, match_score, match_confidence, added_by, observed_at)
-       VALUES ($1, $2, $3, $4, $5, $6, ST_SetSRID(ST_MakePoint($7, $8), 4326)::geography, $9, $10, $11, $12, $13, $14, $15, $16)`,
+          contributor_user_id, contributor_device_id, match_score, match_confidence, added_by, observed_at, text_hash)
+       VALUES ($1, $2, $3, $4, $5, $6, ST_SetSRID(ST_MakePoint($7, $8), 4326)::geography, $9, $10, $11, $12, $13, $14, $15, $16, $17)`,
       [
         evidenceId, eventId, evidenceType, c.originRef.id, c.trustTier, assertion, c.point.lng, c.point.lat, c.weight,
         (c.metadata["presenceBand"] as string | undefined) ?? null, c.contributor?.userId ?? null, c.contributor?.deviceId ?? null,
         score, confidence, confidence === "USER_SELECTED" ? "USER" : "RULE", c.observedAt,
+        (c.metadata["textHash"] as string | null | undefined) ?? null,
       ],
     );
     await this.recomputeAggregates(tx, eventId, c);
@@ -841,8 +844,9 @@ export class EventService {
     const { rows } = await q.query<{
       id: string; evidence_type: string; ref_id: string; trust_tier: TrustTier; assertion: "OCCURRING" | "NOT_OCCURRING";
       presence_band: string | null; contributor_user_id: string | null; contributor_device_id: string | null; observed_at: Date;
+      text_hash: string | null;
     }>(
-      `SELECT id, evidence_type, ref_id, trust_tier, assertion, presence_band, contributor_user_id, contributor_device_id, observed_at
+      `SELECT id, evidence_type, ref_id, trust_tier, assertion, presence_band, contributor_user_id, contributor_device_id, observed_at, text_hash
          FROM event.evidence WHERE event_id = $1 AND status = 'ACTIVE' ORDER BY added_at`,
       [eventId],
     );
@@ -852,7 +856,7 @@ export class EventService {
       evidence: rows.map((r) => ({
         id: r.id, evidenceType: r.evidence_type, refId: r.ref_id, trustTier: r.trust_tier, assertion: r.assertion,
         presenceBand: r.presence_band, contributorUserId: r.contributor_user_id, contributorDeviceId: r.contributor_device_id,
-        observedAt: r.observed_at,
+        textHash: r.text_hash, observedAt: r.observed_at,
       })),
     };
   }

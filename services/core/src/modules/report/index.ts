@@ -1,9 +1,10 @@
+import { createHash } from "node:crypto";
 import {
   SubmitReportRequest,
   type PresenceRejectionReason,
   type SubmitReportResponse,
 } from "@dizaster/contracts";
-import { H3_RES, computePresence, extractKeywords, generalize, h3 } from "@dizaster/geo-kit";
+import { H3_RES, computePresence, extractKeywords, generalize, h3, textFingerprint } from "@dizaster/geo-kit";
 import type { Clock } from "../../platform/clock.js";
 import type { Db, Queryable } from "../../platform/db.js";
 import { withTransaction } from "../../platform/db.js";
@@ -113,7 +114,7 @@ export class ReportService {
           createAsPending: presence.band === "MEDIUM",
           externalIds: [],
           mediaHashes: (await this.d.media.phashes(tx, attachable.map((m) => m.id))).slice(0, 8),
-          metadata: { assertion: req.assertion, presenceBand: presence.band, keywords: extractKeywords(req.text) },
+          metadata: { assertion: req.assertion, presenceBand: presence.band, keywords: extractKeywords(req.text), textHash: textHash(req.text) },
         });
         if (resolution.kind === "INVALID_TARGET") throw new DomainError("INVALID_TARGET", resolution.reason, 422);
         if (resolution.kind === "NO_MATCH") downgradeReasons = presence.lateOffline ? ["LATE_OFFLINE_SUBMISSION"] : presence.reasons;
@@ -297,4 +298,10 @@ export class ReportService {
       })),
     };
   }
+}
+
+/** Hash de la huella del texto (ADR 0074): textos iguales entre reportes cuentan como un solo corroborador. */
+function textHash(text: string | undefined): string | null {
+  const f = textFingerprint(text);
+  return f ? createHash("sha256").update(f).digest("hex").slice(0, 32) : null;
 }
