@@ -114,6 +114,13 @@ describe("foto de perfil y logo", () => {
     expect(await mediaState(photo)).toBe("DELETED");
     const log = await t.c.db.query(`SELECT 1 FROM moderation.actions WHERE action = 'REMOVE_AVATAR' AND target_id = $1`, [beto.profileId]);
     expect(log.rowCount).toBe(1);
+    // La misma foto vuelve a subirse (ADR 0145): la subida no se rechaza, pero no puede ser foto de perfil sin revisión.
+    const again = await upload(beto);
+    expect(await mediaState(again)).toBe("READY");
+    const held = await setAvatar(beto, again);
+    expect(held.statusCode).toBe(409);
+    expect(held.json()).toMatchObject({ error: "MEDIA_HELD" });
+    await t.c.db.query(`DELETE FROM media.blocked_hashes`); // las pruebas siguientes reutilizan la misma imagen
     // No se puede aplicar a un post.
     const { rows } = await t.c.db.query<{ id: string }>(`SELECT id FROM social.posts WHERE author_id = $1 LIMIT 1`, [ana.profileId]);
     await t.app.inject({ method: "POST", url: "/v1/flags", headers: auth(beto), payload: { targetType: "POST", targetId: rows[0]!.id, reason: "SPAM" } });

@@ -13,4 +13,6 @@
   y se publica `BlockedMediaMatched`. La subida NO se rechaza: su estado sigue READY para quien la subió.
 - Cada post que la usa (al procesarse o al adjuntarse después) abre un caso en la cola. "Aprobar media" la muestra.
 - Ocultar (HIDE) no alimenta la lista: solo el retiro definitivo.
+- Como foto de perfil o logo, una imagen retenida no se puede usar (409 `MEDIA_HELD`): el perfil no tiene revisión
+  posterior que la muestre. La subida en sí no se rechaza.
 - Independiente de la detección de CSAM, que sigue bloqueada (proveedor y procedimiento legal).

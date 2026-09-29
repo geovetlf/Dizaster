@@ -195,6 +195,11 @@ export class FeedService {
     const [m] = await this.media.assertAttachable(q, profileId, [mediaId]);
     if (m!.kind !== "IMAGE") throw new DomainError("MEDIA_KIND_UNSUPPORTED", "La foto debe ser una imagen");
     if ((await this.social.postsWithMedia(q, mediaId)).length > 0) throw new DomainError("MEDIA_IN_USE", "Esa imagen ya está en una publicación", 409);
+    // Igual a contenido retirado (ADR 0145): la imagen queda subida y oculta; como foto de perfil no hay revisión
+    // posterior que la muestre, así que no se usa (el perfil se ve a la vez por todo el mundo).
+    if ((await this.media.heldByBlocklist(q, [mediaId])).length > 0) {
+      throw new DomainError("MEDIA_HELD", "Esta imagen coincide con contenido retirado por moderación", 409);
+    }
     const [view] = await this.media.publicViews(q, [mediaId], { requireApproval: false });
     if (!view) throw new DomainError("MEDIA_NOT_READY", "La imagen aún se está procesando", 409);
     return { mediaId, url: view.thumbUrl ?? view.url };

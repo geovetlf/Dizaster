@@ -237,6 +237,7 @@ export const fr: Record<MessageKey, string> = {
   authStatus_REJECTED: "Rejetée",
   authStatus_WITHDRAWN: "Retirée",
   errAuthorityTransition: "Ce changement de statut n'est pas autorisé.",
+  errMediaHeld: "Cette image correspond à un contenu retiré par la modération.",
   delayHint: "Minutes d'attente avant publication publique dans les catégories très sensibles. Le signalement est reçu et enregistré immédiatement.",
   delayCatalog: "catalogue",
   delayMinutes: "Minutes (0–1440)",
