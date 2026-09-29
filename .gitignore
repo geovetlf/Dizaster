@@ -10,3 +10,6 @@ apps/mobile/ios/
 apps/mobile/android/
 .DS_Store
 .data/
+
+# Paquetes descargados para herramientas locales; nunca van al repo.
+*.whl
