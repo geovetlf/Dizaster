@@ -389,7 +389,7 @@ export class SocialService {
       `WITH x AS (
          SELECT p.id, p.author_id, p.author_type, p.kind, p.author_visibility, coalesce(pr.handle, bp.handle) AS handle,
                 coalesce(pr.display_name, bp.name) AS display_name, bp.verification_status AS business_verification, p.text, p.lang, p.created_at, p.category_code, le.event_id,
-                p.shared_post_id,
+                p.shared_post_id, p.comment_count, p.share_count, p.reaction_counts,
                 ${nearSql ? `ST_Distance(p.public_point, ${nearSql})` : "NULL"}::float8 AS distance_m,
                 (${score})::float8 AS score
            FROM social.posts p
@@ -402,10 +402,8 @@ export class SocialService {
        SELECT x.*,
               (SELECT json_agg(json_build_object('id', m.media_id, 'kind', m.kind) ORDER BY m.position)
                  FROM social.post_media m WHERE m.post_id = x.id) AS media,
-              (SELECT json_object_agg(g.kind, g.n) FROM (SELECT r.kind, count(*)::int AS n FROM social.reactions r
-                 WHERE r.post_id = x.id GROUP BY r.kind) g) AS reactions,
-              (SELECT count(*) FROM social.comments c WHERE c.post_id = x.id AND c.deleted_at IS NULL AND c.moderation_state = 'VISIBLE')::int AS comment_count,
-              (SELECT count(*) FROM social.posts sp WHERE sp.shared_post_id = x.id AND sp.deleted_at IS NULL AND sp.moderation_state = 'VISIBLE')::int AS share_count,
+              -- Contadores mantenidos por triggers al escribir (ADR 0118): sin COUNT(*) por post leído.
+              x.reaction_counts AS reactions,
               (SELECT coalesce(array_agg(r.kind ORDER BY r.kind), '{}') FROM social.reactions r WHERE r.post_id = x.id AND r.profile_id = $2) AS my_reactions,
               (SELECT coalesce(array_agg(mp.handle ORDER BY mp.handle), '{}') FROM social.post_mentions pm
                  JOIN social.profiles mp ON mp.id = pm.profile_id WHERE pm.post_id = x.id AND mp.deleted_at IS NULL) AS mentions,
