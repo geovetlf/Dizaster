@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { CategoryCode } from "./common.js";
 import { GeoPoint } from "./geo.js";
+import { ReportEvidence } from "./evidence.js";
 import { PresenceBand, PresenceSignals } from "./presence.js";
 
 /**
@@ -24,6 +25,8 @@ export const SubmitReportRequest = z
     presence: PresenceSignals,
     capturedAt: z.iso.datetime({ offset: true }),
     capturedOffline: z.boolean().default(false),
+    /** Firma de la captura hecha en el teléfono (ADR 0129). Sin ella, un envío offline cuenta como testimonio tardío. */
+    evidence: ReportEvidence.optional(),
     anonymityMode: AnonymityMode.default("PUBLIC"),
     deviceId: z.uuid().optional(),
     /** El usuario eligió un evento cercano ("es este"). Obligatorio para NOT_OCCURRING. */
@@ -46,6 +49,10 @@ export const PresenceRejectionReason = z.enum([
   "LATE_OFFLINE_SUBMISSION",
   // La foto o el video que probaba la captura en la app fue rechazado al procesarse (ADR 0121).
   "MEDIA_REJECTED",
+  // Envío offline sin firma válida del dispositivo: se trata como testimonio tardío (ADR 0129).
+  "UNSIGNED_OFFLINE_EVIDENCE",
+  // La firma no corresponde a lo enviado (datos alterados tras la captura) (ADR 0129).
+  "DEVICE_SIGNATURE_INVALID",
 ]);
 export type PresenceRejectionReason = z.infer<typeof PresenceRejectionReason>;
 

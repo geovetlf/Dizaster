@@ -1,6 +1,7 @@
 import type {
   AttestationVerdict,
   CategoryConfig,
+  EvidenceSignatureVerdict,
   GeoPoint,
   PresenceBand,
   PresenceRejectionReason,
@@ -33,6 +34,11 @@ export interface PresenceRuleSet {
    * anteriores a presence-3), no se descuenta.
    */
   lateOfflineFactor?: number;
+  /**
+   * presence-4 (ADR 0129): un envío offline sin firma válida del dispositivo no conserva la tolerancia de retraso
+   * (se trata como testimonio tardío), y una firma que no corresponde a lo enviado resta esta penalización.
+   */
+  signedEvidence?: { requireForOffline: boolean; invalidPenalty: number };
 }
 
 export const PRESENCE_RULES_V1: PresenceRuleSet = {
@@ -64,7 +70,14 @@ export const PRESENCE_RULES_V3: PresenceRuleSet = {
   lateOfflineFactor: 0.5,
 };
 
-export const PRESENCE_RULES_CURRENT = PRESENCE_RULES_V3;
+/** presence-4 (ADR 0129): igual que presence-3 más la firma en el dispositivo de la evidencia offline (§8.3, C-04). */
+export const PRESENCE_RULES_V4: PresenceRuleSet = {
+  ...PRESENCE_RULES_V3,
+  version: "presence-4",
+  signedEvidence: { requireForOffline: true, invalidPenalty: 1 },
+};
+
+export const PRESENCE_RULES_CURRENT = PRESENCE_RULES_V4;
 
 export interface PresenceInput {
   pin: GeoPoint;
@@ -82,6 +95,8 @@ export interface PresenceInput {
    * eso la bonificación es pequeña y no rompe los topes de radio ni de atestación.
    */
   mediaProofs?: { capturedAt: Date; serverSeenAt: Date }[];
+  /** Firma de la captura verificada en el servidor (ADR 0129). Sin valor: ABSENT. */
+  evidenceSignature?: EvidenceSignatureVerdict;
 }
 
 export interface PresenceResult {
@@ -162,6 +177,12 @@ export function computePresence(input: PresenceInput, rules: PresenceRuleSet = P
     }
   }
 
+  const signature = input.evidenceSignature ?? "ABSENT";
+  if (rules.signedEvidence && signature === "INVALID") {
+    penalty += rules.signedEvidence.invalidPenalty;
+    reasons.push("DEVICE_SIGNATURE_INVALID");
+  }
+
   if (hasImplausibleMovement(signals, rules.maxPlausibleSpeedMps)) {
     penalty += rules.penalties.implausibleMovement;
     reasons.push("IMPLAUSIBLE_MOVEMENT");
@@ -173,6 +194,10 @@ export function computePresence(input: PresenceInput, rules: PresenceRuleSet = P
     if (delayMin > category.offlineToleranceMinutes) {
       lateOffline = true;
       reasons.push("LATE_OFFLINE_SUBMISSION");
+    } else if (rules.signedEvidence?.requireForOffline && signature !== "VALID") {
+      // Sin firma de la captura, "estaba sin conexión" es solo una afirmación: vale como testimonio tardío.
+      lateOffline = true;
+      reasons.push("UNSIGNED_OFFLINE_EVIDENCE");
     }
   }
   const discountLate = lateOffline && rules.lateOfflineFactor !== undefined;
@@ -226,7 +251,7 @@ function hasImplausibleMovement(signals: PresenceSignals, maxSpeedMps: number): 
 
 /** Reglas de presencia por versión: una revisión posterior usa las mismas reglas con las que se puntuó. */
 export const PRESENCE_RULES_BY_VERSION: Readonly<Record<string, PresenceRuleSet>> = Object.fromEntries(
-  [PRESENCE_RULES_V1, PRESENCE_RULES_V2, PRESENCE_RULES_V3].map((r) => [r.version, r]),
+  [PRESENCE_RULES_V1, PRESENCE_RULES_V2, PRESENCE_RULES_V3, PRESENCE_RULES_V4].map((r) => [r.version, r]),
 );
 
 /**

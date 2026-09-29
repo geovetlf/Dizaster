@@ -87,6 +87,9 @@ export const api = {
   deleteAccount: () => request<{ status: string }>("/v1/me", { method: "DELETE", body: JSON.stringify({ confirm: "DELETE" }) }),
   registerPushToken: (deviceId: string, body: RegisterPushTokenRequest) =>
     request<void>(`/v1/devices/${deviceId}/push-token`, { method: "PUT", body: JSON.stringify(body) }),
+  /** Clave pública que firma la evidencia de los reportes (ADR 0129). */
+  registerSigningKey: (deviceId: string, publicKey: string) =>
+    request<void>(`/v1/devices/${deviceId}/signing-key`, { method: "PUT", body: JSON.stringify({ publicKey }) }),
   events: (bbox: [number, number, number, number], zoom: number, filter = "") =>
     request<EventMapResponse>(`/v1/events?bbox=${bbox.map((n) => n.toFixed(5)).join(",")}&zoom=${Math.round(zoom)}${filter}`),
   /** Capa del mapa por teselas z/x/y (ADR 0078): URLs iguales para la misma zona, cacheables en la CDN. */

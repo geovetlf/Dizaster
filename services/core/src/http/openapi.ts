@@ -32,6 +32,7 @@ export const OPERATIONS: Record<string, Operation> = {
   "DELETE /v1/me/sessions/:id": { summary: "Cerrar una sesión" },
   "POST /v1/me/sessions/revoke-others": { summary: "Cerrar las demás sesiones" },
   "PUT /v1/devices/:id/push-token": { summary: "Registrar el token de avisos del dispositivo", body: C.RegisterPushTokenRequest },
+  "PUT /v1/devices/:id/signing-key": { summary: "Registrar la clave pública Ed25519 que firma la evidencia de los reportes", body: C.RegisterSigningKeyRequest },
   "DELETE /v1/devices/:id/push-token": { summary: "Quitar el token de avisos" },
   "POST /v1/reports": { summary: "Enviar un reporte con prueba de presencia", body: C.SubmitReportRequest, response: C.SubmitReportResponse },
   "GET /v1/events": { summary: "Eventos del mapa por bbox y zoom (filtros: categorías, verificados, ventana 6h/24h/7d)", response: C.EventMapResponse },

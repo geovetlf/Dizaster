@@ -9,6 +9,7 @@
     "@expo/metro-runtime": "^57.0.16",
     "@expo/vector-icons": "^15.1.1",
     "@maplibre/maplibre-react-native": "^11.4.0",
+    "@noble/curves": "^2.4.0",
     "@noble/hashes": "^2.4.0",
     "expo": "~57.0.25",
     "expo-application": "~57.0.3",

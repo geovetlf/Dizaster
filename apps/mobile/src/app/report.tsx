@@ -15,6 +15,8 @@ import { formatInZone } from "../lib/ui/format";
 import { newId } from "../lib/ids";
 import { OFFLINE_FALLBACK_STYLE, providerFromAppConfig } from "../lib/map/provider";
 import { toPresenceSignals } from "../lib/report/presence";
+import { signEvidence } from "../lib/report/evidence";
+import { signingSeed } from "../lib/device/signing-key";
 import type { LocalMedia } from "../lib/media/local-media";
 import { flushUntilSent, reportQueue } from "../lib/report/outbox";
 import { useSession } from "../lib/session";
@@ -113,7 +115,10 @@ export default function ReportScreen() {
         ...(session.deviceId ? { deviceId: session.deviceId } : {}),
         ...(target ? { targetEventId: target } : {}),
       };
-      await reportQueue.enqueue(body, now, media);
+      // Firma de la captura (ADR 0129): antes de guardar en la cola, con los hashes de las fotos y videos.
+      // Si el almacén seguro falla, el reporte sale igual sin firma: nunca se bloquea un aviso.
+      const evidence = await signingSeed().then((seed) => signEvidence(body, media.map((m) => m.sha256), seed)).catch(() => undefined);
+      await reportQueue.enqueue(evidence ? { ...body, evidence } : body, now, media);
       setMedia([]);
       setStatus(media.length ? t("uploadingMedia") : t("sending"));
       const mine = await flushUntilSent(body.clientReportId);

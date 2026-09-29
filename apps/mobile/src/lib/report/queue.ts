@@ -1,5 +1,6 @@
 import type { SubmitReportRequest, SubmitReportResponse } from "@dizaster/contracts";
 import type { LocalMedia } from "../media/local-media";
+import { atSendTime } from "./evidence";
 
 /**
  * Cola offline de reportes. En un desastre la red cae justo cuando la gente quiere reportar:
@@ -62,6 +63,7 @@ export class ReportQueue {
     send: Sender,
     upload?: MediaUploader,
     onDone?: (item: QueuedReport) => void,
+    now: () => Date = () => new Date(),
   ): Promise<FlushResult> {
     const sent: SubmitReportResponse[] = [];
     const byClientId: Record<string, SubmitReportResponse> = {};
@@ -81,7 +83,8 @@ export class ReportQueue {
         item = uploaded.item;
       }
       const mediaIds = media.length ? (item.media ?? []).flatMap((m) => (m.mediaId ? [m.mediaId] : [])) : item.body.mediaIds;
-      const res = await send({ ...item.body, mediaIds });
+      // La hora del reloj y "capturado offline" se fijan al enviar, no al capturar (§8.3).
+      const res = await send(atSendTime({ ...item.body, mediaIds }, item.createdAt, now()));
       if (res.ok) {
         sent.push(res.response);
         byClientId[item.clientReportId] = res.response;

@@ -349,6 +349,8 @@ export const pt: Record<MessageKey, string> = {
   why_ATTESTATION_FAILED: "Não conseguimos verificar que o app e o telefone são autênticos.",
   why_IMPLAUSIBLE_MOVEMENT: "Sua localização mudou rápido demais para ser real.",
   why_MEDIA_REJECTED: "A foto ou o vídeo que provava que você estava lá não pôde ser processado.",
+  why_UNSIGNED_OFFLINE_EVIDENCE: "Enviado offline sem a assinatura do telefone: conta como testemunho tardio",
+  why_DEVICE_SIGNATURE_INVALID: "Os dados do relato mudaram depois da captura",
   why_CLOCK_SKEW: "A hora do telefone está errada. Ative a hora automática.",
   why_LATE_OFFLINE_SUBMISSION: "Foi enviado muito depois de feito (sem conexão); já não prova presença.",
   rejected_INVALID_CATEGORY: "Essa categoria não existe. Escolha outra.",

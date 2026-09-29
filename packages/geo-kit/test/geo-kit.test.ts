@@ -128,9 +128,29 @@ describe("presencia física", () => {
     expect(r.reasons).toContain("LATE_OFFLINE_SUBMISSION");
   });
 
+  it("offline a tiempo sin firma válida cuenta como testimonio tardío; firma alterada hunde la puntuación (ADR 0129)", () => {
+    const i = base();
+    i.capturedOffline = true;
+    i.receivedAt = new Date(i.capturedAt.getTime() + 10 * 60_000);
+    const unsigned = computePresence(i);
+    expect(unsigned.lateOffline).toBe(true);
+    expect(unsigned.reasons).toEqual(["UNSIGNED_OFFLINE_EVIDENCE"]);
+    expect(unsigned.band).not.toBe("HIGH");
+    const signed = computePresence({ ...i, evidenceSignature: "VALID" });
+    expect(signed.lateOffline).toBe(false);
+    expect(signed.band).toBe("HIGH");
+    const tampered = computePresence({ ...base(), evidenceSignature: "INVALID" });
+    expect(tampered.band).toBe("LOW");
+    expect(tampered.reasons).toContain("DEVICE_SIGNATURE_INVALID");
+    // En línea la firma es opcional; presence-3 no la exige.
+    expect(computePresence({ ...base(), evidenceSignature: "ABSENT" }).band).toBe("HIGH");
+    expect(computePresence(i, PRESENCE_RULES_BY_VERSION["presence-3"]).lateOffline).toBe(false);
+  });
+
   it("el testimonio tardío pesa la mitad y no llega a HIGH; las reglas antiguas no lo descuentan (ADR 0108)", () => {
     const onTime = base();
     onTime.capturedOffline = true;
+    onTime.evidenceSignature = "VALID";
     onTime.receivedAt = new Date(onTime.capturedAt.getTime() + 10 * 60_000);
     const ok = computePresence(onTime);
     expect(ok.lateOffline).toBe(false);
@@ -268,7 +288,7 @@ describe("presencia: bonificación por media capturada en la app (ADR 0073)", ()
     const r = computePresence({ ...weak(), mediaProofs: [photo("2026-09-29T10:00:00Z")] });
     expect(r.breakdown["mediaInApp"]).toBe(1);
     expect(r.band).toBe("HIGH");
-    expect(r.ruleVersion).toBe("presence-3");
+    expect(r.ruleVersion).toBe("presence-4");
   });
 
   it("una foto vieja o con horas incoherentes no suma", () => {
@@ -296,7 +316,7 @@ describe("presencia: bonificación por media capturada en la app (ADR 0073)", ()
     // Sin bonificación que quitar, nada cambia; nunca sube.
     const plain = computePresence(weak());
     expect(withoutMediaBonus(plain.breakdown, rules).score).toBe(plain.score);
-    expect(Object.keys(PRESENCE_RULES_BY_VERSION)).toEqual(["presence-1", "presence-2", "presence-3"]);
+    expect(Object.keys(PRESENCE_RULES_BY_VERSION)).toEqual(["presence-1", "presence-2", "presence-3", "presence-4"]);
   });
 
   it("presence-1 queda igual para auditar reportes viejos", () => {

@@ -9,7 +9,7 @@ import {
   type ReportAssertion,
   type SubmitReportResponse,
 } from "@dizaster/contracts";
-import { H3_RES, PRESENCE_RULES_BY_VERSION, bandOf, computePresence, extractKeywords, generalize, h3, textFingerprint, withoutMediaBonus, type PresenceBreakdown } from "@dizaster/geo-kit";
+import { H3_RES, PRESENCE_RULES_BY_VERSION, PRESENCE_RULES_CURRENT, bandOf, computePresence, extractKeywords, generalize, h3, textFingerprint, withoutMediaBonus, type PresenceBreakdown } from "@dizaster/geo-kit";
 import type { Clock } from "../../platform/clock.js";
 import type { Db, Queryable } from "../../platform/db.js";
 import { withTransaction } from "../../platform/db.js";
@@ -24,6 +24,7 @@ import type { ReferenceData } from "../reference/index.js";
 import type { SocialService } from "../social/index.js";
 import type { TrustService } from "../trust/index.js";
 import type { FieldCipher } from "../../platform/field-cipher.js";
+import { verifyEvidence } from "./evidence.js";
 
 export interface ReportDeps {
   db: Db;
@@ -82,6 +83,9 @@ export class ReportService {
 
     const receivedAt = clock.now();
     const attestation = await this.d.attestation.verify(req.presence.attestationToken, device?.platform ?? null);
+    // Firma de la captura hecha en el teléfono (ADR 0129): la tolerancia de reloj es la misma de las reglas de presencia.
+    const signingKey = device && req.evidence ? await this.d.identity.signingKey(db, device.id, req.evidence.publicKey) : null;
+    const evidenceSignature = verifyEvidence(req, signingKey, await this.d.media.sha256Of(db, req.mediaIds), PRESENCE_RULES_CURRENT.clockSkewToleranceS);
     const presence = computePresence({
       pin: req.pin,
       signals: req.presence,
@@ -91,6 +95,7 @@ export class ReportService {
       receivedAt,
       attestation,
       mediaProofs,
+      evidenceSignature,
     });
     const anonymity = category.forcePseudonymous ? "PSEUDONYMOUS" : req.anonymityMode;
 
@@ -125,7 +130,9 @@ export class ReportService {
           metadata: { assertion: req.assertion, presenceBand: presence.band, keywords: extractKeywords(req.text), textHash: textHash(req.text) },
         });
         if (resolution.kind === "INVALID_TARGET") throw new DomainError("INVALID_TARGET", resolution.reason, 422);
-        if (resolution.kind === "NO_MATCH") downgradeReasons = presence.lateOffline ? ["LATE_OFFLINE_SUBMISSION"] : presence.reasons;
+        if (resolution.kind === "NO_MATCH") downgradeReasons = presence.lateOffline
+          ? presence.reasons.filter((r) => r === "LATE_OFFLINE_SUBMISSION" || r === "UNSIGNED_OFFLINE_EVIDENCE")
+          : presence.reasons;
         else eventId = resolution.eventId;
       }
 
@@ -161,12 +168,12 @@ export class ReportService {
       await tx.query(
         `INSERT INTO report.reports
            (id, client_report_id, author_user_id, author_profile_id, device_id, post_id, event_id, category_code, assertion,
-            pin, pin_h3_r9, captured_at, received_at, captured_offline, presence_score, presence_band, status, anonymity_mode, result, media_ids)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9, ST_SetSRID(ST_MakePoint($10,$11),4326)::geography, $12,$13,$14,$15,$16,$17,$18,$19,$20,$21)`,
+            pin, pin_h3_r9, captured_at, received_at, captured_offline, presence_score, presence_band, status, anonymity_mode, result, media_ids, evidence_signature)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9, ST_SetSRID(ST_MakePoint($10,$11),4326)::geography, $12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)`,
         [
           reportId, req.clientReportId, session.userId, session.profileId, device?.id ?? null, postId, eventId, req.categoryCode, req.assertion,
           req.pin.lng, req.pin.lat, h3(req.pin, H3_RES.DEDUP), req.capturedAt, receivedAt, req.capturedOffline, presence.score, presence.band,
-          downgraded ? "DOWNGRADED" : "ACCEPTED", anonymity, JSON.stringify(result), attachable.map((m) => m.id),
+          downgraded ? "DOWNGRADED" : "ACCEPTED", anonymity, JSON.stringify(result), attachable.map((m) => m.id), evidenceSignature,
         ],
       );
       await this.storePresenceEvidence(tx, reportId, req, presence, attestation, receivedAt);

@@ -1,6 +1,6 @@
 import { createHash, createHmac, randomBytes } from "node:crypto";
 import { SignJWT, jwtVerify } from "jose";
-import { ageAt, PUSH_PROVIDER_BY_PLATFORM, type AttestationVerdict, type DevicePlatform, type RegisterPushTokenRequest, type SessionView } from "@dizaster/contracts";
+import { ageAt, PUSH_PROVIDER_BY_PLATFORM, type AttestationVerdict, type DevicePlatform, type RegisterPushTokenRequest, type RegisterSigningKeyRequest, type SessionView } from "@dizaster/contracts";
 import type { Db, Queryable } from "../../platform/db.js";
 import { withTransaction } from "../../platform/db.js";
 import { DomainError } from "../../platform/errors.js";
@@ -236,6 +236,32 @@ export class IdentityService {
   }
 
   /** Devuelve el dispositivo solo si pertenece al usuario (un usuario no puede usar dispositivos ajenos). */
+  /**
+   * Clave pública de firma de la evidencia (ADR 0129). Registrar la misma es idempotente; una nueva reemplaza a la
+   * actual, que sigue valiendo para lo capturado antes del reemplazo (la cola offline puede traer reportes firmados).
+   */
+  async registerSigningKey(userId: string, deviceId: string, req: RegisterSigningKeyRequest): Promise<void> {
+    await withTransaction(this.db, async (tx) => {
+      const device = await this.ownedDevice(tx, userId, deviceId);
+      if (!device) throw new DomainError("DEVICE_NOT_FOUND", "Dispositivo inexistente o ajeno", 404);
+      await tx.query(`SELECT 1 FROM identity.devices WHERE id = $1 FOR UPDATE`, [deviceId]);
+      const current = await tx.query<{ public_key: string }>(
+        `SELECT public_key FROM identity.device_signing_keys WHERE device_id = $1 AND replaced_at IS NULL`, [deviceId]);
+      if (current.rows[0]?.public_key === req.publicKey) return;
+      const known = await tx.query(`SELECT 1 FROM identity.device_signing_keys WHERE device_id = $1 AND public_key = $2`, [deviceId, req.publicKey]);
+      if (known.rows[0]) throw new DomainError("SIGNING_KEY_REUSED", "Esa clave ya fue reemplazada en este dispositivo", 409);
+      await tx.query(`UPDATE identity.device_signing_keys SET replaced_at = now() WHERE device_id = $1 AND replaced_at IS NULL`, [deviceId]);
+      await tx.query(`INSERT INTO identity.device_signing_keys (id, device_id, public_key) VALUES ($1, $2, $3)`, [newId(), deviceId, req.publicKey]);
+    });
+  }
+
+  /** La clave de firma de un dispositivo, con cuándo se registró y, si fue reemplazada, cuándo. */
+  async signingKey(q: Queryable, deviceId: string, publicKey: string): Promise<{ createdAt: Date; replacedAt: Date | null } | null> {
+    const { rows } = await q.query<{ created_at: Date; replaced_at: Date | null }>(
+      `SELECT created_at, replaced_at FROM identity.device_signing_keys WHERE device_id = $1 AND public_key = $2`, [deviceId, publicKey]);
+    return rows[0] ? { createdAt: rows[0].created_at, replacedAt: rows[0].replaced_at } : null;
+  }
+
   async ownedDevice(q: Queryable, userId: string, deviceId: string): Promise<{ id: string; platform: DevicePlatform; phoneId: string } | null> {
     // phoneId: el primer registro de este mismo teléfono, sea de la cuenta que sea (ADR 0068). Sin clave, el propio.
     const { rows } = await q.query<{ id: string; platform: DevicePlatform; phone_id: string }>(

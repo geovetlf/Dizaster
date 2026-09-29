@@ -3,6 +3,7 @@ export * from "./geo.js";
 export * from "./category.js";
 export * from "./verification.js";
 export * from "./presence.js";
+export * from "./evidence.js";
 export * from "./device.js";
 export * from "./media.js";
 export * from "./event.js";

@@ -6,6 +6,7 @@ import { Platform } from "react-native";
 let mfaOpen = false;
 import { api, onSessionEvents, setSession } from "./api";
 import { ensureAlertChannel, registerPushIfPermitted, watchPushTokenRotation } from "./device/push";
+import { registerSigningKey } from "./device/signing-key";
 import { clearIdentity, loadIdentity, saveIdentity, type StoredIdentity } from "./device/secure-session";
 import { hardwareId } from "./device/hardware-id";
 import { newId } from "./ids";
@@ -82,6 +83,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       if (deviceId) {
         await ensureAlertChannel().catch(() => undefined);
         await registerPushIfPermitted(deviceId).catch(() => false);
+        // Sin conexión no pasa nada: se reintenta en el próximo inicio; los reportes se firman igual (ADR 0129).
+        void registerSigningKey(deviceId).catch(() => undefined);
         stopWatching = watchPushTokenRotation(deviceId);
       }
     })().catch((e: Error) => setState({ ready: true, deviceId: null, error: e.message }));

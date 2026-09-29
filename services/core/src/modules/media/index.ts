@@ -348,6 +348,13 @@ export class MediaService {
     return mediaIds.map((id) => ({ id, kind: kinds.get(id)! }));
   }
 
+  /** SHA-256 declarados (y verificados al procesar) de la media, para cotejar con la firma de la captura (ADR 0129). */
+  async sha256Of(q: Queryable, mediaIds: string[]): Promise<string[]> {
+    if (mediaIds.length === 0) return [];
+    const { rows } = await q.query<{ sha256: string }>(`SELECT sha256 FROM media.media WHERE id = ANY($1)`, [mediaIds]);
+    return rows.map((r) => r.sha256);
+  }
+
   /**
    * Pruebas de captura para la presencia (ADR 0073): de la media ya validada por `assertAttachable`, la que la app
    * capturó con su cámara, con la hora declarada y la hora en que el servidor vio la subida.

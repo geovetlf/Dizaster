@@ -4,7 +4,7 @@ import { isValidTile, tileBounds } from "@dizaster/geo-kit";
 import Fastify, { type FastifyInstance, type FastifyRequest } from "fastify";
 import { z } from "zod";
 import {
-  BBox, CreateCommentRequest, DevicePlatform, MEDIA_UPLOAD_LIMITS, MergeEventsRequest, NegativeState, ReactionKind, CommentReactionKind, ConfirmAgeRequest, RegisterPushTokenRequest, RevertMergeRequest,
+  BBox, CreateCommentRequest, DevicePlatform, MEDIA_UPLOAD_LIMITS, MergeEventsRequest, NegativeState, ReactionKind, CommentReactionKind, ConfirmAgeRequest, RegisterPushTokenRequest, RegisterSigningKeyRequest, RevertMergeRequest,
   SplitEventRequest, SetEventStatusRequest, DismissDuplicateRequest, DATA_EXPORT_FORMAT, type AppConfig, type Attribution, type AttributionsResponse, type DataExport, type EmergencyNumbersResponse, type EventSearchResponse,
 } from "@dizaster/contracts";
 import { LocalDiskStorage } from "../modules/media/index.js";
@@ -277,6 +277,14 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
     const session = requireSession(req);
     const { id } = parse(z.object({ id: z.uuid() }), req.params);
     await c.identity.setPushToken(session.userId, id, parse(RegisterPushTokenRequest, req.body));
+    return reply.status(204).send();
+  });
+
+  // Clave pública con la que el teléfono firma la evidencia de sus reportes (ADR 0129).
+  app.put("/v1/devices/:id/signing-key", async (req, reply) => {
+    const session = requireSession(req);
+    const { id } = parse(z.object({ id: z.uuid() }), req.params);
+    await c.identity.registerSigningKey(session.userId, id, parse(RegisterSigningKeyRequest, req.body));
     return reply.status(204).send();
   });
 

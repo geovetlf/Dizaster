@@ -8,6 +8,7 @@ export const LIBRARIES: { name: string; license: string; url: string }[] = [
   { name: "Expo", license: "MIT", url: "https://github.com/expo/expo" },
   { name: "H3", license: "Apache-2.0", url: "https://github.com/uber/h3-js" },
   { name: "Zod", license: "MIT", url: "https://github.com/colinhacks/zod" },
+  { name: "noble-curves / noble-hashes", license: "MIT", url: "https://github.com/paulmillr/noble-curves" },
   { name: "Material Design Icons", license: "Apache-2.0", url: "https://github.com/Templarian/MaterialDesign" },
 ];
 
