@@ -23,6 +23,10 @@ function requireSession(req: FastifyRequest): Session {
   return req.session;
 }
 
+
+/** Escrituras permitidas a una cuenta suspendida: apelar, cerrar sesión, renovar sesión y borrar la cuenta. */
+const WRITE_ALLOWED_WHEN_SUSPENDED = /^(POST \/v1\/me\/moderation\/[^/]+\/appeal|POST \/v1\/auth\/(refresh|logout)|DELETE \/v1\/me)$/;
+
 export async function buildApp(c: Container): Promise<FastifyInstance> {
   const app = Fastify({
     logger: c.env.NODE_ENV === "test" ? false : { level: "info", redact: ["req.headers.authorization"] },
@@ -33,8 +37,8 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
   app.addHook("onRequest", async (req) => {
     const h = req.headers.authorization;
     if (h?.startsWith("Bearer ")) req.session = await c.identity.verifyToken(h.slice(7));
-    // Cuentas suspendidas: pueden leer y apelar, no publicar ni interactuar.
-    if (req.session && req.method !== "GET" && req.method !== "HEAD" && !/^\/v1\/me\/moderation\/[^/]+\/appeal$/.test(req.url)) {
+    // Cuentas suspendidas: pueden leer, apelar, cerrar sesión y borrar su cuenta; no publicar ni interactuar.
+    if (req.session && req.method !== "GET" && req.method !== "HEAD" && !WRITE_ALLOWED_WHEN_SUSPENDED.test(`${req.method} ${req.url.split("?")[0]}`)) {
       await c.identity.assertCanWrite(req.session.userId);
     }
   });
@@ -122,9 +126,23 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
       );
       const session = await c.identity.signIn("DEV", b.handle.toLowerCase(), b.handle);
       const deviceId = b.platform ? await c.identity.registerDevice(session.userId, b.platform, "dev", b.deviceId) : null;
-      return { token: await c.identity.issueToken(session), userId: session.userId, profileId: session.profileId, deviceId };
+      const pair = await c.identity.startSession(session, deviceId);
+      return { ...pair, userId: session.userId, profileId: session.profileId, deviceId };
     });
   }
+
+  // Sesión: token de acceso corto (15 min) + refresh rotatorio de un solo uso (ADR 0021).
+  app.post("/v1/auth/refresh", async (req, reply) => {
+    const b = parse(z.object({ refreshToken: z.string().min(20).max(200) }), req.body);
+    reply.header("cache-control", "no-store");
+    return c.identity.refresh(b.refreshToken);
+  });
+
+  app.post("/v1/auth/logout", async (req, reply) => {
+    const b = parse(z.object({ refreshToken: z.string().min(20).max(200) }), req.body);
+    await c.identity.logout(b.refreshToken);
+    return reply.status(204).send();
+  });
 
   // ───────────── Dispositivos (push APNs / FCM) ─────────────
   app.put("/v1/devices/:id/push-token", async (req, reply) => {
@@ -219,6 +237,14 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
     const session = requireSession(req);
     reply.header("cache-control", "no-store");
     return { roles: session.roles };
+  });
+
+  // Borrar la cuenta desde la app (App Store 5.1.1(v) y Google Play). Irreversible: se pide confirmación explícita.
+  app.delete("/v1/me", async (req, reply) => {
+    const session = requireSession(req);
+    parse(z.object({ confirm: z.literal("DELETE") }), req.body);
+    await c.identity.deleteAccount(session.userId, session.profileId);
+    return reply.status(202).send({ status: "DELETED" });
   });
 
   app.get("/v1/me", async (req, reply) => {

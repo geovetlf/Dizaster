@@ -93,6 +93,12 @@ export class AlertService {
     dispatcher.on("EventEvidenceAdded", "alert.evaluate.evidence", (e, tx) => run(e.payload.eventId, tx));
     dispatcher.on("VerificationChanged", "alert.evaluate.verification", (e, tx) => run(e.payload.eventId, tx));
     dispatcher.on("EventLifecycleChanged", "alert.evaluate.lifecycle", (e, tx) => run(e.payload.eventId, tx));
+    // Borrado de cuenta (ADR 0021): no queda rastro de qué zonas o temas seguía la persona.
+    dispatcher.on("AccountDeleted", "alert.purge-account", async (e, tx) => {
+      await tx.query(`DELETE FROM alert.notifications WHERE profile_id = $1`, [e.payload.profileId]);
+      await tx.query(`DELETE FROM alert.subscriptions WHERE profile_id = $1`, [e.payload.profileId]);
+      await tx.query(`DELETE FROM alert.preferences WHERE profile_id = $1`, [e.payload.profileId]);
+    });
   }
 
   // ───────────── Decidir ─────────────

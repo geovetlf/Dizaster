@@ -1,8 +1,8 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { Platform } from "react-native";
-import { api, setToken } from "./api";
+import { api, onSessionEvents, setSession } from "./api";
 import { ensureAlertChannel, registerPushIfPermitted, watchPushTokenRotation } from "./device/push";
-import { loadIdentity, saveIdentity } from "./device/secure-session";
+import { clearIdentity, loadIdentity, saveIdentity, type StoredIdentity } from "./device/secure-session";
 import { newId } from "./ids";
 import { startAutoFlush } from "./report/outbox";
 
@@ -12,37 +12,83 @@ interface SessionState {
   error: string | null;
 }
 
-const SessionContext = createContext<SessionState>({ ready: false, deviceId: null, error: null });
+interface SessionContextValue extends SessionState {
+  /** Tras borrar la cuenta: olvida la identidad de este teléfono y empieza de cero. */
+  forgetAndRestart: () => Promise<void>;
+}
+
+const SessionContext = createContext<SessionContextValue>({ ready: false, deviceId: null, error: null, forgetAndRestart: async () => undefined });
 
 /**
  * Sesión. En esta etapa solo existe el login de desarrollo (el servidor lo bloquea en producción).
- * Apple, Google y email llegan con la Identity Layer completa. La identidad del dispositivo se guarda en
- * Keychain/Keystore para que cada arranque reutilice el mismo dispositivo en iOS y en Android.
+ * Apple, Google y email llegan con la Identity Layer completa. La identidad del dispositivo y el refresh
+ * rotatorio se guardan en Keychain/Keystore: cada arranque renueva la sesión existente en iOS y en Android,
+ * y solo si ya no sirve se vuelve a entrar.
  */
 export function SessionProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<SessionState>({ ready: false, deviceId: null, error: null });
+  const [generation, setGeneration] = useState(0);
+  const identity = useRef<StoredIdentity | null>(null);
+
   useEffect(() => {
     let stopWatching: (() => void) | undefined;
     let stopFlush: (() => void) | undefined;
     const platform = Platform.OS === "ios" ? "IOS" : "ANDROID";
+    const persist = (patch: Partial<StoredIdentity>) => {
+      if (!identity.current) return;
+      identity.current = { ...identity.current, ...patch };
+      saveIdentity(identity.current).catch(() => undefined);
+    };
+
+    async function signIn(handle: string, deviceId: string | null | undefined) {
+      const s = await api.devSignIn(handle, platform, deviceId);
+      setSession(s);
+      identity.current = { handle, deviceId: s.deviceId, refreshToken: s.refreshToken };
+      persist({});
+      return s.deviceId;
+    }
+
+    onSessionEvents({
+      rotated: (refreshToken) => persist({ refreshToken }),
+      // El refresh caducó o fue revocado: se vuelve a entrar con la misma identidad del teléfono.
+      lost: () => { if (identity.current) void signIn(identity.current.handle, identity.current.deviceId).catch(() => undefined); },
+    });
+
     (async () => {
       const stored = await loadIdentity();
-      const handle = stored?.handle ?? `dev_${newId().slice(-8)}`;
-      const s = await api.devSignIn(handle, platform, stored?.deviceId);
-      setToken(s.token);
-      await saveIdentity({ handle, deviceId: s.deviceId }).catch(() => undefined);
-      setState({ ready: true, deviceId: s.deviceId, error: null });
+      let deviceId: string | null;
+      if (stored?.refreshToken) {
+        identity.current = stored;
+        try {
+          setSession(await api.refresh(stored.refreshToken).then((pair) => { persist({ refreshToken: pair.refreshToken }); return pair; }));
+          deviceId = stored.deviceId;
+        } catch {
+          deviceId = await signIn(stored.handle, stored.deviceId);
+        }
+      } else {
+        deviceId = await signIn(stored?.handle ?? `dev_${newId().slice(-8)}`, stored?.deviceId);
+      }
+      setState({ ready: true, deviceId, error: null });
       // Reportes guardados sin conexión: se envían en cuanto hay sesión y cada vez que la app vuelve al frente.
       stopFlush = startAutoFlush();
-      if (s.deviceId) {
+      if (deviceId) {
         await ensureAlertChannel().catch(() => undefined);
-        await registerPushIfPermitted(s.deviceId).catch(() => false);
-        stopWatching = watchPushTokenRotation(s.deviceId);
+        await registerPushIfPermitted(deviceId).catch(() => false);
+        stopWatching = watchPushTokenRotation(deviceId);
       }
     })().catch((e: Error) => setState({ ready: true, deviceId: null, error: e.message }));
-    return () => { stopWatching?.(); stopFlush?.(); };
+    return () => { stopWatching?.(); stopFlush?.(); onSessionEvents({}); };
+  }, [generation]);
+
+  const forgetAndRestart = useCallback(async () => {
+    setSession(null);
+    identity.current = null;
+    await clearIdentity().catch(() => undefined);
+    setState({ ready: false, deviceId: null, error: null });
+    setGeneration((g) => g + 1);
   }, []);
-  return <SessionContext.Provider value={state}>{children}</SessionContext.Provider>;
+
+  return <SessionContext.Provider value={{ ...state, forgetAndRestart }}>{children}</SessionContext.Provider>;
 }
 
 export const useSession = () => useContext(SessionContext);

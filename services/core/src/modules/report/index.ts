@@ -9,7 +9,7 @@ import type { Db, Queryable } from "../../platform/db.js";
 import { withTransaction } from "../../platform/db.js";
 import { DomainError } from "../../platform/errors.js";
 import { newId } from "../../platform/ids.js";
-import { publish } from "../../platform/outbox.js";
+import { publish, type OutboxDispatcher } from "../../platform/outbox.js";
 import type { EventService } from "../event/index.js";
 import type { GeoService } from "../geo/index.js";
 import type { AttestationVerifier, IdentityService, Session } from "../identity/index.js";
@@ -176,6 +176,21 @@ export class ReportService {
    * Retención de privacidad: tras el plazo aprobado (30 días por defecto) se borra el fix preciso del dispositivo
    * y solo queda la celda H3 r7 (~5 km²) para estadística y antiabuso. Idempotente; lo ejecuta el worker a diario.
    */
+  /**
+   * Borrado de cuenta (ADR 0021): la evidencia de presencia se generaliza en el acto, sin esperar la retención,
+   * y se desvincula el dispositivo. El reporte sigue contando como evidencia anónima del EVENT.
+   */
+  registerHandlers(dispatcher: OutboxDispatcher): void {
+    dispatcher.on("AccountDeleted", "report.generalize-account", async (e, tx) => {
+      await tx.query(
+        `UPDATE report.presence_evidence SET device_fix = NULL, generalized_at = COALESCE(generalized_at, now())
+          WHERE report_id IN (SELECT id FROM report.reports WHERE author_user_id = $1)`,
+        [e.payload.userId],
+      );
+      await tx.query(`UPDATE report.reports SET device_id = NULL WHERE author_user_id = $1`, [e.payload.userId]);
+    });
+  }
+
   async generalizeExpiredPresence(now: Date = this.d.clock.now()): Promise<number> {
     const res = await this.d.db.query(
       `UPDATE report.presence_evidence SET device_fix = NULL, generalized_at = $1 WHERE expires_at <= $1 AND generalized_at IS NULL`,

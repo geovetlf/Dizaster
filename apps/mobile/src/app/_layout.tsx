@@ -26,6 +26,7 @@ export default function RootLayout() {
         <Stack.Screen name="moderation/index" options={{ title: t("moderation") }} />
         <Stack.Screen name="moderation/[id]" options={{ title: t("moderation") }} />
         <Stack.Screen name="my-moderation" options={{ title: t("myModeration") }} />
+        <Stack.Screen name="delete-account" options={{ title: t("deleteAccount") }} />
       </Stack>
       <NotificationRouting />
     </SessionProvider>

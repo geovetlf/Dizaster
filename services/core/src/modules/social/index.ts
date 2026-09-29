@@ -1,5 +1,6 @@
 import type { CommentView, FeedTab, GeoPoint, PostAuthor, ProfileSearchResult, ProfileView } from "@dizaster/contracts";
 import type { Queryable } from "../../platform/db.js";
+import type { OutboxDispatcher } from "../../platform/outbox.js";
 import { DomainError, notFound } from "../../platform/errors.js";
 import { newId } from "../../platform/ids.js";
 
@@ -82,6 +83,32 @@ function rankSql(nearSql: string | null): string {
 }
 
 export class SocialService {
+  registerHandlers(dispatcher: OutboxDispatcher): void {
+    dispatcher.on("AccountDeleted", "social.anonymize-account", (e, tx) => this.anonymizeProfile(tx, e.payload.profileId));
+  }
+
+  /**
+   * Borrado de cuenta (ADR 0021): el perfil deja de existir públicamente (handle neutro, sin nombre), su
+   * contenido se retira y se vacía, y se cortan sus relaciones. Los registros de moderación se conservan aparte.
+   */
+  async anonymizeProfile(q: Queryable, profileId: string): Promise<void> {
+    await q.query(
+      `UPDATE social.profiles SET handle = 'borrado_' || replace(id::text, '-', ''), display_name = '', home_country = NULL,
+              deleted_at = COALESCE(deleted_at, now()), updated_at = now()
+        WHERE id = $1`,
+      [profileId],
+    );
+    await q.query(
+      `UPDATE social.posts SET text = NULL, public_point = NULL, deleted_at = COALESCE(deleted_at, now()), updated_at = now()
+        WHERE author_type = 'PROFILE' AND author_id = $1`,
+      [profileId],
+    );
+    await q.query(`UPDATE social.comments SET text = '-', deleted_at = COALESCE(deleted_at, now()) WHERE author_profile_id = $1`, [profileId]);
+    await q.query(`DELETE FROM social.reactions WHERE profile_id = $1`, [profileId]);
+    await q.query(`DELETE FROM social.follows WHERE follower_profile_id = $1 OR (target_type = 'PROFILE' AND target_id = $1::text)`, [profileId]);
+    await q.query(`DELETE FROM social.blocks WHERE blocker_profile_id = $1 OR blocked_profile_id = $1`, [profileId]);
+  }
+
   async createProfile(tx: Queryable, input: { userId: string; handleHint: string }): Promise<{ id: string; handle: string }> {
     const id = newId();
     const base = input.handleHint.toLowerCase().replace(/[^a-z0-9_]/g, "").slice(0, 20) || "usuario";
@@ -286,7 +313,7 @@ export class SocialService {
   }
 
   async profileIdByHandle(q: Queryable, handle: string): Promise<string> {
-    const { rows } = await q.query<{ id: string }>(`SELECT id FROM social.profiles WHERE lower(handle) = lower($1)`, [handle]);
+    const { rows } = await q.query<{ id: string }>(`SELECT id FROM social.profiles WHERE lower(handle) = lower($1) AND deleted_at IS NULL`, [handle]);
     if (!rows[0]) throw notFound("Perfil");
     return rows[0].id;
   }
@@ -303,7 +330,7 @@ export class SocialService {
                   AND p.deleted_at IS NULL AND p.moderation_state = 'VISIBLE')::int AS posts,
               EXISTS (SELECT 1 FROM social.follows f WHERE f.follower_profile_id = $2 AND f.target_type = 'PROFILE' AND f.target_id = pr.id::text) AS followed,
               EXISTS (SELECT 1 FROM social.blocks b WHERE b.blocker_profile_id = $2 AND b.blocked_profile_id = pr.id) AS blocked
-         FROM social.profiles pr WHERE lower(pr.handle) = lower($1)`,
+         FROM social.profiles pr WHERE lower(pr.handle) = lower($1) AND pr.deleted_at IS NULL`,
       [handle, viewerProfileId],
     );
     const r = rows[0];
@@ -322,7 +349,8 @@ export class SocialService {
               (SELECT count(*) FROM social.follows f WHERE f.target_type = 'PROFILE' AND f.target_id = pr.id::text)::int AS followers,
               EXISTS (SELECT 1 FROM social.follows f WHERE f.follower_profile_id = $2 AND f.target_type = 'PROFILE' AND f.target_id = pr.id::text) AS followed
          FROM social.profiles pr
-        WHERE lower(pr.handle) LIKE $1 || '%' OR lower(pr.display_name) LIKE $1 || '%' OR lower(pr.display_name) LIKE '% ' || $1 || '%'
+        WHERE pr.deleted_at IS NULL
+          AND (lower(pr.handle) LIKE $1 || '%' OR lower(pr.display_name) LIKE $1 || '%' OR lower(pr.display_name) LIKE '% ' || $1 || '%')
         ORDER BY (lower(pr.handle) = $1) DESC, followers DESC, pr.handle
         LIMIT $3`,
       [key, viewerProfileId, limit],

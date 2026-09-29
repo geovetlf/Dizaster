@@ -131,11 +131,27 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | App: denunciar, bloquear, avisos y herramientas de moderación, iOS y Android | ✅ | `apps/mobile/src/app/flag.tsx`, `moderation/`, `my-moderation.tsx` |
 | Difuminado de rostros y matrículas (D-08) | ⏳ | etapa de media |
 
+## Etapa 10 — Seguridad de cuenta (hecha)
+
+| Área | Estado | Dónde |
+|---|---|---|
+| Acceso de 15 min + refresh rotatorio de un solo uso (solo el hash en la base) | ✅ | `identity.sessions`, `IdentityService.refresh`, ADR 0021 |
+| Reuso de un refresh rotado → se revoca toda la familia; cerrar sesión | ✅ | `/v1/auth/refresh`, `/v1/auth/logout` |
+| Borrar la cuenta desde la app (App Store y Google Play) | ✅ | `DELETE /v1/me`, evento `AccountDeleted` |
+| Cada módulo borra o anonimiza lo suyo (perfil, posts, media en el almacenamiento, alertas, presencia generalizada) | ✅ | handlers `AccountDeleted` en social, report, media, alert |
+| App: renovación automática (una a la vez), refresh en Keychain/Keystore, pantalla de borrado con confirmación, iOS y Android | ✅ | `apps/mobile/src/lib/auth/refresh.ts`, `session.tsx`, `app/delete-account.tsx` |
+| Ver y cerrar sesiones de otros dispositivos | ⏳ | las familias ya existen; falta la pantalla |
+
 ## Siguiente etapa (en orden)
 
-1. Métricas de calidad del producto (duplicados, tiempo hasta verificación) y aviso push de umbrales a administración.
-2. Identity real: Sign in with Apple, Google y email; App Attest / Play Integrity (necesita cuentas de Apple y Google).
-3. Social: negocios, etiquetas y menciones.
+1. Zonas guardadas (casa, trabajo, familia) y última ubicación aproximada para alertas cercanas (D-16).
+2. Trust & Safety: reputación de cuentas y dispositivos y señales de abuso para la verificación.
+3. Idiomas portugués y francés (D-19).
+4. Media: miniaturas y hash perceptual para duplicados.
+5. Métricas de calidad del producto (duplicados, tiempo hasta verificación) y aviso push de umbrales a administración.
+6. **BLOQUEADA** — Identity real: Sign in with Apple, Google y email; App Attest / Play Integrity. Falta: cuentas de
+   Apple Developer y Google (client IDs, Service ID, Team ID) y un proveedor de email aprobado (gasto).
+7. Social: negocios, etiquetas y menciones.
 
 ## Requiere acción humana
 

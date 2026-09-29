@@ -1,9 +1,11 @@
+import { createHash, randomBytes } from "node:crypto";
 import { SignJWT, jwtVerify } from "jose";
 import { PUSH_PROVIDER_BY_PLATFORM, type AttestationVerdict, type DevicePlatform, type RegisterPushTokenRequest } from "@dizaster/contracts";
 import type { Db, Queryable } from "../../platform/db.js";
 import { withTransaction } from "../../platform/db.js";
 import { DomainError } from "../../platform/errors.js";
 import { newId } from "../../platform/ids.js";
+import { publish } from "../../platform/outbox.js";
 import type { SocialService } from "../social/index.js";
 
 export type Role = "user" | "moderator" | "admin";
@@ -48,6 +50,18 @@ export interface PushTarget {
   token: string;
   environment: "development" | "production";
 }
+
+/** Vida del token de acceso (JWT) y del refresh token. */
+export const ACCESS_TTL_SECONDS = 900;
+export const REFRESH_TTL_DAYS = 60;
+
+export interface TokenPair {
+  token: string;
+  refreshToken: string;
+  expiresIn: number;
+}
+
+const hashToken = (t: string) => createHash("sha256").update(t).digest("hex");
 
 export class IdentityService {
   private readonly key: Uint8Array;
@@ -209,7 +223,80 @@ export class IdentityService {
     return new Map(rows.map((r) => [r.id, Number(r.hours)]));
   }
 
-  async issueToken(session: Session, ttlSeconds = 900): Promise<string> {
+  // ───────────── Sesiones: acceso corto + refresh rotatorio ─────────────
+
+  /** Inicia una familia de sesión. El refresh token solo se guarda como hash. */
+  async startSession(session: Session, deviceId: string | null): Promise<TokenPair> {
+    return this.issuePair(this.db, session, newId(), deviceId);
+  }
+
+  /**
+   * Rotación: cada refresh token sirve una sola vez. Si un token ya rotado vuelve a usarse, alguien lo copió:
+   * se revoca toda la familia (la persona legítima y quien lo robó tendrán que volver a entrar).
+   */
+  async refresh(refreshToken: string): Promise<TokenPair> {
+    const invalid = () => new DomainError("INVALID_REFRESH", "Sesión caducada; vuelve a entrar", 401);
+    return withTransaction(this.db, async (tx) => {
+      const { rows } = await tx.query<{ id: string; family_id: string; user_id: string; device_id: string | null; expires_at: Date; rotated_at: Date | null; revoked_at: Date | null; status: string; roles: Role[] }>(
+        `SELECT s.id, s.family_id, s.user_id, s.device_id, s.expires_at, s.rotated_at, s.revoked_at, u.status, u.roles
+           FROM identity.sessions s JOIN identity.users u ON u.id = s.user_id WHERE s.token_hash = $1 FOR UPDATE OF s`,
+        [hashToken(refreshToken)],
+      );
+      const s = rows[0];
+      if (!s || s.revoked_at || s.expires_at <= new Date() || s.status === "DELETED") throw invalid();
+      if (s.rotated_at) {
+        await tx.query(`UPDATE identity.sessions SET revoked_at = now(), revoke_reason = 'REUSE_DETECTED' WHERE family_id = $1 AND revoked_at IS NULL`, [s.family_id]);
+        // Se confirma la revocación aunque la petición falle: la transacción debe terminar bien.
+        return null;
+      }
+      await tx.query(`UPDATE identity.sessions SET rotated_at = now() WHERE id = $1`, [s.id]);
+      const profile = await this.social.profileForUser(tx, s.user_id);
+      return this.issuePair(tx, { userId: s.user_id, profileId: profile.id, roles: ["user", ...s.roles] }, s.family_id, s.device_id);
+    }).then((pair) => {
+      if (!pair) throw invalid();
+      return pair;
+    });
+  }
+
+  /** Cerrar sesión en este dispositivo: revoca la familia del token. */
+  async logout(refreshToken: string): Promise<void> {
+    await this.db.query(
+      `UPDATE identity.sessions SET revoked_at = now(), revoke_reason = 'LOGOUT'
+        WHERE family_id = (SELECT family_id FROM identity.sessions WHERE token_hash = $1) AND revoked_at IS NULL`,
+      [hashToken(refreshToken)],
+    );
+  }
+
+  private async issuePair(q: Queryable, session: Session, familyId: string, deviceId: string | null): Promise<TokenPair> {
+    const refreshToken = randomBytes(32).toString("base64url");
+    await q.query(
+      `INSERT INTO identity.sessions (id, family_id, user_id, device_id, token_hash, expires_at)
+       VALUES ($1, $2, $3, $4, $5, now() + make_interval(days => $6))`,
+      [newId(), familyId, session.userId, deviceId, hashToken(refreshToken), REFRESH_TTL_DAYS],
+    );
+    return { token: await this.issueToken(session), refreshToken, expiresIn: ACCESS_TTL_SECONDS };
+  }
+
+  // ───────────── Borrar cuenta (exigido por App Store y Google Play) ─────────────
+
+  /**
+   * Borra la cuenta: queda marcada DELETED, se cierran todas sus sesiones, se olvidan dispositivos y proveedores de
+   * acceso, y `AccountDeleted` hace que cada módulo elimine o anonimice lo suyo en la misma transacción del outbox.
+   */
+  async deleteAccount(userId: string, profileId: string): Promise<void> {
+    await withTransaction(this.db, async (tx) => {
+      const { rowCount } = await tx.query(`UPDATE identity.users SET status = 'DELETED', deleted_at = now(), roles = '{}', updated_at = now() WHERE id = $1 AND status <> 'DELETED'`, [userId]);
+      if (!rowCount) return;
+      await tx.query(`UPDATE identity.sessions SET revoked_at = now(), revoke_reason = 'ACCOUNT_DELETED' WHERE user_id = $1 AND revoked_at IS NULL`, [userId]);
+      await tx.query(`UPDATE identity.devices SET push_token = NULL, push_provider = NULL, push_environment = NULL, push_token_updated_at = now() WHERE user_id = $1`, [userId]);
+      // Sin vínculo con Apple/Google/email: volver a entrar con la misma identidad crea una cuenta nueva.
+      await tx.query(`DELETE FROM identity.auth_identities WHERE user_id = $1`, [userId]);
+      await publish(tx, "AccountDeleted", { userId, profileId }, { lane: "interactive" });
+    });
+    this.statusCache.delete(userId);
+  }
+
+  async issueToken(session: Session, ttlSeconds = ACCESS_TTL_SECONDS): Promise<string> {
     return new SignJWT({ pid: session.profileId, roles: session.roles })
       .setProtectedHeader({ alg: "HS256" })
       .setSubject(session.userId)

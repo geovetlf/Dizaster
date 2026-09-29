@@ -64,6 +64,33 @@ export class MediaService {
     dispatcher.on("MediaUploaded", "media.process", async (e, tx) => {
       await this.process(tx, e.payload.mediaId);
     });
+    dispatcher.on("AccountDeleted", "media.purge-account", async (e, tx) => {
+      await this.purgeOwner(tx, e.payload.profileId);
+    });
+  }
+
+  /**
+   * Borrado de cuenta: se eliminan del almacenamiento el original y todas las variantes públicas de cada media
+   * de la persona, y la fila queda DELETED sin claves (el hash se conserva para detectar re-subidas abusivas).
+   * Borrar un objeto es idempotente: si la transacción se reintenta, repetirlo no hace daño.
+   */
+  async purgeOwner(q: Queryable, ownerProfileId: string): Promise<number> {
+    const { rows } = await q.query<{ id: string; storage_key_original: string | null; keys: string[] }>(
+      `SELECT m.id, m.storage_key_original, COALESCE(array_agg(v.storage_key) FILTER (WHERE v.storage_key IS NOT NULL), '{}') AS keys
+         FROM media.media m LEFT JOIN media.variants v ON v.media_id = m.id
+        WHERE m.owner_profile_id = $1 AND (m.state <> 'DELETED' OR m.storage_key_original IS NOT NULL OR v.media_id IS NOT NULL)
+        GROUP BY m.id`,
+      [ownerProfileId],
+    );
+    for (const r of rows) {
+      for (const key of [r.storage_key_original, ...r.keys]) if (key) await this.storage.delete(key);
+      await q.query(`DELETE FROM media.variants WHERE media_id = $1`, [r.id]);
+      await q.query(
+        `UPDATE media.media SET state = 'DELETED', storage_key_original = NULL, capture_h3_r9 = NULL, updated_at = now() WHERE id = $1`,
+        [r.id],
+      );
+    }
+    return rows.length;
   }
 
   async createUpload(ownerProfileId: string, body: unknown): Promise<CreateUploadResponse> {
@@ -199,11 +226,6 @@ export class MediaService {
     return { mediaId, state: rows[0].state, rejectionReason: rows[0].rejection_reason };
   }
 
-  /**
-   * Mantenimiento diario (cost-first y privacidad):
-   * - subidas nunca completadas → DELETED y se borra lo que haya llegado;
-   * - originales privados de media READY → se borran tras la retención (queda la variante pública saneada y el hash).
-   */
   /** Bytes guardados hoy en el almacenamiento de objetos (originales vigentes + variantes): base del costo de media. */
   async storedBytes(q: Queryable): Promise<number> {
     const { rows } = await q.query<{ n: string | null }>(
@@ -213,6 +235,11 @@ export class MediaService {
     return Number(rows[0]?.n ?? 0);
   }
 
+  /**
+   * Mantenimiento diario (cost-first y privacidad):
+   * - subidas nunca completadas → DELETED y se borra lo que haya llegado;
+   * - originales privados de media READY → se borran tras la retención (queda la variante pública saneada y el hash).
+   */
   async applyRetention(now: Date = this.clock.now()): Promise<{ abandoned: number; originalsDeleted: number }> {
     const abandoned = await this.db.query<{ id: string; storage_key_original: string }>(
       `SELECT id, storage_key_original FROM media.media WHERE state = 'PENDING_UPLOAD' AND upload_expires_at < $1::timestamptz - interval '1 hour' LIMIT 500`,

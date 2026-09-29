@@ -1,16 +1,46 @@
 import type { AppealView, CaseDetail, CaseSummary, CreateFlagRequest, ModerationActionType, ModerationNotice, CostDashboard, KillSwitchView, AlertPreferences, CategorySubscription, CategorySubscriptionInput, NotificationsResponse, AppConfig, AreaSearchResult, FollowTarget, MyFollows, ProfileSearchResult, ProfileView, CommentView, CreateUploadRequest, FeedResponse, FeedTab, CreateUploadResponse, DevicePlatform, MediaView, RegisterPushTokenRequest, EventMapResponse, EventSummary, NearbyEventsResponse, SubmitReportRequest, SubmitReportResponse, TimelineEntryView } from "@dizaster/contracts";
+import { canRetryWithRefresh, singleFlight } from "./auth/refresh";
 import { API_URL } from "./config";
 import type { Sender } from "./report/queue";
 
-let token: string | null = null;
-export const setToken = (t: string | null) => { token = t; };
+export interface TokenPair { token: string; refreshToken: string; expiresIn: number }
 
-async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+let token: string | null = null;
+let refreshToken: string | null = null;
+let listeners: { rotated?: (refreshToken: string) => void; lost?: () => void } = {};
+
+/** Sesión actual. `null` al borrar la cuenta. */
+export function setSession(pair: Pick<TokenPair, "token" | "refreshToken"> | null) {
+  token = pair?.token ?? null;
+  refreshToken = pair?.refreshToken ?? null;
+}
+
+/** `rotated`: guardar el refresh nuevo en el almacén seguro. `lost`: la sesión no se pudo renovar. */
+export function onSessionEvents(l: typeof listeners) { listeners = l; }
+
+/** Renueva con el refresh rotatorio. Una sola renovación en vuelo aunque fallen varias peticiones a la vez. */
+const renew = singleFlight(async (): Promise<boolean> => {
+  if (!refreshToken) return false;
+  try {
+    const pair = await api.refresh(refreshToken);
+    setSession(pair);
+    listeners.rotated?.(pair.refreshToken);
+    return true;
+  } catch (err) {
+    // Sin red no se pierde la sesión: se reintentará en la próxima petición.
+    if ((err as { status?: number }).status === 401) { setSession(null); listeners.lost?.(); }
+    return false;
+  }
+});
+
+async function request<T>(path: string, init: RequestInit = {}, retried = false): Promise<T> {
+  const auth: Record<string, string> = token && !path.startsWith("/v1/auth/") ? { authorization: `Bearer ${token}` } : {};
   const res = await fetch(`${API_URL}${path}`, {
     ...init,
     // Sin cuerpo no se declara JSON: el servidor rechaza un cuerpo JSON vacío (p. ej. DELETE o POST .../complete).
-    headers: { ...(init.body ? { "content-type": "application/json" } : {}), ...(token ? { authorization: `Bearer ${token}` } : {}), ...(init.headers ?? {}) },
+    headers: { ...(init.body ? { "content-type": "application/json" } : {}), ...auth, ...(init.headers ?? {}) },
   });
+  if (canRetryWithRefresh(path, res.status, retried, refreshToken !== null) && (await renew())) return request<T>(path, init, true);
   const body = (await res.json().catch(() => ({}))) as T & { message?: string };
   if (!res.ok) throw Object.assign(new Error(body.message ?? `HTTP ${res.status}`), { status: res.status, body });
   return body;
@@ -19,10 +49,14 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 export const api = {
   config: () => request<AppConfig>("/v1/config"),
   devSignIn: (handle: string, platform: DevicePlatform, deviceId?: string | null) =>
-    request<{ token: string; deviceId: string | null }>("/v1/auth/dev", {
+    request<TokenPair & { deviceId: string | null }>("/v1/auth/dev", {
       method: "POST",
       body: JSON.stringify({ handle, platform, ...(deviceId ? { deviceId } : {}) }),
     }),
+  refresh: (refreshToken: string) => request<TokenPair>("/v1/auth/refresh", { method: "POST", body: JSON.stringify({ refreshToken }) }),
+  logout: (refreshToken: string) => request<void>("/v1/auth/logout", { method: "POST", body: JSON.stringify({ refreshToken }) }),
+  /** Irreversible. La pantalla exige escribir la palabra de confirmación antes de llamarlo. */
+  deleteAccount: () => request<{ status: string }>("/v1/me", { method: "DELETE", body: JSON.stringify({ confirm: "DELETE" }) }),
   registerPushToken: (deviceId: string, body: RegisterPushTokenRequest) =>
     request<void>(`/v1/devices/${deviceId}/push-token`, { method: "PUT", body: JSON.stringify(body) }),
   events: (bbox: [number, number, number, number], zoom: number) =>

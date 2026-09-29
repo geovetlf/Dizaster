@@ -7,6 +7,8 @@ import * as SecureStore from "expo-secure-store";
 export interface StoredIdentity {
   handle: string;
   deviceId: string | null;
+  /** Refresh rotatorio (60 días, un solo uso). Solo aquí: nunca en AsyncStorage, SQLite ni registros. */
+  refreshToken?: string | null;
 }
 
 const KEY = "dizaster.identity.v1";
@@ -17,7 +19,12 @@ export async function loadIdentity(): Promise<StoredIdentity | null> {
   if (!raw) return null;
   try {
     const v = JSON.parse(raw) as Partial<StoredIdentity>;
-    return typeof v.handle === "string" ? { handle: v.handle, deviceId: typeof v.deviceId === "string" ? v.deviceId : null } : null;
+    if (typeof v.handle !== "string") return null;
+    return {
+      handle: v.handle,
+      deviceId: typeof v.deviceId === "string" ? v.deviceId : null,
+      refreshToken: typeof v.refreshToken === "string" ? v.refreshToken : null,
+    };
   } catch {
     return null;
   }
@@ -25,4 +32,9 @@ export async function loadIdentity(): Promise<StoredIdentity | null> {
 
 export async function saveIdentity(identity: StoredIdentity): Promise<void> {
   await SecureStore.setItemAsync(KEY, JSON.stringify(identity), OPTIONS);
+}
+
+/** Tras borrar la cuenta: este teléfono olvida la identidad y el próximo arranque es una cuenta nueva. */
+export async function clearIdentity(): Promise<void> {
+  await SecureStore.deleteItemAsync(KEY, OPTIONS);
 }

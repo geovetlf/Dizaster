@@ -54,6 +54,7 @@ export default function ProfileScreen() {
         {notices > 0 ? <Row icon="gavel" label={t("myModeration")} value={String(notices)} onPress={() => router.push("/my-moderation")} /> : null}
         {roles.includes("moderator") || roles.includes("admin") ? <Row icon="shield-check-outline" label={t("moderation")} onPress={() => router.push("/moderation")} /> : null}
         {roles.includes("admin") ? <Row icon="chart-bar" label={t("costTitle")} onPress={() => router.push("/admin-cost")} /> : null}
+        <Row icon="account-remove-outline" label={t("deleteAccount")} onPress={() => router.push("/delete-account")} />
         <Text style={styles.note}>{t("privacyNote")}</Text>
         <Text style={styles.version}>Dizaster {Application.nativeApplicationVersion ?? ""}</Text>
       </ScrollView>
@@ -61,7 +62,7 @@ export default function ProfileScreen() {
   );
 }
 
-function Row({ icon, label, value, onPress }: { icon: "account-circle-outline" | "bell-outline" | "cloud-upload-outline" | "phone-alert" | "chart-bar" | "gavel" | "shield-check-outline"; label: string; value?: string; onPress?: () => void }) {
+function Row({ icon, label, value, onPress }: { icon: "account-circle-outline" | "bell-outline" | "cloud-upload-outline" | "phone-alert" | "chart-bar" | "gavel" | "shield-check-outline" | "account-remove-outline"; label: string; value?: string; onPress?: () => void }) {
   return (
     <Pressable accessibilityRole={onPress ? "button" : "text"} disabled={!onPress} style={styles.row} onPress={onPress}>
       <Icon name={icon} size={22} color={colors.text} />
