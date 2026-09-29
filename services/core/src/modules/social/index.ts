@@ -219,6 +219,11 @@ export class SocialService {
     );
   }
 
+  async mediaOfPost(q: Queryable, postId: string): Promise<string[]> {
+    const { rows } = await q.query<{ media_id: string }>(`SELECT media_id FROM social.post_media WHERE post_id = $1 ORDER BY position`, [postId]);
+    return rows.map((r) => r.media_id);
+  }
+
   async postsWithMedia(q: Queryable, mediaId: string): Promise<string[]> {
     const { rows } = await q.query<{ post_id: string }>(`SELECT post_id FROM social.post_media WHERE media_id = $1`, [mediaId]);
     return rows.map((r) => r.post_id);

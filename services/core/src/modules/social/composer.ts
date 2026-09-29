@@ -44,12 +44,12 @@ export class PostComposer {
     if (media.filter((m) => m.kind === "VIDEO_RECORDED").length > 1) throw new DomainError("VALIDATION", "Solo un video por publicación");
 
     // Un EVENT fusionado se menciona por el que lo absorbió; uno oculto o inexistente no se puede mencionar.
-    let event: { id: string; categoryCode: string } | null = null;
+    let event: { id: string; categoryCode: string; sensitivity: string } | null = null;
     if (req.eventId) {
       const e = await this.events.getEvent(this.db, req.eventId);
       const target = e.mergedIntoId ? await this.events.getEvent(this.db, e.mergedIntoId) : e;
       if (target.publicationState !== "PUBLISHED") throw notFound("Evento");
-      event = { id: target.id, categoryCode: target.categoryCode };
+      event = { id: target.id, categoryCode: target.categoryCode, sensitivity: target.sensitivity };
     }
 
     return withTransaction(this.db, async (tx) => {
@@ -63,6 +63,7 @@ export class PostComposer {
         businessId,
       });
       await this.social.attachMedia(tx, postId, media);
+      if (media.length > 0 && event && event.sensitivity !== "NORMAL") await publish(tx, "PostMediaNeedsReview", { postId });
       for (const mediaId of await this.media.reuseSuspected(tx, media.map((m) => m.id))) await publish(tx, "MediaReuseDetected", { mediaId });
       if (event) await this.social.linkPostToEvent(tx, postId, event.id, "MENTION");
       const indexed = await this.social.indexPostText(tx, postId, profileId, req.text);

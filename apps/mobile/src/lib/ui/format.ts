@@ -78,3 +78,8 @@ export const imageUri = (m: Pick<MediaView, "url" | "thumbUrl">, size: "small" |
 export function eventTitle(e: { title: Record<string, string> | null; categoryCode: string }, lang: string): string {
   return e.title?.[lang] ?? (e.title ? Object.values(e.title)[0] : undefined) ?? e.categoryCode;
 }
+
+/** Imagen de fondo (difuminada) del aviso de contenido sensible: la miniatura, que es lo más liviano. */
+export function blurPreviewUri(m: Pick<MediaView, "kind" | "url" | "thumbUrl">): string | null {
+  return m.thumbUrl ?? (m.kind === "IMAGE" ? m.url : null);
+}

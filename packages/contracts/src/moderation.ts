@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { MediaView } from "./media.js";
 
 /**
  * Moderation Layer (Blueprint §5.21, §13.3): denuncias de usuarios, cola priorizada, acciones auditables,
@@ -22,6 +23,8 @@ export type CreateFlagRequest = z.infer<typeof CreateFlagRequest>;
 
 export const ModerationActionType = z.enum([
   "HIDE", "REMOVE", "RESTORE", "LIMIT", "WARN_USER", "SUSPEND_USER", "UNSUSPEND_USER", "MARK_DISPUTED", "DISMISS",
+  // Media de un post (ADR 0035): aprobar la que espera revisión (categorías sensibles) y marcarla como impactante.
+  "APPROVE_MEDIA", "MARK_GRAPHIC",
 ]);
 export type ModerationActionType = z.infer<typeof ModerationActionType>;
 
@@ -43,6 +46,8 @@ export interface ModerationTargetPreview {
   authorHandle: string | null;
   state: string;
   categoryCode: string | null;
+  /** Solo posts: su media tal como la vería moderación (incluida la que espera aprobación). */
+  media?: MediaView[];
 }
 
 export interface CaseSummary {

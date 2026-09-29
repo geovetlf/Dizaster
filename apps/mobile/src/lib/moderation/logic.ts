@@ -5,7 +5,7 @@ export const FLAG_REASONS: FlagReason[] = ["PRIVACY", "VIOLENCE", "HARASSMENT", 
 
 /** Acciones disponibles por tipo de objeto (igual que el servidor; este lo vuelve a validar). */
 const ACTIONS: Record<FlagTargetType, ModerationActionType[]> = {
-  POST: ["HIDE", "REMOVE", "LIMIT", "RESTORE", "WARN_USER", "SUSPEND_USER", "UNSUSPEND_USER", "DISMISS"],
+  POST: ["APPROVE_MEDIA", "MARK_GRAPHIC", "HIDE", "REMOVE", "LIMIT", "RESTORE", "WARN_USER", "SUSPEND_USER", "UNSUSPEND_USER", "DISMISS"],
   COMMENT: ["HIDE", "REMOVE", "RESTORE", "WARN_USER", "SUSPEND_USER", "UNSUSPEND_USER", "DISMISS"],
   PROFILE: ["WARN_USER", "SUSPEND_USER", "UNSUSPEND_USER", "DISMISS"],
   BUSINESS: ["REMOVE", "RESTORE", "WARN_USER", "SUSPEND_USER", "UNSUSPEND_USER", "DISMISS"],

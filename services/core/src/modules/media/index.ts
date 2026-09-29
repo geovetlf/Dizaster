@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import {
   CreateUploadRequest,
   V1_MEDIA_KINDS,
+  type ContentWarning,
   type CreateUploadResponse,
   type MediaDelivery,
   type MediaKind,
@@ -133,10 +134,10 @@ export class MediaService {
       : null;
     await this.db.query(
       `INSERT INTO media.media (id, owner_profile_id, kind, state, delivery, captured_in_app, captured_at, duration_ms, width, height,
-                                bytes, mime, sha256, storage_key_original, upload_expires_at, poster_bytes, poster_sha256)
-       VALUES ($1, $2, $3, 'PENDING_UPLOAD', 'FILE', $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
+                                bytes, mime, sha256, storage_key_original, upload_expires_at, poster_bytes, poster_sha256, content_warning)
+       VALUES ($1, $2, $3, 'PENDING_UPLOAD', 'FILE', $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)`,
       [id, ownerProfileId, req.kind, req.capturedInApp, req.capturedAt ?? null, req.durationMs ?? null, req.width ?? null, req.height ?? null,
-        req.sizeBytes, req.mime, req.sha256, key, expiresAt, req.poster?.sizeBytes ?? null, req.poster?.sha256 ?? null],
+        req.sizeBytes, req.mime, req.sha256, key, expiresAt, req.poster?.sizeBytes ?? null, req.poster?.sha256 ?? null, req.graphic ? "GRAPHIC" : null],
     );
     return { mediaId: id, upload, ...(posterUpload ? { posterUpload } : {}), expiresAt: expiresAt.toISOString() };
   }
@@ -319,8 +320,9 @@ export class MediaService {
     const { rows } = await q.query<{
       id: string; kind: MediaKind; mime: string; width: number | null; height: number | null; duration_ms: number | null;
       captured_in_app: boolean; storage_key: string; thumb_key: string | null; poster_key: string | null; display_mime: string;
+      content_warning: ContentWarning | null;
     }>(
-      `SELECT m.id, m.kind, m.mime, m.width, m.height, m.duration_ms, m.captured_in_app, v.storage_key, v.mime AS display_mime,
+      `SELECT m.id, m.kind, m.mime, m.width, m.height, m.duration_ms, m.captured_in_app, v.storage_key, v.mime AS display_mime, m.content_warning,
               t.storage_key AS thumb_key, po.storage_key AS poster_key
          FROM media.media m JOIN media.variants v ON v.media_id = m.id AND v.variant = $2
          LEFT JOIN media.variants t ON t.media_id = m.id AND t.variant = $4
@@ -335,7 +337,21 @@ export class MediaService {
       capturedInApp: r.captured_in_app, url: this.storage.publicUrl(r.storage_key),
       thumbUrl: r.thumb_key ? this.storage.publicUrl(r.thumb_key) : null,
       posterUrl: r.poster_key ? this.storage.publicUrl(r.poster_key) : null,
+      contentWarning: r.content_warning,
     }));
+  }
+
+  /** Moderación (ADR 0035): media que esperaba aprobación en una categoría sensible pasa a mostrarse. */
+  async approve(q: Queryable, mediaIds: string[]): Promise<number> {
+    if (mediaIds.length === 0) return 0;
+    const res = await q.query(`UPDATE media.media SET moderation_state = 'APPROVED', updated_at = now() WHERE id = ANY($1) AND moderation_state = 'PENDING'`, [mediaIds]);
+    return res.rowCount ?? 0;
+  }
+
+  /** Moderación (ADR 0035): se muestra difuminada con aviso hasta que la persona toque para verla. */
+  async markGraphic(q: Queryable, mediaIds: string[]): Promise<void> {
+    if (mediaIds.length === 0) return;
+    await q.query(`UPDATE media.media SET content_warning = 'GRAPHIC', updated_at = now() WHERE id = ANY($1)`, [mediaIds]);
   }
 
   /** Estado para el propietario (la app consulta si su subida ya está lista). */

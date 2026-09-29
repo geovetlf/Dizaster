@@ -233,6 +233,7 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | Póster de video generado en el teléfono (miniatura, hash perceptual, carga al tocar) | ✅ | ADR 0032 |
 | Adapter genérico CAP 1.2 (alerta suelta, Atom con alertas, perfil `cap:*`) | ✅ | ADR 0033 |
 | Fusionar, revertir y dividir EVENTs desde moderación (API + pantalla) | ✅ | ADR 0034 |
+| Contenido sensible: aviso "tocar para ver" y aprobación de media en categorías sensibles | ✅ | ADR 0035 |
 | Reglas `dedup-2` con `sim_media` y `sim_texto` reales | ✅ | `packages/geo-kit/src/dedup.ts` |
 | Fotos procesadas después del reporte suman su hash al evento | ✅ | `MediaReady.phash`, `event.media-fingerprint` |
 
@@ -240,16 +241,15 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 
 1. **BLOQUEADA** — Identity real: Sign in with Apple, Google y email; App Attest / Play Integrity. Falta: cuentas de
    Apple Developer y Google (client IDs, Service ID, Team ID) y un proveedor de email aprobado (gasto).
-2. Aviso de contenido sensible en fotos y videos ("tocar para ver", §13.3, D-08).
-3. Reportes "aquí no pasa nada" que llevan un evento a DISPUTED (§10.2).
-4. Explicación de la verificación en la pantalla del evento (§10.4).
-5. Retirar un reporte propio (§6.1 `withdrawReport`) con recálculo del evento.
-6. Exportar mis datos (§13.2).
-7. Números de emergencia con actualización incremental (`?since=version`, §6.3).
-8. Tipos de reacción de contexto ("apoyo", "útil", "yo también lo vi", §7.3).
-9. Scripts y estilos de mapas offline por zona guardada (§11.3; el alojamiento requiere storage aprobado).
-10. Difuminado de rostros y matrículas (D-08; modelo abierto, trabajo grande).
-11. Fuentes peruanas IGP, INDECI y SENAMHI: **en espera de acción humana** (confirmar formato/URL y términos);
+2. Reportes "aquí no pasa nada" que llevan un evento a DISPUTED (§10.2).
+3. Explicación de la verificación en la pantalla del evento (§10.4).
+4. Retirar un reporte propio (§6.1 `withdrawReport`) con recálculo del evento.
+5. Exportar mis datos (§13.2).
+6. Números de emergencia con actualización incremental (`?since=version`, §6.3).
+7. Tipos de reacción de contexto ("apoyo", "útil", "yo también lo vi", §7.3).
+8. Scripts y estilos de mapas offline por zona guardada (§11.3; el alojamiento requiere storage aprobado).
+9. Difuminado de rostros y matrículas (D-08; modelo abierto, trabajo grande).
+10. Fuentes peruanas IGP, INDECI y SENAMHI: **en espera de acción humana** (confirmar formato/URL y términos);
     si publican CAP, activar es solo configuración (ADR 0033).
 
 ## Requiere acción humana

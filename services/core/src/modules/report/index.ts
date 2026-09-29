@@ -124,6 +124,7 @@ export class ReportService {
         publicPoint: eventId ? generalize(req.pin, category.sensitivity).point : null,
       });
       await this.d.social.attachMedia(tx, postId, attachable);
+      if (attachable.length > 0 && category.sensitivity !== "NORMAL") await publish(tx, "PostMediaNeedsReview", { postId });
       await this.d.social.indexPostText(tx, postId, session.profileId, req.text ?? null);
       // Si alguna foto ya se sabe reciclada, moderación la revisa (si se procesa después, avisa el Media Engine).
       for (const mediaId of await this.d.media.reuseSuspected(tx, attachable.map((m) => m.id))) {

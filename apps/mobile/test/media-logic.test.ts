@@ -49,6 +49,8 @@ describe("preparación de media en el dispositivo", () => {
     const req = toUploadRequest(photo(1));
     expect(JSON.stringify(req)).not.toContain("file://");
     expect(req).toMatchObject({ kind: "IMAGE", mime: "image/jpeg", capturedInApp: true });
+    expect(req.graphic).toBe(false);
+    expect(toUploadRequest({ ...photo(1), graphic: true }).graphic).toBe(true);
   });
 
   it("el póster del video viaja solo como tamaño y hash; nunca en fotos ni si excede el límite", () => {

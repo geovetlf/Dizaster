@@ -6,6 +6,7 @@ import {
 } from "@dizaster/contracts";
 import { LocalDiskStorage } from "../modules/media/index.js";
 import type { Container } from "../container.js";
+import { withWarning } from "../modules/feed/index.js";
 import { withTransaction } from "../platform/db.js";
 import { DomainError, forbidden } from "../platform/errors.js";
 import { latencyMetric } from "../platform/metrics.js";
@@ -226,7 +227,7 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
     const mediaIds = (await c.events.timeline(c.db, id))
       .filter((t) => t.type === "MEDIA_ADDED")
       .flatMap((t) => (Array.isArray(t.payload["mediaIds"]) ? (t.payload["mediaIds"] as string[]) : []));
-    return { media: await c.media.publicViews(c.db, mediaIds, { requireApproval: event.sensitivity !== "NORMAL" }) };
+    return { media: withWarning(await c.media.publicViews(c.db, mediaIds, { requireApproval: event.sensitivity !== "NORMAL" }), event.sensitivity) };
   });
 
   // ───────────── Red social ─────────────

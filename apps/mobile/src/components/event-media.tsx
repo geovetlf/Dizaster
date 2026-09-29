@@ -4,13 +4,18 @@ import { useState } from "react";
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { t } from "../lib/i18n";
 import { duration } from "../lib/ui/format";
+import { SensitiveCover } from "./sensitive-cover";
 
 /** Galería pública de un evento: solo variantes saneadas que el servidor ya aprobó para mostrar. */
 export function EventMedia({ media }: { media: MediaView[] }) {
   if (media.length === 0) return null;
   return (
     <ScrollView horizontal style={styles.strip} contentContainerStyle={styles.content} showsHorizontalScrollIndicator={false}>
-      {media.map((m) => (m.kind === "IMAGE" ? <Photo key={m.id} m={m} /> : <Video key={m.id} m={m} />))}
+      {media.map((m) => (
+        <SensitiveCover key={m.id} m={m} style={[styles.item, aspect(m)]}>
+          {m.kind === "IMAGE" ? <Photo m={m} /> : <Video m={m} />}
+        </SensitiveCover>
+      ))}
     </ScrollView>
   );
 }

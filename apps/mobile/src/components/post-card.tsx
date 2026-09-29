@@ -14,6 +14,7 @@ import { duration, imageUri, initials, mediaLayout, postWhere } from "../lib/ui/
 import { colors, radius, space } from "../theme";
 import { Icon } from "./icon";
 import { RichText } from "./rich-text";
+import { SensitiveCover } from "./sensitive-cover";
 
 /** Tarjeta de publicación (referencia visual: docs/design/referencia-inicio.jpg). */
 export function PostCard({ post, categoryName }: { post: FeedPost; categoryName: (code: string) => string }) {
@@ -137,6 +138,10 @@ function MediaGrid({ media, onOpen }: { media: MediaView[]; onOpen: (() => void)
 
 /** Miniatura: foto o, para video, su póster (si lo hay) con botón de reproducción y duración (sin cargar el video). */
 function Tile({ m, style, small = false }: { m: MediaView; style: object; small?: boolean }) {
+  return <SensitiveCover m={m} style={[styles.tile, style]}><TileContent m={m} style={style} small={small} /></SensitiveCover>;
+}
+
+function TileContent({ m, style, small }: { m: MediaView; style: object; small: boolean }) {
   if (m.kind === "IMAGE") return <Image source={{ uri: imageUri(m, small ? "small" : "large") }} style={[styles.tile, style]} resizeMode="cover" accessibilityIgnoresInvertColors />;
   return (
     <View style={[styles.tile, styles.videoTile, style]}>

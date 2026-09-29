@@ -29,6 +29,8 @@ export interface DomainEventMap {
   /** Acción de moderación aplicada (por regla o por una persona). */
   /** Una foto casi idéntica (hash perceptual) a otra subida antes por otra persona: posible foto reciclada. */
   MediaReuseDetected: { mediaId: string };
+  /** Post con fotos o video en una categoría sensible: su media no se muestra hasta que moderación la apruebe (ADR 0035). */
+  PostMediaNeedsReview: { postId: string };
   /** El mismo texto (normalizado) publicado por varias cuentas distintas en pocas horas: posible spam coordinado. */
   DuplicateTextDetected: { postIds: string[] };
   /** La reputación de una persona entró o salió del nivel bajo (ADR 0031). Solo ordena el feed. */

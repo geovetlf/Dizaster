@@ -22,6 +22,7 @@ import { newId } from "../../platform/ids.js";
 import { publish, type OutboxDispatcher } from "../../platform/outbox.js";
 import type { EventService } from "../event/index.js";
 import type { IdentityService } from "../identity/index.js";
+import type { MediaService } from "../media/index.js";
 import type { SocialService } from "../social/index.js";
 import type { TrustService } from "../trust/index.js";
 import type { VerificationService } from "../verification/index.js";
@@ -38,7 +39,7 @@ export const APPEAL_WINDOW_DAYS = 30;
 
 /** Qué acciones admite cada tipo de objeto. */
 const ALLOWED: Record<FlagTargetType, ModerationActionType[]> = {
-  POST: ["HIDE", "REMOVE", "RESTORE", "LIMIT", "WARN_USER", "SUSPEND_USER", "UNSUSPEND_USER", "DISMISS"],
+  POST: ["HIDE", "REMOVE", "RESTORE", "LIMIT", "WARN_USER", "SUSPEND_USER", "UNSUSPEND_USER", "DISMISS", "APPROVE_MEDIA", "MARK_GRAPHIC"],
   COMMENT: ["HIDE", "REMOVE", "RESTORE", "WARN_USER", "SUSPEND_USER", "UNSUSPEND_USER", "DISMISS"],
   PROFILE: ["WARN_USER", "SUSPEND_USER", "UNSUSPEND_USER", "DISMISS"],
   // Retirar un negocio lo oculta con todos sus posts; las acciones sobre la cuenta afectan a quien lo administra.
@@ -48,6 +49,7 @@ const ALLOWED: Record<FlagTargetType, ModerationActionType[]> = {
 /** Acciones que cierran el caso (las demás, como avisar, lo dejan abierto). */
 const CLOSES: Partial<Record<ModerationActionType, CaseStatus>> = {
   HIDE: "RESOLVED", REMOVE: "RESOLVED", RESTORE: "RESOLVED", SUSPEND_USER: "RESOLVED", MARK_DISPUTED: "RESOLVED", DISMISS: "DISMISSED",
+  APPROVE_MEDIA: "RESOLVED",
 };
 /** Acciones apelables y su inversa si la apelación prospera. */
 const INVERSE: Partial<Record<ModerationActionType, ModerationActionType>> = {
@@ -70,6 +72,7 @@ export class ModerationService {
     private readonly events: EventService,
     private readonly verification: VerificationService,
     private readonly trust: TrustService,
+    private readonly media: MediaService,
   ) {}
 
   registerHandlers(dispatcher: OutboxDispatcher): void {
@@ -78,6 +81,10 @@ export class ModerationService {
       for (const postId of await this.social.postsWithMedia(tx, e.payload.mediaId)) {
         await this.systemFlag(tx, "POST", postId, "FALSE_INFO", "Regla: una foto es casi idéntica a otra publicada antes por otra cuenta (posible foto reciclada).");
       }
+    });
+    // Fotos o video en una categoría sensible: esperan a que una persona los apruebe (y, si hace falta, los marque).
+    dispatcher.on("PostMediaNeedsReview", "moderation.sensitive-media", async (e, tx) => {
+      await this.systemFlag(tx, "POST", e.payload.postId, "PRIVACY", "Regla: media en una categoría sensible; no se muestra hasta aprobarla (revisar rostros, matrículas e imágenes impactantes).");
     });
     // Mismo texto desde varias cuentas en pocas horas (ADR 0031): cada post entra en la cola, sin ocultarse solo.
     dispatcher.on("DuplicateTextDetected", "moderation.duplicate-text", async (e, tx) => {
@@ -236,7 +243,11 @@ export class ModerationService {
       const t = await this.social.moderationTarget(tx, p.targetType, p.targetId);
       if (!t) throw notFound("Objeto");
       affectedUserId = t.authorUserId;
-      if (p.targetType === "POST") {
+      if (p.targetType === "POST" && (p.action === "APPROVE_MEDIA" || p.action === "MARK_GRAPHIC")) {
+        const mediaIds = await this.social.mediaOfPost(tx, p.targetId);
+        if (p.action === "APPROVE_MEDIA") await this.media.approve(tx, mediaIds);
+        else await this.media.markGraphic(tx, mediaIds);
+      } else if (p.targetType === "POST") {
         const state = ({ HIDE: "HIDDEN", REMOVE: "REMOVED", RESTORE: "VISIBLE", LIMIT: "LIMITED" } as const)[p.action as "HIDE"];
         if (state) await this.social.setPostModeration(tx, p.targetId, state);
       } else if (p.targetType === "BUSINESS") {
@@ -277,7 +288,7 @@ export class ModerationService {
       `SELECT a.id, a.action, a.reason, a.actor, a.target_type, a.target_id, a.created_at,
               ap.id AS appeal_id, ap.status AS appeal_status, ap.decision_reason
          FROM moderation.actions a LEFT JOIN moderation.appeals ap ON ap.action_id = a.id
-        WHERE a.affected_user_id = $1 AND a.action NOT IN ('DISMISS','RESTORE','UNSUSPEND_USER')
+        WHERE a.affected_user_id = $1 AND a.action NOT IN ('DISMISS','RESTORE','UNSUSPEND_USER','APPROVE_MEDIA')
         ORDER BY a.created_at DESC LIMIT 50`,
       [userId],
     );
@@ -374,7 +385,9 @@ export class ModerationService {
     }
     const t = await this.social.moderationTarget(q, type, id);
     if (!t) throw notFound("Objeto");
-    return { type, id, text: t.text, authorHandle: t.authorHandle, state: t.state, categoryCode: t.categoryCode };
+    const base = { type, id, text: t.text, authorHandle: t.authorHandle, state: t.state, categoryCode: t.categoryCode };
+    if (type !== "POST") return base;
+    return { ...base, media: await this.media.publicViews(q, await this.social.mediaOfPost(q, id), { requireApproval: false }) };
   }
 
   // ───────────── Calidad (ADR 0026) ─────────────

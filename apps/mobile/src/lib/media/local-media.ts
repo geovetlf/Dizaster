@@ -20,6 +20,8 @@ export interface LocalMedia {
   capturedAt: string;
   /** Solo videos: fotograma JPEG extraído en el teléfono (ADR 0032). Sin él, el video se ve con un marco genérico. */
   poster?: LocalPoster | null;
+  /** Quien sube marca que puede impactar (heridos, violencia): se mostrará con aviso (ADR 0035). */
+  graphic?: boolean;
 }
 
 export interface LocalPoster {
@@ -84,6 +86,7 @@ export function toUploadRequest(m: LocalMedia): CreateUploadRequest {
     ...(m.durationMs ? { durationMs: Math.round(m.durationMs) } : {}),
     capturedAt: m.capturedAt,
     capturedInApp: m.capturedInApp,
+    graphic: m.graphic ?? false,
     ...(m.kind === "VIDEO_RECORDED" && m.poster && m.poster.sizeBytes <= VIDEO_POSTER_MAX_BYTES
       ? { poster: { sizeBytes: m.poster.sizeBytes, sha256: m.poster.sha256 } }
       : {}),

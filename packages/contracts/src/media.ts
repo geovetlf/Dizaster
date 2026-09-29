@@ -36,6 +36,9 @@ export const MEDIA_UPLOAD_LIMITS = {
 
 export type UploadableMediaKind = keyof typeof MEDIA_UPLOAD_LIMITS;
 
+export const ContentWarning = z.enum(["GRAPHIC"]);
+export type ContentWarning = z.infer<typeof ContentWarning>;
+
 /**
  * Póster de un video (ADR 0032): un fotograma JPEG que el teléfono extrae y sube junto al video. El servidor
  * no decodifica video (sin ffmpeg): re-codifica el póster como una foto más y lo usa de miniatura.
@@ -60,6 +63,8 @@ export const CreateUploadRequest = z
     capturedAt: z.iso.datetime().optional(),
     /** Capturada con la cámara dentro de la app (más valor probatorio que una foto de la galería). */
     capturedInApp: z.boolean().default(false),
+    /** Quien sube avisa de que puede impactar (heridos, violencia): se muestra difuminado hasta tocar (ADR 0035). */
+    graphic: z.boolean().default(false),
     /** Solo videos. Opcional: sin póster el video se muestra con un marco genérico. */
     poster: VideoPoster.optional(),
   })
@@ -105,4 +110,6 @@ export interface MediaView {
   thumbUrl: string | null;
   /** Solo videos: fotograma a tamaño de pantalla para mostrar antes de reproducir. */
   posterUrl: string | null;
+  /** GRAPHIC: la app la muestra difuminada con aviso hasta que la persona toque para verla (ADR 0035). */
+  contentWarning: ContentWarning | null;
 }

@@ -35,6 +35,11 @@ const FOLLOW_TYPE: Record<FollowTarget, FollowType> = { profile: "PROFILE", even
  * ningún módulo lea el esquema de otro. La media de categorías sensibles solo aparece si moderación la aprobó.
  * También mantiene la proyección de señales de eventos que social usa para ordenar, y valida a quién se sigue.
  */
+/** En categorías muy sensibles (violencia, salud personal) toda media aprobada se muestra con aviso (ADR 0035). */
+export function withWarning(media: MediaView[], sensitivity: Sensitivity): MediaView[] {
+  return sensitivity === "HIGHLY_SENSITIVE" ? media.map((m) => ({ ...m, contentWarning: m.contentWarning ?? "GRAPHIC" })) : media;
+}
+
 export class FeedService {
   constructor(
     private readonly social: SocialService,
@@ -167,7 +172,7 @@ export class FeedService {
       [...(await this.media.publicViews(q, strict, { requireApproval: true })), ...(await this.media.publicViews(q, open, { requireApproval: false }))].map((v) => [v.id, v]),
     );
     return rows.map((r) => {
-      const media = r.media.flatMap((m) => (views.has(m.id) ? [views.get(m.id)!] : []));
+      const media = withWarning(r.media.flatMap((m) => (views.has(m.id) ? [views.get(m.id)!] : [])), sensitivityOf(r));
       const state = r.eventId ? states.get(r.eventId) : undefined;
       return {
         id: r.id,

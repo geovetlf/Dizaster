@@ -1,7 +1,7 @@
 import type { CaseDetail, ModerationActionType } from "@dizaster/contracts";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
-import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Alert, Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { api } from "../../lib/api";
 import { lang, t } from "../../lib/i18n";
 import { actionsFor, isSevere, reasonSummary, validReason } from "../../lib/moderation/logic";
@@ -45,6 +45,13 @@ export default function CaseScreen() {
       <Text style={styles.kind}>{c.target.type} · {c.target.state} · {c.status}</Text>
       <Text style={styles.author}>{c.target.authorHandle ? `@${c.target.authorHandle}` : t("pseudonymousAuthor")}</Text>
       <Text style={styles.text}>{c.target.text ?? "—"}</Text>
+      {c.target.media?.length ? (
+        <View style={styles.media}>
+          {c.target.media.map((m) => (
+            <Image key={m.id} source={{ uri: m.thumbUrl ?? m.url }} style={styles.thumb} accessibilityIgnoresInvertColors />
+          ))}
+        </View>
+      ) : null}
       <Text style={styles.meta}>{reasonSummary(c.reasons, (r) => t(`reason_${r}`))}</Text>
       {c.target.type === "EVENT" ? (
         <Pressable accessibilityRole="button" style={[styles.action, styles.tools]} onPress={() => router.push(`/moderation/event/${c.target.id}`)}>
@@ -88,6 +95,8 @@ const styles = StyleSheet.create({
   severe: { backgroundColor: colors.accent },
   disabled: { opacity: 0.4 },
   tools: { alignSelf: "flex-start", marginTop: space.sm },
+  media: { flexDirection: "row", flexWrap: "wrap", gap: space.sm, marginVertical: space.sm },
+  thumb: { width: 96, height: 96, borderRadius: radius.md, backgroundColor: colors.surfaceAlt },
   actionText: { color: colors.white, fontWeight: "600" },
   error: { color: colors.accent, padding: space.sm },
 });

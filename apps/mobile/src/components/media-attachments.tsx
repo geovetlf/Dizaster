@@ -34,6 +34,10 @@ export function MediaAttachments({ items, onChange }: { items: LocalMedia[]; onC
     }
   }
 
+  function setGraphic(m: LocalMedia, graphic: boolean) {
+    onChange(items.map((x) => (x.localUri === m.localUri ? { ...x, graphic } : x)));
+  }
+
   function remove(m: LocalMedia) {
     discardLocal(m);
     onChange(items.filter((x) => x.localUri !== m.localUri));
@@ -53,6 +57,10 @@ export function MediaAttachments({ items, onChange }: { items: LocalMedia[]; onC
                 <Text style={styles.videoText}>▶ {Math.round((m.durationMs ?? 0) / 1000)} s</Text>
               </View>
             )}
+            <Pressable accessibilityRole="switch" accessibilityLabel={t("markGraphic")} accessibilityState={{ checked: !!m.graphic }}
+              style={[styles.graphic, m.graphic && styles.graphicOn]} onPress={() => setGraphic(m, !m.graphic)}>
+              <Text style={styles.removeText}>⚠</Text>
+            </Pressable>
             <Pressable accessibilityRole="button" accessibilityLabel={t("remove")} style={styles.remove} onPress={() => remove(m)}>
               <Text style={styles.removeText}>✕</Text>
             </Pressable>
@@ -64,6 +72,7 @@ export function MediaAttachments({ items, onChange }: { items: LocalMedia[]; onC
         <Button label={t("addVideo")} disabled={busy || full} onPress={() => void add("camera", "VIDEO_RECORDED")} />
         <Button label={t("fromGallery")} disabled={busy || full} onPress={() => void add("library", "IMAGE")} />
       </View>
+      {items.length > 0 ? <Text style={styles.note}>{t("graphicHint")}</Text> : null}
       {message ? <Text style={styles.note}>{message}</Text> : null}
     </View>
   );
@@ -87,6 +96,8 @@ const styles = StyleSheet.create({
   videoText: { color: colors.white, fontWeight: "600" },
   remove: { position: "absolute", top: -6, right: -6, width: 24, height: 24, borderRadius: 12, backgroundColor: colors.surfaceAlt, alignItems: "center", justifyContent: "center" },
   removeText: { color: colors.white, fontSize: 12 },
+  graphic: { position: "absolute", bottom: -6, right: -6, width: 24, height: 24, borderRadius: 12, backgroundColor: colors.surfaceAlt, alignItems: "center", justifyContent: "center", opacity: 0.6 },
+  graphicOn: { backgroundColor: colors.accent, opacity: 1 },
   buttons: { flexDirection: "row", gap: 8 },
   button: { flex: 1, borderWidth: 1, borderColor: colors.text, borderRadius: 8, paddingVertical: 10, alignItems: "center" },
   buttonText: { color: colors.text, fontWeight: "600" },
