@@ -47,10 +47,14 @@ export const PresenceRejectionReason = z.enum([
 ]);
 export type PresenceRejectionReason = z.infer<typeof PresenceRejectionReason>;
 
+export const ReportRejectionCode = z.enum(["INVALID_CATEGORY", "OFFICIAL_ONLY"]);
+export type ReportRejectionCode = z.infer<typeof ReportRejectionCode>;
+
 export const SubmitReportResponse = z.discriminatedUnion("outcome", [
   z.object({ outcome: z.literal("ATTACHED_TO_EVENT"), reportId: z.uuid(), postId: z.uuid(), eventId: z.uuid(), presenceBand: PresenceBand }),
   z.object({ outcome: z.literal("CREATED_EVENT"), reportId: z.uuid(), postId: z.uuid(), eventId: z.uuid(), presenceBand: PresenceBand }),
   z.object({ outcome: z.literal("DOWNGRADED_TO_POST"), postId: z.uuid(), reasons: z.array(PresenceRejectionReason) }),
-  z.object({ outcome: z.literal("REJECTED"), reason: z.string() }),
+  /** `code` es estable (la app lo traduce); `reason` es el texto del servidor, en español. */
+  z.object({ outcome: z.literal("REJECTED"), code: ReportRejectionCode, reason: z.string() }),
 ]);
 export type SubmitReportResponse = z.infer<typeof SubmitReportResponse>;

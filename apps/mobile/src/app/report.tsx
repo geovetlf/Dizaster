@@ -14,6 +14,7 @@ import { toPresenceSignals } from "../lib/report/presence";
 import type { LocalMedia } from "../lib/media/local-media";
 import { flushUntilSent, reportQueue } from "../lib/report/outbox";
 import { useSession } from "../lib/session";
+import { outcomeLines } from "../lib/report/outcome";
 import { colors } from "../theme";
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -220,12 +221,7 @@ export default function ReportScreen() {
 }
 
 function describe(r: SubmitReportResponse): string {
-  switch (r.outcome) {
-    case "CREATED_EVENT": return t("created");
-    case "ATTACHED_TO_EVENT": return t("attached");
-    case "DOWNGRADED_TO_POST": return t("downgraded");
-    case "REJECTED": return `${t("rejected")}: ${r.reason}`;
-  }
+  return outcomeLines(r, t).join("\n");
 }
 
 const styles = StyleSheet.create({

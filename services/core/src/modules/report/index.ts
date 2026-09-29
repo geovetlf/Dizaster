@@ -57,8 +57,8 @@ export class ReportService {
 
     const country = geo.countryOf(req.pin);
     const category = ref.category(req.categoryCode, country);
-    if (!category || !ref.isLeaf(req.categoryCode)) return { outcome: "REJECTED", reason: "Categoría no válida" };
-    if (!category.citizenReportable) return { outcome: "REJECTED", reason: "Esta categoría solo la publican fuentes oficiales o externas" };
+    if (!category || !ref.isLeaf(req.categoryCode)) return { outcome: "REJECTED", code: "INVALID_CATEGORY", reason: "Categoría no válida" };
+    if (!category.citizenReportable) return { outcome: "REJECTED", code: "OFFICIAL_ONLY", reason: "Esta categoría solo la publican fuentes oficiales o externas" };
 
     const recent = await db.query<{ n: string }>(
       `SELECT count(*) AS n FROM report.reports WHERE author_user_id = $1 AND received_at > now() - interval '1 hour'`,
