@@ -42,6 +42,8 @@ const Env = z.object({
   MEDIA_DAILY_UPLOAD_MB: z.coerce.number().int().min(60).default(300),
   /** Días que se guarda el crudo de cada fuente (ADR 0075); 0 = no se guarda. */
   SOURCE_RAW_RETENTION_DAYS: z.coerce.number().int().min(0).max(365).default(30),
+  /** MFA TOTP para moderación y administración (ADR 0090). "auto" = exigida solo en producción. */
+  STAFF_MFA_REQUIRED: z.enum(["auto", "true", "false"]).default("auto"),
   MEDIA_UPLOAD_URL_TTL_SECONDS: z.coerce.number().int().min(60).max(3600).default(900),
   MEDIA_ORIGINAL_RETENTION_DAYS: z.coerce.number().int().positive().default(30),
   // Push directo (gratis). "log" no envía nada (desarrollo); "live" usa APNs y FCM con las credenciales de abajo.
@@ -79,6 +81,9 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): AppEnv {
   }
   if (env.NODE_ENV === "production" && !env.FIELD_KEYS) {
     throw new Error("Producción requiere FIELD_KEYS (cifrado de la ubicación precisa)");
+  }
+  if (env.NODE_ENV === "production" && env.STAFF_MFA_REQUIRED === "false") {
+    throw new Error("En producción la moderación y la administración siempre exigen MFA (ADR 0090)");
   }
   if (env.NODE_ENV === "production" && env.PUSH_DRIVER !== "live") {
     throw new Error("Producción requiere PUSH_DRIVER=live (APNs y FCM)");

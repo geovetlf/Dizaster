@@ -378,6 +378,10 @@ export class IdentityService {
       await tx.query(`UPDATE identity.devices SET push_token = NULL, push_provider = NULL, push_environment = NULL, push_token_updated_at = now() WHERE user_id = $1`, [userId]);
       // Sin vínculo con Apple/Google/email: volver a entrar con la misma identidad crea una cuenta nueva.
       await tx.query(`DELETE FROM identity.auth_identities WHERE user_id = $1`, [userId]);
+      // Segundo factor (ADR 0090): nada de él sobrevive a la cuenta.
+      for (const table of ["mfa_recovery_codes", "mfa_verified_sessions", "mfa_totp", "mfa_failures"]) {
+        await tx.query(`DELETE FROM identity.${table} WHERE user_id = $1`, [userId]);
+      }
       await publish(tx, "AccountDeleted", { userId, profileId }, { lane: "interactive" });
     });
     this.statusCache.delete(userId);
@@ -426,3 +430,5 @@ export class IdentityService {
     return { account: account.rows, logins: logins.rows, devices: devices.rows, sessions: sessions.rows };
   }
 }
+
+export { MfaService } from "./mfa.js";

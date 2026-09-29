@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { MEDIA_KILL_SWITCHES } from "@dizaster/contracts";
+import { MEDIA_KILL_SWITCHES, MfaCodeRequest, MfaVerifyRequest, type MfaStatus } from "@dizaster/contracts";
 import { isValidTile, tileBounds } from "@dizaster/geo-kit";
 import Fastify, { type FastifyInstance, type FastifyRequest } from "fastify";
 import { z } from "zod";
@@ -581,7 +581,7 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
     return c.feed.businessPosts(c.db, parse(HandleParam, req.params).handle, req.query, req.session?.profileId ?? null);
   });
   app.put("/v1/admin/businesses/:handle/verification", async (req) => {
-    requireAdmin(req);
+    await requireAdmin(req);
     return c.business.setVerification(parse(HandleParam, req.params).handle, req.body);
   });
 
@@ -706,31 +706,66 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
     });
   }
 
+  // ───────────── MFA TOTP del personal (ADR 0090) ─────────────
+  const requireStaffRole = (req: FastifyRequest) => {
+    const session = requireSession(req);
+    if (!session.roles.includes("moderator") && !session.roles.includes("admin")) throw forbidden("Solo moderación y administración");
+    return session;
+  };
+  app.get("/v1/me/mfa", async (req, reply): Promise<MfaStatus> => {
+    const session = requireStaffRole(req);
+    reply.header("cache-control", "no-store");
+    return { ...(await c.mfa.status(c.db, session.userId)), required: c.mfa.required };
+  });
+  app.post("/v1/me/mfa/totp", async (req, reply) => {
+    const session = requireStaffRole(req);
+    reply.header("cache-control", "no-store");
+    return c.mfa.enroll(session.userId, await c.social.handleById(c.db, session.profileId));
+  });
+  app.post("/v1/me/mfa/totp/confirm", async (req, reply) => {
+    const session = requireStaffRole(req);
+    reply.header("cache-control", "no-store");
+    return c.mfa.confirm(session.userId, session.sessionId, parse(MfaCodeRequest, req.body).code);
+  });
+  app.post("/v1/me/mfa/verify", async (req, reply) => {
+    const session = requireStaffRole(req);
+    reply.header("cache-control", "no-store");
+    const b = parse(MfaVerifyRequest, req.body);
+    return c.mfa.verify(session.userId, session.sessionId, "code" in b ? { code: b.code } : { recoveryCode: b.recoveryCode });
+  });
+  app.post("/v1/me/mfa/totp/disable", async (req, reply) => {
+    const session = requireStaffRole(req);
+    await c.mfa.disable(session.userId, parse(MfaCodeRequest, req.body).code);
+    return reply.status(204).send();
+  });
+
   // ───────────── Costos (rol admin): tablero, presupuestos y kill switches remotos ─────────────
-  const requireAdmin = (req: FastifyRequest) => {
+  // Personal (ADR 0090): además del rol, segundo factor verificado en esta sesión cuando MFA es obligatoria.
+  const requireAdmin = async (req: FastifyRequest) => {
     const session = requireSession(req);
     if (!session.roles.includes("admin")) throw forbidden("Solo administración");
+    await c.mfa.assertStaff(session);
     return session;
   };
   app.get("/v1/admin/cost", async (req, reply) => {
-    requireAdmin(req);
+    await requireAdmin(req);
     // Lo medido en este proceso entra antes de leer: el tablero no va por detrás de sí mismo.
     await c.meter.flush(c.cost);
     reply.header("cache-control", "no-store");
     return c.cost.dashboard(req.query);
   });
   app.get("/v1/admin/quality", async (req, reply) => {
-    requireAdmin(req);
+    await requireAdmin(req);
     await c.meter.flush(c.cost);
     reply.header("cache-control", "no-store");
     return c.quality.report(req.query);
   });
   app.put("/v1/admin/cost/budgets/:key", async (req) => {
-    const session = requireAdmin(req);
+    const session = await requireAdmin(req);
     return c.cost.setBudget((req.params as { key: string }).key, req.body, session.userId);
   });
   app.put("/v1/admin/kill-switches/:feature", async (req) => {
-    const session = requireAdmin(req);
+    const session = await requireAdmin(req);
     return c.cost.setKillSwitch((req.params as { feature: string }).feature, req.body, session.userId);
   });
 
@@ -767,55 +802,56 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
   });
 
   // ───────────── Moderación (rol moderator) ─────────────
-  const requireModerator = (req: FastifyRequest) => {
+  const requireModerator = async (req: FastifyRequest) => {
     const session = requireSession(req);
     if (!session.roles.includes("moderator") && !session.roles.includes("admin")) throw forbidden("Solo moderación");
+    await c.mfa.assertStaff(session);
     return session;
   };
   app.get("/v1/moderation/cases", async (req, reply) => {
-    requireModerator(req);
+    await requireModerator(req);
     reply.header("cache-control", "no-store");
     return c.moderation.queue(req.query);
   });
   app.get("/v1/moderation/cases/:id", async (req, reply) => {
-    requireModerator(req);
+    await requireModerator(req);
     reply.header("cache-control", "no-store");
     return c.moderation.caseDetail(parse(IdParam, req.params).id);
   });
   // Evidencia de presencia de un reporte (ADR 0089): POST porque cada consulta es un acto auditado con motivo.
   app.post("/v1/moderation/posts/:id/presence", async (req, reply) => {
-    const session = requireModerator(req);
+    const session = await requireModerator(req);
     reply.header("cache-control", "no-store");
     return c.reports.presenceForReview(parse(IdParam, req.params).id, session.userId, req.body);
   });
   app.get("/v1/admin/presence-access", async (req, reply) => {
-    requireAdmin(req);
+    await requireAdmin(req);
     reply.header("cache-control", "no-store");
     const q = parse(z.object({ reportId: z.uuid().optional(), actorUserId: z.uuid().optional(), limit: z.coerce.number().int().min(1).max(200).default(100) }), req.query);
     return { entries: await c.reports.presenceAccessLog(c.db, q) };
   });
   app.post("/v1/moderation/cases/:id/actions", async (req) => {
-    const session = requireModerator(req);
+    const session = await requireModerator(req);
     return c.moderation.act(parse(IdParam, req.params).id, session.userId, req.body);
   });
   app.get("/v1/moderation/appeals", async (req, reply) => {
-    requireModerator(req);
+    await requireModerator(req);
     reply.header("cache-control", "no-store");
     const { status } = parse(z.object({ status: z.enum(["OPEN", "UPHELD", "REVERSED"]).default("OPEN") }), req.query);
     return { appeals: await c.moderation.appeals(status) };
   });
   app.post("/v1/moderation/appeals/:id/decision", async (req) => {
-    const session = requireModerator(req);
+    const session = await requireModerator(req);
     return c.moderation.decideAppeal(parse(IdParam, req.params).id, session.userId, req.body);
   });
   // Fusión y división de eventos (ADR 0034). La auditoría vive en event.merge_log y event.split_log.
   app.get("/v1/moderation/events/:id", async (req, reply) => {
-    requireModerator(req);
+    await requireModerator(req);
     reply.header("cache-control", "no-store");
     return c.events.moderatorDetail(c.db, parse(IdParam, req.params).id);
   });
   app.post("/v1/moderation/events/:id/merge", async (req) => {
-    const session = requireModerator(req);
+    const session = await requireModerator(req);
     const { id } = parse(IdParam, req.params);
     const b = parse(MergeEventsRequest, req.body);
     const mergeIds = await withTransaction(c.db, async (tx) => {
@@ -827,37 +863,37 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
   });
   // Cola de posibles duplicados (ADR 0076): se fusionan con la ruta de arriba o se descartan.
   app.get("/v1/moderation/duplicates", async (req, reply) => {
-    requireModerator(req);
+    await requireModerator(req);
     reply.header("cache-control", "no-store");
     return { candidates: await c.events.duplicateQueue(c.db) };
   });
   app.post("/v1/moderation/duplicates/:id/dismiss", async (req, reply) => {
-    const session = requireModerator(req);
+    const session = await requireModerator(req);
     const { reason } = parse(DismissDuplicateRequest, req.body);
     await c.events.dismissDuplicate(c.db, parse(IdParam, req.params).id, session.userId, reason);
     return reply.status(204).send();
   });
   app.post("/v1/moderation/merges/:id/revert", async (req) => {
-    const session = requireModerator(req);
+    const session = await requireModerator(req);
     const { reason } = parse(RevertMergeRequest, req.body);
     return withTransaction(c.db, (tx) => c.events.revertMerge(tx, parse(IdParam, req.params).id, session.userId, reason));
   });
   app.post("/v1/moderation/events/:id/split", async (req, reply) => {
-    const session = requireModerator(req);
+    const session = await requireModerator(req);
     const { id } = parse(IdParam, req.params);
     const b = parse(SplitEventRequest, req.body);
     const eventId = await withTransaction(c.db, (tx) => c.events.split(tx, id, b.evidenceIds, session.userId, b.reason));
     return reply.status(201).send({ eventId });
   });
   app.post("/v1/moderation/events/:id/status", async (req) => {
-    const session = requireModerator(req);
+    const session = await requireModerator(req);
     const { id } = parse(IdParam, req.params);
     const b = parse(SetEventStatusRequest, req.body);
     await withTransaction(c.db, (tx) => c.events.setStatus(tx, id, b.to, session.userId, b.reason));
     return c.events.moderatorDetail(c.db, id);
   });
   app.post("/v1/moderation/events/:id/negative-state", async (req) => {
-    const session = requireModerator(req);
+    const session = await requireModerator(req);
     const { id } = parse(IdParam, req.params);
     const b = parse(z.object({ to: NegativeState, reason: z.string().max(2000), evidenceRefs: z.array(z.uuid()).max(20).default([]) }), req.body);
     await c.verification.moderatorSetNegative({ eventId: id, moderatorUserId: session.userId, to: b.to, reason: b.reason, evidenceRefs: b.evidenceRefs });

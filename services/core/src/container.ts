@@ -15,7 +15,7 @@ import { AlertService, ApnsSender, budgetAlertText, sourceAlertText, FcmSender, 
 import { GeoService } from "./modules/geo/index.js";
 import { ModerationService } from "./modules/moderation/index.js";
 import { TrustService } from "./modules/trust/index.js";
-import { DevAttestationVerifier, IdentityService, type AttestationVerifier } from "./modules/identity/index.js";
+import { DevAttestationVerifier, IdentityService, MfaService, type AttestationVerifier } from "./modules/identity/index.js";
 import { IngestionScheduler, IngestionService, NodeHttpFetcher, type HttpFetcher } from "./modules/ingestion/index.js";
 import { LocalDiskStorage, MediaService, S3Storage, type StorageProvider } from "./modules/media/index.js";
 import { QualityService } from "./modules/quality/index.js";
@@ -33,6 +33,7 @@ export interface Container {
   geo: GeoService;
   social: SocialService;
   identity: IdentityService;
+  mfa: MfaService;
   events: EventService;
   ingestion: IngestionService;
   ingestionScheduler: IngestionScheduler;
@@ -80,11 +81,13 @@ export function buildContainer(env: AppEnv, overrides: { db?: Db; clock?: Clock;
   if (env.NODE_ENV === "production" && !overrides.attestation) {
     throw new Error("Producción requiere un verificador real de App Attest / Play Integrity");
   }
+  const fieldCipher = fieldCipherFromEnv(env.FIELD_KEYS, env.AUTH_JWT_SECRET);
+  const mfa = new MfaService(db, fieldCipher, clock, env.STAFF_MFA_REQUIRED === "true" || (env.STAFF_MFA_REQUIRED === "auto" && env.NODE_ENV === "production"));
   const reports = new ReportService({
     db, clock, ref, geo, social, events, identity, media, trust,
     attestation: overrides.attestation ?? new DevAttestationVerifier(),
     limits: { reportsPerHour: env.REPORTS_PER_HOUR_LIMIT, presenceRetentionDays: env.PRESENCE_RETENTION_DAYS },
-    cipher: fieldCipherFromEnv(env.FIELD_KEYS, env.AUTH_JWT_SECRET),
+    cipher: fieldCipher,
   });
   const business = new BusinessService(db);
   const feed = new FeedService(social, events, media, ref, geo, business);
@@ -120,7 +123,7 @@ export function buildContainer(env: AppEnv, overrides: { db?: Db; clock?: Clock;
   });
   const composer = new PostComposer(db, social, media, events, business);
   const quality = new QualityService(db, clock, { cost, events, verification, alerts, ingestion, moderation });
-  return { env, db, clock, ref, geo, social, identity, events, ingestion, ingestionScheduler, verification, media, storage, reports, feed, alerts, dispatcher, cost, moderation, trust, quality, composer, business, meter, connectors };
+  return { env, db, clock, ref, geo, social, identity, mfa, events, ingestion, ingestionScheduler, verification, media, storage, reports, feed, alerts, dispatcher, cost, moderation, trust, quality, composer, business, meter, connectors };
 }
 
 /** APNs y FCM directos. Si falta la credencial de una plataforma, sus avisos quedan solo en el historial. */

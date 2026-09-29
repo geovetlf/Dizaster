@@ -138,3 +138,20 @@ export interface PresenceAccessEntry {
   preciseShown: boolean;
   accessedAt: string;
 }
+
+// ───────────── MFA TOTP del personal (ADR 0090) ─────────────
+export interface MfaStatus {
+  /** La cuenta tiene un autenticador confirmado. */
+  enrolled: boolean;
+  /** El servidor exige MFA a moderación y administración. */
+  required: boolean;
+  recoveryCodesLeft: number;
+}
+export interface MfaEnrollResponse { secret: string; otpauthUri: string }
+export const MfaCodeRequest = z.object({ code: z.string().trim().regex(/^\d{6}$/) });
+export type MfaCodeRequest = z.infer<typeof MfaCodeRequest>;
+export const MfaVerifyRequest = z.union([
+  z.object({ code: z.string().trim().regex(/^\d{6}$/) }),
+  z.object({ recoveryCode: z.string().trim().min(8).max(12) }),
+]);
+export type MfaVerifyRequest = z.infer<typeof MfaVerifyRequest>;

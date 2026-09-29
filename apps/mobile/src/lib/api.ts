@@ -1,15 +1,16 @@
-import type { PresenceReview, EventSourceView, EventStatus, MyProfile, UpdateProfileRequest, ReactionKind, ReactionState, DataExport, VerificationView, ModeratorEventDetail, SavedZone, SavedZoneInput, AppealView, CaseDetail, CaseSummary, CreateFlagRequest, ModerationActionType, ModerationNotice, CostDashboard, KillSwitchView, QualityReport, CreatePostRequest, TagView, BusinessView, SessionView, CreateBusinessRequest, UpdateBusinessRequest, AlertPreferences, CategorySubscription, CategorySubscriptionInput, NotificationsResponse, AppConfig, AttributionsResponse, AreaSearchResult, FollowTarget, MyFollows, ProfileSearchResult, ProfileView, CommentView, CreateUploadRequest, FeedPost, FeedResponse, FeedTab, CreateUploadResponse, DevicePlatform, MediaView, RegisterPushTokenRequest, EventMapResponse, EventSummary, NearbyEventsResponse, SubmitReportRequest, SubmitReportResponse, TimelineEntryView } from "@dizaster/contracts";
+import type { MfaEnrollResponse, MfaStatus, PresenceReview, EventSourceView, EventStatus, MyProfile, UpdateProfileRequest, ReactionKind, ReactionState, DataExport, VerificationView, ModeratorEventDetail, SavedZone, SavedZoneInput, AppealView, CaseDetail, CaseSummary, CreateFlagRequest, ModerationActionType, ModerationNotice, CostDashboard, KillSwitchView, QualityReport, CreatePostRequest, TagView, BusinessView, SessionView, CreateBusinessRequest, UpdateBusinessRequest, AlertPreferences, CategorySubscription, CategorySubscriptionInput, NotificationsResponse, AppConfig, AttributionsResponse, AreaSearchResult, FollowTarget, MyFollows, ProfileSearchResult, ProfileView, CommentView, CreateUploadRequest, FeedPost, FeedResponse, FeedTab, CreateUploadResponse, DevicePlatform, MediaView, RegisterPushTokenRequest, EventMapResponse, EventSummary, NearbyEventsResponse, SubmitReportRequest, SubmitReportResponse, TimelineEntryView } from "@dizaster/contracts";
 import { mergeMapTiles, tilesForView } from "@dizaster/geo-kit";
 import { canRetryWithRefresh, singleFlight } from "./auth/refresh";
 import { API_URL } from "./config";
 import { EtagCache } from "./http/etag-cache";
+import { isMfaError } from "./auth/mfa";
 import type { Sender } from "./report/queue";
 
 export interface TokenPair { token: string; refreshToken: string; expiresIn: number }
 
 let token: string | null = null;
 let refreshToken: string | null = null;
-let listeners: { rotated?: (refreshToken: string) => void; lost?: () => void } = {};
+let listeners: { rotated?: (refreshToken: string) => void; lost?: () => void; mfa?: () => void } = {};
 
 /** Sesión actual. `null` al borrar la cuenta. */
 export function setSession(pair: Pick<TokenPair, "token" | "refreshToken"> | null) {
@@ -19,7 +20,7 @@ export function setSession(pair: Pick<TokenPair, "token" | "refreshToken"> | nul
   refreshToken = pair?.refreshToken ?? null;
 }
 
-/** `rotated`: guardar el refresh nuevo en el almacén seguro. `lost`: la sesión no se pudo renovar. */
+/** `rotated`: guardar el refresh nuevo. `lost`: la sesión no se pudo renovar. `mfa`: moderación pide el segundo factor. */
 export function onSessionEvents(l: typeof listeners) { listeners = l; }
 
 /** Renueva con el refresh rotatorio. Una sola renovación en vuelo aunque fallen varias peticiones a la vez. */
@@ -60,6 +61,7 @@ async function request<T>(path: string, init: RequestInit = {}, retried = false)
     if (cached !== undefined) return cached as T;
   }
   const body = (await res.json().catch(() => ({}))) as T & { message?: string };
+  if (res.status === 403 && isMfaError(body)) listeners.mfa?.();
   if (!res.ok) throw Object.assign(new Error(body.message ?? `HTTP ${res.status}`), { status: res.status, body });
   if (isGet) etags.store(path, res.headers.get("etag"), body);
   return body;
@@ -159,6 +161,10 @@ export const api = {
     request<ModerationNotice>(`/v1/me/moderation/${actionId}/appeal`, { method: "POST", body: JSON.stringify({ text }) }),
   moderationQueue: (cursor?: string | null) =>
     request<{ cases: CaseSummary[]; nextCursor: string | null }>(`/v1/moderation/cases${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`),
+  mfaStatus: () => request<MfaStatus>("/v1/me/mfa"),
+  mfaEnroll: () => request<MfaEnrollResponse>("/v1/me/mfa/totp", { method: "POST" }),
+  mfaConfirm: (code: string) => request<{ recoveryCodes: string[] }>("/v1/me/mfa/totp/confirm", { method: "POST", body: JSON.stringify({ code }) }),
+  mfaVerify: (input: { code: string } | { recoveryCode: string }) => request<{ verifiedUntil: string }>("/v1/me/mfa/verify", { method: "POST", body: JSON.stringify(input) }),
   moderationPresence: (postId: string, reason: string, caseId?: string) =>
     request<PresenceReview>(`/v1/moderation/posts/${postId}/presence`, { method: "POST", body: JSON.stringify({ reason, ...(caseId ? { caseId } : {}) }) }),
   moderationCase: (id: string) => request<CaseDetail>(`/v1/moderation/cases/${id}`),

@@ -1,5 +1,9 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import { router } from "expo-router";
 import { Platform } from "react-native";
+
+/** Evita abrir la pantalla de MFA varias veces si fallan varias peticiones a la vez. */
+let mfaOpen = false;
 import { api, onSessionEvents, setSession } from "./api";
 import { ensureAlertChannel, registerPushIfPermitted, watchPushTokenRotation } from "./device/push";
 import { clearIdentity, loadIdentity, saveIdentity, type StoredIdentity } from "./device/secure-session";
@@ -53,6 +57,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     onSessionEvents({
       rotated: (refreshToken) => persist({ refreshToken }),
       // El refresh caducó o fue revocado: se vuelve a entrar con la misma identidad del teléfono.
+      // Moderación o administración pide el segundo factor (ADR 0090).
+      mfa: () => { if (!mfaOpen) { mfaOpen = true; router.push("/mfa"); setTimeout(() => { mfaOpen = false; }, 3000); } },
       lost: () => { if (identity.current) void signIn(identity.current.handle, identity.current.deviceId).catch(() => undefined); },
     });
 
