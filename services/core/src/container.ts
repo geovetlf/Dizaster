@@ -16,7 +16,7 @@ import { GeoService } from "./modules/geo/index.js";
 import { ModerationService } from "./modules/moderation/index.js";
 import { TrustService } from "./modules/trust/index.js";
 import { DevAttestationVerifier, IdentityService, MfaService, type AttestationVerifier } from "./modules/identity/index.js";
-import { IngestionScheduler, IngestionService, NodeHttpFetcher, type HttpFetcher } from "./modules/ingestion/index.js";
+import { IngestionScheduler, IngestionService, InstitutionService, NodeHttpFetcher, type HttpFetcher } from "./modules/ingestion/index.js";
 import { LocalDiskStorage, MediaService, S3Storage, type StorageProvider } from "./modules/media/index.js";
 import { QualityService } from "./modules/quality/index.js";
 import { ReferenceData } from "./modules/reference/index.js";
@@ -51,6 +51,7 @@ export interface Container {
   quality: QualityService;
   composer: PostComposer;
   business: BusinessService;
+  institutions: InstitutionService;
   meter: Meter;
 }
 
@@ -121,9 +122,14 @@ export function buildContainer(env: AppEnv, overrides: { db?: Db; clock?: Clock;
     const admins = await identity.usersWithRole(db, "admin");
     await alerts.notifyAdmins(admins, (lang) => sourceAlertText(lang, e.payload), "dizaster://admin-quality", `source:${e.payload.sourceKey}`);
   });
+  // Perfiles institucionales oficiales como fuente OFICIAL (ADR 0095).
+  const institutions = new InstitutionService(db, ingestion, events, business, ref, geo, clock);
+  dispatcher.on("AccountDeleted", "ingestion.retire-institutions", async (e, tx) => {
+    await institutions.retire(tx, await business.idsOwnedBy(tx, e.payload.userId));
+  });
   const composer = new PostComposer(db, social, media, events, business);
   const quality = new QualityService(db, clock, { cost, events, verification, alerts, ingestion, moderation });
-  return { env, db, clock, ref, geo, social, identity, mfa, events, ingestion, ingestionScheduler, verification, media, storage, reports, feed, alerts, dispatcher, cost, moderation, trust, quality, composer, business, meter, connectors };
+  return { env, db, clock, ref, geo, social, identity, mfa, events, ingestion, ingestionScheduler, verification, media, storage, reports, feed, alerts, dispatcher, cost, moderation, trust, quality, composer, business, institutions, meter, connectors };
 }
 
 /** APNs y FCM directos. Si falta la credencial de una plataforma, sus avisos quedan solo en el historial. */

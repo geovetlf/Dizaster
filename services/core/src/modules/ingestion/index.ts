@@ -9,6 +9,7 @@ import type { EventService, ResolutionResult } from "../event/index.js";
 import type { GeoService } from "../geo/index.js";
 
 export { FEED_ADAPTERS, type FeedAdapter } from "./adapters/index.js";
+export { InstitutionService, INSTITUTION_ADAPTER, institutionSourceKey } from "./institution.js";
 export { IngestionScheduler, NodeHttpFetcher, lastScheduledAt, resolveSourceUrl, type HttpFetcher, type FetchResult, type RunSummary } from "./scheduler.js";
 
 /** Ítem ya normalizado al esquema común, independiente del formato de la fuente. */
@@ -32,6 +33,8 @@ export interface NormalizedItem {
   geocodes?: { scheme: string; value: string }[];
   /** Área oficial afectada tal como la da la fuente (CAP `<polygon>`/`<circle>`, ADR 0087). */
   area?: AreaGeometry;
+  /** Declaración sobre un EVENT concreto (institución oficial, ADR 0095): se adjunta solo a ese evento o falla. */
+  targetEventId?: string;
   raw: Record<string, unknown>;
 }
 
@@ -154,13 +157,18 @@ export class IngestionService {
         ...(item.title ? { title: item.title } : {}),
         trustTier: source.trust_tier,
         weight: 1,
-        mayCreateEvent: item.assertion === "OCCURRING",
+        mayCreateEvent: item.assertion === "OCCURRING" && !item.targetEventId,
+        ...(item.targetEventId ? { userSelectedEventId: item.targetEventId } : {}),
         createAsPending: false,
         externalIds: [item.externalId],
         mediaHashes: [],
         metadata: { assertion: item.assertion, sourceKey },
         ...(item.area ? { affectedArea: item.area } : {}),
       });
+      if (item.targetEventId && !(resolution.kind === "ATTACHED" && resolution.confidence === "USER_SELECTED")) {
+        // Deshace todo (ítem y evidencia): una declaración nunca cae en otro evento por deduplicación.
+        throw new DomainError("INVALID_TARGET", resolution.kind === "INVALID_TARGET" ? resolution.reason : "No se puede declarar sobre ese evento", 409);
+      }
       const eventId = resolution.kind === "CREATED" || resolution.kind === "ATTACHED" ? resolution.eventId : null;
       await tx.query(`UPDATE ingestion.external_items SET status = $2, event_id = $3 WHERE id = $1`, [itemId, eventId ? "MAPPED" : "IGNORED", eventId]);
       return { externalItemId: itemId, resolution, duplicate: false };

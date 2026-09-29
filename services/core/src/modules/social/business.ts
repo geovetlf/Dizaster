@@ -73,13 +73,14 @@ export class BusinessService {
   }
 
   /** Borrar el negocio: sus posts y seguidores se van con él. El handle queda reservado. */
-  async delete(owner: { userId: string }, handle: string): Promise<void> {
+  async delete(owner: { userId: string }, handle: string): Promise<string> {
     const id = await this.ownedId(this.db, owner.userId, handle);
     await this.db.query(`UPDATE social.business_profiles SET deleted_at = now(), updated_at = now() WHERE id = $1`, [id]);
     await this.db.query(`UPDATE social.posts SET text = NULL, deleted_at = coalesce(deleted_at, now()) WHERE author_type = 'BUSINESS' AND author_id = $1`, [id]);
     await this.db.query(`DELETE FROM social.follows WHERE target_type = 'BUSINESS' AND target_id = $1`, [id]);
     await this.db.query(`DELETE FROM social.post_business_mentions WHERE business_id = $1`, [id]);
     await this.db.query(`DELETE FROM social.business_blocks WHERE business_id = $1`, [id]);
+    return id;
   }
 
   /** Vista pública. Un negocio retirado por moderación solo lo ve quien lo administra. */
@@ -144,6 +145,22 @@ export class BusinessService {
     if (!rows[0]) throw notFound("Negocio");
     if (opts.toPublish && rows[0].moderation_state !== "VISIBLE") throw new DomainError("BUSINESS_REMOVED", "Moderación retiró este negocio: no puede publicar", 403);
     return rows[0].id;
+  }
+
+  /** Datos mínimos para las declaraciones oficiales (ADR 0095). Incluye negocios retirados por moderación. */
+  async officialInfo(q: Queryable, handle: string): Promise<{ id: string; name: string; ownerUserId: string; verification: BusinessVerification; visible: boolean } | null> {
+    const { rows } = await q.query<{ id: string; name: string; owner_user_id: string; verification_status: BusinessVerification; moderation_state: string }>(
+      `SELECT id, name, owner_user_id, verification_status, moderation_state FROM social.business_profiles WHERE lower(handle) = lower($1) AND deleted_at IS NULL`,
+      [handle],
+    );
+    const r = rows[0];
+    return r ? { id: r.id, name: r.name, ownerUserId: r.owner_user_id, verification: r.verification_status, visible: r.moderation_state === "VISIBLE" } : null;
+  }
+
+  /** Ids de los negocios de una persona, también los borrados (para retirar sus fuentes institucionales). */
+  async idsOwnedBy(q: Queryable, userId: string): Promise<string[]> {
+    const { rows } = await q.query<{ id: string }>(`SELECT id FROM social.business_profiles WHERE owner_user_id = $1`, [userId]);
+    return rows.map((r) => r.id);
   }
 
   async namesByIds(q: Queryable, ids: string[]): Promise<Map<string, { handle: string; name: string }>> {

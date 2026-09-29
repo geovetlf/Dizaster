@@ -1,7 +1,7 @@
-import type { EventSourceView, EventSummary, MediaView, TimelineEntryView, VerificationView } from "@dizaster/contracts";
+import type { EventSourceView, EventSummary, OfficialScopeView, MediaView, TimelineEntryView, VerificationView } from "@dizaster/contracts";
 import { router, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
-import { Linking, Pressable, StyleSheet, Text, View } from "react-native";
+import { Alert, Linking, Pressable, StyleSheet, Text, View } from "react-native";
 import { FeedList } from "../../components/feed-list";
 import { EventMedia } from "../../components/event-media";
 import { OfflineNote } from "../../components/offline-note";
@@ -14,6 +14,7 @@ import { evidenceLine, explainLines, timelineLabel } from "../../lib/verificatio
 import { followablePlace } from "../../lib/social/place";
 import { useFollows } from "../../lib/social/follows";
 import { mergedTarget } from "../../lib/events/merged";
+import { canStateOn } from "../../lib/social/business";
 import { openFlag } from "../../lib/moderation/menu";
 import { colors, radius, space } from "../../theme";
 
@@ -30,6 +31,7 @@ export default function EventScreen() {
   const [error, setError] = useState<string | null>(null);
   const [savedAt, setSavedAt] = useState<number | null>(null);
   const follows = useFollows();
+  const [institutions, setInstitutions] = useState<{ handle: string; name: string; scope: OfficialScopeView | null }[]>([]);
 
   useEffect(() => {
     if (!id) return;
@@ -46,7 +48,26 @@ export default function EventScreen() {
     api.eventMedia(id).then((r) => setMedia(r.media)).catch(() => setMedia([]));
     api.verification(id).then(setVerification).catch(() => setVerification(null));
     api.eventSources(id).then((r) => setSources(r.sources)).catch(() => setSources([]));
+    // Perfiles institucionales oficiales que administro (ADR 0095): pueden confirmar o desmentir en su ámbito.
+    api.myBusinesses()
+      .then((r) => Promise.all(r.businesses.filter((b) => b.verification === "INSTITUTIONAL_OFFICIAL")
+        .map(async (b) => ({ handle: b.handle, name: b.name, scope: (await api.officialScope(b.handle)).scope }))))
+      .then(setInstitutions)
+      .catch(() => setInstitutions([]));
   }, [id, hops]);
+
+  function officialStatement(handle: string, name: string) {
+    if (!event) return;
+    const send = (assertion: "OCCURRING" | "NOT_OCCURRING") => void api.officialStatement(handle, event.id, assertion)
+      .then(() => api.verification(event.id).then(setVerification))
+      .then(() => api.eventSources(event.id).then((r) => setSources(r.sources)))
+      .catch((e: Error) => Alert.alert(name, e.message));
+    Alert.alert(`${t("officialStatement")} · ${name}`, t("officialStatementHint"), [
+      { text: t("cancel"), style: "cancel" },
+      { text: t("officialDeny"), style: "destructive", onPress: () => send("NOT_OCCURRING") },
+      { text: t("officialConfirm"), onPress: () => send("OCCURRING") },
+    ]);
+  }
 
   const fetchPage = useCallback((cursor: string | null) => api.eventPosts(id ?? "", cursor), [id]);
 
@@ -68,6 +89,9 @@ export default function EventScreen() {
         <FollowChip label={t("nothingHere")} on={false}
           onPress={() => router.push({ pathname: "/report", params: { eventId: event.id, category: event.categoryCode, deny: "1" } })} />
         <FollowChip label={t("flag")} on={false} onPress={() => openFlag("EVENT", event.id)} />
+        {institutions.filter((i) => canStateOn(i.scope, event)).map((i) => (
+          <FollowChip key={i.handle} label={`${t("officialStatement")} · ${i.name}`} on={false} onPress={() => officialStatement(i.handle, i.name)} />
+        ))}
       </View>
       <Text style={[styles.badge, { backgroundColor: color }]}>{verificationLabel(event.publicVerificationState)}</Text>
       <Text style={styles.meta}>

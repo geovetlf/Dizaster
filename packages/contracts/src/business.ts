@@ -62,3 +62,26 @@ export const BusinessSearchQuery = z.object({
   q: z.string().trim().min(2).max(40),
   limit: z.coerce.number().int().min(1).max(20).default(10),
 });
+
+/**
+ * Ámbito de un perfil institucional oficial (ADR 0095): qué categorías y países puede confirmar o desmentir.
+ * Lo fija administración; fuera de él la institución no puede pronunciarse.
+ */
+export const OfficialScopeRequest = z.object({
+  categories: z.array(z.string().regex(/^[a-z_]+(\.[a-z_]+)*$/)).min(1).max(20),
+  countries: z.array(z.string().regex(/^[A-Z]{2}$/)).min(1).max(20),
+});
+export type OfficialScopeRequest = z.infer<typeof OfficialScopeRequest>;
+
+export interface OfficialScopeView {
+  categories: string[];
+  countries: string[];
+  active: boolean;
+}
+
+/** Confirmación o desmentido explícito de un EVENT por un perfil institucional oficial (§10.2, D-04). */
+export const OfficialStatementRequest = z.object({
+  eventId: z.uuid(),
+  assertion: z.enum(["OCCURRING", "NOT_OCCURRING"]),
+});
+export type OfficialStatementRequest = z.infer<typeof OfficialStatementRequest>;

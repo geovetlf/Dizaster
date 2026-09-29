@@ -27,3 +27,17 @@ export function verificationIcon(v: BusinessVerification | undefined): "check-de
 export function telUri(phone: string): string {
   return `tel:${phone.replace(/[^0-9+]/g, "")}`;
 }
+
+/**
+ * ¿Puede esta institución pronunciarse sobre el evento? (ADR 0095). Mismo criterio que el servidor: categoría en su
+ * ámbito (o hija de una raíz listada) y país en su lista. El servidor lo vuelve a comprobar.
+ * NO AI REQUIRED.
+ */
+export function canStateOn(
+  scope: { categories: string[]; countries: string[]; active: boolean } | null,
+  event: { categoryCode: string; countryCode: string | null; status: string },
+): boolean {
+  if (!scope?.active || (event.status !== "ACTIVE" && event.status !== "MONITORING")) return false;
+  const category = scope.categories.some((c) => c === event.categoryCode || event.categoryCode.startsWith(`${c}.`));
+  return category && event.countryCode !== null && (scope.countries.includes("*") || scope.countries.includes(event.countryCode));
+}

@@ -586,7 +586,7 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
   });
   app.delete("/v1/businesses/:handle", async (req, reply) => {
     const session = requireSession(req);
-    await c.business.delete(session, parse(HandleParam, req.params).handle);
+    await c.institutions.retire(c.db, [await c.business.delete(session, parse(HandleParam, req.params).handle)]);
     return reply.status(204).send();
   });
   app.get("/v1/businesses/:handle/posts", async (req, reply) => {
@@ -595,7 +595,28 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
   });
   app.put("/v1/admin/businesses/:handle/verification", async (req) => {
     await requireAdmin(req);
-    return c.business.setVerification(parse(HandleParam, req.params).handle, req.body);
+    const { handle } = parse(HandleParam, req.params);
+    const view = await c.business.setVerification(handle, req.body);
+    // Sin el sello institucional, sus declaraciones dejan de contar como oficiales (ADR 0095).
+    if (view.verification !== "INSTITUTIONAL_OFFICIAL") {
+      const info = await c.business.officialInfo(c.db, handle);
+      if (info) await c.institutions.retire(c.db, [info.id]);
+    }
+    return view;
+  });
+  app.put("/v1/admin/businesses/:handle/official-scope", async (req) => {
+    await requireAdmin(req);
+    return c.institutions.setScope(parse(HandleParam, req.params).handle, req.body);
+  });
+  app.get("/v1/businesses/:handle/official-scope", async (req, reply) => {
+    reply.header("cache-control", "no-store");
+    const info = await c.business.officialInfo(c.db, parse(HandleParam, req.params).handle);
+    if (!info || !info.visible) throw new DomainError("NOT_FOUND", "Negocio no encontrado", 404);
+    return { scope: info.verification === "INSTITUTIONAL_OFFICIAL" ? await c.institutions.scope(c.db, info.id) : null };
+  });
+  app.post("/v1/businesses/:handle/official-statements", async (req) => {
+    const session = requireSession(req);
+    return c.institutions.statement(session.userId, parse(HandleParam, req.params).handle, req.body);
   });
 
   app.get("/v1/tags", async (req, reply) => {
