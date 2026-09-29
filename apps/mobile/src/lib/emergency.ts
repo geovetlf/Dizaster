@@ -1,4 +1,4 @@
-import { compareDatasetVersions, type EmergencyDataset, type EmergencyNumber } from "@dizaster/contracts";
+import { compareDatasetVersions, directEmergencyNumber, type EmergencyDataset, type EmergencyNumber } from "@dizaster/contracts";
 
 export interface EmergencyLookup {
   country: string | null;
@@ -32,7 +32,7 @@ export function label(n: EmergencyNumber, locale: string): string {
 }
 
 /** Se queda con el dataset más nuevo entre el empaquetado y el descargado (una app actualizada puede traer uno más reciente). */
-export function newestDataset(bundled: EmergencyDataset, cached: EmergencyDataset | null): EmergencyDataset {
+export function newestDataset<T extends { version: string }>(bundled: T, cached: T | null): T {
   return cached && compareDatasetVersions(cached.version, bundled.version) > 0 ? cached : bundled;
 }
 
@@ -43,4 +43,15 @@ export function newestDataset(bundled: EmergencyDataset, cached: EmergencyDatase
 export function regionOf(locale: string): string | null {
   const m = /[-_]([A-Za-z]{2})(?:[-_@]|$)/.exec(locale);
   return m ? m[1]!.toUpperCase() : null;
+}
+
+export type CallTarget = { kind: "direct"; number: EmergencyNumber; tel: string } | { kind: "list" };
+
+/**
+ * Qué hace "Llamar" en un reporte grave (ADR 0062): marca el número del servicio de esa categoría si el registro lo
+ * tiene para el país; si no, abre la lista de emergencias. Todo en el teléfono, sin red ni IA.
+ */
+export function callTarget(dataset: EmergencyDataset, category: string, country: string | null): CallTarget {
+  const n = directEmergencyNumber(dataset, { category, country });
+  return n ? { kind: "direct", number: n, tel: `tel:${n.number}` } : { kind: "list" };
 }

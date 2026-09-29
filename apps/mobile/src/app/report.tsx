@@ -4,10 +4,13 @@ import { clampToRadius } from "@dizaster/geo-kit";
 import * as Location from "expo-location";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { FlatList, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
+import { FlatList, Linking, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
 import { MediaAttachments } from "../components/media-attachments";
 import { api } from "../lib/api";
-import { t, verificationLabel } from "../lib/i18n";
+import { callTarget, label as serviceLabel, type CallTarget } from "../lib/emergency";
+import { localEmergencyDataset } from "../lib/emergency-store";
+import { countryOf } from "../lib/geo/country";
+import { locale, t, verificationLabel } from "../lib/i18n";
 import { newId } from "../lib/ids";
 import { OFFLINE_FALLBACK_STYLE, providerFromAppConfig } from "../lib/map/provider";
 import { toPresenceSignals } from "../lib/report/presence";
@@ -44,6 +47,7 @@ export default function ReportScreen() {
   const [pseudonymous, setPseudonymous] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [call, setCall] = useState<CallTarget>({ kind: "list" });
   const recent = useRef<Location.LocationObject[]>([]);
 
   useEffect(() => {
@@ -76,6 +80,10 @@ export default function ReportScreen() {
     setPin(here);
     setStatus(null);
     setPhase("compose");
+    if (c.defaultSeverity >= 4) {
+      // País calculado en el teléfono; la ubicación no sale para esto.
+      localEmergencyDataset().then((ds) => setCall(callTarget(ds, c.code, countryOf(here)))).catch(() => setCall({ kind: "list" }));
+    }
     api.nearby(here.lat, here.lng, c.code).then((r) => setNearby(r.events)).catch(() => setNearby([]));
   }
 
@@ -163,9 +171,17 @@ export default function ReportScreen() {
         </View>
       ) : null}
       {!deny && category.defaultSeverity >= 4 ? (
-        <Pressable accessibilityRole="button" style={styles.callFirst} onPress={() => router.push("/emergency")}>
+        <View style={styles.callFirst}>
           <Text style={styles.callFirstText}>{t("callFirst")}</Text>
-        </Pressable>
+          {call.kind === "direct" ? (
+            <Pressable accessibilityRole="button" style={styles.callButton} onPress={() => void Linking.openURL(call.tel)}>
+              <Text style={styles.callButtonText}>{t("callNow")} {serviceLabel(call.number, locale)} · {call.number.number}</Text>
+            </Pressable>
+          ) : null}
+          <Pressable accessibilityRole="button" onPress={() => router.push("/emergency")}>
+            <Text style={styles.callLink}>{call.kind === "direct" ? t("allNumbers") : t("emergencyTitle")}</Text>
+          </Pressable>
+        </View>
       ) : null}
 
       <Text style={styles.note}>{t("adjustPin")}</Text>
@@ -242,6 +258,9 @@ const styles = StyleSheet.create({
   note: { color: colors.textMuted, marginBottom: 12 },
   callFirst: { backgroundColor: colors.accentSoft, padding: 12, borderRadius: 8, marginBottom: 12 },
   callFirstText: { color: "#FF8A8A", fontWeight: "600" },
+  callButton: { backgroundColor: colors.accent, padding: 12, borderRadius: 8, marginTop: 10, alignItems: "center" },
+  callButtonText: { color: "#fff", fontWeight: "700", fontSize: 16 },
+  callLink: { color: colors.text, textDecorationLine: "underline", marginTop: 10 },
   send: { backgroundColor: colors.accent, borderRadius: 12, paddingVertical: 16, alignItems: "center" },
   disabled: { opacity: 0.5 },
   sendText: { color: colors.white, fontSize: 16, fontWeight: "600" },

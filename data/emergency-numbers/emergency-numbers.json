@@ -1,5 +1,5 @@
 {
- "version": "emergency-2026.09.1",
+ "version": "emergency-2026.09.2",
  "numbers": [
   {
    "country": "PE",
@@ -645,6 +645,125 @@
    "source": "Pendiente de contrastar con fuente oficial del país",
    "verification": "NEEDS_VERIFICATION",
    "verifiedAt": null
+  }
+ ],
+ "routes": [
+  {
+   "country": "*",
+   "subdivision": null,
+   "category": "natural",
+   "services": [
+    "GENERAL",
+    "CIVIL_DEFENSE"
+   ]
+  },
+  {
+   "country": "*",
+   "subdivision": null,
+   "category": "natural.earthquake",
+   "services": [
+    "GENERAL",
+    "FIRE"
+   ]
+  },
+  {
+   "country": "*",
+   "subdivision": null,
+   "category": "natural.landslide",
+   "services": [
+    "GENERAL",
+    "FIRE"
+   ]
+  },
+  {
+   "country": "*",
+   "subdivision": null,
+   "category": "natural.volcano",
+   "services": [
+    "GENERAL",
+    "CIVIL_DEFENSE"
+   ]
+  },
+  {
+   "country": "*",
+   "subdivision": null,
+   "category": "fire",
+   "services": [
+    "GENERAL",
+    "FIRE"
+   ]
+  },
+  {
+   "country": "*",
+   "subdivision": null,
+   "category": "accident",
+   "services": [
+    "GENERAL",
+    "AMBULANCE"
+   ]
+  },
+  {
+   "country": "*",
+   "subdivision": null,
+   "category": "accident.industrial",
+   "services": [
+    "GENERAL",
+    "FIRE"
+   ]
+  },
+  {
+   "country": "*",
+   "subdivision": null,
+   "category": "accident.building_collapse",
+   "services": [
+    "GENERAL",
+    "FIRE"
+   ]
+  },
+  {
+   "country": "*",
+   "subdivision": null,
+   "category": "crime",
+   "services": [
+    "GENERAL",
+    "POLICE"
+   ]
+  },
+  {
+   "country": "*",
+   "subdivision": null,
+   "category": "infra.gas_leak",
+   "services": [
+    "GENERAL",
+    "FIRE"
+   ]
+  },
+  {
+   "country": "*",
+   "subdivision": null,
+   "category": "health",
+   "services": [
+    "GENERAL",
+    "AMBULANCE"
+   ]
+  },
+  {
+   "country": "*",
+   "subdivision": null,
+   "category": "emergency.hazmat",
+   "services": [
+    "GENERAL",
+    "FIRE"
+   ]
+  },
+  {
+   "country": "*",
+   "subdivision": null,
+   "category": "emergency.rescue",
+   "services": [
+    "GENERAL",
+    "FIRE"
+   ]
   }
  ]
 }

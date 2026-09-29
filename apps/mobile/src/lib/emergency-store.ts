@@ -32,7 +32,7 @@ export async function refreshEmergencyDataset(): Promise<EmergencyDataset | null
     if (!res.ok) return null;
     const body = EmergencyNumbersResponse.safeParse(await res.json());
     if (!body.success || body.data.unchanged || compareDatasetVersions(body.data.version, current.version) <= 0) return null;
-    const next: EmergencyDataset = { version: body.data.version, numbers: body.data.numbers };
+    const next: EmergencyDataset = { version: body.data.version, numbers: body.data.numbers, routes: body.data.routes };
     const f = file();
     if (f.exists) f.delete();
     f.create();

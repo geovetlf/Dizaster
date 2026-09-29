@@ -198,6 +198,8 @@ export const fr: Record<MessageKey, string> = {
   saveZone: "Enregistrer la zone",
   costMonth: "mois",
   playVideo: "Lire la vidéo",
+  callNow: "Appeler",
+  allNumbers: "Voir tous les numéros d’urgence",
   verifiedOnly: "Vérifiés seulement",
   why_OUT_OF_RADIUS: "Vous êtes loin de l'épingle. Rapprochez l'épingle de votre position ou signalez depuis le lieu.",
   why_LOW_ACCURACY: "Le GPS était imprécis. Allez dans un endroit dégagé, attendez quelques secondes et réessayez.",

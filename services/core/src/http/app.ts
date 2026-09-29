@@ -145,8 +145,8 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
     const version = c.ref.emergency.version;
     reply.header("cache-control", "public, max-age=3600");
     // La app pregunta con la versión que tiene; si coincide no se repite el dataset (ADR 0039).
-    if (q.since === version) return { version, unchanged: true, numbers: [] };
-    return { version, unchanged: false, numbers: q.country ? c.ref.emergencyNumbers(q.country) : c.ref.emergency.numbers };
+    if (q.since === version) return { version, unchanged: true, numbers: [], routes: [] };
+    return { version, unchanged: false, numbers: q.country ? c.ref.emergencyNumbers(q.country) : c.ref.emergency.numbers, routes: c.ref.emergency.routes };
   });
 
   app.get("/v1/geo/country", async (req) => {

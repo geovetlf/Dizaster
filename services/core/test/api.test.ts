@@ -25,9 +25,10 @@ describe("API de referencia y configuración", () => {
 
   it("con since= no repite el dataset si la app ya tiene la versión vigente", async () => {
     const full = (await t.app.inject({ url: "/v1/reference/emergency-numbers" })).json();
+    expect(full.routes.length).toBeGreaterThan(0);
     expect(full.unchanged).toBe(false);
     const same = (await t.app.inject({ url: `/v1/reference/emergency-numbers?since=${full.version}` })).json();
-    expect(same).toEqual({ version: full.version, unchanged: true, numbers: [] });
+    expect(same).toEqual({ version: full.version, unchanged: true, numbers: [], routes: [] });
     const old = (await t.app.inject({ url: "/v1/reference/emergency-numbers?since=emergency-2000.01.1&country=PE" })).json();
     expect(old.unchanged).toBe(false);
     expect(old.numbers.every((n: { country: string }) => n.country === "PE")).toBe(true);

@@ -198,6 +198,8 @@ export const pt: Record<MessageKey, string> = {
   saveZone: "Salvar região",
   costMonth: "mês",
   playVideo: "Reproduzir vídeo",
+  callNow: "Ligar para",
+  allNumbers: "Ver todos os números de emergência",
   verifiedOnly: "Só verificados",
   why_OUT_OF_RADIUS: "Você está longe do pino. Aproxime o pino de onde está ou reporte do local.",
   why_LOW_ACCURACY: "O GPS estava impreciso. Vá para um lugar aberto, espere alguns segundos e tente de novo.",
