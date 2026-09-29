@@ -10,6 +10,7 @@ import { withWarning } from "../modules/feed/index.js";
 import { withTransaction } from "../platform/db.js";
 import { DomainError, forbidden } from "../platform/errors.js";
 import { latencyMetric } from "../platform/metrics.js";
+import { FixedWindowLimiter } from "../platform/rate-limit.js";
 import type { Session } from "../modules/identity/index.js";
 
 declare module "fastify" {
@@ -37,12 +38,26 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
   const app = Fastify({
     logger: c.env.NODE_ENV === "test" ? false : { level: "info", redact: ["req.headers.authorization"] },
     bodyLimit: 256 * 1024,
+    trustProxy: c.env.TRUST_PROXY,
   });
+
+  // Límite general (ADR 0047): por cuenta con sesión, por IP sin ella. Las escrituras tienen un cupo menor.
+  const allLimiter = new FixedWindowLimiter(c.env.RATE_LIMIT_PER_MINUTE);
+  const writeLimiter = new FixedWindowLimiter(c.env.RATE_LIMIT_WRITES_PER_MINUTE);
 
   app.decorateRequest("session", null);
   app.addHook("onRequest", async (req) => {
     const h = req.headers.authorization;
     if (h?.startsWith("Bearer ")) req.session = await c.identity.verifyToken(h.slice(7));
+    if (req.url.startsWith("/v1/")) {
+      const key = req.session ? `u:${req.session.userId}` : `ip:${req.ip}`;
+      const write = req.method !== "GET" && req.method !== "HEAD";
+      const wait = allLimiter.hit(key) ?? (write ? writeLimiter.hit(key) : null);
+      if (wait !== null) {
+        c.meter.add("http", "rate_limited", 1);
+        throw Object.assign(new DomainError("RATE_LIMITED", "Demasiadas peticiones; espera un momento", 429), { retryAfter: wait });
+      }
+    }
     // Cuentas suspendidas: pueden leer, apelar, cerrar sesión y borrar su cuenta; no publicar ni interactuar.
     if (req.session && req.method !== "GET" && req.method !== "HEAD" && !WRITE_ALLOWED_WHEN_SUSPENDED.test(`${req.method} ${req.url.split("?")[0]}`)) {
       await c.identity.assertCanWrite(req.session.userId);
@@ -59,7 +74,11 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
   });
 
   app.setErrorHandler((err, req, reply) => {
-    if (err instanceof DomainError) return reply.status(err.httpStatus).send({ error: err.code, message: err.message });
+    if (err instanceof DomainError) {
+      const retry = (err as { retryAfter?: number }).retryAfter;
+      if (retry) reply.header("retry-after", String(retry));
+      return reply.status(err.httpStatus).send({ error: err.code, message: err.message });
+    }
     const status = (err as { statusCode?: number }).statusCode;
     if (status && status < 500) return reply.status(status).send({ error: "BAD_REQUEST", message: (err as Error).message });
     req.log.error(err);

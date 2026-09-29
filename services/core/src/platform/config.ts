@@ -14,6 +14,11 @@ const Env = z.object({
   MAP_STYLE_URL_DARK: z.string().default("https://demotiles.maplibre.org/style.json"),
   MAP_ATTRIBUTION: z.string().default("© OpenStreetMap contributors · MapLibre"),
   REPORTS_PER_HOUR_LIMIT: z.coerce.number().int().positive().default(10),
+  /** Límite general por persona (o por IP sin sesión), por minuto (ADR 0047). */
+  RATE_LIMIT_PER_MINUTE: z.coerce.number().int().positive().default(300),
+  RATE_LIMIT_WRITES_PER_MINUTE: z.coerce.number().int().positive().default(60),
+  /** Detrás de un CDN o balanceador: tomar la IP de X-Forwarded-For. Solo si ese proxy la fija. */
+  TRUST_PROXY: z.enum(["true", "false"]).default("false").transform((v) => v === "true"),
   PRESENCE_RETENTION_DAYS: z.coerce.number().int().positive().default(30),
   DATA_DIR: z.string().optional(),
   // Media. "local" solo fuera de producción; producción usa un almacenamiento compatible con S3.

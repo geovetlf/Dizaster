@@ -30,7 +30,7 @@ export interface TestContext {
   close(): Promise<void>;
 }
 
-export async function createTestContext(opts: { push?: PushSender } = {}): Promise<TestContext> {
+export async function createTestContext(opts: { push?: PushSender; env?: Record<string, string> } = {}): Promise<TestContext> {
   await resetDatabase();
   const env = loadEnv({
     NODE_ENV: "test",
@@ -41,6 +41,10 @@ export async function createTestContext(opts: { push?: PushSender } = {}): Promi
     STORAGE_DRIVER: "local",
     STORAGE_LOCAL_DIR: mkdtempSync(join(tmpdir(), "dizaster-storage-")),
     MEDIA_UPLOADS_PER_HOUR_LIMIT: "6",
+    // Las suites hacen cientos de peticiones seguidas desde la misma IP: el límite general se prueba aparte.
+    RATE_LIMIT_PER_MINUTE: "100000",
+    RATE_LIMIT_WRITES_PER_MINUTE: "100000",
+    ...opts.env,
   });
   const c = buildContainer(env, { push: opts.push ?? new LogPushSender(() => undefined) });
   await c.ingestion.syncRegistry(c.ref.sources);
