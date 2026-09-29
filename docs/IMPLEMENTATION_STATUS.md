@@ -107,9 +107,21 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | Envío real a teléfonos | ⏳ | necesita clave APNs y cuenta de servicio de Firebase (ver abajo) |
 | Alertas por cercanía a la ubicación actual | ⏳ | decisión de producto (D-16, sin ubicación en segundo plano) |
 
+## Etapa 8 — Costos: presupuestos, kill switches y tablero (hecha)
+
+| Área | Estado | Dónde |
+|---|---|---|
+| `CostGuard` persistido: presupuestos diarios/mensuales, gasto real, denegación al agotarse | ✅ | `services/core/src/modules/cost`, ADR 0019 |
+| Avisos al 50/80/100 % (una vez por periodo) por outbox | ✅ | `BudgetThresholdReached` |
+| Kill switches remotos (sin publicar versión) expuestos en `/v1/config` | ✅ | `cost.kill_switches` |
+| Uso medido por módulo, volcado en lote cada minuto | ✅ | `platform/metrics.ts`, `cost.usage_daily` |
+| Tablero: costo total, por módulo, diario y por 1.000 usuarios activos | ✅ | `GET /v1/admin/cost`, `pnpm cost:report`, pantalla "Costos" (admin) |
+| Precios de referencia versionados como datos | ✅ | `data/cost/prices.json` |
+| Avisar a administradores por push al cruzar un umbral | ⏳ | hoy va al log del worker |
+
 ## Siguiente etapa (en orden)
 
-1. Tablero de costo persistido y métricas por módulo.
+1. Métricas de calidad del producto (duplicados, tiempo hasta verificación) y aviso push de umbrales a administración.
 2. Identity real: Sign in with Apple, Google y email; App Attest / Play Integrity (necesita cuentas de Apple y Google).
 3. Social: negocios, etiquetas y menciones.
 

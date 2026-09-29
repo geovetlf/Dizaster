@@ -11,23 +11,36 @@ let stopping = false;
 let lastDaily = 0;
 let lastHourly = 0;
 let lastIngestionTick = 0;
+let lastMeterFlush = Date.now();
 
 async function loop() {
   while (!stopping) {
     const n = await c.dispatcher.runOnce(200);
+    c.meter.add("outbox", "events", n);
     // Entrega de alertas: barata (una consulta indexada) y justo después de procesar eventos de dominio.
     const pushed = await c.alerts.flush();
+    for (const [status, count] of Object.entries(pushed)) c.meter.add("alert", "notifications", count, status);
+    c.meter.add("push", "messages", pushed.SENT + pushed.GROUPED);
     if (pushed.SENT + pushed.GROUPED + pushed.FAILED > 0) console.log(JSON.stringify({ msg: "alerts.flush", ...pushed }));
     if (Date.now() - lastIngestionTick > 30_000) {
       lastIngestionTick = Date.now();
-      for (const run of await c.ingestionScheduler.tick()) console.log(JSON.stringify({ msg: "ingestion.run", ...run }));
+      for (const run of await c.ingestionScheduler.tick()) {
+        c.meter.add("ingestion", "fetches", 1, run.sourceKey);
+        c.meter.add("ingestion", "items_new", run.itemsNew, run.sourceKey);
+        console.log(JSON.stringify({ msg: "ingestion.run", ...run }));
+      }
     }
     if (Date.now() - lastHourly > 3600_000) {
       lastHourly = Date.now();
       console.log(JSON.stringify({ msg: "events.lifecycle", ...(await c.events.applyLifecycle(c.db, c.clock.now())) }));
     }
+    if (Date.now() - lastMeterFlush > 60_000) {
+      lastMeterFlush = Date.now();
+      await c.meter.flush(c.cost).catch((e: Error) => console.warn(JSON.stringify({ msg: "meter.flush", error: e.message })));
+    }
     if (Date.now() - lastDaily > 24 * 3600_000) {
       lastDaily = Date.now();
+      console.log(JSON.stringify({ msg: "retention.cost", ...(await c.cost.applyRetention()) }));
       const generalized = await c.reports.generalizeExpiredPresence();
       console.log(JSON.stringify({ msg: "retention.presence.generalized", count: generalized }));
       const media = await c.media.applyRetention();
@@ -35,6 +48,7 @@ async function loop() {
     }
     if (n === 0) await new Promise((r) => setTimeout(r, 1000));
   }
+  await c.meter.flush(c.cost).catch(() => undefined);
   await c.db.end();
 }
 

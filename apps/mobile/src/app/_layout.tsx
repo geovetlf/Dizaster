@@ -21,6 +21,7 @@ export default function RootLayout() {
         <Stack.Screen name="u/[handle]" options={{ title: "" }} />
         <Stack.Screen name="alerts" options={{ title: t("alertsTitle") }} />
         <Stack.Screen name="alert-settings" options={{ title: t("alertSettings") }} />
+        <Stack.Screen name="admin-cost" options={{ title: t("costTitle") }} />
       </Stack>
       <NotificationRouting />
     </SessionProvider>

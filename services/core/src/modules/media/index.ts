@@ -204,6 +204,15 @@ export class MediaService {
    * - subidas nunca completadas → DELETED y se borra lo que haya llegado;
    * - originales privados de media READY → se borran tras la retención (queda la variante pública saneada y el hash).
    */
+  /** Bytes guardados hoy en el almacenamiento de objetos (originales vigentes + variantes): base del costo de media. */
+  async storedBytes(q: Queryable): Promise<number> {
+    const { rows } = await q.query<{ n: string | null }>(
+      `SELECT (SELECT COALESCE(sum(bytes), 0) FROM media.media WHERE storage_key_original IS NOT NULL AND state NOT IN ('PENDING_UPLOAD','DELETED'))
+            + (SELECT COALESCE(sum(v.bytes), 0) FROM media.variants v JOIN media.media m ON m.id = v.media_id WHERE m.state <> 'DELETED') AS n`,
+    );
+    return Number(rows[0]?.n ?? 0);
+  }
+
   async applyRetention(now: Date = this.clock.now()): Promise<{ abandoned: number; originalsDeleted: number }> {
     const abandoned = await this.db.query<{ id: string; storage_key_original: string }>(
       `SELECT id, storage_key_original FROM media.media WHERE state = 'PENDING_UPLOAD' AND upload_expires_at < $1::timestamptz - interval '1 hour' LIMIT 500`,

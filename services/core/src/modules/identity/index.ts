@@ -171,6 +171,12 @@ export class IdentityService {
     return rows[0] ?? null;
   }
 
+  /** Cuentas activas desde `since` (un dispositivo suyo se conectó): denominador del costo por 1.000 usuarios. */
+  async activeUsers(q: Queryable, since: Date): Promise<number> {
+    const { rows } = await q.query<{ n: number }>(`SELECT count(DISTINCT user_id)::int AS n FROM identity.devices WHERE last_seen_at >= $1`, [since]);
+    return rows[0]?.n ?? 0;
+  }
+
   /** Antigüedad de cuentas en horas (Trust & Safety: las cuentas nuevas pesan menos en la corroboración). */
   async accountAgeHours(q: Queryable, userIds: string[]): Promise<Map<string, number>> {
     if (userIds.length === 0) return new Map();

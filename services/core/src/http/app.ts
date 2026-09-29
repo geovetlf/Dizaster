@@ -35,6 +35,14 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
     if (h?.startsWith("Bearer ")) req.session = await c.identity.verifyToken(h.slice(7));
   });
 
+  // Medición por grupo de rutas (/v1/<grupo>/...): peticiones y bytes de respuesta, agregados en memoria.
+  app.addHook("onResponse", async (req, reply) => {
+    const group = routeGroup(req.routeOptions.url);
+    c.meter.add("http", "requests", 1, group);
+    const len = Number(reply.getHeader("content-length") ?? 0);
+    if (len > 0) c.meter.add("http", "response_bytes", len, group);
+  });
+
   app.setErrorHandler((err, req, reply) => {
     if (err instanceof DomainError) return reply.status(err.httpStatus).send({ error: err.code, message: err.message });
     const status = (err as { statusCode?: number }).statusCode;
@@ -60,7 +68,7 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
         maxZoom: 18,
         offlineRegions: true,
       },
-      killSwitches: { ai: c.cost.isKilled("ai"), translation: c.cost.isKilled("translation"), sms: c.cost.isKilled("sms") },
+      killSwitches: { ai: await c.cost.isKilled("ai"), translation: await c.cost.isKilled("translation"), sms: await c.cost.isKilled("sms") },
       limits: { maxVideoSeconds: 60, maxReportsPerHour: c.env.REPORTS_PER_HOUR_LIMIT },
       referenceVersions: { categories: c.ref.categories.version, emergencyNumbers: c.ref.emergency.version },
     };
@@ -202,6 +210,13 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
     return c.feed.profilePosts(c.db, parse(HandleParam, req.params).handle, req.query, req.session?.profileId ?? null);
   });
 
+  /** Roles de la sesión: la app muestra herramientas de moderación o administración solo a quien las tiene. */
+  app.get("/v1/me/account", async (req, reply) => {
+    const session = requireSession(req);
+    reply.header("cache-control", "no-store");
+    return { roles: session.roles };
+  });
+
   app.get("/v1/me", async (req, reply) => {
     const session = requireSession(req);
     reply.header("cache-control", "no-store");
@@ -329,6 +344,28 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
     });
   }
 
+  // ───────────── Costos (rol admin): tablero, presupuestos y kill switches remotos ─────────────
+  const requireAdmin = (req: FastifyRequest) => {
+    const session = requireSession(req);
+    if (!session.roles.includes("admin")) throw forbidden("Solo administración");
+    return session;
+  };
+  app.get("/v1/admin/cost", async (req, reply) => {
+    requireAdmin(req);
+    // Lo medido en este proceso entra antes de leer: el tablero no va por detrás de sí mismo.
+    await c.meter.flush(c.cost);
+    reply.header("cache-control", "no-store");
+    return c.cost.dashboard(req.query);
+  });
+  app.put("/v1/admin/cost/budgets/:key", async (req) => {
+    const session = requireAdmin(req);
+    return c.cost.setBudget((req.params as { key: string }).key, req.body, session.userId);
+  });
+  app.put("/v1/admin/kill-switches/:feature", async (req) => {
+    const session = requireAdmin(req);
+    return c.cost.setKillSwitch((req.params as { feature: string }).feature, req.body, session.userId);
+  });
+
   // ───────────── Moderación (rol moderator) ─────────────
   app.post("/v1/moderation/events/:id/negative-state", async (req) => {
     const session = requireSession(req);
@@ -340,4 +377,11 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
   });
 
   return app;
+}
+
+/** "/v1/events/:id" → "events". Sin ruta (404) → "unmatched"; fuera de /v1 → primer segmento. */
+export function routeGroup(url: string | undefined): string {
+  if (!url) return "unmatched";
+  const parts = url.split("/").filter(Boolean);
+  return (parts[0] === "v1" ? parts[1] : parts[0])?.replace(/^:.*/, "param") ?? "root";
 }

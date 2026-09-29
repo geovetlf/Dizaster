@@ -13,7 +13,9 @@
     "worker": "node dist/worker.js",
     "migrate": "node dist/migrate-cli.js",
     "geo:import": "node dist/geo-import-cli.js",
-    "geo:import:dev": "tsx src/geo-import-cli.ts"
+    "geo:import:dev": "tsx src/geo-import-cli.ts",
+    "cost:report": "node dist/cost-report-cli.js",
+    "grant-role": "node dist/grant-role-cli.js"
   },
   "dependencies": {
     "@dizaster/contracts": "workspace:*",

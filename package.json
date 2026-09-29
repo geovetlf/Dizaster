@@ -14,7 +14,9 @@
     "check:boundaries": "node scripts/check-module-boundaries.mjs",
     "check": "pnpm lint && pnpm check:boundaries && pnpm typecheck && pnpm build && pnpm test",
     "db:migrate": "pnpm --filter @dizaster/core run build && pnpm --filter @dizaster/core run migrate",
-    "geo:import": "pnpm --filter @dizaster/core run build && pnpm --filter @dizaster/core run geo:import"
+    "geo:import": "pnpm --filter @dizaster/core run build && pnpm --filter @dizaster/core run geo:import",
+    "cost:report": "pnpm --filter @dizaster/core run build && pnpm --filter @dizaster/core run cost:report",
+    "grant-role": "pnpm --filter @dizaster/core run build && pnpm --filter @dizaster/core run grant-role"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.0",

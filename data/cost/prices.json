@@ -1,0 +1,42 @@
+{
+  "version": "2026.09.1",
+  "currency": "USD",
+  "note": "Precios de referencia para estimar, no cotizaciones. Se revisan antes de contratar (Blueprint §12.3).",
+  "storageGbMonthUsd": {
+    "media": 0.015,
+    "database": 0.0
+  },
+  "unitPrices": {
+    "push.messages": {
+      "usd": 0,
+      "note": "APNs y FCM directos son gratuitos"
+    },
+    "http.requests": {
+      "usd": 0,
+      "note": "Incluido en el cómputo fijo"
+    },
+    "http.response_bytes": {
+      "usd": 0,
+      "note": "Egreso incluido en el plan del servidor; media sale por almacenamiento sin egreso"
+    },
+    "ingestion.fetches": {
+      "usd": 0,
+      "note": "Fuentes abiertas sin coste por petición"
+    },
+    "geo.context_lookups": {
+      "usd": 0,
+      "note": "Índice propio, sin geocodificador comercial"
+    },
+    "alert.notifications": {
+      "usd": 0
+    },
+    "outbox.events": {
+      "usd": 0
+    },
+    "ingestion.items_new": {
+      "usd": 0
+    }
+  },
+  "fixedMonthlyUsd": null,
+  "fixedMonthlyNote": "Pendiente: proveedor de cómputo y base de datos sin aprobar (D-18)."
+}

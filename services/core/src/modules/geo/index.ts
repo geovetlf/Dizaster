@@ -4,6 +4,7 @@ import { AreaSearchQuery, type AreaSearchResult, type ContextualLocation, type G
 import { CountryLocator, H3_RES, distanceMeters, generalize, h3, type CountryFeature } from "@dizaster/geo-kit";
 import type { Queryable } from "../../platform/db.js";
 import { DomainError } from "../../platform/errors.js";
+import type { Meter } from "../../platform/metrics.js";
 import type { ReferenceData } from "../reference/index.js";
 import { labelFor, toContextualLocation, type ResolvedContext } from "./context.js";
 import { searchKey } from "./names.js";
@@ -35,6 +36,7 @@ export class GeoService {
   constructor(
     dataDir: string,
     private readonly ref: ReferenceData,
+    private readonly meter?: Meter,
   ) {
     const fc = JSON.parse(readFileSync(join(dataDir, "countries/countries-50m.geojson"), "utf8")) as { features: CountryFeature[] };
     this.locator = new CountryLocator(fc.features);
@@ -71,7 +73,11 @@ export class GeoService {
   async resolveAdmin(q: Queryable, point: GeoPoint): Promise<ResolvedContext> {
     const cell = h3(point, CACHE_RES);
     const cached = await q.query<{ context: ResolvedContext }>(`SELECT context FROM geo.context_cache WHERE cell = $1::h3index`, [cell]);
-    if (cached.rows[0]) return cached.rows[0].context;
+    if (cached.rows[0]) {
+      this.meter?.add("geo", "context_lookups", 1, "cache");
+      return cached.rows[0].context;
+    }
+    this.meter?.add("geo", "context_lookups", 1, "index");
     const ctx = await this.lookup(q, point);
     await q.query(`INSERT INTO geo.context_cache (cell, context) VALUES ($1::h3index, $2) ON CONFLICT (cell) DO NOTHING`, [cell, JSON.stringify(ctx)]);
     return ctx;

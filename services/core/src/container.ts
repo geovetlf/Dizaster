@@ -2,10 +2,11 @@ import { createHmac } from "node:crypto";
 import { resolve } from "node:path";
 import { decodeSecret, type AppEnv } from "./platform/config.js";
 import { systemClock, type Clock } from "./platform/clock.js";
-import { InMemoryCostGuard } from "./platform/cost-guard.js";
+import { Meter } from "./platform/metrics.js";
 import { createPool, type Db } from "./platform/db.js";
 import { OutboxDispatcher } from "./platform/outbox.js";
 import { defaultDataDir } from "./platform/paths.js";
+import { CostService } from "./modules/cost/index.js";
 import { EventService } from "./modules/event/index.js";
 import { FeedService } from "./modules/feed/index.js";
 import { AlertService, ApnsSender, FcmSender, LogPushSender, PushGateway, type FcmServiceAccount, type PushSender } from "./modules/alert/index.js";
@@ -37,15 +38,17 @@ export interface Container {
   feed: FeedService;
   alerts: AlertService;
   dispatcher: OutboxDispatcher;
-  cost: InMemoryCostGuard;
+  cost: CostService;
+  meter: Meter;
 }
 
 export function buildContainer(env: AppEnv, overrides: { db?: Db; clock?: Clock; attestation?: AttestationVerifier; fetcher?: HttpFetcher; storage?: StorageProvider; push?: PushSender } = {}): Container {
   const db = overrides.db ?? createPool(env.DATABASE_URL);
   const clock = overrides.clock ?? systemClock;
+  const meter = new Meter(() => clock.now());
   const dataDir = env.DATA_DIR ?? defaultDataDir();
   const ref = new ReferenceData(dataDir);
-  const geo = new GeoService(dataDir, ref);
+  const geo = new GeoService(dataDir, ref, meter);
   const social = new SocialService();
   const identity = new IdentityService(db, social, env.AUTH_JWT_SECRET);
   const events = new EventService(ref, geo);
@@ -74,9 +77,12 @@ export function buildContainer(env: AppEnv, overrides: { db?: Db; clock?: Clock;
   feed.registerHandlers(dispatcher);
   const alerts = new AlertService(db, ref, events, social, identity, geo, overrides.push ?? buildPush(env, clock), clock);
   alerts.registerHandlers(dispatcher);
-  // Presupuestos iniciales: las funciones de pago están a 0 hasta que se aprueben (cost-first).
-  const cost = new InMemoryCostGuard({ "ai.daily": 0, "sms.daily": 0, "translation.daily": 0 }, { ai: true, sms: true, translation: true });
-  return { env, db, clock, ref, geo, social, identity, events, ingestion, ingestionScheduler, verification, media, storage, reports, feed, alerts, dispatcher, cost };
+  // Presupuestos y kill switches persistidos: las funciones de pago empiezan a 0 y apagadas (migración 0009).
+  const cost = new CostService(db, identity, media, clock, dataDir);
+  dispatcher.on("BudgetThresholdReached", "cost.log-threshold", async (e) => {
+    console.warn(JSON.stringify({ msg: "cost.budget.threshold", ...e.payload }));
+  });
+  return { env, db, clock, ref, geo, social, identity, events, ingestion, ingestionScheduler, verification, media, storage, reports, feed, alerts, dispatcher, cost, meter };
 }
 
 /** APNs y FCM directos. Si falta la credencial de una plataforma, sus avisos quedan solo en el historial. */

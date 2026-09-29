@@ -1,4 +1,4 @@
-import type { AlertPreferences, CategorySubscription, CategorySubscriptionInput, NotificationsResponse, AppConfig, AreaSearchResult, FollowTarget, MyFollows, ProfileSearchResult, ProfileView, CommentView, CreateUploadRequest, FeedResponse, FeedTab, CreateUploadResponse, DevicePlatform, MediaView, RegisterPushTokenRequest, EventMapResponse, EventSummary, NearbyEventsResponse, SubmitReportRequest, SubmitReportResponse, TimelineEntryView } from "@dizaster/contracts";
+import type { CostDashboard, KillSwitchView, AlertPreferences, CategorySubscription, CategorySubscriptionInput, NotificationsResponse, AppConfig, AreaSearchResult, FollowTarget, MyFollows, ProfileSearchResult, ProfileView, CommentView, CreateUploadRequest, FeedResponse, FeedTab, CreateUploadResponse, DevicePlatform, MediaView, RegisterPushTokenRequest, EventMapResponse, EventSummary, NearbyEventsResponse, SubmitReportRequest, SubmitReportResponse, TimelineEntryView } from "@dizaster/contracts";
 import { API_URL } from "./config";
 import type { Sender } from "./report/queue";
 
@@ -70,6 +70,10 @@ export const api = {
   /** Sin ids: marca todo como leído. */
   markNotificationsRead: (ids?: string[]) =>
     request<{ unread: number }>("/v1/me/notifications/read", { method: "POST", ...(ids ? { body: JSON.stringify({ ids }) } : {}) }),
+  account: () => request<{ roles: string[] }>("/v1/me/account"),
+  costDashboard: (days = 30) => request<CostDashboard>(`/v1/admin/cost?days=${days}`),
+  setKillSwitch: (feature: string, killed: boolean) =>
+    request<KillSwitchView>(`/v1/admin/kill-switches/${encodeURIComponent(feature)}`, { method: "PUT", body: JSON.stringify({ killed }) }),
   myFollows: () => request<MyFollows>("/v1/me/follows"),
   follow: (target: FollowTarget, id: string, on: boolean) =>
     request<{ following: boolean }>(`/v1/follows/${target}/${encodeURIComponent(id)}`, { method: on ? "PUT" : "DELETE" }),
