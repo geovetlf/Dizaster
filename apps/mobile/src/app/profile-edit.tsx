@@ -1,4 +1,4 @@
-import type { MyProfile, Units } from "@dizaster/contracts";
+import type { MentionsFrom, MyProfile, Units } from "@dizaster/contracts";
 import { router } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
@@ -21,6 +21,8 @@ export default function ProfileEditScreen() {
   const [name, setName] = useState("");
   const [bio, setBio] = useState("");
   const [units, setUnitsState] = useState<Units>("metric");
+  // Quién puede mencionarte (ADR 0137).
+  const [mentionsFrom, setMentionsFrom] = useState<MentionsFrom>("EVERYONE");
   const [country, setCountry] = useState<string | null>(null);
   const [countryQuery, setCountryQuery] = useState("");
   const options = useMemo(() => countryOptions(lang), []);
@@ -28,7 +30,7 @@ export default function ProfileEditScreen() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    api.me().then((m) => { setMe(m); setName(m.displayName); setBio(m.bio ?? ""); setUnitsState(m.units); setCountry(m.country); }).catch((e: Error) => setError(e.message));
+    api.me().then((m) => { setMe(m); setName(m.displayName); setBio(m.bio ?? ""); setUnitsState(m.units); setCountry(m.country); setMentionsFrom(m.mentionsFrom); }).catch((e: Error) => setError(e.message));
   }, []);
 
   async function save() {
@@ -36,7 +38,7 @@ export default function ProfileEditScreen() {
     setBusy(true);
     setError(null);
     try {
-      const saved = await api.updateMe({ displayName: name.trim(), bio: bio.trim() || null, units, country });
+      const saved = await api.updateMe({ displayName: name.trim(), bio: bio.trim() || null, units, country, mentionsFrom });
       setUnits(saved.units);
       setPreferredCountry(saved.country);
       forgetMe();
@@ -66,6 +68,15 @@ export default function ProfileEditScreen() {
           <Pressable key={u} accessibilityRole="button" accessibilityState={{ selected: units === u }} onPress={() => setUnitsState(u)}
             style={[styles.chip, units === u && styles.chipOn]}>
             <Text style={styles.chipText}>{t(u === "metric" ? "unitsMetric" : "unitsImperial")}</Text>
+          </Pressable>
+        ))}
+      </View>
+      <Text style={styles.label}>{t("mentionsFrom")}</Text>
+      <View style={styles.row}>
+        {(["EVERYONE", "FOLLOWING", "NOBODY"] as const).map((v) => (
+          <Pressable key={v} accessibilityRole="button" accessibilityState={{ selected: mentionsFrom === v }} onPress={() => setMentionsFrom(v)}
+            style={[styles.chip, mentionsFrom === v && styles.chipOn]}>
+            <Text style={styles.chipText}>{t(`mentionsFrom_${v}`)}</Text>
           </Pressable>
         ))}
       </View>

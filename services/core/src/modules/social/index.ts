@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { ChronoPageQuery, POST_EDIT_WINDOW_HOURS, detectLanguage, detectPersonalData, extractMentions, extractTags, textFingerprintBase, type CommentView, type FeedTab, type GeoPoint, type PostAuthor, type ProfileSearchResult, type ReactionCounts, type ReactionKind, type ReactionState, type CommentReactionKind, type Units, type UpdateProfileRequest, type ProfileView, type TagView } from "@dizaster/contracts";
+import { ChronoPageQuery, POST_EDIT_WINDOW_HOURS, type MentionsFrom, detectLanguage, detectPersonalData, extractMentions, extractTags, textFingerprintBase, type CommentView, type FeedTab, type GeoPoint, type PostAuthor, type ProfileSearchResult, type ReactionCounts, type ReactionKind, type ReactionState, type CommentReactionKind, type Units, type UpdateProfileRequest, type ProfileView, type TagView } from "@dizaster/contracts";
 import type { Queryable } from "../../platform/db.js";
 import { publish, type OutboxDispatcher } from "../../platform/outbox.js";
 import { DomainError, notFound } from "../../platform/errors.js";
@@ -485,6 +485,10 @@ export class SocialService {
        SELECT $1, pr.id FROM social.profiles pr
         WHERE lower(pr.handle) = ANY($2) AND pr.deleted_at IS NULL AND pr.id <> $3
           AND NOT EXISTS (SELECT 1 FROM social.blocks b WHERE b.blocker_profile_id = pr.id AND b.blocked_profile_id = $3)
+          -- Quién puede mencionarte (ADR 0137): una mención no permitida queda como texto, sin enlace ni aviso.
+          AND (pr.mentions_from = 'EVERYONE'
+               OR (pr.mentions_from = 'FOLLOWING' AND EXISTS (SELECT 1 FROM social.follows f
+                    WHERE f.follower_profile_id = pr.id AND f.target_type = 'PROFILE' AND f.target_id = $3::text)))
        ON CONFLICT DO NOTHING
        RETURNING profile_id, (SELECT handle FROM social.profiles WHERE id = profile_id) AS handle`,
       [postId, handles, authorProfileId],
@@ -756,11 +760,11 @@ export class SocialService {
   }
 
   /** Ajustes propios del perfil (no públicos). */
-  async settings(q: Queryable, profileId: string): Promise<{ units: Units; country: string | null }> {
-    const { rows } = await q.query<{ units: Units; home_country: string | null }>(
-      `SELECT units, home_country FROM social.profiles WHERE id = $1 AND deleted_at IS NULL`, [profileId]);
+  async settings(q: Queryable, profileId: string): Promise<{ units: Units; country: string | null; mentionsFrom: MentionsFrom }> {
+    const { rows } = await q.query<{ units: Units; home_country: string | null; mentions_from: MentionsFrom }>(
+      `SELECT units, home_country, mentions_from FROM social.profiles WHERE id = $1 AND deleted_at IS NULL`, [profileId]);
     if (!rows[0]) throw notFound("Perfil");
-    return { units: rows[0].units, country: rows[0].home_country?.trim() ?? null };
+    return { units: rows[0].units, country: rows[0].home_country?.trim() ?? null, mentionsFrom: rows[0].mentions_from };
   }
 
   /** Editar mi perfil (ADR 0044). La bio vacía se guarda como NULL. */
@@ -771,6 +775,7 @@ export class SocialService {
     if (patch.bio !== undefined) sets.push(`bio = $${params.push(patch.bio ? patch.bio : null)}`);
     if (patch.units !== undefined) sets.push(`units = $${params.push(patch.units)}`);
     if (patch.country !== undefined) sets.push(`home_country = $${params.push(patch.country)}`);
+    if (patch.mentionsFrom !== undefined) sets.push(`mentions_from = $${params.push(patch.mentionsFrom)}`);
     const res = await q.query(`UPDATE social.profiles SET ${sets.join(", ")}, updated_at = now() WHERE id = $1 AND deleted_at IS NULL`, params);
     if (res.rowCount === 0) throw notFound("Perfil");
   }

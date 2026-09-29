@@ -166,6 +166,13 @@ export function reactionKindsFor(post: { event: unknown }): ReactionKind[] {
 export const Units = z.enum(["metric", "imperial"]);
 export type Units = z.infer<typeof Units>;
 
+/**
+ * Quién puede mencionarte (ADR 0137): todos, solo quienes sigues, o nadie. Una mención no permitida queda como texto:
+ * no enlaza ni avisa. En V1 no hay perfil privado (decisión del propietario).
+ */
+export const MentionsFrom = z.enum(["EVERYONE", "FOLLOWING", "NOBODY"]);
+export type MentionsFrom = z.infer<typeof MentionsFrom>;
+
 /** Mi perfil: lo público más mis ajustes (ADR 0044). */
 export interface MyProfile extends ProfileView {
   units: Units;
@@ -174,6 +181,7 @@ export interface MyProfile extends ProfileView {
    * emergencia y "todo el país" en alertas. `null` = sin elegir.
    */
   country: string | null;
+  mentionsFrom: MentionsFrom;
 }
 
 /** Cambios de mi perfil. El handle no se cambia en V1: rompería menciones y enlaces compartidos. */
@@ -185,6 +193,7 @@ export const UpdateProfileRequest = z
     units: Units.optional(),
     /** `null` = quitarlo. El servidor comprueba que exista en el dataset de fronteras. */
     country: z.string().regex(/^[A-Z]{2}$/).nullable().optional(),
+    mentionsFrom: MentionsFrom.optional(),
   })
   .refine((v) => Object.keys(v).length > 0, "Nada que cambiar");
 export type UpdateProfileRequest = z.infer<typeof UpdateProfileRequest>;
