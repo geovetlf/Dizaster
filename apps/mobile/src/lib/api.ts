@@ -2,6 +2,7 @@ import type { EventSourceView, EventStatus, MyProfile, UpdateProfileRequest, Rea
 import { mergeMapTiles, tilesForView } from "@dizaster/geo-kit";
 import { canRetryWithRefresh, singleFlight } from "./auth/refresh";
 import { API_URL } from "./config";
+import { EtagCache } from "./http/etag-cache";
 import type { Sender } from "./report/queue";
 
 export interface TokenPair { token: string; refreshToken: string; expiresIn: number }
@@ -12,6 +13,8 @@ let listeners: { rotated?: (refreshToken: string) => void; lost?: () => void } =
 
 /** Sesión actual. `null` al borrar la cuenta. */
 export function setSession(pair: Pick<TokenPair, "token" | "refreshToken"> | null) {
+  // Al cerrar o perder la sesión se vacía la caché condicional: la próxima cuenta no ve respuestas de la anterior.
+  if (!pair) etags.clear();
   token = pair?.token ?? null;
   refreshToken = pair?.refreshToken ?? null;
 }
@@ -40,16 +43,25 @@ const renew = singleFlight(async (): Promise<boolean> => {
  */
 const NO_AUTH_PREFIXES = ["/v1/auth/", "/v1/events/tiles/"];
 
+/** GET condicionales con ETag (ADR 0084): un 304 reutiliza el cuerpo ya descargado. */
+const etags = new EtagCache();
+
 async function request<T>(path: string, init: RequestInit = {}, retried = false): Promise<T> {
   const auth: Record<string, string> = token && !NO_AUTH_PREFIXES.some((p) => path.startsWith(p)) ? { authorization: `Bearer ${token}` } : {};
+  const isGet = (init.method ?? "GET") === "GET";
   const res = await fetch(`${API_URL}${path}`, {
     ...init,
     // Sin cuerpo no se declara JSON: el servidor rechaza un cuerpo JSON vacío (p. ej. DELETE o POST .../complete).
-    headers: { ...(init.body ? { "content-type": "application/json" } : {}), ...auth, ...(init.headers ?? {}) },
+    headers: { ...(init.body ? { "content-type": "application/json" } : {}), ...auth, ...(isGet ? etags.headers(path) : {}), ...(init.headers ?? {}) },
   });
   if (canRetryWithRefresh(path, res.status, retried, refreshToken !== null) && (await renew())) return request<T>(path, init, true);
+  if (res.status === 304 && isGet) {
+    const cached = etags.hit(path);
+    if (cached !== undefined) return cached as T;
+  }
   const body = (await res.json().catch(() => ({}))) as T & { message?: string };
   if (!res.ok) throw Object.assign(new Error(body.message ?? `HTTP ${res.status}`), { status: res.status, body });
+  if (isGet) etags.store(path, res.headers.get("etag"), body);
   return body;
 }
 

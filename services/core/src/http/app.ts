@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { MEDIA_KILL_SWITCHES } from "@dizaster/contracts";
 import { isValidTile, tileBounds } from "@dizaster/geo-kit";
 import Fastify, { type FastifyInstance, type FastifyRequest } from "fastify";
@@ -81,6 +82,23 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
     if (req.session && req.method !== "GET" && req.method !== "HEAD" && !WRITE_ALLOWED_WHEN_SUSPENDED.test(`${req.method} ${req.url.split("?")[0]}`)) {
       await c.identity.assertCanWrite(req.session.userId, { requireAge: AGE_REQUIRED.test(`${req.method} ${req.url.split("?")[0]}`) });
     }
+  });
+
+  // ETag en recursos cacheables (ADR 0084, §6.3): la app o la CDN revalidan con If-None-Match y reciben 304 sin
+  // cuerpo si nada cambió. Solo GET 200 con cache-control public/private (nunca no-store). Hash del cuerpo: sin estado.
+  app.addHook("onSend", async (req, reply, payload) => {
+    if (req.method !== "GET" || reply.statusCode !== 200) return payload;
+    const cc = String(reply.getHeader("cache-control") ?? "");
+    if (!/\b(public|private)\b/.test(cc) || /no-store/.test(cc)) return payload;
+    if (typeof payload !== "string" && !Buffer.isBuffer(payload)) return payload;
+    const etag = weakEtag(payload);
+    reply.header("etag", etag);
+    if (ifNoneMatch(req.headers["if-none-match"], etag)) {
+      reply.code(304);
+      reply.removeHeader("content-length");
+      return "";
+    }
+    return payload;
   });
 
   // Medición por grupo de rutas (/v1/<grupo>/...): peticiones y bytes de respuesta, agregados en memoria.
@@ -842,4 +860,16 @@ export function routeGroup(url: string | undefined): string {
   if (!url) return "unmatched";
   const parts = url.split("/").filter(Boolean);
   return (parts[0] === "v1" ? parts[1] : parts[0])?.replace(/^:.*/, "param") ?? "root";
+}
+
+/** ETag débil: el mismo JSON da la misma etiqueta en cualquier instancia (ADR 0084). */
+export function weakEtag(body: string | Buffer): string {
+  return `W/"${createHash("sha256").update(body).digest("base64url").slice(0, 27)}"`;
+}
+
+/** ¿Alguna de las etiquetas de If-None-Match coincide? Comparación débil (RFC 9110 §13.1.2). */
+export function ifNoneMatch(header: string | string[] | undefined, etag: string): boolean {
+  if (!header) return false;
+  const strip = (x: string) => x.trim().replace(/^W\//, "");
+  return (Array.isArray(header) ? header.join(",") : header).split(",").some((t) => t.trim() === "*" || strip(t) === strip(etag));
 }
