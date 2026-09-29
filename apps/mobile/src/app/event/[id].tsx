@@ -19,6 +19,7 @@ import { shareUrl } from "../../lib/links";
 import { canStateOn } from "../../lib/social/business";
 import { openFlag } from "../../lib/moderation/menu";
 import { colors, radius, space } from "../../theme";
+import { appendPage, newestFirst } from "../../lib/ui/pages";
 
 const TIMELINE_SHOWN = 12;
 
@@ -27,6 +28,8 @@ export default function EventScreen() {
   const { id, hops } = useLocalSearchParams<{ id: string; hops?: string }>();
   const [event, setEvent] = useState<EventSummary | null>(null);
   const [timeline, setTimeline] = useState<TimelineEntryView[]>([]);
+  // Timeline por páginas, de lo más reciente hacia atrás (ADR 0106).
+  const [timelineNext, setTimelineNext] = useState<string | null>(null);
   const [media, setMedia] = useState<MediaView[]>([]);
   const [verification, setVerification] = useState<VerificationView | null>(null);
   const [sources, setSources] = useState<EventSourceView[]>([]);
@@ -38,12 +41,12 @@ export default function EventScreen() {
   useEffect(() => {
     if (!id) return;
     // Sin red se muestra la última versión guardada del evento (ADR 0066).
-    readThrough(readCache(), cacheKeys.event(id), () => Promise.all([api.event(id), api.timeline(id)]))
+    readThrough(readCache(), cacheKeys.event(id), () => Promise.all([api.event(id), api.timeline(id, { order: "desc", limit: TIMELINE_SHOWN })]))
       .then(({ value: [e, tl], savedAt }) => {
         // Evento fusionado (ADR 0093): enlaces, avisos y seguidos antiguos llevan al evento que queda.
         const target = mergedTarget(e, Number(hops ?? 0));
         if (target) { router.replace(`/event/${target}?hops=${Number(hops ?? 0) + 1}`); return; }
-        setEvent(e); setTimeline(tl.entries); setSavedAt(savedAt);
+        setEvent(e); setTimeline(tl.entries); setTimelineNext(tl.nextCursor ?? null); setSavedAt(savedAt);
       })
       .catch((e: Error) => setError(e.message));
     // La media es secundaria: si falla, el evento se muestra igual.
@@ -128,10 +131,20 @@ export default function EventScreen() {
       ) : null}
       <EventMedia media={media} />
       <Text style={styles.section}>{t("timeline")}</Text>
-      {/* Lo más reciente primero; la historia completa vive en el servidor. */}
-      {timeline.slice(-TIMELINE_SHOWN).reverse().map((item) => (
+      {/* Lo más reciente primero; lo anterior se pide por páginas. */}
+      {newestFirst(timeline).map((item) => (
         <Text key={item.id} style={styles.entry}>{eventTime(item.at, lang, event?.place?.timezone, zoneLabels(), "time")} · {timelineLabel(item.type, t)}</Text>
       ))}
+      {timelineNext && id ? (
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => void api.timeline(id, { order: "desc", limit: TIMELINE_SHOWN, cursor: timelineNext })
+            .then((r) => { setTimeline((prev) => appendPage(prev, r.entries)); setTimelineNext(r.nextCursor ?? null); })
+            .catch(() => undefined)}
+        >
+          <Text style={[styles.entry, styles.link]}>{t("showEarlier")}</Text>
+        </Pressable>
+      ) : null}
       <Text style={[styles.section, styles.postsTitle]}>{t("eventPosts")}</Text>
     </View>
   );

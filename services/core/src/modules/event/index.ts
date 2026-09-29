@@ -17,7 +17,7 @@ import type {
   TrustTier,
   VerificationLevel,
 } from "@dizaster/contracts";
-import { AreaGeometry, EventSearchQuery, VERIFICATION_LEVEL_RANK, publicVerificationState } from "@dizaster/contracts";
+import { AreaGeometry, ChronoPageQuery, EventSearchQuery, VERIFICATION_LEVEL_RANK, publicVerificationState } from "@dizaster/contracts";
 import {
   DEDUP_RULES,
   H3_RES,
@@ -806,11 +806,30 @@ export class EventService {
       `SELECT id, type, at, payload FROM event.timeline WHERE event_id = $1 AND visibility = 'PUBLIC' ORDER BY at, id`,
       [eventId],
     );
-    // Marcas internas (de qué reporte o fusión viene una foto) no salen en la timeline pública.
-    return rows.map((r) => {
-      const { reportId: _r, viaMerge: _m, ...payload } = r.payload;
-      return { id: r.id, type: r.type, at: r.at.toISOString(), payload };
-    });
+    return rows.map(publicEntry);
+  }
+
+  /**
+   * Timeline pública por páginas (ADR 0106). El cursor es el id del último elemento: se compara por `(at, id)`
+   * con la fila real, así no se pierde precisión de microsegundos. Un cursor que no es de este evento da 400.
+   */
+  async timelinePage(q: Queryable, eventId: string, raw: unknown): Promise<{ entries: TimelineEntryView[]; nextCursor: string | null }> {
+    const p = parseChrono(raw);
+    const cmp = p.order === "asc" ? ">" : "<";
+    const dir = p.order === "asc" ? "ASC" : "DESC";
+    if (p.cursor) {
+      const c = await q.query(`SELECT 1 FROM event.timeline WHERE id = $1 AND event_id = $2 AND visibility = 'PUBLIC'`, [p.cursor, eventId]);
+      if (!c.rowCount) throw new DomainError("VALIDATION", "Cursor inválido");
+    }
+    const { rows } = await q.query<{ id: string; type: TimelineEntryView["type"]; at: Date; payload: Record<string, unknown> }>(
+      `SELECT t.id, t.type, t.at, t.payload FROM event.timeline t
+        WHERE t.event_id = $1 AND t.visibility = 'PUBLIC'
+          AND ($2::uuid IS NULL OR (t.at, t.id) ${cmp} (SELECT c.at, c.id FROM event.timeline c WHERE c.id = $2::uuid))
+        ORDER BY t.at ${dir}, t.id ${dir} LIMIT $3`,
+      [eventId, p.cursor ?? null, p.limit],
+    );
+    const entries = rows.map(publicEntry);
+    return { entries, nextCursor: rows.length === p.limit ? rows[rows.length - 1]!.id : null };
   }
 
   /** `verifiedOnly` (ADR 0057): solo corroborados o confirmados y sin disputa. */
@@ -1112,4 +1131,16 @@ export function nextPublication(
   if (s.hasNonCitizen) return "PUBLISHED";
   if (current === "PENDING_CORROBORATION" && s.distinctContributors >= 2) return s.delayPending ? "DELAYED" : "PUBLISHED";
   return current;
+}
+
+/** Marcas internas (de qué reporte o fusión viene una foto) no salen en la timeline pública. */
+function publicEntry(r: { id: string; type: TimelineEntryView["type"]; at: Date; payload: Record<string, unknown> }): TimelineEntryView {
+  const { reportId: _r, viaMerge: _m, ...payload } = r.payload;
+  return { id: r.id, type: r.type, at: r.at.toISOString(), payload };
+}
+
+function parseChrono(raw: unknown): ChronoPageQuery {
+  const r = ChronoPageQuery.safeParse(raw ?? {});
+  if (!r.success) throw new DomainError("VALIDATION", r.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; "));
+  return r.data;
 }

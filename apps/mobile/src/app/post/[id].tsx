@@ -14,11 +14,15 @@ import { useMe } from "../../lib/social/me";
 import { applyReaction } from "../../lib/social/reactions";
 import { timeAgo } from "../../lib/ui/format";
 import { colors, radius, space } from "../../theme";
+import { appendPage } from "../../lib/ui/pages";
 
 /** Una publicación y sus comentarios. Destino de dizaster://post/<id> y https://<dominio>/p/<id> (ADR 0083). */
 export default function PostCommentsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [comments, setComments] = useState<CommentView[]>([]);
+  // Siguiente página de comentarios (ADR 0106); null cuando ya están todos.
+  const [next, setNext] = useState<string | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [text, setText] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -29,7 +33,7 @@ export default function PostCommentsScreen() {
   useEffect(() => {
     if (!id) return;
     api.post(id).then(setPost).catch(() => setPost(null));
-    api.comments(id).then((r) => setComments(r.comments)).catch(() => setError(t("loadError")));
+    api.comments(id).then((r) => { setComments(r.comments); setNext(r.nextCursor ?? null); }).catch(() => setError(t("loadError")));
   }, [id]);
 
   async function send() {
@@ -37,7 +41,7 @@ export default function PostCommentsScreen() {
     setBusy(true);
     try {
       const c = await api.addComment(id, text.trim(), replyTo?.id);
-      setComments((prev) => [...prev, c]);
+      setComments((prev) => appendPage(prev, [c]));
       setText("");
       setReplyTo(null);
       setError(null);
@@ -60,6 +64,15 @@ export default function PostCommentsScreen() {
     }
   }
 
+  function loadMore() {
+    if (!id || !next || loadingMore) return;
+    setLoadingMore(true);
+    api.comments(id, next)
+      .then((r) => { setComments((prev) => appendPage(prev, r.comments)); setNext(r.nextCursor ?? null); })
+      .catch(() => setError(t("loadError")))
+      .finally(() => setLoadingMore(false));
+  }
+
   function confirmDelete(c: CommentView) {
     Alert.alert(t("deleteComment"), t("deleteCommentConfirm"), [
       { text: t("cancel"), style: "cancel" },
@@ -76,6 +89,8 @@ export default function PostCommentsScreen() {
         data={threadComments(comments)}
         keyExtractor={(x) => x.comment.id}
         contentContainerStyle={styles.list}
+        onEndReached={loadMore}
+        onEndReachedThreshold={0.5}
         ListHeaderComponent={post ? <PostCard post={post} categoryName={categoryName} /> : null}
         renderItem={({ item: { comment: item, reply } }) => {
           const liked = item.myReactions.includes("LIKE");

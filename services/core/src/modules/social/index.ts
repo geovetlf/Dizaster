@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { detectLanguage, detectPersonalData, extractMentions, extractTags, textFingerprintBase, type CommentView, type FeedTab, type GeoPoint, type PostAuthor, type ProfileSearchResult, type ReactionCounts, type ReactionKind, type ReactionState, type CommentReactionKind, type Units, type UpdateProfileRequest, type ProfileView, type TagView } from "@dizaster/contracts";
+import { ChronoPageQuery, detectLanguage, detectPersonalData, extractMentions, extractTags, textFingerprintBase, type CommentView, type FeedTab, type GeoPoint, type PostAuthor, type ProfileSearchResult, type ReactionCounts, type ReactionKind, type ReactionState, type CommentReactionKind, type Units, type UpdateProfileRequest, type ProfileView, type TagView } from "@dizaster/contracts";
 import type { Queryable } from "../../platform/db.js";
 import { publish, type OutboxDispatcher } from "../../platform/outbox.js";
 import { DomainError, notFound } from "../../platform/errors.js";
@@ -755,11 +755,32 @@ export class SocialService {
     const id = newId();
     await q.query(`INSERT INTO social.comments (id, post_id, author_profile_id, text, parent_comment_id) VALUES ($1, $2, $3, $4, $5)`, [id, postId, profileId, text, parent]);
     await this.detectPersonalData(q, "COMMENT", id, text, null);
-    return (await this.comments(q, postId, profileId)).find((c) => c.id === id)!;
+    return (await this.commentRows(q, postId, profileId, { onlyId: id }))[0]!;
   }
 
-  async comments(q: Queryable, postId: string, viewerProfileId: string | null = null): Promise<CommentView[]> {
+  /**
+   * Comentarios por páginas (ADR 0106): cursor = id del último comentario recibido, comparado por `(created_at, id)`
+   * con la fila real. Por defecto, de lo más antiguo a lo más nuevo: una respuesta siempre llega después que su padre.
+   */
+  async comments(q: Queryable, postId: string, viewerProfileId: string | null = null, raw: unknown = {}): Promise<{ comments: CommentView[]; nextCursor: string | null }> {
+    const r = ChronoPageQuery.safeParse(raw ?? {});
+    if (!r.success) throw new DomainError("VALIDATION", r.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; "));
+    const p = r.data;
     await this.assertVisible(q, postId);
+    if (p.cursor) {
+      const c = await q.query(`SELECT 1 FROM social.comments WHERE id = $1 AND post_id = $2`, [p.cursor, postId]);
+      if (!c.rowCount) throw new DomainError("VALIDATION", "Cursor inválido");
+    }
+    const comments = await this.commentRows(q, postId, viewerProfileId, p);
+    return { comments, nextCursor: comments.length === p.limit ? comments[comments.length - 1]!.id : null };
+  }
+
+  private async commentRows(
+    q: Queryable, postId: string, viewerProfileId: string | null,
+    page: { onlyId?: string; cursor?: string | undefined; limit?: number; order?: "asc" | "desc" },
+  ): Promise<CommentView[]> {
+    const dir = page.order === "desc" ? "DESC" : "ASC";
+    const cmp = page.order === "desc" ? "<" : ">";
     const { rows } = await q.query<{
       id: string; parent_comment_id: string | null; handle: string; display_name: string; text: string; created_at: Date; mine: boolean;
       reactions: ReactionCounts | null; my_reactions: ReactionKind[];
@@ -771,8 +792,10 @@ export class SocialService {
          FROM social.comments c JOIN social.profiles pr ON pr.id = c.author_profile_id
         WHERE c.post_id = $1 AND c.deleted_at IS NULL AND c.moderation_state = 'VISIBLE'
           AND NOT EXISTS (SELECT 1 FROM social.blocks b WHERE b.blocker_profile_id = $2 AND b.blocked_profile_id = c.author_profile_id)
-        ORDER BY c.created_at, c.id LIMIT 200`,
-      [postId, viewerProfileId],
+          AND ($3::uuid IS NULL OR c.id = $3::uuid)
+          AND ($4::uuid IS NULL OR (c.created_at, c.id) ${cmp} (SELECT k.created_at, k.id FROM social.comments k WHERE k.id = $4::uuid))
+        ORDER BY c.created_at ${dir}, c.id ${dir} LIMIT $5`,
+      [postId, viewerProfileId, page.onlyId ?? null, page.cursor ?? null, page.limit ?? 1],
     );
     return rows.map((r) => ({
       id: r.id, parentId: r.parent_comment_id, author: { handle: r.handle, displayName: r.display_name }, text: r.text,

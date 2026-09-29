@@ -6,7 +6,11 @@ import { EtagCache } from "./http/etag-cache";
 import { isMfaError } from "./auth/mfa";
 import { serverErrorMessage } from "./errors/server-error";
 import { lang, t } from "./i18n";
+import { pageQuery } from "./ui/pages";
 import type { Sender } from "./report/queue";
+
+/** Comentarios por página (ADR 0106). */
+const COMMENTS_PAGE = 50;
 
 export interface TokenPair { token: string; refreshToken: string; expiresIn: number }
 
@@ -97,7 +101,8 @@ export const api = {
   post: (id: string) => request<FeedPost>(`/v1/posts/${id}`),
   verification: (id: string) => request<VerificationView>(`/v1/events/${id}/verification`),
   eventSources: (id: string) => request<{ sources: EventSourceView[] }>(`/v1/events/${id}/sources`),
-  timeline: (id: string) => request<{ entries: TimelineEntryView[] }>(`/v1/events/${id}/timeline`),
+  timeline: (id: string, page: { cursor?: string | null; limit?: number; order?: "asc" | "desc" } = {}) =>
+    request<{ entries: TimelineEntryView[]; nextCursor: string | null }>(`/v1/events/${id}/timeline${pageQuery(page)}`),
   nearby: (lat: number, lng: number, category: string) =>
     request<NearbyEventsResponse>(`/v1/events/nearby?lat=${lat.toFixed(6)}&lng=${lng.toFixed(6)}&category=${encodeURIComponent(category)}`),
   createUpload: (body: CreateUploadRequest) => request<CreateUploadResponse>("/v1/media/uploads", { method: "POST", body: JSON.stringify(body) }),
@@ -114,7 +119,8 @@ export const api = {
   /** Reacción de contexto (ADR 0040). */
   setReaction: (postId: string, kind: ReactionKind, on: boolean) =>
     request<ReactionState>(`/v1/posts/${postId}/reactions/${kind}`, { method: on ? "PUT" : "DELETE" }),
-  comments: (postId: string) => request<{ comments: CommentView[] }>(`/v1/posts/${postId}/comments`),
+  comments: (postId: string, cursor: string | null = null) =>
+    request<{ comments: CommentView[]; nextCursor: string | null }>(`/v1/posts/${postId}/comments${pageQuery({ limit: COMMENTS_PAGE, cursor })}`),
   addComment: (postId: string, text: string, parentId?: string) =>
     request<CommentView>(`/v1/posts/${postId}/comments`, { method: "POST", body: JSON.stringify({ text, ...(parentId ? { parentId } : {}) }) }),
   deleteComment: (commentId: string) => request<void>(`/v1/comments/${commentId}`, { method: "DELETE" }),

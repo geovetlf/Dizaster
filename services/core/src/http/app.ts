@@ -326,7 +326,7 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
   app.get("/v1/events/:id/timeline", async (req) => {
     const { id } = parse(IdParam, req.params);
     await c.events.getEvent(c.db, id);
-    return { entries: await c.events.timeline(c.db, id) };
+    return c.events.timelinePage(c.db, id, req.query);
   });
   app.get("/v1/events/:id/posts", async (req, reply) => {
     reply.header("cache-control", "no-store");
@@ -672,7 +672,7 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
     reply.header("cache-control", "no-store");
     return c.feed.post(c.db, parse(IdParam, req.params).id, req.session?.profileId ?? null);
   });
-  app.get("/v1/posts/:id/comments", async (req) => ({ comments: await c.social.comments(c.db, parse(IdParam, req.params).id, req.session?.profileId ?? null) }));
+  app.get("/v1/posts/:id/comments", async (req) => c.social.comments(c.db, parse(IdParam, req.params).id, req.session?.profileId ?? null, req.query));
 
   app.post("/v1/posts/:id/comments", async (req, reply) => {
     const session = requireSession(req);

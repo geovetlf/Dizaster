@@ -188,6 +188,7 @@ export const pt: Record<MessageKey, string> = {
   upholdAppeal: "Manter",
   reverseAppeal: "Reverter",
   myModeration: "Avisos de moderação",
+  showEarlier: "Ver anteriores",
   errRateLimited: "Muitas tentativas; aguarde um momento",
   errNotFound: "Não encontrado",
   errForbidden: "Você não tem permissão para isso",

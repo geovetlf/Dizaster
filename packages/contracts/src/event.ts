@@ -99,6 +99,17 @@ export const TimelineEntryView = z.object({
 });
 export type TimelineEntryView = z.infer<typeof TimelineEntryView>;
 
+/**
+ * Página cronológica (ADR 0106): timeline de un evento y comentarios de un post. `cursor` es el id del último
+ * elemento recibido; `order` elige de lo más antiguo a lo más nuevo (por defecto) o al revés.
+ */
+export const ChronoPageQuery = z.object({
+  cursor: z.uuid().optional(),
+  limit: z.coerce.number().int().min(1).max(200).default(200),
+  order: z.enum(["asc", "desc"]).default("asc"),
+});
+export type ChronoPageQuery = z.infer<typeof ChronoPageQuery>;
+
 export const EventCluster = z.object({
   h3: z.string(),
   point: GeoPoint,
