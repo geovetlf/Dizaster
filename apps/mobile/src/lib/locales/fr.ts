@@ -198,6 +198,8 @@ export const fr: Record<MessageKey, string> = {
   saveZone: "Enregistrer la zone",
   costMonth: "mois",
   playVideo: "Lire la vidéo",
+  eventPosts: "Publications",
+  noEventPosts: "Aucune publication sur cet événement pour l'instant.",
   redactTitle: "Flouter visages et plaques",
   redactHelp: "Touchez chaque visage ou plaque pour le masquer. Touchez un cadre pour l'enlever. Le flou s'applique à ce qui est publié.",
   redactSizeS: "Petit",

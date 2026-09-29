@@ -60,6 +60,8 @@ export interface FeedFilter {
   tag?: string;
   /** Posts de un negocio (su página). */
   authorBusinessId?: string;
+  /** Posts ligados a un evento (reportes y publicaciones sobre él). */
+  eventId?: string;
 }
 
 export type FollowType = "PROFILE" | "EVENT" | "PLACE" | "TAG" | "BUSINESS";
@@ -295,6 +297,7 @@ export class SocialService {
     if (f.authorBusinessId) where.push(`p.author_type = 'BUSINESS' AND p.author_id = $${params.push(f.authorBusinessId)}::uuid`);
     // Un negocio retirado o borrado deja de aparecer con todos sus posts.
     where.push(`(p.author_type = 'PROFILE' OR (bp.deleted_at IS NULL AND bp.moderation_state = 'VISIBLE'))`);
+    if (f.eventId) where.push(`EXISTS (SELECT 1 FROM social.post_event_links l2 WHERE l2.post_id = p.id AND l2.event_id = $${params.push(f.eventId)}::uuid)`);
     if (f.tag) {
       where.push(`EXISTS (SELECT 1 FROM social.post_tags pt JOIN social.tags tg ON tg.id = pt.tag_id WHERE pt.post_id = p.id AND tg.normalized = $${params.push(f.tag)})`);
     }
@@ -309,7 +312,7 @@ export class SocialService {
                    OR EXISTS (SELECT 1 FROM social.post_tags pt JOIN social.tags tg ON tg.id = pt.tag_id
                                WHERE pt.post_id = p.id AND tg.normalized IN ${followed("TAG")}))`);
     }
-    const ranked = f.tab === "for_you" && !f.authorProfileId && !f.authorBusinessId && !f.tag;
+    const ranked = f.tab === "for_you" && !f.authorProfileId && !f.authorBusinessId && !f.tag && !f.eventId;
     if (ranked) where.push(`p.created_at > now() - make_interval(days => ${FOR_YOU_WINDOW_DAYS})`);
     const score = ranked ? rankSql(nearSql) : `extract(epoch FROM p.created_at) / 3600.0`;
     const cursor = f.cursor ? `WHERE (x.score, x.id) < ($${params.push(f.cursor.score)}::float8, $${params.push(f.cursor.id)}::uuid)` : "";

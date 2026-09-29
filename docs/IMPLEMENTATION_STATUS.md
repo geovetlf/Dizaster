@@ -241,18 +241,38 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | Reacciones de contexto (apoyo, útil, yo también lo vi; nunca son evidencia) | ✅ | ADR 0040 |
 | Mapa sin conexión por zona guardada + pipeline PMTiles (subida bloqueada por storage) | ✅ | ADR 0041, `infra/maps` |
 | Difuminado manual de rostros y matrículas en fotos (aplicado en el servidor) | ✅ | ADR 0042 |
+| Feed de un evento en su pantalla (`/v1/events/:id/posts`) | ✅ | ADR 0043 |
 | Reglas `dedup-2` con `sim_media` y `sim_texto` reales | ✅ | `packages/geo-kit/src/dedup.ts` |
 | Fotos procesadas después del reporte suman su hash al evento | ✅ | `MediaReady.phash`, `event.media-fingerprint` |
 
 ## Siguiente etapa (en orden)
 
-1. **BLOQUEADA** — Identity real: Sign in with Apple, Google y email; App Attest / Play Integrity. Falta: cuentas de
-   Apple Developer y Google (client IDs, Service ID, Team ID) y un proveedor de email aprobado (gasto).
-2. Detección automática de rostros que proponga recuadros (D-08, ADR 0042; elegir modelo abierto y medir coste).
-3. Fuentes peruanas IGP, INDECI y SENAMHI: **en espera de acción humana** (confirmar formato/URL y términos);
-   si publican CAP, activar es solo configuración (ADR 0033).
-4. **BLOQUEADA** — Publicar el mapa propio: `infra/maps/publish.sh --apply` en cuanto haya bucket aprobado; después
-   validar en un teléfono la descarga offline con `pmtiles://` (ADR 0041).
+Revisión del Blueprint del 2026-09-29 (tras ADR 0042), verificada contra el código:
+
+1. Editar mi perfil: nombre, bio, idioma y unidades; aplicar unidades en la app (§5.2, §7.3).
+2. Comentarios: respuestas de un nivel, borrar el propio, reacciones en comentarios (RF-02, §7.3).
+3. Compartir dentro de la app (`Post.kind = SHARE`) (RF-02, §7.3).
+4. Límite general de peticiones por IP y por sesión, en proceso (§12.2, §13.1).
+5. Cifrado por columna de la ubicación precisa con clave del entorno (§13.1).
+6. Edad mínima de 16 años en el registro (D-13; el texto legal lo pone el propietario).
+7. Zona horaria por polígonos (timezone-boundary-builder) (§5.5).
+8. Pantalla "Acerca de / licencias" con atribuciones ODbL (§11.3).
+9. Observabilidad OpenTelemetry y contrato OpenAPI (§5.22, §4.3).
+10. Moderación: cambiar el ciclo de vida de un evento; menciones y bloqueo de negocios.
+
+Bloqueadas o en espera:
+
+- **BLOQUEADA** — Identity real: Sign in with Apple, Google y email; App Attest / Play Integrity. Falta: cuentas de
+  Apple Developer y Google (client IDs, Service ID, Team ID) y un proveedor de email aprobado (gasto).
+- **BLOQUEADA** — Detección automática de rostros que proponga recuadros (ADR 0042): la opción barata es en el
+  teléfono (ML Kit), pero sin `EXPO_TOKEN` no se puede probar un módulo nativo nuevo en una development build.
+- **BLOQUEADA** — Publicar el mapa propio: `infra/maps/publish.sh --apply` cuando haya bucket; después validar en un
+  teléfono la descarga offline con `pmtiles://` (ADR 0041).
+- **En espera de acción humana** — Fuentes IGP, INDECI y SENAMHI (confirmar formato/URL y términos; si publican CAP,
+  activar es solo configuración, ADR 0033).
+- **Requiere al propietario** — Capa de IA (proveedor y presupuesto), enlaces de donación verificados (D-15), textos
+  legales (términos, privacidad, aviso "no es un servicio de emergencias", edad), detección de CSAM (proveedor y
+  procedimiento legal), Sentry (cuenta gratuita y DSN), procedimiento de solicitudes legales.
 
 ## Requiere acción humana
 

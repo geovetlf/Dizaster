@@ -147,6 +147,8 @@ export const api = {
     request<{ postId: string; eventId: string | null; tags: string[]; mentions: string[] }>("/v1/posts", { method: "POST", body: JSON.stringify(body) }),
   deletePost: (postId: string) => request<void>(`/v1/posts/${postId}`, { method: "DELETE" }),
   tag: (tag: string) => request<TagView>(`/v1/tags/${encodeURIComponent(tag)}`),
+  eventPosts: (eventId: string, cursor: string | null) =>
+    request<FeedResponse>(`/v1/events/${eventId}/posts${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`),
   tagPosts: (tag: string, cursor: string | null) =>
     request<FeedResponse>(`/v1/tags/${encodeURIComponent(tag)}/posts${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`),
   searchTags: (q: string) => request<{ tags: TagView[] }>(`/v1/tags?${new URLSearchParams({ q })}`),

@@ -104,6 +104,13 @@ export class FeedService {
     return this.page(q, { tab: "for_you", tag, ...(f.cursor ? { cursor: decodeCursor(f.cursor) } : {}), limit: f.limit, viewerProfileId });
   }
 
+  /** Feed de un evento (§5.3): sus reportes y publicaciones, por recientes. Un evento oculto no tiene feed. */
+  async eventPosts(q: Queryable, eventId: string, rawQuery: unknown, viewerProfileId: string | null): Promise<FeedResponse> {
+    const f = parse(ProfilePostsQuery, rawQuery);
+    await this.events.getEvent(q, eventId);
+    return this.page(q, { tab: "for_you", eventId, ...(f.cursor ? { cursor: decodeCursor(f.cursor) } : {}), limit: f.limit, viewerProfileId });
+  }
+
   async tag(q: Queryable, rawTag: string, viewerProfileId: string | null): Promise<TagView> {
     return this.social.tag(q, normalizeTag(parse(TagParam, { tag: rawTag }).tag), viewerProfileId);
   }

@@ -1,7 +1,8 @@
 import type { EventSummary, MediaView, TimelineEntryView, VerificationView } from "@dizaster/contracts";
 import { router, useLocalSearchParams } from "expo-router";
-import { useEffect, useState } from "react";
-import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import { useCallback, useEffect, useState } from "react";
+import { Pressable, StyleSheet, Text, View } from "react-native";
+import { FeedList } from "../../components/feed-list";
 import { EventMedia } from "../../components/event-media";
 import { api } from "../../lib/api";
 import { lang, t, VERIFICATION_LABEL, verificationLabel } from "../../lib/i18n";
@@ -11,6 +12,8 @@ import { followablePlace } from "../../lib/social/place";
 import { useFollows } from "../../lib/social/follows";
 import { openFlag } from "../../lib/moderation/menu";
 import { colors, radius, space } from "../../theme";
+
+const TIMELINE_SHOWN = 12;
 
 /** Pantalla de evento. También es el destino de los deep links: dizaster://event/<id> y https://<dominio>/e/<id>. */
 export default function EventScreen() {
@@ -32,12 +35,14 @@ export default function EventScreen() {
     api.verification(id).then(setVerification).catch(() => setVerification(null));
   }, [id]);
 
-  if (error) return <Text style={[styles.container, styles.entry]}>{error}</Text>;
+  const fetchPage = useCallback((cursor: string | null) => api.eventPosts(id ?? "", cursor), [id]);
+
+  if (error) return <Text style={[styles.container, styles.header, styles.entry]}>{error}</Text>;
   if (!event) return <View style={styles.container} />;
   const color = VERIFICATION_LABEL[event.publicVerificationState]?.color ?? "#8a94a6";
   const place = followablePlace(event.place);
-  return (
-    <View style={styles.container}>
+  const header = (
+    <View style={styles.header}>
       <Text style={styles.title}>{eventTitle(event, lang)}</Text>
       {event.place ? <Text style={styles.place}>{event.place.label}</Text> : null}
       <View style={styles.follows}>
@@ -63,13 +68,18 @@ export default function EventScreen() {
       ) : null}
       <EventMedia media={media} />
       <Text style={styles.section}>{t("timeline")}</Text>
-      <FlatList
-        data={timeline}
-        keyExtractor={(e) => e.id}
-        renderItem={({ item }) => (
-          <Text style={styles.entry}>{new Date(item.at).toLocaleTimeString()} · {timelineLabel(item.type, t)}</Text>
-        )}
-      />
+      {/* Lo más reciente primero; la historia completa vive en el servidor. */}
+      {timeline.slice(-TIMELINE_SHOWN).reverse().map((item) => (
+        <Text key={item.id} style={styles.entry}>{new Date(item.at).toLocaleTimeString()} · {timelineLabel(item.type, t)}</Text>
+      ))}
+      <Text style={[styles.section, styles.postsTitle]}>{t("eventPosts")}</Text>
+    </View>
+  );
+  // Feed del evento (§5.3): reportes y publicaciones sobre él, debajo de la ficha.
+  return (
+    <View style={styles.container}>
+      <FeedList tab="for_you" category={null} near={null} header={header} fetchPage={fetchPage} sourceKey={`event:${event.id}`}
+        empty={<Text style={[styles.meta, styles.pad]}>{t("noEventPosts")}</Text>} />
     </View>
   );
 }
@@ -87,7 +97,10 @@ const styles = StyleSheet.create({
   chip: { borderWidth: 1, borderColor: colors.accent, borderRadius: radius.pill, paddingHorizontal: space.md, paddingVertical: 6 },
   chipOn: { backgroundColor: colors.accent },
   chipText: { color: colors.text, fontWeight: "600" },
-  container: { flex: 1, padding: 16, backgroundColor: colors.bg },
+  container: { flex: 1, backgroundColor: colors.bg },
+  header: { padding: 16 },
+  pad: { paddingHorizontal: 16 },
+  postsTitle: { marginTop: space.lg },
   title: { fontSize: 22, fontWeight: "700", color: colors.text },
   place: { fontSize: 15, color: colors.textMuted, marginTop: 4 },
   badge: { alignSelf: "flex-start", color: colors.white, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, marginVertical: 8, overflow: "hidden" },

@@ -218,6 +218,10 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
   const IdParam = z.object({ id: z.uuid() });
   app.get("/v1/events/:id", async (req) => c.events.getEvent(c.db, parse(IdParam, req.params).id));
   app.get("/v1/events/:id/timeline", async (req) => ({ entries: await c.events.timeline(c.db, parse(IdParam, req.params).id) }));
+  app.get("/v1/events/:id/posts", async (req, reply) => {
+    reply.header("cache-control", "no-store");
+    return c.feed.eventPosts(c.db, parse(IdParam, req.params).id, req.query, req.session?.profileId ?? null);
+  });
   app.get("/v1/events/:id/verification", async (req) => c.verification.view(c.db, parse(IdParam, req.params).id));
 
   // Media pública del evento: solo variantes saneadas; en categorías sensibles, solo la aprobada por moderación.

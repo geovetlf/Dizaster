@@ -140,6 +140,20 @@ describe("feed", () => {
     expect((await t.app.inject({ method: "PUT", url: `/v1/posts/${plain.json().postId}/reactions/USEFUL`, headers: auth(reader) })).statusCode).toBe(200);
   });
 
+  it("feed de un evento: sus reportes y los posts que lo mencionan, nada más", async () => {
+    const post = (await feed("tab=for_you")).posts.find((p) => p.text === "Choque")!;
+    const eventId = post.event!.id;
+    const u = await createUser(t, "feed_event_poster");
+    const about = await t.app.inject({ method: "POST", url: "/v1/posts", headers: auth(u), payload: { text: "Tráfico desviado por el choque", eventId } });
+    expect(about.statusCode).toBe(201);
+    const res = await t.app.inject({ url: `/v1/events/${eventId}/posts` });
+    const texts = (res.json() as { posts: { text: string; event: { id: string } }[] }).posts.map((p) => p.text);
+    expect(texts[0]).toBe("Tráfico desviado por el choque");
+    expect(texts).toContain("Choque");
+    expect(texts).not.toContain("Robo");
+    expect((await t.app.inject({ url: "/v1/events/00000000-0000-7000-8000-000000000000/posts" })).statusCode).toBe(404);
+  });
+
   it("los posts ocultos por moderación no aparecen ni aceptan interacción", async () => {
     const u = await createUser(t, "feed_mod");
     const r = await submit(t, u, reportBody(u, { pin: offset(LIMA, 9000), text: "ocultar" }));

@@ -198,6 +198,8 @@ export const pt: Record<MessageKey, string> = {
   saveZone: "Salvar região",
   costMonth: "mês",
   playVideo: "Reproduzir vídeo",
+  eventPosts: "Publicações",
+  noEventPosts: "Ainda não há publicações sobre este evento.",
   redactTitle: "Desfocar rostos e placas",
   redactHelp: "Toque em cada rosto ou placa para cobri-lo. Toque em um quadro para removê-lo. O desfoque vale para o que é publicado.",
   redactSizeS: "Pequeno",
