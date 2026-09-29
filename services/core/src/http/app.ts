@@ -782,6 +782,18 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
     reply.header("cache-control", "no-store");
     return c.moderation.caseDetail(parse(IdParam, req.params).id);
   });
+  // Evidencia de presencia de un reporte (ADR 0089): POST porque cada consulta es un acto auditado con motivo.
+  app.post("/v1/moderation/posts/:id/presence", async (req, reply) => {
+    const session = requireModerator(req);
+    reply.header("cache-control", "no-store");
+    return c.reports.presenceForReview(parse(IdParam, req.params).id, session.userId, req.body);
+  });
+  app.get("/v1/admin/presence-access", async (req, reply) => {
+    requireAdmin(req);
+    reply.header("cache-control", "no-store");
+    const q = parse(z.object({ reportId: z.uuid().optional(), actorUserId: z.uuid().optional(), limit: z.coerce.number().int().min(1).max(200).default(100) }), req.query);
+    return { entries: await c.reports.presenceAccessLog(c.db, q) };
+  });
   app.post("/v1/moderation/cases/:id/actions", async (req) => {
     const session = requireModerator(req);
     return c.moderation.act(parse(IdParam, req.params).id, session.userId, req.body);

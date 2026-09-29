@@ -1,4 +1,4 @@
-import type { FlagReason, FlagTargetType, ModerationActionType } from "@dizaster/contracts";
+import type { FlagReason, FlagTargetType, ModerationActionType, PresenceReview } from "@dizaster/contracts";
 
 /** Motivos en el orden en que se muestran: primero los que ponen en riesgo a personas. */
 export const FLAG_REASONS: FlagReason[] = ["PRIVACY", "VIOLENCE", "HARASSMENT", "ILLEGAL", "FALSE_INFO", "SPAM", "OTHER"];
@@ -30,4 +30,24 @@ export function reasonSummary(reasons: Partial<Record<FlagReason, number>>, labe
     .sort((a, b) => b[1] - a[1] || FLAG_REASONS.indexOf(a[0]) - FLAG_REASONS.indexOf(b[0]))
     .map(([r, n]) => `${label(r)} ${n}`)
     .join(" · ");
+}
+
+/**
+ * Evidencia de presencia en líneas para la pantalla del caso (ADR 0089). La ubicación precisa se muestra con 5
+ * decimales (~1 m) solo si aún existe. NO AI REQUIRED.
+ */
+export function presenceLines(v: PresenceReview, t: (k: "presenceBandLine" | "presencePrecise" | "presenceGeneralized" | "presencePrior") => string): string[] {
+  const fill = (s: string, p: Record<string, string | number>) => s.replace(/\{(\w+)\}/g, (_, k: string) => String(p[k] ?? ""));
+  const lines = [
+    fill(t("presenceBandLine"), {
+      band: v.presenceBand, score: Math.round(v.presenceScore * 100) / 100, distance: Math.round(v.fixToPinM), attestation: v.attestationVerdict,
+    }),
+  ];
+  if (v.mockLocation) lines.push("MOCK_LOCATION");
+  if (v.reasons.length) lines.push(v.reasons.join(", "));
+  lines.push(v.deviceFix
+    ? fill(t("presencePrecise"), { lat: v.deviceFix.lat.toFixed(5), lng: v.deviceFix.lng.toFixed(5), until: v.preciseExpiresAt.slice(0, 10) })
+    : t("presenceGeneralized"));
+  if (v.priorAccesses > 0) lines.push(fill(t("presencePrior"), { n: v.priorAccesses }));
+  return lines;
 }

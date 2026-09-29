@@ -103,3 +103,38 @@ export interface AppealView {
   action: ModerationActionView;
   target: ModerationTargetPreview | null;
 }
+
+/** Ver la evidencia de presencia de un reporte (ADR 0089): motivo obligatorio, queda en auditoría. */
+export const PresenceReviewRequest = z.object({
+  reason: z.string().trim().min(10).max(500),
+  caseId: z.uuid().optional(),
+});
+export type PresenceReviewRequest = z.infer<typeof PresenceReviewRequest>;
+
+export interface PresenceReview {
+  reportId: string;
+  presenceBand: string;
+  presenceScore: number;
+  fixToPinM: number;
+  mockLocation: boolean | null;
+  attestationVerdict: "GENUINE" | "FAILED" | "UNAVAILABLE";
+  reasons: string[];
+  scoreBreakdown: Record<string, unknown>;
+  ruleVersion: string;
+  /** Ubicación precisa del teléfono al reportar; null si ya se generalizó (retención o cuenta borrada). */
+  deviceFix: { lat: number; lng: number; accuracyM?: number; [k: string]: unknown } | null;
+  preciseExpiresAt: string;
+  generalizedAt: string | null;
+  /** Veces que moderación ya la consultó (sin decir quién). */
+  priorAccesses: number;
+}
+
+export interface PresenceAccessEntry {
+  id: string;
+  reportId: string;
+  actorUserId: string;
+  reason: string;
+  caseId: string | null;
+  preciseShown: boolean;
+  accessedAt: string;
+}

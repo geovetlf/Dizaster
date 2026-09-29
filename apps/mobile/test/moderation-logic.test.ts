@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { actionsFor, canBlock, FLAG_REASONS, isSevere, reasonSummary, validReason } from "../src/lib/moderation/logic";
+import { actionsFor, canBlock, FLAG_REASONS, isSevere, presenceLines, reasonSummary, validReason } from "../src/lib/moderation/logic";
 import type { ModeratorEvidenceView, NearbyEvent } from "@dizaster/contracts";
 import { canSplit, duplicateCandidates, toggle } from "../src/lib/moderation/event-tools";
 
@@ -42,5 +42,26 @@ describe("herramientas de evento (fusionar y dividir)", () => {
     expect(canSplit(new Set(["1", "2"]), all)).toBe(false);
     expect(canSplit(new Set(["1", "9"]), all)).toBe(true);
     expect([...toggle(toggle(new Set(["1"]), "2"), "1")]).toEqual(["2"]);
+  });
+});
+
+describe("presenceLines (ADR 0089)", () => {
+  const tr = (k: string) => ({
+    presenceBandLine: "{band} {score} {distance}m {attestation}", presencePrecise: "{lat},{lng} hasta {until}",
+    presenceGeneralized: "generalizada", presencePrior: "antes {n}",
+  })[k]!;
+  const base = {
+    reportId: "r", presenceBand: "HIGH", presenceScore: 0.8734, fixToPinM: 12.4, mockLocation: false, attestationVerdict: "GENUINE" as const,
+    reasons: [], scoreBreakdown: {}, ruleVersion: "p1", preciseExpiresAt: "2026-10-29T00:00:00Z", generalizedAt: null, priorAccesses: 0,
+  };
+  it("con ubicación precisa y sin accesos previos", () => {
+    expect(presenceLines({ ...base, deviceFix: { lat: -12.046412345, lng: -77.04281 } }, tr as never)).toEqual([
+      "HIGH 0.87 12m GENUINE", "-12.04641,-77.04281 hasta 2026-10-29",
+    ]);
+  });
+  it("generalizada, con motivos y accesos previos", () => {
+    expect(presenceLines({ ...base, deviceFix: null, mockLocation: true, reasons: ["LOW_ACCURACY"], priorAccesses: 2 }, tr as never)).toEqual([
+      "HIGH 0.87 12m GENUINE", "MOCK_LOCATION", "LOW_ACCURACY", "generalizada", "antes 2",
+    ]);
   });
 });

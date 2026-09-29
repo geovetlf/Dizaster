@@ -107,6 +107,8 @@ export const OPERATIONS: Record<string, Operation> = {
   "POST /v1/me/moderation/:id/appeal": { summary: "Apelar una decisión", body: C.AppealRequest },
   "GET /v1/moderation/cases": { summary: "Cola de casos (moderación)", query: C.CaseQueueQuery },
   "GET /v1/moderation/cases/:id": { summary: "Detalle de un caso" },
+  "POST /v1/moderation/posts/:id/presence": { summary: "Ver la evidencia de presencia de un reporte, con motivo auditado (moderación)", body: C.PresenceReviewRequest },
+  "GET /v1/admin/presence-access": { summary: "Registro de accesos a evidencia de presencia (admin)" },
   "POST /v1/moderation/cases/:id/actions": { summary: "Tomar una acción", body: C.TakeActionRequest },
   "GET /v1/moderation/appeals": { summary: "Apelaciones" },
   "POST /v1/moderation/appeals/:id/decision": { summary: "Decidir una apelación", body: C.DecideAppealRequest },

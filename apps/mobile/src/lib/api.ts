@@ -1,4 +1,4 @@
-import type { EventSourceView, EventStatus, MyProfile, UpdateProfileRequest, ReactionKind, ReactionState, DataExport, VerificationView, ModeratorEventDetail, SavedZone, SavedZoneInput, AppealView, CaseDetail, CaseSummary, CreateFlagRequest, ModerationActionType, ModerationNotice, CostDashboard, KillSwitchView, QualityReport, CreatePostRequest, TagView, BusinessView, SessionView, CreateBusinessRequest, UpdateBusinessRequest, AlertPreferences, CategorySubscription, CategorySubscriptionInput, NotificationsResponse, AppConfig, AttributionsResponse, AreaSearchResult, FollowTarget, MyFollows, ProfileSearchResult, ProfileView, CommentView, CreateUploadRequest, FeedPost, FeedResponse, FeedTab, CreateUploadResponse, DevicePlatform, MediaView, RegisterPushTokenRequest, EventMapResponse, EventSummary, NearbyEventsResponse, SubmitReportRequest, SubmitReportResponse, TimelineEntryView } from "@dizaster/contracts";
+import type { PresenceReview, EventSourceView, EventStatus, MyProfile, UpdateProfileRequest, ReactionKind, ReactionState, DataExport, VerificationView, ModeratorEventDetail, SavedZone, SavedZoneInput, AppealView, CaseDetail, CaseSummary, CreateFlagRequest, ModerationActionType, ModerationNotice, CostDashboard, KillSwitchView, QualityReport, CreatePostRequest, TagView, BusinessView, SessionView, CreateBusinessRequest, UpdateBusinessRequest, AlertPreferences, CategorySubscription, CategorySubscriptionInput, NotificationsResponse, AppConfig, AttributionsResponse, AreaSearchResult, FollowTarget, MyFollows, ProfileSearchResult, ProfileView, CommentView, CreateUploadRequest, FeedPost, FeedResponse, FeedTab, CreateUploadResponse, DevicePlatform, MediaView, RegisterPushTokenRequest, EventMapResponse, EventSummary, NearbyEventsResponse, SubmitReportRequest, SubmitReportResponse, TimelineEntryView } from "@dizaster/contracts";
 import { mergeMapTiles, tilesForView } from "@dizaster/geo-kit";
 import { canRetryWithRefresh, singleFlight } from "./auth/refresh";
 import { API_URL } from "./config";
@@ -159,6 +159,8 @@ export const api = {
     request<ModerationNotice>(`/v1/me/moderation/${actionId}/appeal`, { method: "POST", body: JSON.stringify({ text }) }),
   moderationQueue: (cursor?: string | null) =>
     request<{ cases: CaseSummary[]; nextCursor: string | null }>(`/v1/moderation/cases${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`),
+  moderationPresence: (postId: string, reason: string, caseId?: string) =>
+    request<PresenceReview>(`/v1/moderation/posts/${postId}/presence`, { method: "POST", body: JSON.stringify({ reason, ...(caseId ? { caseId } : {}) }) }),
   moderationCase: (id: string) => request<CaseDetail>(`/v1/moderation/cases/${id}`),
   moderationAct: (id: string, action: ModerationActionType, reason: string) =>
     request<CaseDetail>(`/v1/moderation/cases/${id}/actions`, { method: "POST", body: JSON.stringify({ action, reason }) }),

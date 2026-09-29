@@ -1,10 +1,10 @@
-import type { CaseDetail, ModerationActionType } from "@dizaster/contracts";
+import type { CaseDetail, ModerationActionType, PresenceReview } from "@dizaster/contracts";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import { Alert, Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { api } from "../../lib/api";
 import { lang, t } from "../../lib/i18n";
-import { actionsFor, isSevere, reasonSummary, validReason } from "../../lib/moderation/logic";
+import { actionsFor, isSevere, presenceLines, reasonSummary, validReason } from "../../lib/moderation/logic";
 import { timeAgo } from "../../lib/ui/format";
 import { colors, radius, space } from "../../theme";
 
@@ -14,6 +14,7 @@ export default function CaseScreen() {
   const [c, setC] = useState<CaseDetail | null>(null);
   const [reason, setReason] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [presence, setPresence] = useState<PresenceReview | null>(null);
 
   useEffect(() => {
     if (id) api.moderationCase(id).then(setC).catch((e: Error) => setError(e.message));
@@ -24,6 +25,17 @@ export default function CaseScreen() {
     try {
       setC(await api.moderationAct(c.id, action, reason.trim()));
       setReason("");
+      setError(null);
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }
+
+  /** Ver la evidencia de presencia (ADR 0089): usa el mismo motivo escrito y queda en auditoría. */
+  async function viewPresence() {
+    if (!c) return;
+    try {
+      setPresence(await api.moderationPresence(c.target.id, reason.trim(), c.id));
       setError(null);
     } catch (e) {
       setError((e as Error).message);
@@ -69,7 +81,13 @@ export default function CaseScreen() {
 
       <TextInput value={reason} onChangeText={setReason} multiline maxLength={1000} placeholder={t("actionReason")} placeholderTextColor={colors.textMuted} style={styles.input} />
       {error ? <Text style={styles.error}>{error}</Text> : null}
+      {presence ? presenceLines(presence, t).map((l) => <Text key={l} style={styles.meta}>{l}</Text>) : null}
       <View style={styles.actions}>
+        {c.target.type === "POST" && !presence ? (
+          <Pressable accessibilityRole="button" disabled={!ok} style={[styles.action, !ok && styles.disabled]} onPress={() => void viewPresence()}>
+            <Text style={styles.actionText}>{t("viewPresence")}</Text>
+          </Pressable>
+        ) : null}
         {actionsFor(c.target.type).map((a) => (
           <Pressable key={a} accessibilityRole="button" disabled={!ok} style={[styles.action, isSevere(a) && styles.severe, !ok && styles.disabled]} onPress={() => confirm(a)}>
             <Text style={styles.actionText}>{t(`action_${a}`)}</Text>

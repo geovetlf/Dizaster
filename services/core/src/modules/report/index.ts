@@ -1,6 +1,9 @@
 import { createHash } from "node:crypto";
 import {
+  PresenceReviewRequest,
   SubmitReportRequest,
+  type PresenceAccessEntry,
+  type PresenceReview,
   type PresenceRejectionReason,
   type SubmitReportResponse,
 } from "@dizaster/contracts";
@@ -224,6 +227,65 @@ export class ReportService {
     });
   }
 
+  /**
+   * Evidencia de presencia para moderación (ADR 0089, Blueprint §13.1): solo con motivo, y cada consulta queda en un
+   * registro de solo inserción. Máximo PRESENCE_ACCESS_PER_HOUR por persona (evita consultas masivas). La ubicación
+   * precisa solo existe mientras no se haya generalizado.
+   */
+  async presenceForReview(postId: string, actorUserId: string, raw: unknown): Promise<PresenceReview> {
+    const parsed = PresenceReviewRequest.safeParse(raw);
+    if (!parsed.success) throw new DomainError("VALIDATION", parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; "));
+    const req = parsed.data;
+    return withTransaction(this.d.db, async (tx) => {
+      const reportId = await this.reportIdForPost(tx, postId);
+      if (!reportId) throw notFound("Reporte");
+      // Serializa las consultas de una misma persona para que el límite no se pueda saltar en paralelo.
+      await tx.query(`SELECT pg_advisory_xact_lock(hashtext('presence-access:' || $1))`, [actorUserId]);
+      const recent = (await tx.query<{ n: number }>(
+        `SELECT count(*)::int AS n FROM report.presence_access_log WHERE actor_user_id = $1 AND accessed_at > now() - interval '1 hour'`,
+        [actorUserId],
+      )).rows[0]!.n;
+      if (recent >= PRESENCE_ACCESS_PER_HOUR) throw new DomainError("RATE_LIMITED", "Demasiadas consultas de presencia en una hora", 429);
+      const { rows } = await tx.query<{
+        presence_band: string; presence_score: number; fix_to_pin_m: number; mock_location: boolean | null; attestation_verdict: PresenceReview["attestationVerdict"];
+        reasons: string[]; score_breakdown: Record<string, unknown>; rule_version: string; device_fix: PresenceReview["deviceFix"]; device_fix_enc: string | null;
+        expires_at: Date; generalized_at: Date | null; prior: number;
+      }>(
+        `SELECT r.presence_band, r.presence_score, p.fix_to_pin_m, p.mock_location, p.attestation_verdict, p.reasons, p.score_breakdown,
+                p.rule_version, p.device_fix, p.device_fix_enc, p.expires_at, p.generalized_at,
+                (SELECT count(*)::int FROM report.presence_access_log l WHERE l.report_id = r.id) AS prior
+           FROM report.reports r JOIN report.presence_evidence p ON p.report_id = r.id WHERE r.id = $1`,
+        [reportId],
+      );
+      const r = rows[0];
+      if (!r) throw notFound("Evidencia de presencia");
+      const deviceFix = r.generalized_at ? null : r.device_fix_enc ? JSON.parse(this.d.cipher.decrypt(r.device_fix_enc, reportId)) : r.device_fix;
+      await tx.query(
+        `INSERT INTO report.presence_access_log (id, report_id, actor_user_id, reason, case_id, precise_shown) VALUES ($1, $2, $3, $4, $5, $6)`,
+        [newId(), reportId, actorUserId, req.reason, req.caseId ?? null, deviceFix !== null],
+      );
+      return {
+        reportId, presenceBand: r.presence_band, presenceScore: r.presence_score, fixToPinM: r.fix_to_pin_m, mockLocation: r.mock_location,
+        attestationVerdict: r.attestation_verdict, reasons: r.reasons, scoreBreakdown: r.score_breakdown, ruleVersion: r.rule_version, deviceFix,
+        preciseExpiresAt: r.expires_at.toISOString(), generalizedAt: r.generalized_at?.toISOString() ?? null, priorAccesses: r.prior,
+      };
+    });
+  }
+
+  /** Registro de accesos para administración (quién consultó qué y por qué), más reciente primero. */
+  async presenceAccessLog(q: Queryable, filter: { reportId?: string; actorUserId?: string; limit: number }): Promise<PresenceAccessEntry[]> {
+    const { rows } = await q.query<{ id: string; report_id: string; actor_user_id: string; reason: string; case_id: string | null; precise_shown: boolean; accessed_at: Date }>(
+      `SELECT id, report_id, actor_user_id, reason, case_id, precise_shown, accessed_at FROM report.presence_access_log
+        WHERE ($1::uuid IS NULL OR report_id = $1) AND ($2::uuid IS NULL OR actor_user_id = $2)
+        ORDER BY accessed_at DESC, id DESC LIMIT $3`,
+      [filter.reportId ?? null, filter.actorUserId ?? null, filter.limit],
+    );
+    return rows.map((r) => ({
+      id: r.id, reportId: r.report_id, actorUserId: r.actor_user_id, reason: r.reason, caseId: r.case_id, preciseShown: r.precise_shown,
+      accessedAt: r.accessed_at.toISOString(),
+    }));
+  }
+
   /** Post de un reporte (para que "borrar" un post propio de tipo REPORT lo retire). */
   async reportIdForPost(q: Queryable, postId: string): Promise<string | null> {
     const { rows } = await q.query<{ id: string }>(`SELECT id FROM report.reports WHERE post_id = $1`, [postId]);
@@ -290,8 +352,15 @@ export class ReportService {
         WHERE r.author_user_id = $1 ORDER BY r.received_at DESC LIMIT 10000`,
       [userId],
     );
+    // Transparencia (ADR 0089): cuándo moderación consultó la presencia de sus reportes (sin decir quién).
+    const accesses = await q.query(
+      `SELECT l.report_id, l.accessed_at, l.precise_shown FROM report.presence_access_log l JOIN report.reports r ON r.id = l.report_id
+        WHERE r.author_user_id = $1 ORDER BY l.accessed_at DESC LIMIT 10000`,
+      [userId],
+    );
     // Se descifra solo para la propia persona; el valor cifrado nunca sale.
     return {
+      presenceAccesses: accesses.rows,
       reports: rows.map(({ device_fix_enc, ...r }) => ({
         ...r,
         device_fix: device_fix_enc ? JSON.parse(this.d.cipher.decrypt(device_fix_enc as string, r["id"] as string)) : r["device_fix"],
@@ -305,3 +374,6 @@ function textHash(text: string | undefined): string | null {
   const f = textFingerprint(text);
   return f ? createHash("sha256").update(f).digest("hex").slice(0, 32) : null;
 }
+
+/** Consultas de evidencia de presencia por persona de moderación y hora (ADR 0089). */
+export const PRESENCE_ACCESS_PER_HOUR = 30;
