@@ -7,6 +7,7 @@ import { createPool, type Db } from "./platform/db.js";
 import { OutboxDispatcher } from "./platform/outbox.js";
 import { defaultDataDir } from "./platform/paths.js";
 import { EventService } from "./modules/event/index.js";
+import { FeedService } from "./modules/feed/index.js";
 import { GeoService } from "./modules/geo/index.js";
 import { DevAttestationVerifier, IdentityService, type AttestationVerifier } from "./modules/identity/index.js";
 import { IngestionScheduler, IngestionService, NodeHttpFetcher, type HttpFetcher } from "./modules/ingestion/index.js";
@@ -32,6 +33,7 @@ export interface Container {
   media: MediaService;
   storage: StorageProvider;
   reports: ReportService;
+  feed: FeedService;
   dispatcher: OutboxDispatcher;
   cost: InMemoryCostGuard;
 }
@@ -62,13 +64,14 @@ export function buildContainer(env: AppEnv, overrides: { db?: Db; clock?: Clock;
     attestation: overrides.attestation ?? new DevAttestationVerifier(),
     limits: { reportsPerHour: env.REPORTS_PER_HOUR_LIMIT, presenceRetentionDays: env.PRESENCE_RETENTION_DAYS },
   });
+  const feed = new FeedService(social, events, media, ref);
   const dispatcher = new OutboxDispatcher(db);
   events.registerHandlers(dispatcher);
   verification.registerHandlers(dispatcher);
   media.registerHandlers(dispatcher);
   // Presupuestos iniciales: las funciones de pago están a 0 hasta que se aprueben (cost-first).
   const cost = new InMemoryCostGuard({ "ai.daily": 0, "sms.daily": 0, "translation.daily": 0 }, { ai: true, sms: true, translation: true });
-  return { env, db, clock, ref, geo, social, identity, events, ingestion, ingestionScheduler, verification, media, storage, reports, dispatcher, cost };
+  return { env, db, clock, ref, geo, social, identity, events, ingestion, ingestionScheduler, verification, media, storage, reports, feed, dispatcher, cost };
 }
 
 function buildStorage(env: AppEnv, clock: Clock): StorageProvider {

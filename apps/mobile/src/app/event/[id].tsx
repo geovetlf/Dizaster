@@ -5,6 +5,7 @@ import { FlatList, StyleSheet, Text, View } from "react-native";
 import { EventMedia } from "../../components/event-media";
 import { api } from "../../lib/api";
 import { t, VERIFICATION_LABEL, verificationLabel } from "../../lib/i18n";
+import { colors } from "../../theme";
 
 /** Pantalla de evento. También es el destino de los deep links: dizaster://event/<id> y https://<dominio>/e/<id>. */
 export default function EventScreen() {
@@ -23,7 +24,7 @@ export default function EventScreen() {
     api.eventMedia(id).then((r) => setMedia(r.media)).catch(() => setMedia([]));
   }, [id]);
 
-  if (error) return <Text style={styles.container}>{error}</Text>;
+  if (error) return <Text style={[styles.container, styles.entry]}>{error}</Text>;
   if (!event) return <View style={styles.container} />;
   const color = VERIFICATION_LABEL[event.publicVerificationState]?.color ?? "#8a94a6";
   return (
@@ -47,10 +48,10 @@ export default function EventScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 16, backgroundColor: "#fff" },
-  title: { fontSize: 22, fontWeight: "700" },
-  badge: { alignSelf: "flex-start", color: "#fff", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, marginVertical: 8, overflow: "hidden" },
-  meta: { color: "#555", marginBottom: 16 },
-  section: { fontSize: 16, fontWeight: "600", marginBottom: 8 },
-  entry: { paddingVertical: 6, color: "#333" },
+  container: { flex: 1, padding: 16, backgroundColor: colors.bg },
+  title: { fontSize: 22, fontWeight: "700", color: colors.text },
+  badge: { alignSelf: "flex-start", color: colors.white, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, marginVertical: 8, overflow: "hidden" },
+  meta: { color: colors.textMuted, marginBottom: 16 },
+  section: { fontSize: 16, fontWeight: "600", marginBottom: 8, color: colors.text },
+  entry: { paddingVertical: 6, color: colors.text },
 });

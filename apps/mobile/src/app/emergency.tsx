@@ -5,6 +5,7 @@ import { FlatList, Linking, Pressable, StyleSheet, Text, View } from "react-nati
 import { lookupEmergency, label, type EmergencyLookup } from "../lib/emergency";
 import { countryOf } from "../lib/geo/country";
 import { locale, t } from "../lib/i18n";
+import { colors } from "../theme";
 
 // Dataset empaquetado: los números funcionan sin conexión.
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -46,10 +47,10 @@ export default function EmergencyScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 16, backgroundColor: "#fff" },
-  title: { fontSize: 20, fontWeight: "700", marginBottom: 12 },
-  warning: { backgroundColor: "#fff4e5", color: "#8a4b00", padding: 10, borderRadius: 8, marginBottom: 12 },
-  row: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 16, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: "#ddd" },
-  label: { fontSize: 16, flex: 1 },
-  number: { fontSize: 22, fontWeight: "700", color: "#c62828" },
+  container: { flex: 1, padding: 16, backgroundColor: colors.bg },
+  title: { fontSize: 20, fontWeight: "700", marginBottom: 12, color: colors.text },
+  warning: { backgroundColor: "#3A2A10", color: "#FACC15", padding: 10, borderRadius: 8, marginBottom: 12 },
+  row: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 16, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
+  label: { fontSize: 16, flex: 1, color: colors.text },
+  number: { fontSize: 22, fontWeight: "700", color: colors.accent },
 });

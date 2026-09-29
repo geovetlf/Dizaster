@@ -150,8 +150,8 @@ export class MediaService {
   }
 
   /** Un reporte o post solo puede adjuntar media propia, de un tipo soportado en V1 y ya subida. */
-  async assertAttachable(q: Queryable, ownerProfileId: string, mediaIds: string[]): Promise<void> {
-    if (mediaIds.length === 0) return;
+  async assertAttachable(q: Queryable, ownerProfileId: string, mediaIds: string[]): Promise<{ id: string; kind: "IMAGE" | "VIDEO_RECORDED" }[]> {
+    if (mediaIds.length === 0) return [];
     const { rows } = await q.query<{ id: string; kind: MediaKind; state: string }>(
       `SELECT id, kind, state FROM media.media WHERE id = ANY($1) AND owner_profile_id = $2`,
       [mediaIds, ownerProfileId],
@@ -161,6 +161,8 @@ export class MediaService {
       if (!V1_MEDIA_KINDS.includes(r.kind)) throw new DomainError("MEDIA_KIND_UNSUPPORTED", `Tipo de media no soportado en V1: ${r.kind}`);
       if (!["UPLOADED", "PROCESSING", "READY"].includes(r.state)) throw new DomainError("MEDIA_NOT_READY", "La media aún no se ha subido");
     }
+    const kinds = new Map(rows.map((r) => [r.id, r.kind as "IMAGE" | "VIDEO_RECORDED"]));
+    return mediaIds.map((id) => ({ id, kind: kinds.get(id)! }));
   }
 
   /**

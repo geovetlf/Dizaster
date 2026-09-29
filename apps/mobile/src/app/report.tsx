@@ -14,6 +14,7 @@ import { toPresenceSignals } from "../lib/report/presence";
 import type { LocalMedia } from "../lib/media/local-media";
 import { flushUntilSent, reportQueue } from "../lib/report/outbox";
 import { useSession } from "../lib/session";
+import { colors } from "../theme";
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const catalog = require("../reference-data/categories.json") as CategoryCatalog;
@@ -178,7 +179,7 @@ export default function ReportScreen() {
       ) : null}
 
       <MediaAttachments items={media} onChange={setMedia} />
-      <TextInput style={styles.input} multiline maxLength={2000} value={text} onChangeText={setText} placeholder="…" />
+      <TextInput style={styles.input} multiline maxLength={2000} value={text} onChangeText={setText} placeholder="…" placeholderTextColor={colors.textMuted} />
       {category.forcePseudonymous ? (
         <Text style={styles.note}>{t("pseudonymousForced")}</Text>
       ) : (
@@ -206,25 +207,25 @@ function describe(r: SubmitReportResponse): string {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fff" },
+  container: { flex: 1, backgroundColor: colors.bg },
   content: { padding: 16, paddingBottom: 48 },
-  title: { fontSize: 20, fontWeight: "700", marginBottom: 12, paddingHorizontal: 0 },
-  section: { fontSize: 16, fontWeight: "600", marginBottom: 8 },
-  row: { paddingVertical: 14, paddingHorizontal: 16, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: "#ddd" },
-  rowText: { fontSize: 16 },
-  meta: { color: "#666", marginTop: 2 },
+  title: { fontSize: 20, fontWeight: "700", marginBottom: 12, paddingHorizontal: 0, color: colors.text },
+  section: { fontSize: 16, fontWeight: "600", marginBottom: 8, color: colors.text },
+  row: { paddingVertical: 14, paddingHorizontal: 16, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
+  rowText: { fontSize: 16, color: colors.text },
+  meta: { color: colors.textMuted, marginTop: 2 },
   mapBox: { height: 220, borderRadius: 12, overflow: "hidden", marginBottom: 12 },
   map: { flex: 1 },
   nearby: { marginBottom: 12 },
-  nearbyRow: { padding: 12, borderWidth: 1, borderColor: "#ddd", borderRadius: 8, marginBottom: 8 },
-  nearbySelected: { borderColor: "#1f2937", backgroundColor: "#f3f4f6" },
-  input: { minHeight: 100, borderWidth: 1, borderColor: "#ccc", borderRadius: 8, padding: 10, textAlignVertical: "top", marginBottom: 12 },
+  nearbyRow: { padding: 12, borderWidth: 1, borderColor: colors.border, borderRadius: 8, marginBottom: 8 },
+  nearbySelected: { borderColor: colors.text, backgroundColor: colors.surfaceAlt },
+  input: { minHeight: 100, color: colors.text, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: 8, padding: 10, textAlignVertical: "top", marginBottom: 12 },
   switchRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 },
-  note: { color: "#555", marginBottom: 12 },
-  callFirst: { backgroundColor: "#fdecea", padding: 12, borderRadius: 8, marginBottom: 12 },
-  callFirstText: { color: "#b71c1c", fontWeight: "600" },
-  send: { backgroundColor: "#1f2937", borderRadius: 12, paddingVertical: 16, alignItems: "center" },
+  note: { color: colors.textMuted, marginBottom: 12 },
+  callFirst: { backgroundColor: colors.accentSoft, padding: 12, borderRadius: 8, marginBottom: 12 },
+  callFirstText: { color: "#FF8A8A", fontWeight: "600" },
+  send: { backgroundColor: colors.accent, borderRadius: 12, paddingVertical: 16, alignItems: "center" },
   disabled: { opacity: 0.5 },
-  sendText: { color: "#fff", fontSize: 16, fontWeight: "600" },
-  status: { marginTop: 16, fontSize: 15, paddingHorizontal: 16 },
+  sendText: { color: colors.white, fontSize: 16, fontWeight: "600" },
+  status: { marginTop: 16, fontSize: 15, paddingHorizontal: 16, color: colors.text },
 });

@@ -7,7 +7,7 @@ import { join, relative } from "node:path";
 const modulesDir = new URL("../services/core/src/modules/", import.meta.url).pathname;
 const SCHEMA_BY_MODULE = {
   identity: ["identity"], social: ["social"], report: ["report"], event: ["event"], verification: ["verification"],
-  ingestion: ["ingestion"], media: ["media"], geo: [], reference: [],
+  ingestion: ["ingestion"], media: ["media"], geo: [], reference: [], feed: [],
 };
 const ALL_SCHEMAS = ["identity", "social", "report", "event", "verification", "ingestion", "media"];
 const errors = [];

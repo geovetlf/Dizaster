@@ -65,7 +65,7 @@ export class ReportService {
 
     const device = req.deviceId ? await this.d.identity.ownedDevice(db, session.userId, req.deviceId) : null;
     if (req.deviceId && !device) throw new DomainError("UNKNOWN_DEVICE", "Dispositivo no registrado para este usuario", 403);
-    await this.d.media.assertAttachable(db, session.profileId, req.mediaIds);
+    const attachable = await this.d.media.assertAttachable(db, session.profileId, req.mediaIds);
 
     const receivedAt = clock.now();
     const attestation = await this.d.attestation.verify(req.presence.attestationToken, device?.platform ?? null);
@@ -116,9 +116,10 @@ export class ReportService {
         kind: eventId ? "REPORT" : "STANDARD",
         text: req.text ?? null,
         authorVisibility: anonymity,
+        categoryCode: req.categoryCode,
         publicPoint: eventId ? generalize(req.pin, category.sensitivity).point : null,
       });
-      await this.d.social.attachMedia(tx, postId, req.mediaIds);
+      await this.d.social.attachMedia(tx, postId, attachable);
       if (eventId) {
         await this.d.social.linkPostToEvent(tx, postId, eventId, "REPORT");
         if (req.mediaIds.length > 0) {

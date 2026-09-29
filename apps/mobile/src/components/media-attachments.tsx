@@ -3,6 +3,7 @@ import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 import { t, type MessageKey } from "../lib/i18n";
 import { captureMedia, discardLocal, type CaptureKind, type CaptureSource } from "../lib/media/capture";
 import { checkLimits, type LocalMedia } from "../lib/media/local-media";
+import { colors } from "../theme";
 
 export const MAX_MEDIA_PER_REPORT = 4;
 
@@ -75,17 +76,17 @@ function Button({ label, disabled, onPress }: { label: string; disabled: boolean
 
 const styles = StyleSheet.create({
   box: { marginBottom: 12 },
-  section: { fontSize: 16, fontWeight: "600", marginBottom: 8 },
+  section: { fontSize: 16, fontWeight: "600", marginBottom: 8, color: colors.text },
   thumbs: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 8 },
   thumb: { width: 76, height: 76 },
   image: { width: 76, height: 76, borderRadius: 8 },
-  video: { backgroundColor: "#1f2937", alignItems: "center", justifyContent: "center" },
-  videoText: { color: "#fff", fontWeight: "600" },
-  remove: { position: "absolute", top: -6, right: -6, width: 24, height: 24, borderRadius: 12, backgroundColor: "#111", alignItems: "center", justifyContent: "center" },
-  removeText: { color: "#fff", fontSize: 12 },
+  video: { backgroundColor: colors.accent, alignItems: "center", justifyContent: "center" },
+  videoText: { color: colors.white, fontWeight: "600" },
+  remove: { position: "absolute", top: -6, right: -6, width: 24, height: 24, borderRadius: 12, backgroundColor: colors.surfaceAlt, alignItems: "center", justifyContent: "center" },
+  removeText: { color: colors.white, fontSize: 12 },
   buttons: { flexDirection: "row", gap: 8 },
-  button: { flex: 1, borderWidth: 1, borderColor: "#1f2937", borderRadius: 8, paddingVertical: 10, alignItems: "center" },
-  buttonText: { color: "#1f2937", fontWeight: "600" },
+  button: { flex: 1, borderWidth: 1, borderColor: colors.text, borderRadius: 8, paddingVertical: 10, alignItems: "center" },
+  buttonText: { color: colors.text, fontWeight: "600" },
   disabled: { opacity: 0.4 },
-  note: { color: "#555", marginTop: 8 },
+  note: { color: colors.textMuted, marginTop: 8 },
 });

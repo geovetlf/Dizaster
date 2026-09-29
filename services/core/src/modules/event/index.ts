@@ -6,6 +6,8 @@ import type {
   EventSummary,
   GeoPoint,
   NegativeState,
+  PublicVerificationState,
+  Sensitivity,
   TimelineEntryView,
   TrustTier,
   VerificationLevel,
@@ -315,6 +317,16 @@ export class EventService {
     const r = rows[0];
     if (!r) throw notFound("Evento");
     return { ...toSummary(r), mergedIntoId: r.merged_into_id, publicationState: r.publication_state };
+  }
+
+  /** Estado público y sensibilidad de varios eventos (para componer feeds sin leer el esquema event desde fuera). */
+  async publicStates(q: Queryable, ids: string[]): Promise<Map<string, { publicVerificationState: PublicVerificationState; sensitivity: Sensitivity }>> {
+    if (ids.length === 0) return new Map();
+    const { rows } = await q.query<{ id: string; verification_level: VerificationLevel; negative_state: NegativeState; sensitivity: Sensitivity }>(
+      `SELECT id, verification_level, negative_state, sensitivity FROM event.events WHERE id = ANY($1) AND publication_state <> 'HIDDEN'`,
+      [ids],
+    );
+    return new Map(rows.map((r) => [r.id, { publicVerificationState: publicVerificationState(r.verification_level, r.negative_state), sensitivity: r.sensitivity }]));
   }
 
   async timeline(q: Queryable, eventId: string): Promise<TimelineEntryView[]> {

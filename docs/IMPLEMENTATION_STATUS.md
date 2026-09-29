@@ -1,6 +1,6 @@
 # Estado de la implementación
 
-Actualizado: 2026-09-29 (etapa 3: fotos y videos)
+Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 
 ## Etapa 1 — Fundación (hecha)
 
@@ -29,7 +29,7 @@ Actualizado: 2026-09-29 (etapa 3: fotos y videos)
 | Planificador NORMAL/URGENT, peticiones condicionales, circuit breaker, registro de ejecuciones | ✅ | `ingestion/scheduler.ts`, migración 0002, ADR 0011 |
 | Ciclo de vida por inactividad | ✅ | `EventService.applyLifecycle` (worker, cada hora) |
 
-**Pruebas:** 135 (contratos 5, geo-kit 26, backend 77 con PostgreSQL real, móvil 27). Además 3 pruebas del cliente S3 contra un servidor compatible en CI. JS de la app compila para iOS y Android.
+**Pruebas:** 151 (contratos 5, geo-kit 26, backend 86 con PostgreSQL real, móvil 34), más 3 del cliente S3 contra un servidor compatible en CI. JS de la app compila para iOS y Android y los proyectos nativos se generan en CI.
 
 ## Paridad Android e iOS (hecha)
 
@@ -55,9 +55,20 @@ Actualizado: 2026-09-29 (etapa 3: fotos y videos)
 | App: foto, video y galería con compresión; subida en la cola offline; reenvío automático al volver a la app | ✅ | `apps/mobile/src/lib/media`, `src/lib/report/outbox.ts` |
 | Miniaturas, hash perceptual, difuminado de rostros | ⏳ | ADR 0014 (pendiente) |
 
+## Etapa 4 — Interfaz según la referencia y feed social (hecha)
+
+| Área | Estado | Dónde |
+|---|---|---|
+| Tema oscuro, pestañas y botón central Reportar | ✅ | `apps/mobile/src/app/(tabs)`, `docs/design/REFERENCIA_UI.md` |
+| Inicio: cabecera, buscador, categorías, mapa cercano, publicaciones | ✅ | `src/app/(tabs)/index.tsx` |
+| Feed: para ti, cerca de ti, videos, filtro por categoría | ✅ | `GET /v1/feed`, ADR 0015 |
+| Me gusta y comentarios | ✅ | `/v1/posts/:id/like`, `/v1/posts/:id/comments` |
+| Perfil: alertas, reportes pendientes, emergencia | ✅ | `src/app/(tabs)/profile.tsx` |
+| Nombres de lugar ("Miraflores, Lima"), seguir, búsqueda de lugares y usuarios | ⏳ | siguiente etapa |
+
 ## Siguiente etapa (en orden)
 
-1. Interfaz según la imagen de referencia del propietario (inicio, mapa, reportar, videos, perfil) y feed social.
+1. Índice de lugares abierto (distrito y ciudad en publicaciones y búsqueda), seguir perfiles y ranking del feed.
 2. Identity real: Sign in with Apple, Google y email; App Attest / Play Integrity (necesita cuentas de Apple y Google).
 3. Social: comentarios, reacciones, seguir, feed cercano.
 4. Tablero de costo persistido y métricas por módulo.

@@ -1,0 +1,66 @@
+import * as Application from "expo-application";
+import * as Notifications from "expo-notifications";
+import { router, useFocusEffect } from "expo-router";
+import { useCallback, useState } from "react";
+import { Pressable, ScrollView, StyleSheet, Text } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { Icon } from "../../components/icon";
+import { enablePush } from "../../lib/device/push";
+import { t } from "../../lib/i18n";
+import { reportQueue } from "../../lib/report/outbox";
+import { useSession } from "../../lib/session";
+import { colors, radius, space } from "../../theme";
+
+/** Perfil: ajustes de este teléfono. Perfil público, seguidores e historial llegan con la identidad real. */
+export default function ProfileScreen() {
+  const session = useSession();
+  const [alerts, setAlerts] = useState(false);
+  const [pending, setPending] = useState(0);
+
+  useFocusEffect(
+    useCallback(() => {
+      Notifications.getPermissionsAsync().then((p) => setAlerts(p.granted)).catch(() => undefined);
+      reportQueue.pending().then((p) => setPending(p.length)).catch(() => undefined);
+    }, []),
+  );
+
+  async function turnOnAlerts() {
+    if (!session.deviceId) return;
+    setAlerts(await enablePush(session.deviceId).catch(() => false));
+  }
+
+  return (
+    <SafeAreaView style={styles.safe} edges={["top"]}>
+      <ScrollView contentContainerStyle={styles.content}>
+        <Text style={styles.title}>{t("profile")}</Text>
+        <Row icon="bell-outline" label={t("alerts")} value={alerts ? t("alertsOn") : t("alertsOff")} {...(alerts ? {} : { onPress: () => void turnOnAlerts() })} />
+        <Row icon="cloud-upload-outline" label={t("pendingReports")} value={String(pending)} />
+        <Row icon="phone-alert" label={t("emergencyTitle")} onPress={() => router.push("/emergency")} />
+        <Text style={styles.note}>{t("privacyNote")}</Text>
+        <Text style={styles.version}>Dizaster {Application.nativeApplicationVersion ?? ""}</Text>
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
+
+function Row({ icon, label, value, onPress }: { icon: "bell-outline" | "cloud-upload-outline" | "phone-alert"; label: string; value?: string; onPress?: () => void }) {
+  return (
+    <Pressable accessibilityRole={onPress ? "button" : "text"} disabled={!onPress} style={styles.row} onPress={onPress}>
+      <Icon name={icon} size={22} color={colors.text} />
+      <Text style={styles.rowLabel}>{label}</Text>
+      {value ? <Text style={[styles.rowValue, onPress && styles.rowAction]}>{value}</Text> : <Icon name="chevron-right" size={22} color={colors.textMuted} />}
+    </Pressable>
+  );
+}
+
+const styles = StyleSheet.create({
+  safe: { flex: 1, backgroundColor: colors.bg },
+  content: { padding: space.lg },
+  title: { color: colors.text, fontSize: 24, fontWeight: "800", marginBottom: space.lg },
+  row: { flexDirection: "row", alignItems: "center", gap: space.md, backgroundColor: colors.surface, borderRadius: radius.md, padding: space.lg, marginBottom: space.sm },
+  rowLabel: { flex: 1, color: colors.text, fontSize: 15 },
+  rowValue: { color: colors.textMuted },
+  rowAction: { color: colors.accent, fontWeight: "600" },
+  note: { color: colors.textMuted, marginTop: space.lg },
+  version: { color: colors.textMuted, marginTop: space.xl, fontSize: 12 },
+});

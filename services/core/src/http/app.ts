@@ -1,6 +1,6 @@
 import Fastify, { type FastifyInstance, type FastifyRequest } from "fastify";
 import { z } from "zod";
-import { BBox, DevicePlatform, MEDIA_UPLOAD_LIMITS, NegativeState, RegisterPushTokenRequest, type AppConfig } from "@dizaster/contracts";
+import { BBox, CreateCommentRequest, DevicePlatform, MEDIA_UPLOAD_LIMITS, NegativeState, RegisterPushTokenRequest, type AppConfig } from "@dizaster/contracts";
 import { LocalDiskStorage } from "../modules/media/index.js";
 import type { Container } from "../container.js";
 import { DomainError, forbidden } from "../platform/errors.js";
@@ -162,6 +162,31 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
       .filter((t) => t.type === "MEDIA_ADDED")
       .flatMap((t) => (Array.isArray(t.payload["mediaIds"]) ? (t.payload["mediaIds"] as string[]) : []));
     return { media: await c.media.publicViews(c.db, mediaIds, { requireApproval: event.sensitivity !== "NORMAL" }) };
+  });
+
+  // ───────────── Red social ─────────────
+  app.get("/v1/feed", async (req, reply) => {
+    // Personal (me gusta propios) y puede llevar la ubicación del lector: nunca se cachea en intermediarios.
+    reply.header("cache-control", "no-store");
+    return c.feed.feed(c.db, req.query, req.session?.profileId ?? null);
+  });
+
+  app.put("/v1/posts/:id/like", async (req) => {
+    const session = requireSession(req);
+    return c.social.setLike(c.db, parse(IdParam, req.params).id, session.profileId, true);
+  });
+
+  app.delete("/v1/posts/:id/like", async (req) => {
+    const session = requireSession(req);
+    return c.social.setLike(c.db, parse(IdParam, req.params).id, session.profileId, false);
+  });
+
+  app.get("/v1/posts/:id/comments", async (req) => ({ comments: await c.social.comments(c.db, parse(IdParam, req.params).id) }));
+
+  app.post("/v1/posts/:id/comments", async (req, reply) => {
+    const session = requireSession(req);
+    const { text } = parse(CreateCommentRequest, req.body);
+    return reply.status(201).send(await c.social.addComment(c.db, parse(IdParam, req.params).id, session.profileId, text));
   });
 
   // ───────────── Media (subida directa al almacenamiento) ─────────────
