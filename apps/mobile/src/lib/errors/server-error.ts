@@ -9,6 +9,7 @@ import type { MessageKey } from "../i18n";
  */
 export const SERVER_ERROR_KEYS: Readonly<Record<string, MessageKey>> = {
   RATE_LIMITED: "errRateLimited",
+  AUTHORITY_REQUEST_TRANSITION: "errAuthorityTransition",
   DAILY_UPLOAD_QUOTA: "errRateLimited",
   NOT_FOUND: "errNotFound",
   FORBIDDEN: "errForbidden",

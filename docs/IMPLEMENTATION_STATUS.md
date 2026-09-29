@@ -329,6 +329,7 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | Edición de posts (§7.1) | `PATCH /v1/posts/:id` 24 h, solo STANDARD/SHARE; rehace idioma, etiquetas, menciones y revisión de datos personales; historial solo en el caso de moderación; "editado" en la app | [0136](adr/0136-edicion-de-posts.md) |
 | Quién puede mencionarte (§7.3) | `mentionsFrom` EVERYONE/FOLLOWING/NOBODY en mi perfil; una mención no permitida queda como texto, sin enlace ni aviso; sin perfil privado en V1 | [0137](adr/0137-quien-puede-mencionarte.md) |
 | 0138 | Degradación automática por costo fuera de IA: presupuesto `infra`, escalera video → fotos nuevas → fuentes no urgentes (100/110/125 %), restaura solo lo automático, aviso a admin/operación | ✅ |
+| 0139 | Registro auditado de requerimientos de autoridades: solo registro (estados con nota, historial de solo inserción, referencias internas), pantalla admin, conteo en transparencia; sin entrega de datos | ✅ |
 | Licencias, auditoría, SBOM, Dependabot; respaldo con prueba de restauración en CI | ✅ | ADR 0070, `scripts/supply-chain.mjs`, `scripts/db-restore-check.mjs` |
 | Idioma de la app elegible en el perfil (es/en/pt/fr o del teléfono) | ✅ | ADR 0069, `app/language.tsx` |
 | Varias cuentas en un teléfono corroboran como una (clave seudónima del teléfono) | ✅ | ADR 0068, migración 0036 |
@@ -368,7 +369,6 @@ Revisión del Blueprint del 2026-09-29 (tras ADR 0112): completada con ADR 0113�
 
 Revisión del Blueprint del 2026-09-29 (tras ADR 0129), verificada contra el código, sin bloqueos:
 
-1. Registro auditado de requerimientos de autoridades, sin procedimiento de entrega hasta asesoría legal (§5.20, §13.3; decisión del propietario).
 
 Bloqueadas o en espera:
 

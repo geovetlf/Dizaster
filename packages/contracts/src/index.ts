@@ -23,3 +23,4 @@ export * from "./personal-data.js";
 export * from "./language-detect.js";
 export * from "./roles.js";
 export * from "./advertising.js";
+export * from "./authority.js";

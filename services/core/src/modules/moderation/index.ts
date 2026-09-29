@@ -291,6 +291,8 @@ export class ModerationService {
         GROUP BY action, actor, target_type ORDER BY action, actor, target_type`, [from, now])).rows;
     const reversals = (await q.query<{ n: number }>(
       `SELECT count(*)::int AS n FROM moderation.actions WHERE reverses_action_id IS NOT NULL AND created_at >= $1 AND created_at <= $2`, [from, now])).rows[0]!.n;
+    const authority = (await q.query<{ type: string; n: number }>(
+      `SELECT type, count(*)::int AS n FROM moderation.authority_requests WHERE received_at >= $1 AND received_at <= $2 GROUP BY type ORDER BY type`, [from, now])).rows;
     const appeals = (await q.query<{ received: number; upheld: number; reversed: number; open: number }>(
       `SELECT count(*) FILTER (WHERE created_at >= $1)::int AS received,
               count(*) FILTER (WHERE status = 'UPHELD' AND decided_at >= $1)::int AS upheld,
@@ -309,6 +311,7 @@ export class ModerationService {
       actions: actions.map((a) => ({ action: a.action, actor: a.actor, targetType: a.target_type, count: k(a.n) })),
       reversals: k(reversals),
       appeals: { received: k(appeals.received), upheld: k(appeals.upheld), reversed: k(appeals.reversed), open: k(appeals.open) },
+      authorityRequests: { received: k(authority.reduce((s, a) => s + a.n, 0)), byType: Object.fromEntries(authority.map((a) => [a.type, k(a.n)])) },
     };
   }
 
@@ -556,3 +559,5 @@ function parse<T extends z.ZodType>(schema: T, value: unknown): z.infer<T> {
   if (!r.success) throw new DomainError("VALIDATION", r.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; "));
   return r.data;
 }
+
+export { AuthorityRequestRegister } from "./authority-requests.js";

@@ -873,6 +873,31 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
     reply.header("cache-control", "no-store");
     return c.moderation.transparency(req.query, c.clock.now());
   });
+  // Registro auditado de requerimientos de autoridades (ADR 0139): solo administración y SOLO registro; no hay ruta de
+  // entrega o exportación de datos (decisión del propietario, hasta contar con asesoría legal).
+  app.get("/v1/admin/authority-requests", async (req, reply) => {
+    await requireAdmin(req);
+    reply.header("cache-control", "no-store");
+    return c.authorityRequests.list(req.query);
+  });
+  app.post("/v1/admin/authority-requests", async (req, reply) => {
+    const { userId } = await requireAdmin(req);
+    reply.code(201);
+    return c.authorityRequests.create(req.body, userId);
+  });
+  app.get<{ Params: { id: string } }>("/v1/admin/authority-requests/:id", async (req, reply) => {
+    await requireAdmin(req);
+    reply.header("cache-control", "no-store");
+    return c.authorityRequests.detail(req.params.id);
+  });
+  app.post<{ Params: { id: string } }>("/v1/admin/authority-requests/:id/status", async (req) => {
+    const { userId } = await requireAdmin(req);
+    return c.authorityRequests.changeStatus(req.params.id, req.body, userId);
+  });
+  app.post<{ Params: { id: string } }>("/v1/admin/authority-requests/:id/notes", async (req) => {
+    const { userId } = await requireAdmin(req);
+    return c.authorityRequests.addNote(req.params.id, req.body, userId);
+  });
   app.get("/v1/admin/quality", async (req, reply) => {
     await requirePermission(req, "ops.view");
     await c.meter.flush(c.cost);

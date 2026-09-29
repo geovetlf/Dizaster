@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseDelayMinutes, parseScopeList, parseUsd, shortId } from "../src/lib/admin/admin-tools";
+import { parseDelayMinutes, parseSubjectRefs, dueFromDays, parseScopeList, parseUsd, shortId } from "../src/lib/admin/admin-tools";
 
 describe("parseUsd", () => {
   it("acepta montos con coma o $ y hasta 2 decimales", () => {
@@ -32,5 +32,19 @@ describe("parseDelayMinutes (ADR 0109)", () => {
   });
   it("rechaza lo demás", () => {
     for (const bad of ["", "1441", "-1", "2.5", "abc", "12345"]) expect(parseDelayMinutes(bad)).toBeNull();
+  });
+});
+
+describe("requerimientos de autoridades (ADR 0139)", () => {
+  const id = "0b3c2a8e-8f1e-4c5b-9a7d-1234567890ab";
+  it("solo acepta referencias internas", () => {
+    expect(parseSubjectRefs(`user:${id}, POST:${id.toUpperCase()} Juan +51999`)).toEqual({ values: [`user:${id}`, `post:${id}`], invalid: ["juan", "+51999"] });
+    expect(parseSubjectRefs(" ")).toEqual({ values: [], invalid: [] });
+  });
+  it("convierte el plazo en días", () => {
+    const now = new Date("2026-09-29T12:00:00Z");
+    expect(dueFromDays("", now)).toBeNull();
+    expect(dueFromDays("10", now)).toBe("2026-10-09T12:00:00.000Z");
+    for (const bad of ["0", "366", "2.5", "x"]) expect(dueFromDays(bad, now)).toBe("invalid");
   });
 });

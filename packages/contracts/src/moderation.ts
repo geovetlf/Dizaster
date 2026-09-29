@@ -181,6 +181,8 @@ export interface TransparencyReport {
   actions: { action: ModerationActionType; actor: "RULE" | "MODERATOR"; targetType: string; count: TransparencyCount }[];
   reversals: TransparencyCount;
   appeals: { received: TransparencyCount; upheld: TransparencyCount; reversed: TransparencyCount; open: TransparencyCount };
+  /** Requerimientos de autoridades recibidos en el periodo, por tipo (ADR 0139). Solo conteos. */
+  authorityRequests: { received: TransparencyCount; byType: Partial<Record<string, TransparencyCount>> };
 }
 export const TRANSPARENCY_MIN_COUNT = 5;
 export const transparencyCount = (n: number): TransparencyCount => (n > 0 && n < TRANSPARENCY_MIN_COUNT ? "<5" : n);

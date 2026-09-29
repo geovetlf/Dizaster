@@ -1,4 +1,4 @@
-import type { PublishDelayView, PresenceAccessEntry, DuplicateCandidateView, OfficialScopeView, MyReportView, MfaEnrollResponse, MfaStatus, PresenceReview, EventSourceView, EventStatus, MyProfile, UpdateProfileRequest, ReactionKind, ReactionState, DataExport, VerificationView, ModeratorEventDetail, SavedZone, SavedZoneInput, AppealView, CaseDetail, CaseSummary, CreateFlagRequest, ModerationActionType, ModerationNotice, CostDashboard, KillSwitchView, QualityReport, CreatePostRequest, TagView, BusinessView, SessionView, CreateBusinessRequest, UpdateBusinessRequest, AlertPreferences, CategorySubscription, CategorySubscriptionInput, NotificationsResponse, AppConfig, AttributionsResponse, AreaSearchResult, FollowTarget, MyFollows, ProfileSearchResult, ProfileView, CommentView, CreateUploadRequest, FeedPost, FeedResponse, FeedTab, CreateUploadResponse, DevicePlatform, MediaView, RegisterPushTokenRequest, EventMapResponse, EventDetail, EventSummary, NearbyEventsResponse, SubmitReportRequest, SubmitReportResponse, TimelineEntryView } from "@dizaster/contracts";
+import type { AuthorityRequestDetail, AuthorityRequestSummary, AuthorityRequestStatus, CreateAuthorityRequest, PublishDelayView, PresenceAccessEntry, DuplicateCandidateView, OfficialScopeView, MyReportView, MfaEnrollResponse, MfaStatus, PresenceReview, EventSourceView, EventStatus, MyProfile, UpdateProfileRequest, ReactionKind, ReactionState, DataExport, VerificationView, ModeratorEventDetail, SavedZone, SavedZoneInput, AppealView, CaseDetail, CaseSummary, CreateFlagRequest, ModerationActionType, ModerationNotice, CostDashboard, KillSwitchView, QualityReport, CreatePostRequest, TagView, BusinessView, SessionView, CreateBusinessRequest, UpdateBusinessRequest, AlertPreferences, CategorySubscription, CategorySubscriptionInput, NotificationsResponse, AppConfig, AttributionsResponse, AreaSearchResult, FollowTarget, MyFollows, ProfileSearchResult, ProfileView, CommentView, CreateUploadRequest, FeedPost, FeedResponse, FeedTab, CreateUploadResponse, DevicePlatform, MediaView, RegisterPushTokenRequest, EventMapResponse, EventDetail, EventSummary, NearbyEventsResponse, SubmitReportRequest, SubmitReportResponse, TimelineEntryView } from "@dizaster/contracts";
 import { mergeMapTiles, tilesForView } from "@dizaster/geo-kit";
 import { canRetryWithRefresh, singleFlight } from "./auth/refresh";
 import { API_URL } from "./config";
@@ -153,6 +153,14 @@ export const api = {
   publishDelay: (code: string) => request<PublishDelayView>(`/v1/admin/categories/${encodeURIComponent(code)}/publish-delay`),
   setPublishDelay: (code: string, minutes: number) =>
     request<PublishDelayView>(`/v1/admin/categories/${encodeURIComponent(code)}/publish-delay`, { method: "PUT", body: JSON.stringify({ minutes }) }),
+  authorityRequests: () => request<{ requests: AuthorityRequestSummary[] }>("/v1/admin/authority-requests"),
+  authorityRequest: (id: string) => request<AuthorityRequestDetail>(`/v1/admin/authority-requests/${encodeURIComponent(id)}`),
+  createAuthorityRequest: (body: CreateAuthorityRequest) =>
+    request<AuthorityRequestDetail>("/v1/admin/authority-requests", { method: "POST", body: JSON.stringify(body) }),
+  changeAuthorityRequestStatus: (id: string, status: AuthorityRequestStatus, note: string) =>
+    request<AuthorityRequestDetail>(`/v1/admin/authority-requests/${encodeURIComponent(id)}/status`, { method: "POST", body: JSON.stringify({ status, note }) }),
+  addAuthorityRequestNote: (id: string, note: string) =>
+    request<AuthorityRequestDetail>(`/v1/admin/authority-requests/${encodeURIComponent(id)}/notes`, { method: "POST", body: JSON.stringify({ note }) }),
   searchPosts: (q: string) => request<FeedResponse>(`/v1/search/posts?${new URLSearchParams({ q, limit: "10" })}`),
   searchProfiles: (q: string) => request<{ profiles: ProfileSearchResult[] }>(`/v1/profiles?${new URLSearchParams({ q })}`),
   alertPreferences: () => request<AlertPreferences>("/v1/me/alert-preferences"),

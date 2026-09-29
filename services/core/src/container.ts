@@ -14,7 +14,7 @@ import { EventService } from "./modules/event/index.js";
 import { FeedService } from "./modules/feed/index.js";
 import { AlertService, ApnsSender, budgetAlertText, costDegradationText, sourceAlertText, FcmSender, LogPushSender, PushGateway, type FcmServiceAccount, type PushSender } from "./modules/alert/index.js";
 import { GeoService } from "./modules/geo/index.js";
-import { ModerationService } from "./modules/moderation/index.js";
+import { AuthorityRequestRegister, ModerationService } from "./modules/moderation/index.js";
 import { TrustService } from "./modules/trust/index.js";
 import { DevAttestationVerifier, IdentityService, MfaService, type AttestationVerifier } from "./modules/identity/index.js";
 import { IngestionScheduler, IngestionService, InstitutionService, NodeHttpFetcher, type HttpFetcher } from "./modules/ingestion/index.js";
@@ -48,6 +48,7 @@ export interface Container {
   cost: CostService;
   connectors: Connectors;
   moderation: ModerationService;
+  authorityRequests: AuthorityRequestRegister;
   trust: TrustService;
   quality: QualityService;
   composer: PostComposer;
@@ -112,6 +113,7 @@ export function buildContainer(env: AppEnv, overrides: { db?: Db; clock?: Clock;
   const connectors = buildConnectors(env, cost, overrides.connectors, cost);
   const moderation = new ModerationService(db, social, identity, events, verification, trust, media);
   moderation.registerHandlers(dispatcher);
+  const authorityRequests = new AuthorityRequestRegister(db, () => clock.now());
   dispatcher.on("BudgetThresholdReached", "cost.log-threshold", async (e) => {
     console.warn(JSON.stringify({ msg: "cost.budget.threshold", ...e.payload }));
   });
@@ -140,7 +142,7 @@ export function buildContainer(env: AppEnv, overrides: { db?: Db; clock?: Clock;
   });
   const composer = new PostComposer(db, social, media, events, business, async (userId) => (await trust.socialLimits(db, userId)).postsPerHour);
   const quality = new QualityService(db, clock, { cost, events, verification, alerts, ingestion, moderation, ops: { identity, backlog: () => dispatcher.backlog() } });
-  return { env, db, clock, ref, geo, social, identity, mfa, events, ingestion, ingestionScheduler, verification, media, storage, reports, feed, alerts, dispatcher, cost, moderation, trust, quality, composer, business, institutions, meter, connectors };
+  return { env, db, clock, ref, geo, social, identity, mfa, events, ingestion, ingestionScheduler, verification, media, storage, reports, feed, alerts, dispatcher, cost, moderation, authorityRequests, trust, quality, composer, business, institutions, meter, connectors };
 }
 
 /** APNs y FCM directos. Si falta la credencial de una plataforma, sus avisos quedan solo en el historial. */

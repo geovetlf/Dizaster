@@ -33,3 +33,22 @@ export function parseDelayMinutes(text: string): number | null {
   const n = Number(clean);
   return n <= 1440 ? n : null;
 }
+
+/**
+ * Referencias internas de un requerimiento de autoridad (ADR 0139): "user:<uuid>", "post:<uuid>"… separadas por comas
+ * o espacios. Nunca nombres ni teléfonos: lo que no encaja va a `invalid` para mostrarlo.
+ */
+export function parseSubjectRefs(text: string): { values: string[]; invalid: string[] } {
+  const items = text.split(/[,\s]+/).map((s) => s.trim().toLowerCase()).filter(Boolean);
+  const valid = /^(user|post|comment|report|event|business):[0-9a-f-]{36}$/;
+  return { values: [...new Set(items.filter((s) => valid.test(s)))], invalid: [...new Set(items.filter((s) => !valid.test(s)))] };
+}
+
+/** Plazo en días escrito a mano (1 a 365) → fecha ISO; vacío → null (sin plazo); inválido → "invalid". */
+export function dueFromDays(text: string, now: Date): string | null | "invalid" {
+  const clean = text.trim();
+  if (clean === "") return null;
+  if (!/^\d{1,3}$/.test(clean)) return "invalid";
+  const n = Number(clean);
+  return n >= 1 && n <= 365 ? new Date(now.getTime() + n * 86_400_000).toISOString() : "invalid";
+}
