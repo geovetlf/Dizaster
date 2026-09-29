@@ -105,7 +105,8 @@ export function buildContainer(env: AppEnv, overrides: { db?: Db; clock?: Clock;
   // Presupuestos y kill switches persistidos: las funciones de pago empiezan a 0 y apagadas (migración 0009).
   const cost = new CostService(db, identity, media, clock, dataDir);
   // Conectores (ADR 0064): IA, traducción, SMS y voz detrás de interfaces; apagados por defecto, costo cero.
-  const connectors = buildConnectors(env, cost, overrides.connectors);
+  cost.registerHandlers(dispatcher);
+  const connectors = buildConnectors(env, cost, overrides.connectors, cost);
   const moderation = new ModerationService(db, social, identity, events, verification, trust, media);
   moderation.registerHandlers(dispatcher);
   dispatcher.on("BudgetThresholdReached", "cost.log-threshold", async (e) => {

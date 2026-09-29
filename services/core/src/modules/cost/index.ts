@@ -5,6 +5,7 @@ import {
   MEDIA_KILL_SWITCHES,
   UpdateBudgetRequest,
   UpdateKillSwitchRequest,
+  type AiUsageView,
   type BudgetPeriod,
   type BudgetView,
   type CostDashboard,
@@ -16,8 +17,10 @@ import type { Clock } from "../../platform/clock.js";
 import type { CostGuard } from "../../platform/cost-guard.js";
 import { withTransaction, type Db, type Queryable } from "../../platform/db.js";
 import { DomainError } from "../../platform/errors.js";
+import type { AiCallEntry, AiCallSink } from "../../platform/connectors/index.js";
+import { newId } from "../../platform/ids.js";
 import type { UsageEntry, UsageSink } from "../../platform/metrics.js";
-import { publish } from "../../platform/outbox.js";
+import { publish, type OutboxDispatcher } from "../../platform/outbox.js";
 import type { IdentityService } from "../identity/index.js";
 import type { MediaService } from "../media/index.js";
 
@@ -40,7 +43,7 @@ const Key = z.string().min(2).max(40).regex(/^[a-z][a-z0-9.-]*$/);
  * Cost Optimization Layer persistido (Blueprint §5.18): presupuestos por periodo con avisos al 50/80/100 %,
  * kill switches remotos, uso medido por módulo y el tablero "costo por 1.000 usuarios activos".
  */
-export class CostService implements CostGuard, UsageSink {
+export class CostService implements CostGuard, UsageSink, AiCallSink {
   readonly prices: Prices;
   private kills: { at: number; map: Map<string, boolean> } | null = null;
 
@@ -103,6 +106,39 @@ export class CostService implements CostGuard, UsageSink {
 
   // ───────────── Medición ─────────────
 
+  /** Al borrar una cuenta, sus llamadas a la IA quedan sin persona (el costo sigue contando). */
+  registerHandlers(dispatcher: OutboxDispatcher): void {
+    dispatcher.on("AccountDeleted", "cost.unlink-ai-calls", async (e, tx) => {
+      await tx.query(`UPDATE cost.ai_calls SET actor_user_id = NULL WHERE actor_user_id = $1`, [e.payload.userId]);
+    });
+  }
+
+  /** Una llamada del AI CORE (ADR 0110), sin contenido. */
+  async recordAiCall(e: AiCallEntry): Promise<void> {
+    await this.db.query(
+      `INSERT INTO cost.ai_calls (id, capability, provider, model, status, fallback, latency_ms, input_tokens, output_tokens, estimated_usd, usd,
+                                 subject_type, subject_id, actor_user_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
+      [newId(), e.capability, e.provider, e.model, e.status, e.fallback, e.latencyMs, e.inputTokens, e.outputTokens, e.estimatedUsd, e.usd,
+        e.subject?.type ?? null, e.subject?.id ?? null, e.actorUserId],
+    );
+  }
+
+  /** Uso de IA agregado de un periodo (tablero). */
+  async aiUsage(q: Queryable, fromDay: string, toDay: string): Promise<AiUsageView[]> {
+    const { rows } = await q.query<{ capability: string; provider: string; model: string | null; calls: number; fallbacks: number; inp: string; out: string; usd: string; lat: string }>(
+      `SELECT capability, provider, model, count(*)::int AS calls, count(*) FILTER (WHERE fallback)::int AS fallbacks,
+              sum(input_tokens) AS inp, sum(output_tokens) AS out, sum(usd) AS usd, avg(latency_ms) AS lat
+         FROM cost.ai_calls WHERE at >= $1::date AND at < $2::date + 1
+        GROUP BY capability, provider, model ORDER BY sum(usd) DESC, count(*) DESC, capability`,
+      [fromDay, toDay],
+    );
+    return rows.map((r) => ({
+      capability: r.capability, provider: r.provider, model: r.model, calls: r.calls, fallbacks: r.fallbacks,
+      inputTokens: Number(r.inp), outputTokens: Number(r.out), usd: round(Number(r.usd)), avgLatencyMs: Math.round(Number(r.lat)),
+    }));
+  }
+
   async persistUsage(entries: UsageEntry[]): Promise<void> {
     if (entries.length === 0) return;
     await this.db.query(
@@ -114,10 +150,12 @@ export class CostService implements CostGuard, UsageSink {
   }
 
   /** Retención: el detalle diario se guarda 400 días (comparar con el mismo mes del año anterior). */
-  async applyRetention(): Promise<{ usage: number; spend: number }> {
+  async applyRetention(): Promise<{ usage: number; spend: number; aiCalls: number }> {
     const usage = await this.db.query(`DELETE FROM cost.usage_daily WHERE day < current_date - 400`);
     const spend = await this.db.query(`DELETE FROM cost.spend_daily WHERE day < current_date - 400`);
-    return { usage: usage.rowCount ?? 0, spend: spend.rowCount ?? 0 };
+    // El detalle por llamada de IA se guarda 90 días; el gasto agregado sigue en spend_daily.
+    const aiCalls = await this.db.query(`DELETE FROM cost.ai_calls WHERE at < now() - interval '90 days'`);
+    return { usage: usage.rowCount ?? 0, spend: spend.rowCount ?? 0, aiCalls: aiCalls.rowCount ?? 0 };
   }
 
   // ───────────── Administración ─────────────
@@ -218,6 +256,7 @@ export class CostService implements CostGuard, UsageSink {
       daily: [...daily.entries()].map(([day, v]) => ({ day, requests: v.requests, estimatedUsd: round(v.estimatedUsd) })),
       budgets: await this.budgets(this.db),
       killSwitches: await this.killSwitches(),
+      ai: await this.aiUsage(this.db, from, to),
     };
   }
 

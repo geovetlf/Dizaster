@@ -1,4 +1,4 @@
-import type { AIProvider, AiRequest, AiResponse, SmsProvider, SpeechToTextProvider, TextToSpeechProvider, TranslationProvider } from "./types.js";
+import type { AIProvider, AiRequest, AiResponse, EmbeddingProvider, EmergencyDataProvider, SmsProvider, SpeechToTextProvider, TextToSpeechProvider, TranslationProvider, VisionProvider } from "./types.js";
 
 /** IA apagada (por defecto). El AI CORE ni siquiera la llama: devuelve "desactivada" y el llamador usa su regla. */
 export class NoAIProvider implements AIProvider {
@@ -17,7 +17,7 @@ export class FixtureAIProvider implements AIProvider {
   readonly paid: boolean = false;
   readonly calls: AiRequest[] = [];
   behaviour: "ok" | "fail" | "hang" = "ok";
-  constructor(private readonly answers: Partial<Record<AiRequest["task"], string>> = {}, private readonly price = 0) {}
+  constructor(private readonly answers: Partial<Record<AiRequest["capability"], string>> = {}, private readonly price = 0) {}
   estimateUsd(): number { return this.price; }
   async complete(req: AiRequest, signal: AbortSignal): Promise<AiResponse> {
     this.calls.push(req);
@@ -25,7 +25,7 @@ export class FixtureAIProvider implements AIProvider {
     if (this.behaviour === "hang") {
       await new Promise((_, reject) => signal.addEventListener("abort", () => reject(new Error("aborted")), { once: true }));
     }
-    const text = this.answers[req.task] ?? "{}";
+    const text = this.answers[req.capability] ?? "{}";
     return { text, usage: { inputTokens: Math.ceil(req.input.length / 4), outputTokens: Math.ceil(text.length / 4) }, costUsd: this.price, model: "fixture" };
   }
 }
@@ -65,4 +65,22 @@ export class NoTextToSpeech implements TextToSpeechProvider {
   readonly id = "none";
   readonly paid = false;
   async synthesize(_text: string, _lang: string): Promise<Uint8Array | null> { return null; }
+}
+
+export class NoVision implements VisionProvider {
+  readonly id = "none";
+  readonly paid = false;
+  async describe(): Promise<null> { return null; }
+}
+
+export class NoEmbeddings implements EmbeddingProvider {
+  readonly id = "none";
+  readonly paid = false;
+  async embed(): Promise<null> { return null; }
+}
+
+export class NoEmergencyData implements EmergencyDataProvider {
+  readonly id = "none";
+  readonly paid = false;
+  async numbersFor(): Promise<null> { return null; }
 }

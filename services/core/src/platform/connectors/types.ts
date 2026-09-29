@@ -1,3 +1,5 @@
+import type { AiCapability } from "./capabilities.js";
+
 /**
  * Source Connector Layer / proveedores reemplazables (ADR 0064). Toda capacidad que podría depender de un tercero se
  * declara aquí como interfaz; el resto del código nunca llama a una API externa directamente. Cada proveedor dice si
@@ -12,15 +14,9 @@ export interface Connector {
 
 // ───────────── AI CORE ─────────────
 
-/**
- * Tareas en las que la IA PUEDE ayudar. Lista cerrada: añadir una exige un ADR. Ninguna decide sola; todas dejan
- * una sugerencia que una regla o una persona acepta. Nunca produce OFFICIALLY_CONFIRMED ni FALSE.
- */
-export const AI_TASKS = ["dedup.ambiguous", "moderation.text_triage", "summary.event", "translation.text"] as const;
-export type AiTask = (typeof AI_TASKS)[number];
-
+/** Capacidades en las que la IA PUEDE ayudar: catálogo cerrado en capabilities.ts (ADR 0110, antes AI_TASKS). */
 export interface AiRequest {
-  task: AiTask;
+  capability: AiCapability;
   /** Instrucción fija de la tarea (sin datos personales). */
   instructions: string;
   /** Datos de entrada ya minimizados por el AI CORE. */
@@ -67,6 +63,26 @@ export interface SpeechToTextProvider extends Connector {
 export interface TextToSpeechProvider extends Connector {
   /** null = sin audio del servidor. En el teléfono la síntesis del sistema operativo es gratis. */
   synthesize(text: string, lang: string): Promise<Uint8Array | null>;
+}
+
+// ───────────── Visión, embeddings y datos de emergencia (ADR 0110) ─────────────
+
+/** Análisis de imagen/video. Hoy apagado: ANALYZE_IMAGE/ANALYZE_VIDEO devuelven "no disponible". */
+export interface VisionProvider extends Connector {
+  /** null = sin análisis (la media sigue su flujo determinista y humano). */
+  describe(media: Uint8Array, mime: string, instructions: string): Promise<{ text: string; costUsd: number; model: string } | null>;
+}
+
+/** Embeddings: solo cuando la búsqueda semántica gane a PostgreSQL, trigram, H3 y filtros. Hoy apagado. */
+export interface EmbeddingProvider extends Connector {
+  /** null = sin vector; quien llama usa búsqueda determinista. */
+  embed(text: string): Promise<number[] | null>;
+}
+
+/** Datos de emergencia externos (p. ej. APIs de despacho). Hoy apagado: los números vienen de /data. */
+export interface EmergencyDataProvider extends Connector {
+  /** null = usar el registro propio de números por país y categoría. */
+  numbersFor(country: string, category: string): Promise<{ number: string; service: string }[] | null>;
 }
 
 // Video en vivo: `LiveStreamProvider` en modules/media (ADR 0015). Mapas: `MapProvider` en la app (ADR 0003).

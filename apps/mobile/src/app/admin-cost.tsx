@@ -76,6 +76,16 @@ export default function AdminCostScreen() {
             </View>
           ))}
 
+          {/* Uso del AI CORE por capacidad (ADR 0110); vacío mientras la IA esté apagada. */}
+          <Text style={styles.section}>{t("costAi")}</Text>
+          {(d.ai ?? []).length === 0 ? <Text style={styles.note}>{t("costAiNone")}</Text> : (d.ai ?? []).map((a) => (
+            <View key={`${a.capability}|${a.provider}|${a.model ?? ""}`} style={styles.row}>
+              <Text style={styles.rowLabel}>{a.capability} · {a.provider}</Text>
+              <Text style={styles.value}>{a.calls} · {a.fallbacks} {t("costAiFallbacks")}</Text>
+              <Text style={styles.amount}>{usd(a.usd)}</Text>
+            </View>
+          ))}
+
           <Text style={styles.section}>{t("costBudgets")}</Text>
           {d.budgets.map((b) => (
             <View key={b.key}>

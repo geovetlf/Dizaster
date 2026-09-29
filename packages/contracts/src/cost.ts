@@ -32,6 +32,20 @@ export interface CostMetricView {
   estimatedUsd: number | null;
 }
 
+/** Uso del AI CORE en el periodo por capacidad, proveedor y modelo (ADR 0110). Sin contenido. */
+export interface AiUsageView {
+  capability: string;
+  provider: string;
+  model: string | null;
+  calls: number;
+  /** Intentos en los que quien llamó siguió con su regla determinista. */
+  fallbacks: number;
+  inputTokens: number;
+  outputTokens: number;
+  usd: number;
+  avgLatencyMs: number;
+}
+
 export interface CostModuleView {
   module: string;
   estimatedUsd: number;
@@ -78,4 +92,5 @@ export interface CostDashboard {
   daily: { day: string; requests: number; estimatedUsd: number }[];
   budgets: BudgetView[];
   killSwitches: KillSwitchView[];
+  ai: AiUsageView[];
 }
