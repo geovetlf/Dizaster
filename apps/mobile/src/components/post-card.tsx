@@ -104,7 +104,7 @@ export function PostCard({ post, categoryName }: { post: FeedPost; categoryName:
         ) : null}
       </View>
 
-      {post.text ? <RichText text={post.text} mentions={post.mentions} style={styles.text} /> : null}
+      {post.text ? <RichText text={post.text} mentions={post.mentions} businessMentions={post.businessMentions} style={styles.text} /> : null}
       {post.share ? <SharedPost post={post.share.post} categoryName={categoryName} /> : null}
       <MediaGrid media={post.media} onOpen={post.event ? () => router.push(`/event/${post.event!.id}`) : undefined} />
       {post.hiddenMediaCount > 0 ? <Text style={styles.meta}>+{post.hiddenMediaCount} {t("hiddenMedia")}</Text> : null}

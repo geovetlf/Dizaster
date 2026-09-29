@@ -216,6 +216,7 @@ export class FeedService {
         shareCount: r.shareCount,
         share: r.sharedPostId ? { post: originals.get(r.sharedPostId) ?? null } : null,
         mentions: r.mentions,
+        businessMentions: r.businessMentions,
         mine: r.mine,
       };
     });

@@ -16,7 +16,7 @@ import { newId } from "../../platform/ids.js";
 interface Row {
   id: string; handle: string; name: string; category: BusinessCategory; country: string | null; description: string | null;
   address_public: string | null; contact_phone: string | null; contact_url: string | null; verification_status: BusinessVerification;
-  created_at: Date; followers: number; posts: number; followed: boolean; mine: boolean;
+  created_at: Date; followers: number; posts: number; followed: boolean; mine: boolean; blocked: boolean;
 }
 
 const COLUMNS = `b.id, b.handle, b.name, b.category, b.country, b.description, b.address_public, b.contact_phone, b.contact_url,
@@ -25,7 +25,8 @@ const COLUMNS = `b.id, b.handle, b.name, b.category, b.country, b.description, b
   (SELECT count(*) FROM social.posts p WHERE p.author_type = 'BUSINESS' AND p.author_id = b.id AND p.deleted_at IS NULL
       AND p.visibility = 'PUBLIC' AND p.moderation_state = 'VISIBLE')::int AS posts,
   EXISTS (SELECT 1 FROM social.follows f WHERE f.follower_profile_id = $2 AND f.target_type = 'BUSINESS' AND f.target_id = b.id::text) AS followed,
-  b.owner_user_id = $3 AS mine`;
+  b.owner_user_id = $3 AS mine,
+  EXISTS (SELECT 1 FROM social.business_blocks bb WHERE bb.blocker_profile_id = $2 AND bb.business_id = b.id) AS blocked`;
 
 /**
  * Perfiles de negocio (ADR 0028). V1: una persona administra hasta 3; sin miembros adicionales todavía
@@ -77,6 +78,8 @@ export class BusinessService {
     await this.db.query(`UPDATE social.business_profiles SET deleted_at = now(), updated_at = now() WHERE id = $1`, [id]);
     await this.db.query(`UPDATE social.posts SET text = NULL, deleted_at = coalesce(deleted_at, now()) WHERE author_type = 'BUSINESS' AND author_id = $1`, [id]);
     await this.db.query(`DELETE FROM social.follows WHERE target_type = 'BUSINESS' AND target_id = $1`, [id]);
+    await this.db.query(`DELETE FROM social.post_business_mentions WHERE business_id = $1`, [id]);
+    await this.db.query(`DELETE FROM social.business_blocks WHERE business_id = $1`, [id]);
   }
 
   /** Vista pública. Un negocio retirado por moderación solo lo ve quien lo administra. */
@@ -156,7 +159,7 @@ function toView(r: Row): BusinessView {
   return {
     handle: r.handle, name: r.name, category: r.category, country: r.country, description: r.description, addressPublic: r.address_public,
     contactPhone: r.contact_phone, contactUrl: r.contact_url, verification: r.verification_status, followerCount: r.followers,
-    postCount: r.posts, followedByMe: r.followed, isMine: r.mine === true, createdAt: r.created_at.toISOString(),
+    postCount: r.posts, followedByMe: r.followed, blockedByMe: r.blocked === true, isMine: r.mine === true, createdAt: r.created_at.toISOString(),
   };
 }
 

@@ -51,6 +51,8 @@ export interface FeedPost {
   myReactions: ReactionKind[];
   /** Handles mencionados que existen: solo esos se pintan como enlace. */
   mentions: string[];
+  /** Subconjunto de `mentions` que son negocios (enlazan a su página, ADR 0054). */
+  businessMentions: string[];
   /** Veces que se compartió dentro de la app (ADR 0046). */
   shareCount: number;
   /** Solo en posts SHARE: el original, o `post: null` si ya no está disponible (borrado u oculto). */

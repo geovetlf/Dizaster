@@ -46,6 +46,7 @@ export interface FeedRow {
   sharedPostId: string | null;
   shareCount: number;
   mentions: string[];
+  businessMentions: string[];
   mine: boolean;
 }
 
@@ -154,6 +155,7 @@ export class SocialService {
     await q.query(`DELETE FROM social.post_mentions WHERE profile_id = $1`, [profileId]);
     await q.query(`DELETE FROM social.follows WHERE follower_profile_id = $1 OR (target_type = 'PROFILE' AND target_id = $1::text)`, [profileId]);
     await q.query(`DELETE FROM social.blocks WHERE blocker_profile_id = $1 OR blocked_profile_id = $1`, [profileId]);
+    await q.query(`DELETE FROM social.business_blocks WHERE blocker_profile_id = $1`, [profileId]);
   }
 
   /** Borrado de cuenta: sus negocios desaparecen con sus posts (la tabla conserva el handle para que nadie lo suplante). */
@@ -307,6 +309,7 @@ export class SocialService {
     // seguridad y ocultarlos no aporta nada (el bloqueador no sabe quién los escribió).
     if (f.viewerProfileId) {
       where.push(`NOT (p.author_type = 'PROFILE' AND p.author_visibility = 'PUBLIC' AND EXISTS (SELECT 1 FROM social.blocks b WHERE b.blocker_profile_id = $2 AND b.blocked_profile_id = p.author_id))`);
+      where.push(`NOT (p.author_type = 'BUSINESS' AND EXISTS (SELECT 1 FROM social.business_blocks bb WHERE bb.blocker_profile_id = $2 AND bb.business_id = p.author_id))`);
     }
     const nearSql = f.near ? `ST_SetSRID(ST_MakePoint($${params.push(f.near.lng)}, $${params.push(f.near.lat)}), 4326)::geography` : null;
     if (f.category) {
@@ -341,7 +344,7 @@ export class SocialService {
       id: string; kind: FeedRow["kind"]; author_visibility: string; handle: string; display_name: string; text: string | null;
       created_at: Date; category_code: string | null; event_id: string | null; distance_m: number | null; score: number;
       media: { id: string; kind: "IMAGE" | "VIDEO_RECORDED" }[] | null; reactions: ReactionCounts | null; my_reactions: ReactionKind[]; comment_count: number; shared_post_id: string | null; share_count: number;
-      mentions: string[]; mine: boolean | null; business_verification: "UNVERIFIED" | "VERIFIED" | "INSTITUTIONAL_OFFICIAL" | null;
+      mentions: string[]; business_mentions: string[]; mine: boolean | null; business_verification: "UNVERIFIED" | "VERIFIED" | "INSTITUTIONAL_OFFICIAL" | null;
     }>(
       `WITH x AS (
          SELECT p.id, p.author_id, p.author_type, p.kind, p.author_visibility, coalesce(pr.handle, bp.handle) AS handle,
@@ -366,6 +369,9 @@ export class SocialService {
               (SELECT coalesce(array_agg(r.kind ORDER BY r.kind), '{}') FROM social.reactions r WHERE r.post_id = x.id AND r.profile_id = $2) AS my_reactions,
               (SELECT coalesce(array_agg(mp.handle ORDER BY mp.handle), '{}') FROM social.post_mentions pm
                  JOIN social.profiles mp ON mp.id = pm.profile_id WHERE pm.post_id = x.id AND mp.deleted_at IS NULL) AS mentions,
+              (SELECT coalesce(array_agg(mb.handle ORDER BY mb.handle), '{}') FROM social.post_business_mentions pbm
+                 JOIN social.business_profiles mb ON mb.id = pbm.business_id
+                WHERE pbm.post_id = x.id AND mb.deleted_at IS NULL AND mb.moderation_state = 'VISIBLE') AS business_mentions,
               CASE WHEN x.author_type = 'PROFILE' THEN x.author_id = $2
                    ELSE EXISTS (SELECT 1 FROM social.business_profiles ob JOIN social.profiles op ON op.user_id = ob.owner_user_id
                                  WHERE ob.id = x.author_id AND op.id = $2) END AS mine
@@ -394,7 +400,8 @@ export class SocialService {
       myReactions: r.my_reactions,
       sharedPostId: r.shared_post_id,
       shareCount: r.share_count,
-      mentions: r.mentions,
+      mentions: [...r.mentions, ...r.business_mentions].sort(),
+      businessMentions: r.business_mentions,
       mine: r.mine === true,
     }));
   }
@@ -425,7 +432,16 @@ export class SocialService {
        RETURNING (SELECT handle FROM social.profiles WHERE id = profile_id)`,
       [postId, handles, authorProfileId],
     )).rows;
-    return { tags: tags.map((t) => t.normalized), mentions: mentioned.map((m) => m.handle) };
+    // Negocios (ADR 0054): el handle es único entre personas y negocios, así que no hay ambigüedad.
+    const businesses = handles.length === 0 ? [] : (await tx.query<{ handle: string }>(
+      `INSERT INTO social.post_business_mentions (post_id, business_id)
+       SELECT $1, b.id FROM social.business_profiles b
+        WHERE lower(b.handle) = ANY($2) AND b.deleted_at IS NULL AND b.moderation_state = 'VISIBLE'
+       ON CONFLICT DO NOTHING
+       RETURNING (SELECT handle FROM social.business_profiles WHERE id = business_id)`,
+      [postId, handles],
+    )).rows;
+    return { tags: tags.map((t) => t.normalized), mentions: [...mentioned, ...businesses].map((m) => m.handle) };
   }
 
   async tag(q: Queryable, normalized: string, viewerProfileId: string | null): Promise<TagView> {
@@ -473,6 +489,7 @@ export class SocialService {
     await q.query(`UPDATE social.posts SET text = NULL, public_point = NULL, deleted_at = now(), updated_at = now() WHERE id = $1`, [postId]);
     await q.query(`DELETE FROM social.post_tags WHERE post_id = $1`, [postId]);
     await q.query(`DELETE FROM social.post_mentions WHERE post_id = $1`, [postId]);
+    await q.query(`DELETE FROM social.post_business_mentions WHERE post_id = $1`, [postId]);
     await q.query(`DELETE FROM social.reactions WHERE post_id = $1`, [postId]);
     const media = await q.query<{ media_id: string }>(`SELECT media_id FROM social.post_media WHERE post_id = $1`, [postId]);
     return { mediaIds: media.rows.map((m) => m.media_id) };
@@ -743,9 +760,34 @@ export class SocialService {
     );
   }
 
+  /**
+   * Bloquear por handle: una persona o un negocio (ADR 0054). Bloquear un negocio oculta sus posts y deja de
+   * seguirlo; quien lo administra no se entera. No se puede bloquear un negocio propio.
+   */
+  async setBlockByHandle(q: Queryable, blocker: { userId: string; profileId: string }, handle: string, block: boolean): Promise<void> {
+    const person = await q.query<{ id: string }>(`SELECT id FROM social.profiles WHERE lower(handle) = lower($1) AND deleted_at IS NULL`, [handle]);
+    if (person.rows[0]) return this.setBlock(q, blocker.profileId, person.rows[0].id, block);
+    const biz = (await q.query<{ id: string; owner_user_id: string }>(
+      `SELECT id, owner_user_id FROM social.business_profiles WHERE lower(handle) = lower($1) AND deleted_at IS NULL`, [handle],
+    )).rows[0];
+    if (!biz) throw notFound("Perfil");
+    if (biz.owner_user_id === blocker.userId) throw new DomainError("VALIDATION", "No puedes bloquear tu propio negocio");
+    if (!block) {
+      await q.query(`DELETE FROM social.business_blocks WHERE blocker_profile_id = $1 AND business_id = $2`, [blocker.profileId, biz.id]);
+      return;
+    }
+    await q.query(`INSERT INTO social.business_blocks (blocker_profile_id, business_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`, [blocker.profileId, biz.id]);
+    await q.query(`DELETE FROM social.follows WHERE follower_profile_id = $1 AND target_type = 'BUSINESS' AND target_id = $2`, [blocker.profileId, biz.id]);
+  }
+
   async blockedHandles(q: Queryable, blockerProfileId: string): Promise<string[]> {
     const { rows } = await q.query<{ handle: string }>(
-      `SELECT pr.handle FROM social.blocks b JOIN social.profiles pr ON pr.id = b.blocked_profile_id WHERE b.blocker_profile_id = $1 ORDER BY b.created_at DESC`,
+      `SELECT handle FROM (
+         SELECT pr.handle, b.created_at FROM social.blocks b JOIN social.profiles pr ON pr.id = b.blocked_profile_id WHERE b.blocker_profile_id = $1
+         UNION ALL
+         SELECT bp.handle, bb.created_at FROM social.business_blocks bb JOIN social.business_profiles bp ON bp.id = bb.business_id
+          WHERE bb.blocker_profile_id = $1 AND bp.deleted_at IS NULL
+       ) x ORDER BY created_at DESC`,
       [blockerProfileId],
     );
     return rows.map((r) => r.handle);
@@ -854,7 +896,9 @@ export class SocialService {
     const commentReactions = await q.query(`SELECT comment_id, kind, created_at FROM social.comment_reactions WHERE profile_id = $1 ORDER BY created_at DESC LIMIT 10000`, [p]);
     const follows = await q.query(`SELECT target_type, target_id, created_at FROM social.follows WHERE follower_profile_id = $1`, [p]);
     const blocks = await q.query(
-      `SELECT pr.handle AS blocked_handle, b.created_at FROM social.blocks b JOIN social.profiles pr ON pr.id = b.blocked_profile_id WHERE b.blocker_profile_id = $1`, [p],
+      `SELECT pr.handle AS blocked_handle, b.created_at FROM social.blocks b JOIN social.profiles pr ON pr.id = b.blocked_profile_id WHERE b.blocker_profile_id = $1
+       UNION ALL
+       SELECT bp.handle, bb.created_at FROM social.business_blocks bb JOIN social.business_profiles bp ON bp.id = bb.business_id WHERE bb.blocker_profile_id = $1`, [p],
     );
     return {
       profile: profile.rows, businesses: businesses.rows, posts: posts.rows, comments: comments.rows,

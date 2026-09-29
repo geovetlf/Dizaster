@@ -673,14 +673,12 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
   });
   app.put("/v1/blocks/:handle", async (req) => {
     const session = requireSession(req);
-    const blocked = await c.social.profileIdByHandle(c.db, (req.params as { handle: string }).handle);
-    await c.social.setBlock(c.db, session.profileId, blocked, true);
+    await c.social.setBlockByHandle(c.db, session, (req.params as { handle: string }).handle, true);
     return { blocked: true };
   });
   app.delete("/v1/blocks/:handle", async (req) => {
     const session = requireSession(req);
-    const blocked = await c.social.profileIdByHandle(c.db, (req.params as { handle: string }).handle);
-    await c.social.setBlock(c.db, session.profileId, blocked, false);
+    await c.social.setBlockByHandle(c.db, session, (req.params as { handle: string }).handle, false);
     return { blocked: false };
   });
   app.get("/v1/me/blocks", async (req, reply) => {

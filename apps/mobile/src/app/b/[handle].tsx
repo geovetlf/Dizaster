@@ -6,7 +6,7 @@ import { FeedList } from "../../components/feed-list";
 import { Icon } from "../../components/icon";
 import { api } from "../../lib/api";
 import { lang, t } from "../../lib/i18n";
-import { openFlag } from "../../lib/moderation/menu";
+import { confirmBlock, openFlag } from "../../lib/moderation/menu";
 import { BUSINESS_CATEGORY_LABEL, telUri, verificationIcon } from "../../lib/social/business";
 import { initials } from "../../lib/ui/format";
 import { colors, radius, space } from "../../theme";
@@ -30,6 +30,16 @@ export default function BusinessScreen() {
     const prev = b;
     setB({ ...b, followedByMe: on, followerCount: b.followerCount + (on ? 1 : -1) });
     await api.follow("business", b.handle, on).catch(() => setB(prev));
+  }
+
+  async function toggleBlock() {
+    if (!b) return;
+    if (b.blockedByMe) {
+      await api.block(b.handle, false).catch(() => undefined);
+      setB({ ...b, blockedByMe: false });
+    } else if (await confirmBlock(b.handle)) {
+      setB({ ...b, blockedByMe: true, followedByMe: false });
+    }
   }
 
   const header = useMemo(() => {
@@ -71,6 +81,9 @@ export default function BusinessScreen() {
           <View style={styles.row}>
             <Pressable accessibilityRole="button" accessibilityState={{ selected: b.followedByMe }} style={[styles.follow, b.followedByMe && styles.followOn]} onPress={() => void toggleFollow()}>
               <Text style={styles.followText}>{b.followedByMe ? t("followingState") : t("follow")}</Text>
+            </Pressable>
+            <Pressable accessibilityRole="button" onPress={() => void toggleBlock()} style={styles.flag}>
+              <Text style={styles.meta}>{b.blockedByMe ? t("unblock") : t("block")}</Text>
             </Pressable>
             <Pressable accessibilityRole="button" onPress={() => openFlag("BUSINESS", b.handle)} style={styles.flag}>
               <Text style={styles.meta}>{t("flag")}</Text>

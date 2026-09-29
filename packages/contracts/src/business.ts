@@ -51,6 +51,8 @@ export interface BusinessView {
   followerCount: number;
   postCount: number;
   followedByMe: boolean;
+  /** Quien mira lo bloqueó: sus posts no le aparecen (ADR 0054). */
+  blockedByMe: boolean;
   /** Quien mira lo administra (puede editar y publicar como el negocio). */
   isMine: boolean;
   createdAt: string;

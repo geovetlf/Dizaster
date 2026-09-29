@@ -213,7 +213,8 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | Verificación manual y gratuita por administración, sello en la app | ✅ | `PUT /v1/admin/businesses/:handle/verification` |
 | Moderación de negocios (retirar, restaurar, sanciones a quien lo administra) | ✅ | `ModerationService`, objetivo `BUSINESS` |
 | App: mis negocios, formulario, página de negocio, "Publicar como", búsqueda, iOS y Android | ✅ | `app/my-businesses.tsx`, `app/business-edit.tsx`, `app/b/[handle].tsx` |
-| Mencionar/bloquear negocios, varios administradores | ⏳ | siguiente iteración |
+| Mencionar/bloquear negocios | ✅ | ADR 0054 |
+| Varios administradores por negocio | ⏳ | cuando haya demanda (`BusinessMember`) |
 
 ## Etapa 18 — Sesiones y dispositivos (hecha)
 
@@ -257,9 +258,8 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 
 ## Siguiente etapa (en orden)
 
-Revisión del Blueprint del 2026-09-29 (tras ADR 0042), verificada contra el código:
-
-1. Moderación: menciones y bloqueo de negocios.
+Revisión del Blueprint del 2026-09-29 (tras ADR 0042), verificada contra el código: completada hasta ADR 0054.
+Pendiente una nueva revisión para identificar el siguiente bloque autónomo.
 
 Bloqueadas o en espera:
 
