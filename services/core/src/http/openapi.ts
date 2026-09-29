@@ -98,6 +98,7 @@ export const OPERATIONS: Record<string, Operation> = {
   "GET /v1/tags": { summary: "Buscar etiquetas", query: C.TagSearchQuery },
   "GET /v1/tags/:tag": { summary: "Etiqueta" },
   "GET /v1/tags/:tag/posts": { summary: "Publicaciones de una etiqueta", query: C.ProfilePostsQuery },
+  "POST /v1/ingest/:sourceKey/push": { summary: "Push firmado (HMAC) de una fuente habilitada; mismo formato que su feed (ADR 0128)" },
   "POST /v1/media/uploads": { summary: "Pedir una subida de foto o video", body: C.CreateUploadRequest },
   "POST /v1/media/:id/complete": { summary: "Confirmar una subida" },
   "GET /v1/media/:id": { summary: "Estado y enlaces de una media" },

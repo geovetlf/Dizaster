@@ -67,8 +67,8 @@ export function buildContainer(env: AppEnv, overrides: { db?: Db; clock?: Clock;
   const identity = new IdentityService(db, social, env.AUTH_JWT_SECRET);
   const events = new EventService(ref, geo, { archiveAfterDays: env.EVENT_ARCHIVE_AFTER_DAYS });
   const ingestion = new IngestionService(db, events, geo);
-  // Claves de fuentes (SOURCE_KEY_*): solo del entorno, nunca en data/ (ADR 0067).
-  const sourceSecrets = Object.fromEntries(Object.entries(process.env).filter(([k]) => k.startsWith("SOURCE_KEY_")));
+  // Claves de fuentes (SOURCE_KEY_*) y secretos de push (SOURCE_PUSH_SECRET_*): solo del entorno (ADR 0067, 0128).
+  const sourceSecrets = Object.fromEntries(Object.entries(process.env).filter(([k]) => k.startsWith("SOURCE_KEY_") || k.startsWith("SOURCE_PUSH_SECRET_")));
   const storage = overrides.storage ?? buildStorage(env, clock);
   const ingestionScheduler = new IngestionScheduler(db, ingestion, overrides.fetcher ?? new NodeHttpFetcher(), clock, sourceSecrets,
     env.SOURCE_RAW_RETENTION_DAYS > 0 ? { storage, retentionDays: env.SOURCE_RAW_RETENTION_DAYS } : null);

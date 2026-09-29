@@ -37,6 +37,9 @@ function requireSession(req: FastifyRequest): Session {
 
 
 /** Escrituras permitidas a una cuenta suspendida: apelar, cerrar y renovar sesiones, borrar sus posts y borrar la cuenta. */
+/** Tope del documento que una fuente puede empujar (ADR 0128). */
+const PUSH_BODY_LIMIT = 2 * 1024 * 1024;
+const SourcePushParams = z.object({ sourceKey: z.string().regex(/^[a-z0-9-]{1,64}$/) });
 const WRITE_ALLOWED_WHEN_SUSPENDED = /^(POST \/v1\/me\/moderation\/[^/]+\/appeal|POST \/v1\/auth\/(refresh|logout)|DELETE \/v1\/me|DELETE \/v1\/posts\/[^/]+|DELETE \/v1\/me\/sessions\/[^/]+|POST \/v1\/me\/sessions\/revoke-others)$/;
 
 /**
@@ -783,6 +786,23 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
       });
     });
   }
+
+  // ───────────── Push firmado de fuentes (Blueprint §9.2, ADR 0128) ─────────────
+  // Cuerpo crudo: la firma se calcula sobre los bytes exactos, así que no se interpreta antes de verificarla.
+  await app.register(async (sub) => {
+    sub.removeAllContentTypeParsers();
+    sub.addContentTypeParser("*", { parseAs: "string", bodyLimit: PUSH_BODY_LIMIT }, (_req, body, done) => done(null, body));
+    sub.post("/v1/ingest/:sourceKey/push", async (req, reply) => {
+      const { sourceKey } = parse(SourcePushParams, req.params);
+      const header = (name: string) => { const v = req.headers[name]; return Array.isArray(v) ? v[0] : v; };
+      const r = await c.ingestionScheduler.receivePush(sourceKey, typeof req.body === "string" ? req.body : "", {
+        timestamp: header("x-dizaster-timestamp"), signature: header("x-dizaster-signature"),
+      });
+      if (r.ok) return reply.status(202).send({ itemsSeen: r.summary.itemsSeen, itemsNew: r.summary.itemsNew, itemsUrgent: r.summary.itemsUrgent });
+      const status = r.code === "NOT_FOUND" ? 404 : r.code === "UNPARSEABLE" ? 422 : 401;
+      return reply.status(status).send({ error: r.code });
+    });
+  });
 
   // ───────────── MFA TOTP del personal (ADR 0090) ─────────────
   const requireStaffRole = (req: FastifyRequest) => {

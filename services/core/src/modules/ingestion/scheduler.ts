@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { gzipSync } from "node:zlib";
 import { publish } from "../../platform/outbox.js";
 import type { Clock } from "../../platform/clock.js";
@@ -79,6 +79,24 @@ interface SourceRow {
 export interface RunSummary { sourceKey: string; lane: Lane; status: string; itemsSeen: number; itemsNew: number; itemsUrgent: number }
 
 const BREAKER_THRESHOLD = 3;
+
+/** Ventana de reloj aceptada en un push (repeticiones fuera de ella se rechazan). */
+export const PUSH_TOLERANCE_S = 300;
+export type PushResult = { ok: true; summary: RunSummary } | { ok: false; code: "NOT_FOUND" | "STALE" | "BAD_SIGNATURE" | "UNPARSEABLE" };
+
+/** `usgs-earthquakes` → `SOURCE_PUSH_SECRET_USGS_EARTHQUAKES`. */
+export const pushSecretName = (key: string) => `SOURCE_PUSH_SECRET_${key.toUpperCase().replace(/[^A-Z0-9]/g, "_")}`;
+
+/** Firma `sha256=<hex>` de HMAC-SHA256(secreto, "<timestamp>.<cuerpo>"), comparada en tiempo constante. */
+export function pushSignature(secret: string, timestamp: string, body: string): string {
+  return `sha256=${createHmac("sha256", secret).update(`${timestamp}.${body}`).digest("hex")}`;
+}
+export function validPushSignature(secret: string, timestamp: string, body: string, signature: string | undefined): boolean {
+  if (!signature) return false;
+  const expected = Buffer.from(pushSignature(secret, timestamp, body));
+  const got = Buffer.from(signature);
+  return got.length === expected.length && timingSafeEqual(got, expected);
+}
 
 /**
  * Las claves de fuentes (p. ej. la MAP_KEY de FIRMS) nunca van en `data/`: la URL lleva `{secret:SOURCE_KEY_…}` y el
@@ -190,8 +208,64 @@ export class IngestionScheduler {
     return { deleted };
   }
 
-  private async run(s: SourceRow, lane: Lane, now: Date): Promise<RunSummary> {
+  /** Interpreta un documento de la fuente y lo ingiere. Común al sondeo y al push. */
+  private async processBody(s: SourceRow, body: string, runId: string, now: Date, summary: RunSummary, opts: { onlyUrgent: boolean }): Promise<void> {
     const adapter = FEED_ADAPTERS.get(s.adapter)!;
+    // El crudo se guarda antes de interpretarlo: si el adapter falla, queda lo que la fuente respondió.
+    const rawRef = await this.archiveRaw(s, runId, body, now);
+    const items = adapter.parse(body, s.config);
+    summary.itemsSeen = items.length;
+    for (const item of items) {
+      // Lo crítico según el adapter, o lo que la regla de la fuente promueve (ADR 0100).
+      const urgent = adapter.isUrgent(item, s.config) || promoteByRule(item, s.config["promote"]);
+      if (opts.onlyUrgent && !urgent) continue; // lo no crítico espera al carril NORMAL
+      const r = await this.ingestion.ingest(s.key, item, urgent ? "URGENT" : "NORMAL", rawRef);
+      if (!r.duplicate) summary.itemsNew++;
+      if (urgent) summary.itemsUrgent++;
+    }
+    for (const id of adapter.withdrawals?.(body, s.config) ?? []) await this.ingestion.withdraw(s.key, id, now);
+  }
+
+  /**
+   * Push de una fuente (§9.2 "webhooks / feeds push", ADR 0128). La fuente envía el mismo documento que publicaría
+   * en su feed, firmado: `x-dizaster-timestamp` (segundos Unix) y `x-dizaster-signature: sha256=<hex>` con
+   * HMAC-SHA256(secreto, "<timestamp>.<cuerpo>"). El secreto está en `SOURCE_PUSH_SECRET_<CLAVE>` (entorno).
+   * Solo fuentes ACTIVE con `config.push: true`. Fuera de ±5 min se rechaza (repetición); los ítems ya vistos son
+   * duplicados idempotentes. Todo lo del documento se ingiere: lo urgente por el carril URGENT. NO AI REQUIRED.
+   */
+  async receivePush(key: string, body: string, headers: { timestamp?: string; signature?: string }): Promise<PushResult> {
+    const now = this.clock.now();
+    const s = (await this.db.query<SourceRow & { status: string }>(
+      `SELECT s.id, s.key, s.adapter, s.config, s.schedule_normal, s.urgent_capable, s.urgent_poll_seconds, s.status,
+              NULL AS etag_normal, NULL AS last_modified_normal, NULL AS etag_urgent, NULL AS last_modified_urgent,
+              NULL AS last_normal_run_at, NULL AS last_urgent_run_at, 0 AS consecutive_failures, NULL AS open_until
+         FROM ingestion.sources s WHERE s.key = $1`, [key],
+    )).rows[0];
+    const secret = this.secrets[pushSecretName(key)];
+    // Mismo error para "no existe", "no acepta push" y "sin secreto": no se revela qué fuentes existen.
+    if (!s || s.status !== "ACTIVE" || s.config["push"] !== true || !FEED_ADAPTERS.has(s.adapter) || !secret) return { ok: false, code: "NOT_FOUND" };
+    const ts = Number(headers.timestamp);
+    if (!Number.isInteger(ts) || Math.abs(now.getTime() / 1000 - ts) > PUSH_TOLERANCE_S) return { ok: false, code: "STALE" };
+    if (!validPushSignature(secret, headers.timestamp!, body, headers.signature)) return { ok: false, code: "BAD_SIGNATURE" };
+
+    const runId = newId();
+    await this.db.query(`INSERT INTO ingestion.runs (id, source_id, lane, started_at, status, trigger) VALUES ($1, $2, 'URGENT', $3, 'RUNNING', 'PUSH')`, [runId, s.id, now]);
+    const summary: RunSummary = { sourceKey: s.key, lane: "URGENT", status: "OK", itemsSeen: 0, itemsNew: 0, itemsUrgent: 0 };
+    try {
+      await this.processBody(s, body, runId, now, summary, { onlyUrgent: false });
+      await this.db.query(
+        `UPDATE ingestion.runs SET finished_at = now(), http_status = 202, items_seen = $2, items_new = $3, items_urgent = $4, status = 'OK' WHERE id = $1`,
+        [runId, summary.itemsSeen, summary.itemsNew, summary.itemsUrgent],
+      );
+      return { ok: true, summary };
+    } catch (err) {
+      const error = redactSecrets(String(err instanceof Error ? err.message : err), this.secrets).slice(0, 2000);
+      await this.db.query(`UPDATE ingestion.runs SET finished_at = now(), status = 'FAILED', error = $2 WHERE id = $1`, [runId, error]);
+      return { ok: false, code: "UNPARSEABLE" };
+    }
+  }
+
+  private async run(s: SourceRow, lane: Lane, now: Date): Promise<RunSummary> {
     const runId = newId();
     await this.db.query(`INSERT INTO ingestion.runs (id, source_id, lane, started_at, status) VALUES ($1, $2, $3, $4, 'RUNNING')`, [runId, s.id, lane, now]);
     const summary: RunSummary = { sourceKey: s.key, lane, status: "OK", itemsSeen: 0, itemsNew: 0, itemsUrgent: 0 };
@@ -208,19 +282,7 @@ export class IngestionScheduler {
       if (res.status === 304) {
         summary.status = "NOT_MODIFIED";
       } else if (res.status >= 200 && res.status < 300 && res.body !== undefined) {
-        // El crudo se guarda antes de interpretarlo: si el adapter falla, queda lo que la fuente respondió.
-        const rawRef = await this.archiveRaw(s, runId, res.body, now);
-        const items = adapter.parse(res.body, s.config);
-        summary.itemsSeen = items.length;
-        for (const item of items) {
-          // Lo crítico según el adapter, o lo que la regla de la fuente promueve (ADR 0100).
-          const urgent = adapter.isUrgent(item, s.config) || promoteByRule(item, s.config["promote"]);
-          if (isUrgentLane && !urgent) continue; // lo no crítico espera al carril NORMAL
-          const r = await this.ingestion.ingest(s.key, item, urgent ? "URGENT" : "NORMAL", rawRef);
-          if (!r.duplicate) summary.itemsNew++;
-          if (urgent) summary.itemsUrgent++;
-        }
-        for (const id of adapter.withdrawals?.(res.body, s.config) ?? []) await this.ingestion.withdraw(s.key, id, now);
+        await this.processBody(s, res.body, runId, now, summary, { onlyUrgent: isUrgentLane });
       } else {
         httpStatus = res.status;
         throw new Error(`HTTP ${res.status}`);
