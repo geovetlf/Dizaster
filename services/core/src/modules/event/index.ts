@@ -7,6 +7,8 @@ import type {
   EventMapResponse,
   DuplicateCandidateView,
   EventMergeView,
+  AffectedAreaView,
+  EventDetail,
   EventSummary,
   ModeratorEventDetail,
   GeoPoint,
@@ -303,7 +305,7 @@ export class EventService {
       ],
     );
     await this.recomputeAggregates(tx, eventId, c);
-    if (c.affectedArea && c.trustTier !== "CITIZEN" && assertion === "OCCURRING") await this.addAffectedArea(tx, eventId, c.affectedArea);
+    if (c.affectedArea && c.trustTier !== "CITIZEN" && assertion === "OCCURRING") await this.addAffectedArea(tx, eventId, evidenceId, c.affectedArea);
     await this.addFingerprint(tx, eventId, (c.metadata["keywords"] as string[] | undefined) ?? [], c.mediaHashes ?? []);
     const timelineType =
       c.trustTier === "OFFICIAL" ? "OFFICIAL_UPDATE" : c.trustTier === "EXTERNAL" ? "SOURCE_ADDED" : assertion === "NOT_OCCURRING" ? "COUNTER_REPORT_ADDED" : "REPORT_ADDED";
@@ -321,16 +323,25 @@ export class EventService {
   }
 
   /**
-   * Área oficial afectada (ADR 0087): la unión de las áreas que dieron las fuentes externas/oficiales del evento.
-   * Se simplifica (~100 m) para que no crezca sin límite.
+   * Área oficial afectada (ADR 0087, 0144): la unión de las áreas que dieron las fuentes externas/oficiales del
+   * evento. Cada área queda en su evidencia y la del evento se recalcula; se simplifica (~100 m) para que no crezca.
    */
-  private async addAffectedArea(tx: Queryable, eventId: string, area: AreaGeometry): Promise<void> {
+  private async addAffectedArea(tx: Queryable, eventId: string, evidenceId: string, area: AreaGeometry): Promise<void> {
     await tx.query(
-      `UPDATE event.events SET affected_area = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(
-         ST_Union(coalesce(affected_area::geometry, n.g), n.g), 0.001)), 3))::geography
-         FROM (SELECT ST_SetSRID(ST_GeomFromGeoJSON($2), 4326) AS g) n
-        WHERE id = $1`,
-      [eventId, JSON.stringify(area)],
+      `UPDATE event.evidence SET area = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SetSRID(ST_GeomFromGeoJSON($2), 4326)), 3))::geography WHERE id = $1`,
+      [evidenceId, JSON.stringify(area)],
+    );
+    await this.recomputeArea(tx, eventId);
+  }
+
+  /** Área del evento = unión de las áreas de sus evidencias activas (ADR 0144). Sin ninguna, queda vacía. */
+  private async recomputeArea(tx: Queryable, eventId: string): Promise<void> {
+    await tx.query(
+      `UPDATE event.events e SET affected_area = (
+         SELECT ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(ST_Union(ev.area::geometry), 0.001)), 3))::geography
+           FROM event.evidence ev WHERE ev.event_id = e.id AND ev.status = 'ACTIVE' AND ev.area IS NOT NULL)
+        WHERE e.id = $1`,
+      [eventId],
     );
   }
 
@@ -652,13 +663,8 @@ export class EventService {
       [targetId, sourceId, mergeId],
     );
     await tx.query(`UPDATE event.events SET merged_into_id = $1, updated_at = now() WHERE id = $2`, [targetId, sourceId]);
-    // El área oficial del absorbido pasa al destino (ADR 0087).
-    await tx.query(
-      `UPDATE event.events t SET affected_area = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(
-         ST_Union(coalesce(t.affected_area::geometry, s.affected_area::geometry), s.affected_area::geometry), 0.001)), 3))::geography
-         FROM event.events s WHERE t.id = $1 AND s.id = $2 AND s.affected_area IS NOT NULL`,
-      [targetId, sourceId],
-    );
+    // El área oficial del absorbido pasa al destino con su evidencia (ADR 0087, 0144).
+    await this.recomputeArea(tx, targetId);
     await this.addFingerprint(tx, targetId, source.keywords, source.media_hashes);
     await this.recomputeAggregates(tx, targetId, { observedAt: source.last_activity_at.toISOString(), severityHint: source.severity });
     await tx.query(
@@ -696,6 +702,8 @@ export class EventService {
     const neutral = { observedAt: new Date(0).toISOString() };
     await this.recomputeAggregates(tx, targetId, neutral);
     await this.recomputeAggregates(tx, restoredId, neutral);
+    await this.recomputeArea(tx, targetId);
+    await this.recomputeArea(tx, restoredId);
     await tx.query(`UPDATE event.merge_log SET reverted_at = now(), reverted_by = $2, revert_reason = $3 WHERE id = $1`, [mergeId, `MODERATOR:${moderatorUserId}`, reason]);
     await this.addTimeline(tx, targetId, "SPLIT", { restoredEventId: restoredId });
     await this.addTimeline(tx, restoredId, "SPLIT", { fromEventId: targetId });
@@ -743,6 +751,8 @@ export class EventService {
     );
     const neutral = { observedAt: new Date(0).toISOString() };
     await this.recomputeAggregates(tx, newId_, neutral);
+    await this.recomputeArea(tx, newId_);
+    await this.recomputeArea(tx, sourceId);
     await this.recomputeAggregates(tx, sourceId, neutral);
     await tx.query(
       `INSERT INTO event.split_log (id, source_event_id, new_event_id, evidence_ids, reason, actor) VALUES ($1, $2, $3, $4, $5, $6)`,
@@ -815,11 +825,14 @@ export class EventService {
 
   // ───────────── Lecturas (públicas: solo geometría generalizada) ─────────────
 
-  async getEvent(q: Queryable, id: string): Promise<EventSummary & { mergedIntoId: string | null; publicationState: string }> {
-    const { rows } = await q.query<EventRow>(`SELECT ${PUBLIC_EVENT_COLUMNS} FROM event.events e WHERE e.id = $1 AND e.publication_state NOT IN ('HIDDEN','DELAYED')`, [id]);
+  async getEvent(q: Queryable, id: string): Promise<EventDetail> {
+    // Área oficial afectada (ADR 0144): solo de fuentes externas u oficiales; simplificada (~500 m) para la ficha.
+    const { rows } = await q.query<EventRow & { area: AffectedAreaView | null }>(
+      `SELECT ${PUBLIC_EVENT_COLUMNS}, ST_AsGeoJSON(ST_Multi(ST_SimplifyPreserveTopology(e.affected_area::geometry, 0.005)), 4)::json AS area
+         FROM event.events e WHERE e.id = $1 AND e.publication_state NOT IN ('HIDDEN','DELAYED')`, [id]);
     const r = rows[0];
     if (!r) throw notFound("Evento");
-    return { ...toSummary(r), mergedIntoId: r.merged_into_id, publicationState: r.publication_state };
+    return { ...toSummary(r), mergedIntoId: r.merged_into_id, publicationState: r.publication_state, affectedArea: r.area };
   }
 
   /** Estado público y sensibilidad de varios eventos (para componer feeds sin leer el esquema event desde fuera). */

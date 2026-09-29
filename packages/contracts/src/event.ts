@@ -99,7 +99,13 @@ export const EventSummary = z.object({
 export type EventSummary = z.infer<typeof EventSummary>;
 
 /** GET /v1/events/:id: si el evento se fusionó, `mergedIntoId` es el destino al que la app redirige (ADR 0093). */
-export type EventDetail = EventSummary & { mergedIntoId: string | null; publicationState: string };
+export type EventDetail = EventSummary & {
+  mergedIntoId: string | null;
+  publicationState: string;
+  /** Área oficial afectada simplificada (ADR 0144): solo la aportan fuentes externas u oficiales, nunca un reporte. */
+  affectedArea?: AffectedAreaView | null;
+};
+export interface AffectedAreaView { type: "MultiPolygon"; coordinates: number[][][][] }
 
 export const TimelineEntryView = z.object({
   id: z.uuid(),

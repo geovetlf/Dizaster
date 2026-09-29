@@ -1,5 +1,6 @@
 import type { AreaGeometry, NotificationsResponse } from "@dizaster/contracts";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { withTransaction } from "../src/platform/db.js";
 import { FEED_ADAPTERS, type NormalizedItem } from "../src/modules/ingestion/index.js";
 import { createTestContext, createUser, offset, seedGeoFixtures, type TestContext, type TestUser } from "./helpers.js";
 
@@ -85,5 +86,29 @@ describe("alertas por área oficial", () => {
     });
     const id = (res as { eventId: string }).eventId;
     expect((await t.c.events.alertSnapshot(t.c.db, id))!.affectedArea).toBeNull();
+  });
+});
+
+describe("área por evidencia (ADR 0144)", () => {
+  it("la ficha muestra el área; fusionar la une y revertir la devuelve a cada evento", async () => {
+    const now = new Date().toISOString();
+    const quake = (id: string, lng: number, area: AreaGeometry): NormalizedItem => ({
+      externalId: id, categoryCode: "natural.earthquake", point: { lat: -5, lng }, uncertaintyM: 5000, occurredAt: now, publishedAt: now,
+      title: { es: "Sismo" }, severity: 4, assertion: "OCCURRING", area, raw: {},
+    });
+    const idOf = async (item: NormalizedItem) => ((await t.c.ingestion.ingest("usgs-earthquakes", item, "NORMAL")).resolution as { eventId: string }).eventId;
+    const a = await idOf(quake("area-m-a", -75, box(-75.1, -5.1, -74.9, -4.9)));
+    const b = await idOf(quake("area-m-b", -60, box(-60.1, -5.1, -59.9, -4.9)));
+    expect(b).not.toBe(a);
+    await t.c.dispatcher.drain();
+    const polygons = async (id: string) => ((await t.app.inject({ url: `/v1/events/${id}` })).json().affectedArea as { coordinates: unknown[] } | null)?.coordinates.length ?? 0;
+    expect(await polygons(a)).toBe(1);
+
+    await withTransaction(t.c.db, (tx) => t.c.events.merge(tx, a, b, "test", "prueba de área"));
+    expect(await polygons(a)).toBe(2);
+    const mergeId = (await t.c.db.query<{ id: string }>(`SELECT id FROM event.merge_log WHERE target_event_id = $1`, [a])).rows[0]!.id;
+    await withTransaction(t.c.db, (tx) => t.c.events.revertMerge(tx, mergeId, "00000000-0000-4000-8000-000000000001", "no eran el mismo"));
+    expect(await polygons(a)).toBe(1);
+    expect(await polygons(b)).toBe(1);
   });
 });

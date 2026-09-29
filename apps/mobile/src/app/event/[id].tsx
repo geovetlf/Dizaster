@@ -1,9 +1,10 @@
-import type { EventSourceView, EventSummary, OfficialScopeView, MediaView, TimelineEntryView, VerificationView } from "@dizaster/contracts";
+import type { EventDetail, EventSourceView, OfficialScopeView, MediaView, TimelineEntryView, VerificationView } from "@dizaster/contracts";
 import { router, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import { Alert, Linking, Pressable, Share, StyleSheet, Text, View } from "react-native";
 import { FeedList } from "../../components/feed-list";
 import { EventMedia } from "../../components/event-media";
+import { EventAreaMap } from "../../components/event-area-map";
 import { OfflineNote } from "../../components/offline-note";
 import { api } from "../../lib/api";
 import { cacheKeys, readThrough } from "../../lib/offline/read-cache";
@@ -18,6 +19,7 @@ import { LINK_DOMAIN } from "../../lib/config";
 import { shareUrl } from "../../lib/links";
 import { canStateOn } from "../../lib/social/business";
 import { openFlag } from "../../lib/moderation/menu";
+import { categoryStyle } from "../../lib/ui/categories";
 import { colors, radius, space } from "../../theme";
 import { appendPage, newestFirst } from "../../lib/ui/pages";
 import { evidenceCounts } from "../../lib/events/counts";
@@ -36,7 +38,7 @@ const TIMELINE_SHOWN = 12;
 /** Pantalla de evento. También es el destino de los deep links: dizaster://event/<id> y https://<dominio>/e/<id>. */
 export default function EventScreen() {
   const { id, hops } = useLocalSearchParams<{ id: string; hops?: string }>();
-  const [event, setEvent] = useState<EventSummary | null>(null);
+  const [event, setEvent] = useState<EventDetail | null>(null);
   const [timeline, setTimeline] = useState<TimelineEntryView[]>([]);
   // Timeline por páginas, de lo más reciente hacia atrás (ADR 0106).
   const [timelineNext, setTimelineNext] = useState<string | null>(null);
@@ -146,6 +148,7 @@ export default function EventScreen() {
           ))}
         </View>
       ) : null}
+      {event.affectedArea ? <EventAreaMap area={event.affectedArea} point={event.point} color={categoryStyle(event.categoryCode).color} /> : null}
       <EventMedia media={media} />
       <Text style={styles.section}>{t("timeline")}</Text>
       {/* Lo más reciente primero; lo anterior se pide por páginas. */}
