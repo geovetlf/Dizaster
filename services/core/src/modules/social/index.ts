@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { extractMentions, extractTags, textFingerprintBase, type CommentView, type FeedTab, type GeoPoint, type PostAuthor, type ProfileSearchResult, type ReactionCounts, type ReactionKind, type ReactionState, type ProfileView, type TagView } from "@dizaster/contracts";
+import { extractMentions, extractTags, textFingerprintBase, type CommentView, type FeedTab, type GeoPoint, type PostAuthor, type ProfileSearchResult, type ReactionCounts, type ReactionKind, type ReactionState, type Units, type UpdateProfileRequest, type ProfileView, type TagView } from "@dizaster/contracts";
 import type { Queryable } from "../../platform/db.js";
 import { publish, type OutboxDispatcher } from "../../platform/outbox.js";
 import { DomainError, notFound } from "../../platform/errors.js";
@@ -132,7 +132,7 @@ export class SocialService {
    */
   async anonymizeProfile(q: Queryable, profileId: string): Promise<void> {
     await q.query(
-      `UPDATE social.profiles SET handle = 'borrado_' || replace(id::text, '-', ''), display_name = '', home_country = NULL,
+      `UPDATE social.profiles SET handle = 'borrado_' || replace(id::text, '-', ''), display_name = '', bio = NULL, home_country = NULL,
               deleted_at = COALESCE(deleted_at, now()), updated_at = now()
         WHERE id = $1`,
       [profileId],
@@ -517,9 +517,9 @@ export class SocialService {
   /** Perfil público: los contadores solo incluyen posts con autoría pública. */
   async profile(q: Queryable, handle: string, viewerProfileId: string | null): Promise<ProfileView & { id: string }> {
     const { rows } = await q.query<{
-      id: string; handle: string; display_name: string; created_at: Date; followers: number; following: number; posts: number; followed: boolean; blocked: boolean;
+      id: string; handle: string; display_name: string; bio: string | null; created_at: Date; followers: number; following: number; posts: number; followed: boolean; blocked: boolean;
     }>(
-      `SELECT pr.id, pr.handle, pr.display_name, pr.created_at,
+      `SELECT pr.id, pr.handle, pr.display_name, pr.bio, pr.created_at,
               (SELECT count(*) FROM social.follows f WHERE f.target_type = 'PROFILE' AND f.target_id = pr.id::text)::int AS followers,
               (SELECT count(*) FROM social.follows f WHERE f.follower_profile_id = pr.id AND f.target_type = 'PROFILE')::int AS following,
               (SELECT count(*) FROM social.posts p WHERE p.author_type = 'PROFILE' AND p.author_id = pr.id AND p.author_visibility = 'PUBLIC' AND p.visibility = 'PUBLIC'
@@ -532,9 +532,27 @@ export class SocialService {
     const r = rows[0];
     if (!r) throw notFound("Perfil");
     return {
-      id: r.id, handle: r.handle, displayName: r.display_name, createdAt: r.created_at.toISOString(),
+      id: r.id, handle: r.handle, displayName: r.display_name, bio: r.bio, createdAt: r.created_at.toISOString(),
       followerCount: r.followers, followingCount: r.following, postCount: r.posts, followedByMe: r.followed, blockedByMe: r.blocked, isMe: r.id === viewerProfileId,
     };
+  }
+
+  /** Ajustes propios del perfil (no públicos). */
+  async settings(q: Queryable, profileId: string): Promise<{ units: Units }> {
+    const { rows } = await q.query<{ units: Units }>(`SELECT units FROM social.profiles WHERE id = $1 AND deleted_at IS NULL`, [profileId]);
+    if (!rows[0]) throw notFound("Perfil");
+    return { units: rows[0].units };
+  }
+
+  /** Editar mi perfil (ADR 0044). La bio vacía se guarda como NULL. */
+  async updateProfile(q: Queryable, profileId: string, patch: UpdateProfileRequest): Promise<void> {
+    const sets: string[] = [];
+    const params: unknown[] = [profileId];
+    if (patch.displayName !== undefined) sets.push(`display_name = $${params.push(patch.displayName)}`);
+    if (patch.bio !== undefined) sets.push(`bio = $${params.push(patch.bio ? patch.bio : null)}`);
+    if (patch.units !== undefined) sets.push(`units = $${params.push(patch.units)}`);
+    const res = await q.query(`UPDATE social.profiles SET ${sets.join(", ")}, updated_at = now() WHERE id = $1 AND deleted_at IS NULL`, params);
+    if (res.rowCount === 0) throw notFound("Perfil");
   }
 
   /** Busca personas por handle o nombre (prefijo de palabra). Primero coincidencias exactas y cuentas más seguidas. */
@@ -736,7 +754,7 @@ export class SocialService {
   /** Perfil, publicaciones, comentarios, reacciones, seguimientos, bloqueos y negocios propios. */
   async exportData(q: Queryable, who: { userId: string; profileId: string }): Promise<Record<string, unknown[]>> {
     const p = who.profileId;
-    const profile = await q.query(`SELECT id, handle, display_name, home_country, locale, units, created_at FROM social.profiles WHERE id = $1`, [p]);
+    const profile = await q.query(`SELECT id, handle, display_name, bio, home_country, locale, units, created_at FROM social.profiles WHERE id = $1`, [p]);
     const businesses = await q.query(
       `SELECT id, handle, name, category, country, verification_status, description, address_public, contact_phone, contact_url, moderation_state, created_at, deleted_at
          FROM social.business_profiles WHERE owner_user_id = $1`, [who.userId],

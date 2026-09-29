@@ -1,4 +1,4 @@
-import type { ReactionKind, ReactionState, DataExport, VerificationView, ModeratorEventDetail, SavedZone, SavedZoneInput, AppealView, CaseDetail, CaseSummary, CreateFlagRequest, ModerationActionType, ModerationNotice, CostDashboard, KillSwitchView, QualityReport, CreatePostRequest, TagView, BusinessView, SessionView, CreateBusinessRequest, UpdateBusinessRequest, AlertPreferences, CategorySubscription, CategorySubscriptionInput, NotificationsResponse, AppConfig, AreaSearchResult, FollowTarget, MyFollows, ProfileSearchResult, ProfileView, CommentView, CreateUploadRequest, FeedResponse, FeedTab, CreateUploadResponse, DevicePlatform, MediaView, RegisterPushTokenRequest, EventMapResponse, EventSummary, NearbyEventsResponse, SubmitReportRequest, SubmitReportResponse, TimelineEntryView } from "@dizaster/contracts";
+import type { MyProfile, UpdateProfileRequest, ReactionKind, ReactionState, DataExport, VerificationView, ModeratorEventDetail, SavedZone, SavedZoneInput, AppealView, CaseDetail, CaseSummary, CreateFlagRequest, ModerationActionType, ModerationNotice, CostDashboard, KillSwitchView, QualityReport, CreatePostRequest, TagView, BusinessView, SessionView, CreateBusinessRequest, UpdateBusinessRequest, AlertPreferences, CategorySubscription, CategorySubscriptionInput, NotificationsResponse, AppConfig, AreaSearchResult, FollowTarget, MyFollows, ProfileSearchResult, ProfileView, CommentView, CreateUploadRequest, FeedResponse, FeedTab, CreateUploadResponse, DevicePlatform, MediaView, RegisterPushTokenRequest, EventMapResponse, EventSummary, NearbyEventsResponse, SubmitReportRequest, SubmitReportResponse, TimelineEntryView } from "@dizaster/contracts";
 import { canRetryWithRefresh, singleFlight } from "./auth/refresh";
 import { API_URL } from "./config";
 import type { Sender } from "./report/queue";
@@ -89,7 +89,8 @@ export const api = {
     if (near) { p.set("lat", near.lat.toFixed(2)); p.set("lng", near.lng.toFixed(2)); }
     return request<{ areas: AreaSearchResult[] }>(`/v1/geo/areas?${p}`);
   },
-  me: () => request<ProfileView>("/v1/me"),
+  me: () => request<MyProfile>("/v1/me"),
+  updateMe: (patch: UpdateProfileRequest) => request<MyProfile>("/v1/me", { method: "PATCH", body: JSON.stringify(patch) }),
   profile: (handle: string) => request<ProfileView>(`/v1/profiles/${encodeURIComponent(handle)}`),
   profilePosts: (handle: string, cursor?: string | null) =>
     request<FeedResponse>(`/v1/profiles/${encodeURIComponent(handle)}/posts${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`),

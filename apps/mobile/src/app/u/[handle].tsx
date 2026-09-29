@@ -47,6 +47,7 @@ export default function PublicProfileScreen() {
           <View style={styles.avatar}><Text style={styles.avatarText}>{initials(profile.displayName)}</Text></View>
           <Text style={styles.name}>{profile.displayName}</Text>
           <Text style={styles.handle}>@{profile.handle}</Text>
+          {profile.bio ? <Text style={styles.bio}>{profile.bio}</Text> : null}
           <View style={styles.stats}>
             <Stat n={profile.postCount} label={t("postsCount")} />
             <Stat n={profile.followerCount} label={t("followers")} />
@@ -96,6 +97,7 @@ function Stat({ n, label }: { n: number; label: string }) {
 }
 
 const styles = StyleSheet.create({
+  bio: { color: colors.text, textAlign: "center", marginTop: space.sm, paddingHorizontal: space.lg },
   container: { flex: 1, backgroundColor: colors.bg },
   error: { color: colors.textMuted, padding: space.lg, backgroundColor: colors.bg, flex: 1 },
   head: { alignItems: "center", paddingVertical: space.lg, gap: space.xs },

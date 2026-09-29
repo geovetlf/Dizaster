@@ -77,6 +77,8 @@ export type FollowTarget = z.infer<typeof FollowTarget>;
 export interface ProfileView {
   handle: string;
   displayName: string;
+  /** Biografía pública corta (ADR 0044). */
+  bio: string | null;
   createdAt: string;
   followerCount: number;
   followingCount: number;
@@ -124,3 +126,22 @@ export interface ReactionState { reactions: ReactionCounts; myReactions: Reactio
 export function reactionKindsFor(post: { event: unknown }): ReactionKind[] {
   return post.event ? ["LIKE", "SUPPORT", "USEFUL", "SEEN_TOO"] : ["LIKE", "SUPPORT", "USEFUL"];
 }
+
+export const Units = z.enum(["metric", "imperial"]);
+export type Units = z.infer<typeof Units>;
+
+/** Mi perfil: lo público más mis ajustes (ADR 0044). */
+export interface MyProfile extends ProfileView {
+  units: Units;
+}
+
+/** Cambios de mi perfil. El handle no se cambia en V1: rompería menciones y enlaces compartidos. */
+export const UpdateProfileRequest = z
+  .object({
+    displayName: z.string().trim().min(1).max(50).optional(),
+    /** Vacío = quitarla. */
+    bio: z.string().trim().max(160).nullable().optional(),
+    units: Units.optional(),
+  })
+  .refine((v) => Object.keys(v).length > 0, "Nada que cambiar");
+export type UpdateProfileRequest = z.infer<typeof UpdateProfileRequest>;

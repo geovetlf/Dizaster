@@ -39,6 +39,7 @@ export default function RootLayout() {
         <Stack.Screen name="moderation/event/[id]" options={{ title: t("eventTools") }} />
         <Stack.Screen name="my-moderation" options={{ title: t("myModeration") }} />
         <Stack.Screen name="delete-account" options={{ title: t("deleteAccount") }} />
+        <Stack.Screen name="profile-edit" options={{ title: t("editProfile") }} />
         <Stack.Screen name="zone-edit" options={{ title: t("addZone") }} />
       </Stack>
       <NotificationRouting />

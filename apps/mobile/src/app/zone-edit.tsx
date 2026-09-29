@@ -6,7 +6,7 @@ import { Icon } from "../components/icon";
 import { ZONE_KINDS } from "../lib/alerts/logic";
 import { api } from "../lib/api";
 import { t } from "../lib/i18n";
-import { areaRow } from "../lib/ui/format";
+import { areaRow, formatKm } from "../lib/ui/format";
 import { useCoarseLocation } from "../lib/ui/use-coarse-location";
 import { colors, radius, space } from "../theme";
 
@@ -70,7 +70,7 @@ export default function ZoneEditScreen() {
       <View style={styles.chips}>
         {ZONE_RADII_KM.map((r) => (
           <Pressable key={r} accessibilityRole="button" accessibilityState={{ selected: radiusKm === r }} style={[styles.chip, radiusKm === r && styles.chipOn]} onPress={() => setRadiusKm(r)}>
-            <Text style={styles.chipText}>{r} km</Text>
+            <Text style={styles.chipText}>{formatKm(r)}</Text>
           </Pressable>
         ))}
       </View>

@@ -62,6 +62,7 @@ export default function ProfileScreen() {
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={styles.title}>{t("profile")}</Text>
         {handle ? <Row icon="account-circle-outline" label={t("myPublicProfile")} value={`@${handle}`} onPress={() => router.push(`/u/${handle}`)} /> : null}
+        {handle ? <Row icon="account-edit-outline" label={t("editProfile")} onPress={() => router.push("/profile-edit")} /> : null}
         <Row icon="bell-outline" label={t("alerts")} value={alerts ? t("alertsOn") : t("alertsOff")} onPress={() => (alerts ? router.push("/alert-settings") : void turnOnAlerts())} />
         <Row icon="cloud-upload-outline" label={t("pendingReports")} value={String(pending)} />
         <Row icon="phone-alert" label={t("emergencyTitle")} onPress={() => router.push("/emergency")} />
@@ -80,7 +81,7 @@ export default function ProfileScreen() {
   );
 }
 
-function Row({ icon, label, value, onPress }: { icon: "account-circle-outline" | "bell-outline" | "cloud-upload-outline" | "phone-alert" | "chart-bar" | "gauge" | "storefront-outline" | "cellphone-lock" | "gavel" | "shield-check-outline" | "account-remove-outline" | "download-outline"; label: string; value?: string; onPress?: () => void }) {
+function Row({ icon, label, value, onPress }: { icon: "account-circle-outline" | "bell-outline" | "cloud-upload-outline" | "phone-alert" | "chart-bar" | "gauge" | "storefront-outline" | "cellphone-lock" | "gavel" | "shield-check-outline" | "account-remove-outline" | "download-outline" | "account-edit-outline"; label: string; value?: string; onPress?: () => void }) {
   return (
     <Pressable accessibilityRole={onPress ? "button" : "text"} disabled={!onPress} style={styles.row} onPress={onPress}>
       <Icon name={icon} size={22} color={colors.text} />

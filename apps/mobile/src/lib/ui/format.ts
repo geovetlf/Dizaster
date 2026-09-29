@@ -1,11 +1,22 @@
-import type { AreaSearchResult, BBox, FeedPost, Lang, MediaView } from "@dizaster/contracts";
+import type { AreaSearchResult, BBox, FeedPost, Lang, MediaView, Units } from "@dizaster/contracts";
 
-const WORDS: Record<Lang, { now: string; ago: (x: string) => string; over: (km: string) => string; within: (km: string) => string }> = {
-  es: { now: "Ahora", ago: (x) => `Hace ${x}`, over: (km) => `a más de ${km} km`, within: (km) => `a menos de ${km} km` },
-  en: { now: "Now", ago: (x) => `${x} ago`, over: (km) => `over ${km} km away`, within: (km) => `within ${km} km` },
-  pt: { now: "Agora", ago: (x) => `Há ${x}`, over: (km) => `a mais de ${km} km`, within: (km) => `a menos de ${km} km` },
-  fr: { now: "À l'instant", ago: (x) => `Il y a ${x}`, over: (km) => `à plus de ${km} km`, within: (km) => `à moins de ${km} km` },
+const WORDS: Record<Lang, { now: string; ago: (x: string) => string; over: (distance: string) => string; within: (distance: string) => string }> = {
+  es: { now: "Ahora", ago: (x) => `Hace ${x}`, over: (d) => `a más de ${d}`, within: (d) => `a menos de ${d}` },
+  en: { now: "Now", ago: (x) => `${x} ago`, over: (d) => `over ${d} away`, within: (d) => `within ${d}` },
+  pt: { now: "Agora", ago: (x) => `Há ${x}`, over: (d) => `a mais de ${d}`, within: (d) => `a menos de ${d}` },
+  fr: { now: "À l'instant", ago: (x) => `Il y a ${x}`, over: (d) => `à plus de ${d}`, within: (d) => `à moins de ${d}` },
 };
+
+let units: Units = "metric";
+/** Unidades de la persona (ADR 0044); se fijan al cargar su perfil. */
+export function setUnits(u: Units) { units = u; }
+
+/** "5 km" o, en imperial, "3.1 mi". */
+export function formatKm(km: number, u: Units = units): string {
+  if (u === "metric") return `${km} km`;
+  const mi = km * 0.621371;
+  return `${mi < 10 ? Math.round(mi * 10) / 10 : Math.round(mi)} mi`;
+}
 
 /** "Hace 12 min", "Hace 3 h", "Hace 2 d". */
 export function timeAgo(iso: string, lang: Lang, now = new Date()): string {
@@ -16,11 +27,12 @@ export function timeAgo(iso: string, lang: Lang, now = new Date()): string {
 }
 
 /** "a menos de 2 km" a partir del tramo que da el servidor ("<2km"). */
-export function distanceLabel(bucket: string | null, lang: Lang): string | null {
+export function distanceLabel(bucket: string | null, lang: Lang, u: Units = units): string | null {
   if (!bucket) return null;
   const m = /^([<>])(\d+)km$/.exec(bucket);
   if (!m) return null;
-  return m[1] === ">" ? WORDS[lang].over(m[2]!) : WORDS[lang].within(m[2]!);
+  const d = formatKm(Number(m[2]), u);
+  return m[1] === ">" ? WORDS[lang].over(d) : WORDS[lang].within(d);
 }
 
 /**

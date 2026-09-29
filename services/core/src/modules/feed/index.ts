@@ -5,12 +5,14 @@ import {
   ProfileSearchQuery,
   TagParam,
   TagSearchQuery,
+  UpdateProfileRequest,
   normalizeTag,
   type FeedPost,
   type TagView,
   type FeedResponse,
   type MediaView,
   type MyFollows,
+  type MyProfile,
   type ProfileSearchResult,
   type ProfileView,
   type Sensitivity,
@@ -125,8 +127,14 @@ export class FeedService {
     return view;
   }
 
-  async me(q: Queryable, profileId: string): Promise<ProfileView> {
-    return this.profile(q, await this.social.handleById(q, profileId), profileId);
+  async me(q: Queryable, profileId: string): Promise<MyProfile> {
+    const view = await this.profile(q, await this.social.handleById(q, profileId), profileId);
+    return { ...view, ...(await this.social.settings(q, profileId)) };
+  }
+
+  async updateMe(q: Queryable, profileId: string, body: unknown): Promise<MyProfile> {
+    await this.social.updateProfile(q, profileId, parse(UpdateProfileRequest, body));
+    return this.me(q, profileId);
   }
 
   async searchProfiles(q: Queryable, rawQuery: unknown, viewerProfileId: string | null): Promise<ProfileSearchResult[]> {

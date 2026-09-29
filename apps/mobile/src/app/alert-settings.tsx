@@ -15,7 +15,7 @@ import { providerFromAppConfig } from "../lib/map/provider";
 import { lang, t, type MessageKey } from "../lib/i18n";
 import { useSession } from "../lib/session";
 import { categoryStyle } from "../lib/ui/categories";
-import { areaRow } from "../lib/ui/format";
+import { areaRow, formatKm } from "../lib/ui/format";
 import { useCoarseLocation } from "../lib/ui/use-coarse-location";
 import { colors, radius, space } from "../theme";
 
@@ -138,7 +138,7 @@ export default function AlertSettingsScreen() {
             return (
               <View key={z.id} style={styles.row}>
                 <Icon name={k.icon} size={22} color={colors.text} />
-                <Text style={styles.label}>{zoneTitle(z, t)} · {z.radiusKm} km</Text>
+                <Text style={styles.label}>{zoneTitle(z, t)} · {formatKm(z.radiusKm)}</Text>
                 <ZoneMapButton zone={z} styleUrl={offlineStyle} />
                 <Pressable accessibilityRole="button" accessibilityLabel={t("remove")} hitSlop={8} onPress={() => void removeZone(z.id)}>
                   <Icon name="close" size={20} color={colors.textMuted} />

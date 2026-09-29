@@ -305,6 +305,11 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
     return c.feed.me(c.db, session.profileId);
   });
 
+  app.patch("/v1/me", async (req) => {
+    const session = requireSession(req);
+    return c.feed.updateMe(c.db, session.profileId, req.body);
+  });
+
   // ───────────── Alertas: preferencias, suscripciones e historial (personales: nunca se cachean) ─────────────
   app.get("/v1/me/alert-preferences", async (req, reply) => {
     const session = requireSession(req);

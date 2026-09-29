@@ -3,7 +3,7 @@ import type { CategoryCatalog, MediaView } from "@dizaster/contracts";
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { categoryStyle, homeChips, MORE_CODE } from "../src/lib/ui/categories";
-import { areaRow, bboxParam, distanceLabel, blurPreviewUri, duration, eventTitle, imageUri, initials, mediaLayout, parseBboxParam, postWhere, timeAgo } from "../src/lib/ui/format";
+import { areaRow, bboxParam, distanceLabel, formatKm, blurPreviewUri, duration, eventTitle, imageUri, initials, mediaLayout, parseBboxParam, postWhere, timeAgo } from "../src/lib/ui/format";
 import { evidenceLine, explainLines, timelineLabel } from "../src/lib/verification/explain";
 
 const catalog = JSON.parse(readFileSync(new URL("../../../data/categories/categories.json", import.meta.url), "utf8")) as CategoryCatalog;
@@ -133,5 +133,15 @@ describe("explicación de la verificación", () => {
   it("la cronología usa etiquetas y deja pasar tipos nuevos", () => {
     expect(timelineLabel("MERGED", tr as never)).toBe("Unido");
     expect(timelineLabel("LIVE_STARTED", tr as never)).toBe("LIVE_STARTED");
+  });
+});
+
+describe("unidades (ADR 0044)", () => {
+  it("muestra km o millas según la preferencia", () => {
+    expect(formatKm(5, "metric")).toBe("5 km");
+    expect(formatKm(5, "imperial")).toBe("3.1 mi");
+    expect(formatKm(25, "imperial")).toBe("16 mi");
+    expect(distanceLabel("<2km", "en", "imperial")).toBe("within 1.2 mi");
+    expect(distanceLabel(">25km", "es", "metric")).toBe("a más de 25 km");
   });
 });
