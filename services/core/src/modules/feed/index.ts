@@ -56,6 +56,7 @@ export class FeedService {
         createdAt: r.createdAt.toISOString(),
         categoryCode: r.categoryCode,
         event: r.eventId && state ? { id: r.eventId, publicVerificationState: state.publicVerificationState } : null,
+        place: state?.place ?? null,
         distanceBucket: r.distanceM === null ? null : bucket(r.distanceM),
         media,
         hiddenMediaCount: r.media.length - media.length,

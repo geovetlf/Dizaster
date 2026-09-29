@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { CategoryCode, CountryCode, Instant, LocalizedText } from "./common.js";
-import { GeoPoint, Sensitivity } from "./geo.js";
+import { ContextualLocation, GeoPoint, Sensitivity } from "./geo.js";
 import { NegativeState, PublicVerificationState, TrustTier, VerificationLevel } from "./verification.js";
 
 export const EventStatus = z.enum(["ACTIVE", "MONITORING", "RESOLVED", "ARCHIVED"]);
@@ -69,6 +69,8 @@ export const EventSummary = z.object({
   point: GeoPoint,
   sensitivity: Sensitivity,
   countryCode: CountryCode.nullable(),
+  /** País → región → ciudad → distrito, derivado del punto público (null si aún no hay índice geográfico). */
+  place: ContextualLocation.nullable(),
   status: EventStatus,
   severity: z.number().int(),
   verificationLevel: VerificationLevel,

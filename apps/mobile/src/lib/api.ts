@@ -1,4 +1,4 @@
-import type { AppConfig, CommentView, CreateUploadRequest, FeedResponse, FeedTab, CreateUploadResponse, DevicePlatform, MediaView, RegisterPushTokenRequest, EventMapResponse, EventSummary, NearbyEventsResponse, SubmitReportRequest, SubmitReportResponse, TimelineEntryView } from "@dizaster/contracts";
+import type { AppConfig, AreaSearchResult, CommentView, CreateUploadRequest, FeedResponse, FeedTab, CreateUploadResponse, DevicePlatform, MediaView, RegisterPushTokenRequest, EventMapResponse, EventSummary, NearbyEventsResponse, SubmitReportRequest, SubmitReportResponse, TimelineEntryView } from "@dizaster/contracts";
 import { API_URL } from "./config";
 import type { Sender } from "./report/queue";
 
@@ -47,6 +47,12 @@ export const api = {
   comments: (postId: string) => request<{ comments: CommentView[] }>(`/v1/posts/${postId}/comments`),
   addComment: (postId: string, text: string) =>
     request<CommentView>(`/v1/posts/${postId}/comments`, { method: "POST", body: JSON.stringify({ text }) }),
+  /** Lugares del índice geográfico propio. La ubicación, si se envía, va redondeada (~1 km) solo para ordenar. */
+  areas: (q: string, near?: { lat: number; lng: number } | null) => {
+    const p = new URLSearchParams({ q });
+    if (near) { p.set("lat", near.lat.toFixed(2)); p.set("lng", near.lng.toFixed(2)); }
+    return request<{ areas: AreaSearchResult[] }>(`/v1/geo/areas?${p}`);
+  },
   submitReport: (body: SubmitReportRequest) => request<SubmitReportResponse>("/v1/reports", { method: "POST", body: JSON.stringify(body) }),
 };
 

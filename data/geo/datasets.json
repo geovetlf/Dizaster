@@ -1,0 +1,147 @@
+{
+  "version": "geo-2026.09.1",
+  "notes": "Índice administrativo abierto. Cada dataset fija URL + sha256 + licencia. Añadir un país = añadir datos aquí, no código. Prioridad mayor gana cuando dos fuentes cubren el mismo nivel.",
+  "datasets": [
+    {
+      "id": "ne-admin1",
+      "kind": "admin",
+      "source": "Natural Earth 10m Admin 1 – States, Provinces (v5.1.x)",
+      "url": "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_10m_admin_1_states_provinces.geojson",
+      "sha256": "22d0e3ad85eb3e27f17cabf8ba2d50e554fbc27a87796ff891d958185da62fb5",
+      "license": "Public domain (Natural Earth terms of use)",
+      "attribution": "Made with Natural Earth",
+      "priority": 10,
+      "layer": {
+        "level": 1,
+        "idPrefix": "NE1:",
+        "idProp": "adm1_code",
+        "countryProp": "iso_a2",
+        "codeProp": "iso_3166_2",
+        "nameProps": [
+          "name_es",
+          "name"
+        ],
+        "names": {
+          "es": "name_es",
+          "en": "name_en",
+          "pt": "name_pt",
+          "fr": "name_fr"
+        }
+      }
+    },
+    {
+      "id": "ne-populated-places",
+      "kind": "places",
+      "source": "Natural Earth 10m Populated Places (simple)",
+      "url": "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_10m_populated_places_simple.geojson",
+      "sha256": "fd3fa867a320cbd5c5b6bb5bc550afeec2939fb2cef688e508007282a55ac42f",
+      "license": "Public domain (Natural Earth terms of use)",
+      "attribution": "Made with Natural Earth",
+      "priority": 10,
+      "layer": {
+        "idPrefix": "NEP:",
+        "idProp": "ne_id",
+        "countryProp": "iso_a2",
+        "nameProps": [
+          "name"
+        ],
+        "populationProp": "pop_max"
+      }
+    },
+    {
+      "id": "pe-departamentos",
+      "kind": "admin",
+      "source": "Límites departamentales del Perú (INEI) vía github.com/juaneladio/peru-geojson",
+      "url": "https://raw.githubusercontent.com/juaneladio/peru-geojson/master/peru_departamental_simple.geojson",
+      "sha256": "3d34d5450a1b1f059eebdf7386e5b5d071a5063bf3679fcbbbc5314493791290",
+      "license": "MPL-2.0 (repositorio juaneladio/peru-geojson); datos de origen INEI",
+      "attribution": "INEI; juaneladio/peru-geojson",
+      "priority": 100,
+      "layer": {
+        "level": 1,
+        "idPrefix": "PE:",
+        "idProp": "FIRST_IDDP",
+        "country": "PE",
+        "codeProp": "FIRST_IDDP",
+        "nameProps": [
+          "NOMBDEP"
+        ],
+        "nameCase": "title-es"
+      }
+    },
+    {
+      "id": "pe-provincias",
+      "kind": "admin",
+      "source": "Límites provinciales del Perú (INEI) vía github.com/juaneladio/peru-geojson",
+      "url": "https://raw.githubusercontent.com/juaneladio/peru-geojson/master/peru_provincial_simple.geojson",
+      "sha256": "3663a2b58e52a6bba9c43acabe33e7d9bb065e54551edd9aa375a411fd0c7fa1",
+      "license": "MPL-2.0 (repositorio juaneladio/peru-geojson); datos de origen INEI",
+      "attribution": "INEI; juaneladio/peru-geojson",
+      "priority": 100,
+      "layer": {
+        "level": 2,
+        "idPrefix": "PE:",
+        "idProp": "FIRST_IDPR",
+        "country": "PE",
+        "codeProp": "FIRST_IDPR",
+        "nameProps": [
+          "NOMBPROV"
+        ],
+        "nameCase": "title-es",
+        "parent": {
+          "prop": "FIRST_IDPR",
+          "length": 2
+        }
+      }
+    },
+    {
+      "id": "pe-distritos",
+      "kind": "admin",
+      "source": "Límites distritales del Perú (INEI) vía github.com/juaneladio/peru-geojson",
+      "url": "https://raw.githubusercontent.com/juaneladio/peru-geojson/master/peru_distrital_simple.geojson",
+      "sha256": "1eba0da33464b0818f05bfcf066672e6c9cf979ddc0549c8c2e9ca4d0122ac73",
+      "license": "MPL-2.0 (repositorio juaneladio/peru-geojson); datos de origen INEI",
+      "attribution": "INEI; juaneladio/peru-geojson",
+      "priority": 100,
+      "layer": {
+        "level": 3,
+        "idPrefix": "PE:",
+        "idProp": "IDDIST",
+        "country": "PE",
+        "codeProp": "IDDIST",
+        "nameProps": [
+          "NOMBDIST"
+        ],
+        "nameCase": "title-es",
+        "parent": {
+          "prop": "IDPROV",
+          "length": 4
+        }
+      }
+    }
+  ],
+  "wordFixes": {
+    "PE": {
+      "Ancon": "Ancón",
+      "Apurimac": "Apurímac",
+      "Huanuco": "Huánuco",
+      "Jesus": "Jesús",
+      "Junin": "Junín",
+      "Lurin": "Lurín",
+      "Maria": "María",
+      "Martin": "Martín",
+      "Pachacamac": "Pachacámac",
+      "Rimac": "Rímac",
+      "Peru": "Perú",
+      "Lucia": "Lucía",
+      "Andres": "Andrés",
+      "Jose": "José",
+      "Ramon": "Ramón",
+      "Tomas": "Tomás",
+      "Bolivar": "Bolívar",
+      "Concepcion": "Concepción",
+      "Asuncion": "Asunción",
+      "Victor": "Víctor"
+    }
+  }
+}

@@ -1,5 +1,6 @@
 import type {
   CategoryConfig,
+  ContextualLocation,
   NearbyEvent,
   EventCandidate,
   EventMapResponse,
@@ -65,12 +66,13 @@ interface EventRow {
   sensitivity: EventSummary["sensitivity"]; country_code: string | null; status: EventSummary["status"];
   severity: number; verification_level: VerificationLevel; negative_state: NegativeState; report_count: number;
   source_count: number; first_seen_at: Date; last_activity_at: Date; publication_state: string; merged_into_id: string | null;
+  place: ContextualLocation | null;
 }
 
 const PUBLIC_EVENT_COLUMNS = `
   e.id, e.category_code, e.title, ST_Y(e.public_geom::geometry) AS lat, ST_X(e.public_geom::geometry) AS lng,
   e.sensitivity, e.country_code, e.status, e.severity, e.verification_level, e.negative_state,
-  e.report_count, e.source_count, e.first_seen_at, e.last_activity_at, e.publication_state, e.merged_into_id`;
+  e.report_count, e.source_count, e.first_seen_at, e.last_activity_at, e.publication_state, e.merged_into_id, e.place`;
 
 function toSummary(r: EventRow): EventSummary {
   return {
@@ -80,6 +82,7 @@ function toSummary(r: EventRow): EventSummary {
     point: { lat: r.lat, lng: r.lng },
     sensitivity: r.sensitivity,
     countryCode: r.country_code?.trim() ?? null,
+    place: r.place ?? null,
     status: r.status,
     severity: r.severity,
     verificationLevel: r.verification_level,
@@ -215,17 +218,20 @@ export class EventService {
   private async create(tx: Queryable, c: EventCandidate, category: CategoryConfig, country: string | null): Promise<ResolutionResult> {
     const id = newId();
     const pub = this.geo.generalize(c.point, category.sensitivity);
+    // Ubicación contextual: SIEMPRE desde el punto público generalizado, nunca desde el del reportero.
+    const place = await this.geo.contextFor(tx, pub.point, category.sensitivity);
     await tx.query(
       `INSERT INTO event.events
          (id, category_code, title, geom, public_geom, public_h3, h3_r7, h3_r9, sensitivity, uncertainty_m, country_code,
-          occurred_start, first_seen_at, last_activity_at, severity, publication_state)
+          occurred_start, first_seen_at, last_activity_at, severity, publication_state, region_id, district_id, place)
        VALUES ($1, $2, $3, ST_SetSRID(ST_MakePoint($4, $5), 4326)::geography, ST_SetSRID(ST_MakePoint($6, $7), 4326)::geography,
-               $8, $9, $10, $11, $12, $13, $14, $15, $15, $16, $17)`,
+               $8, $9, $10, $11, $12, $13, $14, $15, $15, $16, $17, $18, $19, $20)`,
       [
         id, c.categoryCode, JSON.stringify(c.title ?? category.names), c.point.lng, c.point.lat, pub.point.lng, pub.point.lat,
         pub.cell, this.geo.h3(c.point, H3_RES.ZONE), this.geo.h3(c.point, H3_RES.DEDUP), category.sensitivity,
         c.locationUncertaintyM, country, c.occurredAt, c.observedAt, c.severityHint ?? category.defaultSeverity,
         c.createAsPending ? "PENDING_CORROBORATION" : "PUBLISHED",
+        place?.region?.id ?? null, place?.district?.id ?? null, place ? JSON.stringify(place) : null,
       ],
     );
     await this.addTimeline(tx, id, "CREATED", { origin: c.origin, trustTier: c.trustTier });
@@ -284,6 +290,7 @@ export class EventService {
       ? { lat: official.lat, lng: official.lng }
       : weightedMedianPoint(rows.map((r) => ({ point: { lat: r.lat, lng: r.lng }, weight: r.weight })));
     const pub = this.geo.generalize(point, ev.sensitivity);
+    const place = await this.geo.contextFor(tx, pub.point, ev.sensitivity);
     const citizens = rows.filter((r) => r.trust_tier === "CITIZEN");
     const distinctContributors = new Set(citizens.map((r) => r.contributor_user_id)).size;
     const hasNonCitizen = rows.some((r) => r.trust_tier !== "CITIZEN");
@@ -295,11 +302,12 @@ export class EventService {
           public_h3 = $6, h3_r7 = $7, h3_r9 = $8,
           report_count = $9, source_count = $10,
           severity = greatest(severity, $11), last_activity_at = greatest(last_activity_at, $12),
-          publication_state = $13, updated_at = now()
+          publication_state = $13, region_id = $14, district_id = $15, place = $16, updated_at = now()
         WHERE id = $1`,
       [
         eventId, point.lng, point.lat, pub.point.lng, pub.point.lat, pub.cell, this.geo.h3(point, H3_RES.ZONE), this.geo.h3(point, H3_RES.DEDUP),
         citizens.length, rows.length - citizens.length, c.severityHint ?? 1, c.observedAt, publication,
+        place?.region?.id ?? null, place?.district?.id ?? null, place ? JSON.stringify(place) : null,
       ],
     );
   }
@@ -320,13 +328,18 @@ export class EventService {
   }
 
   /** Estado público y sensibilidad de varios eventos (para componer feeds sin leer el esquema event desde fuera). */
-  async publicStates(q: Queryable, ids: string[]): Promise<Map<string, { publicVerificationState: PublicVerificationState; sensitivity: Sensitivity }>> {
+  async publicStates(
+    q: Queryable,
+    ids: string[],
+  ): Promise<Map<string, { publicVerificationState: PublicVerificationState; sensitivity: Sensitivity; place: ContextualLocation | null }>> {
     if (ids.length === 0) return new Map();
-    const { rows } = await q.query<{ id: string; verification_level: VerificationLevel; negative_state: NegativeState; sensitivity: Sensitivity }>(
-      `SELECT id, verification_level, negative_state, sensitivity FROM event.events WHERE id = ANY($1) AND publication_state <> 'HIDDEN'`,
+    const { rows } = await q.query<{ id: string; verification_level: VerificationLevel; negative_state: NegativeState; sensitivity: Sensitivity; place: ContextualLocation | null }>(
+      `SELECT id, verification_level, negative_state, sensitivity, place FROM event.events WHERE id = ANY($1) AND publication_state <> 'HIDDEN'`,
       [ids],
     );
-    return new Map(rows.map((r) => [r.id, { publicVerificationState: publicVerificationState(r.verification_level, r.negative_state), sensitivity: r.sensitivity }]));
+    return new Map(
+      rows.map((r) => [r.id, { publicVerificationState: publicVerificationState(r.verification_level, r.negative_state), sensitivity: r.sensitivity, place: r.place }]),
+    );
   }
 
   async timeline(q: Queryable, eventId: string): Promise<TimelineEntryView[]> {

@@ -1,16 +1,35 @@
 {
-  "version": "countries-2026.09.1",
-  "defaults": { "units": "metric", "launchStatus": "AVAILABLE_READ_ONLY" },
+  "version": "countries-2026.09.2",
+  "defaults": {
+    "units": "metric",
+    "launchStatus": "AVAILABLE_READ_ONLY"
+  },
   "countries": [
     {
       "iso2": "PE",
       "launchStatus": "PILOT",
       "defaultLocale": "es-PE",
-      "languages": ["es", "qu", "ay"],
-      "timezones": ["America/Lima"],
+      "languages": [
+        "es",
+        "qu",
+        "ay"
+      ],
+      "timezones": [
+        "America/Lima"
+      ],
       "units": "metric",
       "callingCode": "+51",
-      "notes": "Primer país piloto (aprobado 2026-09-29). Toda configuración específica vive aquí como datos: el código no conoce a Perú."
+      "notes": "Primer país piloto (aprobado 2026-09-29). Toda configuración específica vive aquí como datos: el código no conoce a Perú.",
+      "geo": {
+        "cityLevel": 2,
+        "districtLevel": 3,
+        "levelNames": {
+          "1": "Departamento",
+          "2": "Provincia",
+          "3": "Distrito"
+        },
+        "note": "Perú: ciudad = provincia (INEI), distrito = distrito (ubigeo)."
+      }
     }
   ]
 }

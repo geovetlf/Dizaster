@@ -29,7 +29,7 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | Planificador NORMAL/URGENT, peticiones condicionales, circuit breaker, registro de ejecuciones | ✅ | `ingestion/scheduler.ts`, migración 0002, ADR 0011 |
 | Ciclo de vida por inactividad | ✅ | `EventService.applyLifecycle` (worker, cada hora) |
 
-**Pruebas:** 151 (contratos 5, geo-kit 26, backend 86 con PostgreSQL real, móvil 34), más 3 del cliente S3 contra un servidor compatible en CI. JS de la app compila para iOS y Android y los proyectos nativos se generan en CI.
+**Pruebas:** 171 (contratos 5, geo-kit 26, backend 103 con PostgreSQL real, móvil 37), más 3 del cliente S3 contra un servidor compatible en CI. JS de la app compila para iOS y Android y los proyectos nativos se generan en CI.
 
 ## Paridad Android e iOS (hecha)
 
@@ -64,11 +64,26 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | Feed: para ti, cerca de ti, videos, filtro por categoría | ✅ | `GET /v1/feed`, ADR 0015 |
 | Me gusta y comentarios | ✅ | `/v1/posts/:id/like`, `/v1/posts/:id/comments` |
 | Perfil: alertas, reportes pendientes, emergencia | ✅ | `src/app/(tabs)/profile.tsx` |
-| Nombres de lugar ("Miraflores, Lima"), seguir, búsqueda de lugares y usuarios | ⏳ | siguiente etapa |
+| Nombres de lugar ("Miraflores, Lima") y búsqueda de lugares | ✅ | Etapa 5 |
+| Seguir perfiles y búsqueda de usuarios | ⏳ | siguiente etapa |
+
+## Etapa 5 — Geo Engine: índice geográfico abierto (hecha)
+
+| Área | Estado | Dónde |
+|---|---|---|
+| Esquema `geo` en PostGIS: áreas administrativas, localidades, datasets con licencia y sha256, memoria por celda H3 | ✅ | `migrations/0006_geo_index.sql`, ADR 0016 |
+| Importador de datos abiertos por manifiesto (sin código por país) y CLI `pnpm geo:import` | ✅ | `data/geo/datasets.json`, `modules/geo/importer.ts` |
+| Perú: departamento → provincia (ciudad) → distrito con ubigeo INEI; resto del mundo: región Natural Earth + ciudad por cercanía | ✅ | `data/countries/country-config.json` (`geo`) |
+| `resolveAdmin` / ubicación contextual del EVENT desde su punto público, con detalle según sensibilidad | ✅ | `GeoService.contextFor`, `event.events.place` |
+| Lugar en `EventSummary.place` y `FeedPost.place`; tarjeta "Hace 12 min • Miraflores, Lima" | ✅ | `apps/mobile/src/components/post-card.tsx` |
+| Búsqueda de lugares sin geocodificador comercial (`GET /v1/geo/areas`) y mapa encuadrado en el lugar | ✅ | `apps/mobile/src/app/search.tsx`, `(tabs)/map.tsx` |
+| Atribución de datasets (`GET /v1/geo/datasets`) | ✅ API · ⏳ pantalla "Acerca de" | |
+| 8 distritos de Perú sin polígono en la fuente (p. ej. Santa Anita, La Punta) y nombres sin tildes | ⚠️ | Se muestra la ciudad; ver ADR 0016 |
+| Zonas horarias por polígono (países con varias) | ⏳ | timezone-boundary-builder |
 
 ## Siguiente etapa (en orden)
 
-1. Índice de lugares abierto (distrito y ciudad en publicaciones y búsqueda), seguir perfiles y ranking del feed.
+1. Seguir perfiles, búsqueda de usuarios y ranking del feed.
 2. Identity real: Sign in with Apple, Google y email; App Attest / Play Integrity (necesita cuentas de Apple y Google).
 3. Social: comentarios, reacciones, seguir, feed cercano.
 4. Tablero de costo persistido y métricas por módulo.
@@ -87,3 +102,4 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | Clave NASA FIRMS | Registro personal | Solicitar MAP_KEY gratuita cuando se active la fuente |
 | Acceso de red a las fuentes (USGS, GDACS) desde el entorno de desarrollo | La política de red de este entorno bloquea esos dominios | Opcional: permitirlos en la configuración de red del entorno para validar los adapters con datos reales |
 | Revisar términos de uso de GDACS | Decisión legal | Confirmar que el uso previsto está permitido; entonces se activa |
+| Revisar la licencia MPL-2.0 de los límites de Perú (juaneladio/peru-geojson, datos INEI) | Decisión legal | Se usan solo en el servidor y se atribuyen; alternativa: límites oficiales de INEI/IGN directamente |

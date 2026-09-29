@@ -1,9 +1,10 @@
-import { Camera, GeoJSONSource, Layer, Map, type ViewStateChangeEvent } from "@maplibre/maplibre-react-native";
+import { Camera, GeoJSONSource, Layer, Map, type CameraRef, type ViewStateChangeEvent } from "@maplibre/maplibre-react-native";
 import type { EventMapResponse } from "@dizaster/contracts";
-import { router } from "expo-router";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { router, useLocalSearchParams } from "expo-router";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, StyleSheet, Text, View, type NativeSyntheticEvent } from "react-native";
 import { categoryStyle } from "../../lib/ui/categories";
+import { parseBboxParam } from "../../lib/ui/format";
 import { useCoarseLocation } from "../../lib/ui/use-coarse-location";
 import { colors } from "../../theme";
 import { api } from "../../lib/api";
@@ -18,6 +19,13 @@ export default function MapScreen() {
   const location = useCoarseLocation();
   const [provider, setProvider] = useState<MapProvider | null>(null);
   const [data, setData] = useState<EventMapResponse | null>(null);
+  // Desde la búsqueda de lugares: /map?bbox=w,s,e,n encuadra el área elegida.
+  const { bbox } = useLocalSearchParams<{ bbox?: string }>();
+  const target = useMemo(() => parseBboxParam(bbox), [bbox]);
+  const camera = useRef<CameraRef>(null);
+  useEffect(() => {
+    if (target) camera.current?.fitBounds(target, { padding: { top: 48, right: 24, bottom: 120, left: 24 }, duration: 600 });
+  }, [target]);
 
   useEffect(() => {
     api.config().then((c) => setProvider(providerFromAppConfig(c))).catch(() => setProvider(null));
@@ -56,8 +64,11 @@ export default function MapScreen() {
         logo={false}
       >
         <Camera
-          key={location.point ? "here" : "default"}
-          initialViewState={location.point ? { center: [location.point.lng, location.point.lat], zoom: 12 } : { center: [-75, -10], zoom: 3 }}
+          ref={camera}
+          key={target ? "target" : location.point ? "here" : "default"}
+          initialViewState={
+            target ? { bounds: target } : location.point ? { center: [location.point.lng, location.point.lat], zoom: 12 } : { center: [-75, -10], zoom: 3 }
+          }
         />
         <GeoJSONSource
           id="events"

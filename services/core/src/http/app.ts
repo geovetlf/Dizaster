@@ -89,6 +89,18 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
     return { country, config: country ? c.ref.country(country) ?? null : null };
   });
 
+  // Búsqueda de lugares en el índice abierto propio (sin geocodificador comercial). No recibe la ubicación del usuario.
+  app.get("/v1/geo/areas", async (req, reply) => {
+    reply.header("cache-control", "public, max-age=86400");
+    return { areas: await c.geo.searchAreas(c.db, req.query) };
+  });
+
+  // Atribución y licencia de cada dataset geográfico importado (se muestra en "Acerca de").
+  app.get("/v1/geo/datasets", async (_req, reply) => {
+    reply.header("cache-control", "public, max-age=86400");
+    return { datasets: await c.geo.datasets(c.db) };
+  });
+
   // ───────────── Identidad (solo proveedor DEV en esta etapa) ─────────────
   if (c.env.DEV_AUTH_ENABLED) {
     app.post("/v1/auth/dev", async (req) => {

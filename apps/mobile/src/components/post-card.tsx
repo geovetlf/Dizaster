@@ -6,7 +6,7 @@ import { api } from "../lib/api";
 import { LINK_DOMAIN } from "../lib/config";
 import { lang, t } from "../lib/i18n";
 import { categoryStyle } from "../lib/ui/categories";
-import { distanceLabel, duration, initials, mediaLayout, timeAgo } from "../lib/ui/format";
+import { duration, initials, mediaLayout, postWhere } from "../lib/ui/format";
 import { colors, radius, space } from "../theme";
 import { Icon } from "./icon";
 
@@ -16,7 +16,7 @@ export function PostCard({ post, categoryName }: { post: FeedPost; categoryName:
   const [likes, setLikes] = useState(post.likeCount);
   const style = categoryStyle(post.categoryCode);
   const name = post.author.pseudonymous ? t("citizenReporter") : post.author.displayName;
-  const where = [timeAgo(post.createdAt, lang), distanceLabel(post.distanceBucket, lang)].filter(Boolean).join(" • ");
+  const where = postWhere(post, lang);
 
   async function toggleLike() {
     const next = !liked;

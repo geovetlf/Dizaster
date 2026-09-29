@@ -30,6 +30,7 @@ export default function EventScreen() {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>{event.title?.["es"] ?? event.categoryCode}</Text>
+      {event.place ? <Text style={styles.place}>{event.place.label}</Text> : null}
       <Text style={[styles.badge, { backgroundColor: color }]}>{verificationLabel(event.publicVerificationState)}</Text>
       <Text style={styles.meta}>
         {event.reportCount} {t("reports")} · {event.sourceCount} {t("sources")} · {new Date(event.firstSeenAt).toLocaleString()}
@@ -50,6 +51,7 @@ export default function EventScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 16, backgroundColor: colors.bg },
   title: { fontSize: 22, fontWeight: "700", color: colors.text },
+  place: { fontSize: 15, color: colors.textMuted, marginTop: 4 },
   badge: { alignSelf: "flex-start", color: colors.white, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, marginVertical: 8, overflow: "hidden" },
   meta: { color: colors.textMuted, marginBottom: 16 },
   section: { fontSize: 16, fontWeight: "600", marginBottom: 8, color: colors.text },

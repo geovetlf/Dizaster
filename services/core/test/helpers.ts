@@ -11,7 +11,7 @@ import { migrate } from "../src/platform/migrate.js";
 import { MIGRATIONS_DIR } from "../src/platform/paths.js";
 
 export const TEST_DB_URL = process.env["TEST_DATABASE_URL"] ?? "postgres://dizaster:dizaster@localhost:5432/dizaster_test";
-const SCHEMAS = ["platform", "identity", "social", "report", "event", "verification", "ingestion", "media"];
+const SCHEMAS = ["platform", "identity", "social", "report", "event", "verification", "ingestion", "media", "geo"];
 
 export async function resetDatabase(): Promise<void> {
   const db = createPool(TEST_DB_URL);
@@ -98,4 +98,16 @@ export function reportBody(
 export async function submit(t: TestContext, user: TestUser, body: object) {
   const res = await t.app.inject({ method: "POST", url: "/v1/reports", headers: { authorization: `Bearer ${user.token}` }, payload: body });
   return { status: res.statusCode, body: res.json() as Record<string, unknown> & { outcome: string; eventId?: string; postId?: string; reportId?: string } };
+}
+
+/** Carga el índice geográfico de prueba (subconjunto real de Lima/Callao, Natural Earth Tokio) con el manifiesto real. */
+export async function seedGeoFixtures(t: TestContext): Promise<void> {
+  const { importDataset, loadManifest } = await import("../src/modules/geo/index.js");
+  const { defaultDataDir } = await import("../src/platform/paths.js");
+  const { readFileSync } = await import("node:fs");
+  const manifest = loadManifest(defaultDataDir());
+  for (const spec of manifest.datasets) {
+    const file = new URL(`./fixtures/geo/${spec.id}.geojson`, import.meta.url);
+    await importDataset(t.c.db, manifest, spec, readFileSync(file), { verifyHash: false });
+  }
 }

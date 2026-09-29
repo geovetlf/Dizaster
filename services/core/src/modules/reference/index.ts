@@ -20,6 +20,8 @@ export interface CountryConfigEntry {
   timezones: string[];
   units: "metric" | "imperial";
   callingCode: string;
+  /** Qué nivel del índice administrativo abierto es "ciudad" y cuál "distrito" en este país (sin él: ciudad por cercanía). */
+  geo?: { cityLevel?: 1 | 2 | 3; districtLevel?: 1 | 2 | 3; levelNames?: Partial<Record<"1" | "2" | "3", string>> };
 }
 
 export class ReferenceData {

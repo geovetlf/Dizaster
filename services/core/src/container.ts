@@ -43,7 +43,7 @@ export function buildContainer(env: AppEnv, overrides: { db?: Db; clock?: Clock;
   const clock = overrides.clock ?? systemClock;
   const dataDir = env.DATA_DIR ?? defaultDataDir();
   const ref = new ReferenceData(dataDir);
-  const geo = new GeoService(dataDir);
+  const geo = new GeoService(dataDir, ref);
   const social = new SocialService();
   const identity = new IdentityService(db, social, env.AUTH_JWT_SECRET);
   const events = new EventService(ref, geo);

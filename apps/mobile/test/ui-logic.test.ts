@@ -2,7 +2,7 @@ import type { CategoryCatalog, MediaView } from "@dizaster/contracts";
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { categoryStyle, homeChips, MORE_CODE } from "../src/lib/ui/categories";
-import { distanceLabel, duration, initials, mediaLayout, timeAgo } from "../src/lib/ui/format";
+import { areaRow, bboxParam, distanceLabel, duration, initials, mediaLayout, parseBboxParam, postWhere, timeAgo } from "../src/lib/ui/format";
 
 const catalog = JSON.parse(readFileSync(new URL("../../../data/categories/categories.json", import.meta.url), "utf8")) as CategoryCatalog;
 
@@ -52,5 +52,29 @@ describe("formato de publicaciones", () => {
     expect(mediaLayout([])).toEqual({ main: null, side: [], extra: 0 });
     expect(mediaLayout([m(1)])).toMatchObject({ side: [], extra: 0 });
     expect(mediaLayout([1, 2, 3, 4, 5].map(m))).toMatchObject({ main: { id: "1" }, side: [{ id: "2" }, { id: "3" }], extra: 2 });
+  });
+});
+
+describe("lugar contextual", () => {
+  const now = new Date("2026-09-29T12:00:00Z");
+  const createdAt = "2026-09-29T11:48:00Z";
+  const place = { country: { code: "PE", name: "Perú" }, region: null, city: null, district: null, label: "Miraflores, Lima", granularity: "DISTRICT" as const, timezone: null };
+
+  it("la tarjeta muestra el lugar del evento como en la referencia y, sin lugar, el tramo de distancia", () => {
+    expect(postWhere({ createdAt, place, distanceBucket: "<2km" }, "es", now)).toBe("Hace 12 min • Miraflores, Lima");
+    expect(postWhere({ createdAt, place: null, distanceBucket: "<2km" }, "es", now)).toBe("Hace 12 min • a menos de 2 km");
+    expect(postWhere({ createdAt, place: null, distanceBucket: null }, "es", now)).toBe("Hace 12 min");
+  });
+
+  it("resultado de lugar: nombre y, debajo, nivel y jerarquía", () => {
+    expect(areaRow({ name: "Miraflores", kind: "Distrito", label: "Miraflores, Lima, Perú" })).toEqual({ title: "Miraflores", subtitle: "Distrito · Lima, Perú" });
+  });
+
+  it("el bbox viaja como parámetro de ruta y se valida al volver", () => {
+    const b: [number, number, number, number] = [-77.05, -12.14, -77.01, -12.1];
+    expect(parseBboxParam(bboxParam(b))).toEqual(b);
+    expect(parseBboxParam("1,2,3")).toBeNull();
+    expect(parseBboxParam("0,10,1,5")).toBeNull();
+    expect(parseBboxParam(undefined)).toBeNull();
   });
 });

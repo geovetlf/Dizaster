@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { PublicVerificationState } from "./verification.js";
 import type { MediaView } from "./media.js";
+import type { ContextualLocation } from "./geo.js";
 
 export const FeedTab = z.enum(["for_you", "nearby", "following", "videos"]);
 export type FeedTab = z.infer<typeof FeedTab>;
@@ -31,6 +32,8 @@ export interface FeedPost {
   categoryCode: string | null;
   /** Evento vinculado y su estado público de verificación (si el post es un reporte o lo menciona). */
   event: { id: string; publicVerificationState: PublicVerificationState } | null;
+  /** Lugar contextual del evento vinculado ("Miraflores, Lima"); nunca la ubicación del autor. */
+  place: ContextualLocation | null;
   /** Distancia aproximada desde el lector, en tramos (nunca exacta). */
   distanceBucket: string | null;
   media: MediaView[];

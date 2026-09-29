@@ -13,7 +13,8 @@
     "test": "pnpm -r run test",
     "check:boundaries": "node scripts/check-module-boundaries.mjs",
     "check": "pnpm lint && pnpm check:boundaries && pnpm typecheck && pnpm build && pnpm test",
-    "db:migrate": "pnpm --filter @dizaster/core run build && pnpm --filter @dizaster/core run migrate"
+    "db:migrate": "pnpm --filter @dizaster/core run build && pnpm --filter @dizaster/core run migrate",
+    "geo:import": "pnpm --filter @dizaster/core run build && pnpm --filter @dizaster/core run geo:import"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.0",

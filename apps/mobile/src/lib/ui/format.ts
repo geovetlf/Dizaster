@@ -1,4 +1,4 @@
-import type { MediaView } from "@dizaster/contracts";
+import type { AreaSearchResult, BBox, FeedPost, MediaView } from "@dizaster/contracts";
 
 type Lang = "es" | "en";
 
@@ -17,6 +17,29 @@ export function distanceLabel(bucket: string | null, lang: Lang): string | null 
   if (!m) return null;
   if (m[1] === ">") return lang === "es" ? `a más de ${m[2]} km` : `over ${m[2]} km away`;
   return lang === "es" ? `a menos de ${m[2]} km` : `within ${m[2]} km`;
+}
+
+/**
+ * Línea de contexto de una publicación: "Hace 12 min • Miraflores, Lima". El lugar es el contextual del
+ * evento (derivado de su ubicación pública); si no hay, se muestra el tramo de distancia.
+ */
+export function postWhere(post: Pick<FeedPost, "createdAt" | "place" | "distanceBucket">, lang: Lang, now = new Date()): string {
+  return [timeAgo(post.createdAt, lang, now), post.place?.label ?? distanceLabel(post.distanceBucket, lang)].filter(Boolean).join(" • ");
+}
+
+/** Resultado de lugar para la búsqueda: "Miraflores" / "Distrito · Lima, Perú". */
+export function areaRow(a: Pick<AreaSearchResult, "name" | "label" | "kind">): { title: string; subtitle: string } {
+  const rest = a.label.startsWith(`${a.name}, `) ? a.label.slice(a.name.length + 2) : a.label;
+  return { title: a.name, subtitle: [a.kind, rest].filter(Boolean).join(" · ") };
+}
+
+/** bbox ⇄ parámetro de ruta ("w,s,e,n"), para abrir el mapa encuadrado en un lugar. */
+export const bboxParam = (b: BBox) => b.map((n) => n.toFixed(4)).join(",");
+export function parseBboxParam(v: string | string[] | undefined): BBox | null {
+  const parts = (Array.isArray(v) ? v[0] : v)?.split(",").map(Number);
+  if (!parts || parts.length !== 4 || parts.some((n) => !Number.isFinite(n))) return null;
+  const [w, s, e, n] = parts as [number, number, number, number];
+  return s <= n && w >= -180 && e <= 180 && s >= -90 && n <= 90 ? [w, s, e, n] : null;
 }
 
 /** "0:24" para la duración de un video. */

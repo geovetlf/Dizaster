@@ -11,7 +11,9 @@
     "dev": "tsx watch src/server.ts",
     "start": "node dist/server.js",
     "worker": "node dist/worker.js",
-    "migrate": "node dist/migrate-cli.js"
+    "migrate": "node dist/migrate-cli.js",
+    "geo:import": "node dist/geo-import-cli.js",
+    "geo:import:dev": "tsx src/geo-import-cli.ts"
   },
   "dependencies": {
     "@dizaster/contracts": "workspace:*",

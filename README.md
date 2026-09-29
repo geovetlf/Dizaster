@@ -31,6 +31,7 @@ pnpm install
 docker compose up -d db                 # o PostgreSQL local con postgis + h3
 cp services/core/.env.example services/core/.env
 pnpm db:migrate                         # con DATABASE_URL exportada
+NODE_USE_ENV_PROXY=1 pnpm geo:import    # índice geográfico abierto (data/geo/datasets.json, ~50 MB una vez)
 pnpm --filter @dizaster/core dev        # API en :8080
 pnpm --filter @dizaster/mobile start    # requiere development build (MapLibre no funciona en Expo Go)
 ```
