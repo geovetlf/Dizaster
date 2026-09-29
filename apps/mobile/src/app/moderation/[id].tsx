@@ -16,8 +16,17 @@ export default function CaseScreen() {
   const [error, setError] = useState<string | null>(null);
   const [presence, setPresence] = useState<PresenceReview | null>(null);
 
+  // Al abrir el caso se toma (ADR 0134); si otra persona lo tiene, se ve igual pero sin poder actuar. Al salir se suelta.
   useEffect(() => {
-    if (id) api.moderationCase(id).then(setC).catch((e: Error) => setError(e.message));
+    if (!id) return;
+    let claimed = false;
+    api.moderationClaim(id)
+      .then((d) => { claimed = true; setC(d); })
+      .catch((e: Error) => {
+        setError(e.message);
+        api.moderationCase(id).then(setC).catch(() => undefined);
+      });
+    return () => { if (claimed) void api.moderationRelease(id).catch(() => undefined); };
   }, [id]);
 
   async function apply(action: ModerationActionType) {

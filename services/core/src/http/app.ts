@@ -928,14 +928,24 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
   const requireModerator = (req: FastifyRequest) => requirePermission(req, "content.moderate");
   const requireVerifier = (req: FastifyRequest) => requirePermission(req, "event.verify");
   app.get("/v1/moderation/cases", async (req, reply) => {
-    await requireModerator(req);
+    const session = await requireModerator(req);
     reply.header("cache-control", "no-store");
-    return c.moderation.queue(req.query);
+    return c.moderation.queue(req.query, session.userId);
   });
   app.get("/v1/moderation/cases/:id", async (req, reply) => {
-    await requireModerator(req);
+    const session = await requireModerator(req);
     reply.header("cache-control", "no-store");
-    return c.moderation.caseDetail(parse(IdParam, req.params).id);
+    return c.moderation.caseDetail(parse(IdParam, req.params).id, session.userId);
+  });
+  // Tomar y soltar un caso (ADR 0134): evita que dos personas revisen lo mismo.
+  app.post("/v1/moderation/cases/:id/claim", async (req) => {
+    const session = await requireModerator(req);
+    return c.moderation.claim(parse(IdParam, req.params).id, session.userId);
+  });
+  app.delete("/v1/moderation/cases/:id/claim", async (req, reply) => {
+    const session = await requireModerator(req);
+    await c.moderation.release(parse(IdParam, req.params).id, session.userId);
+    return reply.status(204).send();
   });
   // Evidencia de presencia de un reporte (ADR 0089): POST porque cada consulta es un acto auditado con motivo.
   app.post("/v1/moderation/posts/:id/presence", async (req, reply) => {

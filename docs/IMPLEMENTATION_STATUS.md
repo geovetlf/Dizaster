@@ -324,6 +324,7 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | Cupos y reputación por teléfono (§5.20, §8.2, §12.2) | Cupo por hora contado por cuenta y por teléfono; teléfono con cuenta suspendida o 3 señales de manipulación en 30 días cuenta como LOW | [0131](adr/0131-cupos-y-reputacion-por-telefono.md) |
 | Límites sociales por confianza y tope diario de reportes (§13.3) | Publicaciones/h y comentarios/min según nivel (NEW la mitad, LOW un cuarto); tope diario = 4 × cupo por hora, por cuenta y teléfono | [0132](adr/0132-limites-por-nivel-de-confianza.md) |
 | Re-procesar el crudo guardado de las fuentes (§7.3) | `pnpm reprocess-source <clave> [desde] [hasta]`: última versión de cada ítem con la configuración actual, idempotente, corrida `REPROCESS`; GDACS y Copernicus ya no inventan fechas | [0133](adr/0133-reprocesar-el-crudo-de-las-fuentes.md) |
+| Tomar casos de moderación (§7.3) | Reserva de 15 min renovable; fuera de la cola ajena, 409 para actuar; vence sola y se suelta al cerrar; la app toma el caso al abrirlo | [0134](adr/0134-tomar-casos-de-moderacion.md) |
 | Licencias, auditoría, SBOM, Dependabot; respaldo con prueba de restauración en CI | ✅ | ADR 0070, `scripts/supply-chain.mjs`, `scripts/db-restore-check.mjs` |
 | Idioma de la app elegible en el perfil (es/en/pt/fr o del teléfono) | ✅ | ADR 0069, `app/language.tsx` |
 | Varias cuentas en un teléfono corroboran como una (clave seudónima del teléfono) | ✅ | ADR 0068, migración 0036 |
@@ -363,8 +364,7 @@ Revisión del Blueprint del 2026-09-29 (tras ADR 0112): completada con ADR 0113�
 
 Revisión del Blueprint del 2026-09-29 (tras ADR 0129), verificada contra el código, sin bloqueos:
 
-1. Asignación de casos de moderación: tomar y soltar con vencimiento (§7.3).
-2. Informe de transparencia agregado para administración (§13.3).
+1. Informe de transparencia agregado para administración (§13.3).
 
 Bloqueadas o en espera:
 

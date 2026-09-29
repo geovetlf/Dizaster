@@ -191,6 +191,9 @@ export const api = {
   moderationPresence: (postId: string, reason: string, caseId?: string) =>
     request<PresenceReview>(`/v1/moderation/posts/${postId}/presence`, { method: "POST", body: JSON.stringify({ reason, ...(caseId ? { caseId } : {}) }) }),
   moderationCase: (id: string) => request<CaseDetail>(`/v1/moderation/cases/${id}`),
+  /** Tomar un caso por 15 min (ADR 0134): nadie más actúa mientras tanto. */
+  moderationClaim: (id: string) => request<CaseDetail>(`/v1/moderation/cases/${id}/claim`, { method: "POST" }),
+  moderationRelease: (id: string) => request<void>(`/v1/moderation/cases/${id}/claim`, { method: "DELETE" }),
   moderationAct: (id: string, action: ModerationActionType, reason: string) =>
     request<CaseDetail>(`/v1/moderation/cases/${id}/actions`, { method: "POST", body: JSON.stringify({ action, reason }) }),
   appeals: () => request<{ appeals: AppealView[] }>("/v1/moderation/appeals"),

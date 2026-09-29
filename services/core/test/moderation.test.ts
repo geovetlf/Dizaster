@@ -192,3 +192,35 @@ describe("prioridad por verificación (ADR 0116)", () => {
     expect(verificationPriority("DISPUTED", 1000)).toBeGreaterThan(verificationPriority("COMMUNITY_CORROBORATED", 1000));
   });
 });
+
+describe("tomar casos (ADR 0134)", () => {
+  it("quien toma un caso lo tiene 15 min: las demás no lo ven ni actúan; vence solo y se suelta al cerrar", async () => {
+    const autor = await createUser(t, "autor_toma");
+    const vecino = await createUser(t, "vecino_toma");
+    const posted = await t.app.inject({ method: "POST", url: "/v1/posts", headers: auth(autor), payload: { text: "Publicación para tomar" } });
+    const id = posted.json().postId as string;
+    await flag(vecino, { targetType: "POST", targetId: id, reason: "SPAM" });
+    const caseId = (await queue()).cases.find((x) => x.target.id === id)!.id;
+    const claim = (u: TestUser) => t.app.inject({ method: "POST", url: `/v1/moderation/cases/${caseId}/claim`, headers: auth(u) });
+    const queueOf = async (u: TestUser) => ((await t.app.inject({ url: "/v1/moderation/cases?limit=50", headers: auth(u) })).json() as { cases: CaseSummary[] }).cases;
+
+    const mine = await claim(mod);
+    expect(mine.statusCode).toBe(200);
+    expect((mine.json() as CaseDetail).claim).toMatchObject({ mine: true });
+    expect((await queueOf(mod)).find((x) => x.id === caseId)?.claim?.mine).toBe(true);
+    expect((await queueOf(mod2)).some((x) => x.id === caseId)).toBe(false);
+    expect((await claim(mod2)).json()).toMatchObject({ error: "CASE_CLAIMED" });
+    expect((await act(mod2, caseId, "DISMISS")).statusCode).toBe(409);
+    // Soltar solo lo hace quien lo tiene.
+    await t.app.inject({ method: "DELETE", url: `/v1/moderation/cases/${caseId}/claim`, headers: auth(mod2) });
+    expect((await claim(mod2)).statusCode).toBe(409);
+
+    await t.c.db.query(`UPDATE moderation.cases SET claimed_until = now() - interval '1 minute' WHERE id = $1`, [caseId]);
+    expect((await queueOf(mod2)).find((x) => x.id === caseId)?.claim).toBeNull();
+    expect((await claim(mod2)).statusCode).toBe(200);
+    expect((await act(mod2, caseId, "DISMISS")).statusCode).toBe(200);
+    const closed = (await t.c.db.query(`SELECT status, claimed_by FROM moderation.cases WHERE id = $1`, [caseId])).rows[0];
+    expect(closed).toEqual({ status: "DISMISSED", claimed_by: null });
+    expect((await claim(mod)).json()).toMatchObject({ error: "CASE_CLOSED" });
+  });
+});

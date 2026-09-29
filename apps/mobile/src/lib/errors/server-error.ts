@@ -28,6 +28,8 @@ export const SERVER_ERROR_KEYS: Readonly<Record<string, MessageKey>> = {
   REASON_REQUIRED: "errReasonRequired",
   CONFLICT: "errConflict",
   ALREADY_DECIDED: "errConflict",
+  CASE_CLAIMED: "errCaseClaimed",
+  CASE_CLOSED: "errConflict",
   INTERNAL: "errInternal",
 };
 

@@ -61,7 +61,12 @@ export interface CaseSummary {
   target: ModerationTargetPreview;
   openedAt: string;
   updatedAt: string;
+  /** Quién lo está revisando (ADR 0134): solo si alguien lo tomó y no venció. Nunca se muestra quién es. */
+  claim: { mine: boolean; until: string } | null;
 }
+
+/** Minutos que dura tomar un caso; se renuevan al volver a tomarlo (ADR 0134). */
+export const CASE_CLAIM_MINUTES = 15;
 
 export interface ModerationActionView {
   id: string;

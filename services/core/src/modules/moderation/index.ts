@@ -1,4 +1,5 @@
 import {
+  CASE_CLAIM_MINUTES,
   AppealRequest,
   CaseQueueQuery,
   CreateFlagRequest,
@@ -203,9 +204,9 @@ export class ModerationService {
 
   // ───────────── Cola y casos (rol moderator) ─────────────
 
-  async queue(rawQuery: unknown): Promise<{ cases: CaseSummary[]; nextCursor: string | null }> {
+  async queue(rawQuery: unknown, viewerUserId: string | null = null): Promise<{ cases: CaseSummary[]; nextCursor: string | null }> {
     const f = parse(CaseQueueQuery, rawQuery);
-    const params: unknown[] = [f.status, f.limit];
+    const params: unknown[] = [f.status, f.limit, viewerUserId];
     let cursor = "";
     if (f.cursor) {
       const [p, at, id] = Buffer.from(f.cursor, "base64url").toString().split("|");
@@ -213,10 +214,13 @@ export class ModerationService {
       cursor = `AND (-priority, opened_at, id) > (-$${params.push(Number(p))}::real, $${params.push(at)}::timestamptz, $${params.push(id)}::uuid)`;
     }
     const { rows } = await this.db.query<{ id: string; priority: number; opened_at: Date }>(
-      `SELECT id, priority, opened_at FROM moderation.cases WHERE status = $1 ${cursor} ORDER BY priority DESC, opened_at, id LIMIT $2`,
+      // Lo que otra persona tomó y no venció no aparece en la cola (ADR 0134).
+      `SELECT id, priority, opened_at FROM moderation.cases
+        WHERE status = $1 AND (claimed_until IS NULL OR claimed_until <= now() OR claimed_by IS NOT DISTINCT FROM $3::uuid) ${cursor}
+        ORDER BY priority DESC, opened_at, id LIMIT $2`,
       params,
     );
-    const cases = await Promise.all(rows.map((r) => this.summary(this.db, r.id)));
+    const cases = await Promise.all(rows.map((r) => this.summary(this.db, r.id, viewerUserId)));
     const last = rows[rows.length - 1];
     return {
       cases,
@@ -224,8 +228,8 @@ export class ModerationService {
     };
   }
 
-  async caseDetail(caseId: string): Promise<CaseDetail> {
-    const base = await this.summary(this.db, caseId);
+  async caseDetail(caseId: string, viewerUserId: string | null = null): Promise<CaseDetail> {
+    const base = await this.summary(this.db, caseId, viewerUserId);
     const notes = await this.db.query<{ reason: FlagReason; note: string; created_at: Date }>(
       `SELECT reason, note, created_at FROM moderation.flags WHERE case_id = $1 AND note IS NOT NULL ORDER BY created_at DESC LIMIT 50`, [caseId],
     );
@@ -239,18 +243,45 @@ export class ModerationService {
   async act(caseId: string, moderatorUserId: string, raw: unknown): Promise<CaseDetail> {
     const a = parse(TakeActionRequest, raw);
     await withTransaction(this.db, async (tx) => {
-      const c = (await tx.query<{ target_type: FlagTargetType; target_id: string; status: CaseStatus }>(
-        `SELECT target_type, target_id, status FROM moderation.cases WHERE id = $1 FOR UPDATE`, [caseId],
+      const c = (await tx.query<{ target_type: FlagTargetType; target_id: string; status: CaseStatus; claimed_by: string | null; claimed_until: Date | null }>(
+        `SELECT target_type, target_id, status, claimed_by, claimed_until FROM moderation.cases WHERE id = $1 FOR UPDATE`, [caseId],
       )).rows[0];
       if (!c) throw notFound("Caso");
+      if (c.claimed_by && c.claimed_by !== moderatorUserId && c.claimed_until && c.claimed_until > new Date()) {
+        throw new DomainError("CASE_CLAIMED", "Otra persona está revisando este caso", 409);
+      }
       if (!ALLOWED[c.target_type].includes(a.action)) throw new DomainError("VALIDATION", `${a.action} no aplica a ${c.target_type}`);
       await this.apply(tx, { caseId, targetType: c.target_type, targetId: c.target_id, action: a.action, reason: a.reason, moderatorUserId });
       const closes = CLOSES[a.action];
       if (closes && c.status === "OPEN") {
-        await tx.query(`UPDATE moderation.cases SET status = $2, resolved_at = now(), resolved_by = $3, updated_at = now() WHERE id = $1`, [caseId, closes, moderatorUserId]);
+        await tx.query(`UPDATE moderation.cases SET status = $2, resolved_at = now(), resolved_by = $3, updated_at = now(), claimed_by = NULL, claimed_until = NULL WHERE id = $1`, [caseId, closes, moderatorUserId]);
       }
     });
-    return this.caseDetail(caseId);
+    return this.caseDetail(caseId, moderatorUserId);
+  }
+
+  /**
+   * Tomar un caso (ADR 0134): por `CASE_CLAIM_MINUTES`, renovable por quien lo tiene. Mientras tanto no aparece en la
+   * cola de las demás personas y nadie más puede actuar sobre él. Vence solo: nadie queda bloqueado si alguien se va.
+   */
+  async claim(caseId: string, moderatorUserId: string): Promise<CaseDetail> {
+    const r = await this.db.query(
+      `UPDATE moderation.cases SET claimed_by = $2, claimed_until = now() + make_interval(mins => $3)
+        WHERE id = $1 AND status = 'OPEN' AND (claimed_until IS NULL OR claimed_until <= now() OR claimed_by = $2)`,
+      [caseId, moderatorUserId, CASE_CLAIM_MINUTES],
+    );
+    if (r.rowCount === 0) {
+      const c = (await this.db.query<{ status: CaseStatus }>(`SELECT status FROM moderation.cases WHERE id = $1`, [caseId])).rows[0];
+      if (!c) throw notFound("Caso");
+      if (c.status !== "OPEN") throw new DomainError("CASE_CLOSED", "El caso ya está cerrado", 409);
+      throw new DomainError("CASE_CLAIMED", "Otra persona está revisando este caso", 409);
+    }
+    return this.caseDetail(caseId, moderatorUserId);
+  }
+
+  /** Soltar un caso tomado; solo quien lo tiene. */
+  async release(caseId: string, moderatorUserId: string): Promise<void> {
+    await this.db.query(`UPDATE moderation.cases SET claimed_by = NULL, claimed_until = NULL WHERE id = $1 AND claimed_by = $2`, [caseId, moderatorUserId]);
   }
 
   private async apply(
@@ -391,9 +422,11 @@ export class ModerationService {
     return id;
   }
 
-  private async summary(q: Queryable, caseId: string): Promise<CaseSummary> {
-    const c = (await q.query<{ id: string; status: CaseStatus; priority: number; target_type: FlagTargetType; target_id: string; opened_at: Date; updated_at: Date }>(
-      `SELECT id, status, priority, target_type, target_id, opened_at, updated_at FROM moderation.cases WHERE id = $1`, [caseId],
+  private async summary(q: Queryable, caseId: string, viewerUserId: string | null = null): Promise<CaseSummary> {
+    const c = (await q.query<{ id: string; status: CaseStatus; priority: number; target_type: FlagTargetType; target_id: string; opened_at: Date; updated_at: Date; claimed_by: string | null; claimed_until: Date | null }>(
+      `SELECT id, status, priority, target_type, target_id, opened_at, updated_at, claimed_by,
+              CASE WHEN claimed_until > now() THEN claimed_until END AS claimed_until
+         FROM moderation.cases WHERE id = $1`, [caseId],
     )).rows[0];
     if (!c) throw notFound("Caso");
     const reasons = await q.query<{ reason: FlagReason; n: number }>(`SELECT reason, count(*)::int AS n FROM moderation.flags WHERE case_id = $1 GROUP BY reason`, [caseId]);
@@ -403,6 +436,7 @@ export class ModerationService {
       flagCount: reasons.rows.reduce((s, r) => s + r.n, 0),
       reasons: Object.fromEntries(reasons.rows.map((r) => [r.reason, r.n])),
       openedAt: c.opened_at.toISOString(), updatedAt: c.updated_at.toISOString(),
+      claim: c.claimed_until ? { mine: c.claimed_by === viewerUserId, until: c.claimed_until.toISOString() } : null,
     };
   }
 

@@ -227,6 +227,7 @@ export const pt: Record<MessageKey, string> = {
   errEvidenceRequired: "Falta a evidência exigida",
   errReasonRequired: "Informe um motivo",
   errConflict: "Isso já mudou; atualize e tente novamente",
+  errCaseClaimed: "Outra pessoa está revisando este caso",
   errInternal: "Algo falhou no servidor; tente mais tarde",
   seenTooChip: "Eu também vejo",
   publishDelayed: "Por segurança, será publicado às",

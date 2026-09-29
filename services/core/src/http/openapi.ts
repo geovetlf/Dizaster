@@ -119,6 +119,8 @@ export const OPERATIONS: Record<string, Operation> = {
   "POST /v1/me/moderation/:id/appeal": { summary: "Apelar una decisión", body: C.AppealRequest },
   "GET /v1/moderation/cases": { summary: "Cola de casos (moderación)", query: C.CaseQueueQuery },
   "GET /v1/moderation/cases/:id": { summary: "Detalle de un caso" },
+  "POST /v1/moderation/cases/:id/claim": { summary: "Tomar un caso por 15 min (renovable); las demás personas no lo ven en su cola" },
+  "DELETE /v1/moderation/cases/:id/claim": { summary: "Soltar un caso tomado" },
   "GET /v1/me/mfa": { summary: "Estado del segundo factor (personal)" },
   "POST /v1/me/mfa/totp": { summary: "Generar un autenticador TOTP (personal)" },
   "POST /v1/me/mfa/totp/confirm": { summary: "Confirmar el autenticador y recibir códigos de recuperación", body: C.MfaCodeRequest },
