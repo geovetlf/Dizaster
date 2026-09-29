@@ -26,3 +26,23 @@ export const AppConfig = z.object({
   referenceVersions: z.object({ categories: z.string(), emergencyNumbers: z.string() }),
 });
 export type AppConfig = z.infer<typeof AppConfig>;
+
+/**
+ * Atribución de datos de terceros (pantalla "Acerca de", Blueprint §11.3). ODbL exige mostrar "© OpenStreetMap
+ * contributors"; cada dataset o fuente lleva su licencia. La lista la arma el servidor: cambia con los datos.
+ */
+export const AttributionKind = z.enum(["MAP", "GEO", "TIMEZONE", "SOURCE"]);
+export type AttributionKind = z.infer<typeof AttributionKind>;
+
+export const Attribution = z.object({
+  id: z.string(),
+  kind: AttributionKind,
+  name: z.string(),
+  attribution: z.string(),
+  license: z.string(),
+  url: z.string().nullable(),
+});
+export type Attribution = z.infer<typeof Attribution>;
+
+export const AttributionsResponse = z.object({ attributions: z.array(Attribution) });
+export type AttributionsResponse = z.infer<typeof AttributionsResponse>;

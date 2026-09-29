@@ -2,11 +2,12 @@ import Fastify, { type FastifyInstance, type FastifyRequest } from "fastify";
 import { z } from "zod";
 import {
   BBox, CreateCommentRequest, DevicePlatform, MEDIA_UPLOAD_LIMITS, MergeEventsRequest, NegativeState, ReactionKind, CommentReactionKind, ConfirmAgeRequest, RegisterPushTokenRequest, RevertMergeRequest,
-  SplitEventRequest, DATA_EXPORT_FORMAT, type AppConfig, type DataExport, type EmergencyNumbersResponse,
+  SplitEventRequest, DATA_EXPORT_FORMAT, type AppConfig, type Attribution, type AttributionsResponse, type DataExport, type EmergencyNumbersResponse,
 } from "@dizaster/contracts";
 import { LocalDiskStorage } from "../modules/media/index.js";
 import type { Container } from "../container.js";
 import { withWarning } from "../modules/feed/index.js";
+import { TIMEZONE_ATTRIBUTION } from "../modules/geo/index.js";
 import { withTransaction } from "../platform/db.js";
 import { DomainError, forbidden } from "../platform/errors.js";
 import { latencyMetric } from "../platform/metrics.js";
@@ -147,6 +148,20 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
   app.get("/v1/geo/datasets", async (_req, reply) => {
     reply.header("cache-control", "public, max-age=86400");
     return { datasets: await c.geo.datasets(c.db) };
+  });
+
+  // "Acerca de / licencias" (§11.3): mapa (ODbL), datasets geográficos importados, zonas horarias y fuentes activas.
+  app.get("/v1/about/attributions", async (_req, reply): Promise<AttributionsResponse> => {
+    const attributions: Attribution[] = [
+      { id: c.env.MAP_PROVIDER_ID, kind: "MAP", name: c.env.MAP_PROVIDER_ID, attribution: c.env.MAP_ATTRIBUTION, license: "ODbL 1.0", url: "https://www.openstreetmap.org/copyright" },
+      ...(await c.geo.datasets(c.db)).map((d): Attribution => ({ id: d.id, kind: "GEO", name: d.source, attribution: d.attribution, license: d.license, url: null })),
+      { ...TIMEZONE_ATTRIBUTION, kind: "TIMEZONE" },
+      ...c.ref.sources
+        .filter((s) => s.status === "ACTIVE")
+        .map((s): Attribution => ({ id: String(s.key), kind: "SOURCE", name: String(s.name), attribution: String(s.name), license: String(s.license ?? ""), url: typeof s.termsUrl === "string" ? s.termsUrl : null })),
+    ];
+    reply.header("cache-control", "public, max-age=86400");
+    return { attributions };
   });
 
   // ───────────── Identidad (solo proveedor DEV en esta etapa) ─────────────

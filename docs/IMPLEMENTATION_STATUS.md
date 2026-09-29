@@ -251,14 +251,14 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | Fotos procesadas después del reporte suman su hash al evento | ✅ | `MediaReady.phash`, `event.media-fingerprint` |
 | Edad mínima de 16 años sin guardar la fecha de nacimiento (D-13) | ✅ | ADR 0049, `POST /v1/me/age` |
 | Zona horaria por polígonos de timezone-boundary-builder (§5.5) | ✅ | ADR 0050, `geo/timezone.ts` |
+| Pantalla "Acerca de / licencias" con atribuciones ODbL (§11.3) | ✅ | ADR 0051, `GET /v1/about/attributions`, `app/about.tsx` |
 
 ## Siguiente etapa (en orden)
 
 Revisión del Blueprint del 2026-09-29 (tras ADR 0042), verificada contra el código:
 
-1. Pantalla "Acerca de / licencias" con atribuciones ODbL (§11.3).
-2. Observabilidad OpenTelemetry y contrato OpenAPI (§5.22, §4.3).
-3. Moderación: cambiar el ciclo de vida de un evento; menciones y bloqueo de negocios.
+1. Observabilidad OpenTelemetry y contrato OpenAPI (§5.22, §4.3).
+2. Moderación: cambiar el ciclo de vida de un evento; menciones y bloqueo de negocios.
 
 Bloqueadas o en espera:
 

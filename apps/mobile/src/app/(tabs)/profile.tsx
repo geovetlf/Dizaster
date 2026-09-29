@@ -74,6 +74,7 @@ export default function ProfileScreen() {
         <Row icon="cellphone-lock" label={t("sessionsTitle")} onPress={() => router.push("/sessions")} />
         <Row icon="download-outline" label={t("exportData")} value={exporting ? t("exportPreparing") : undefined} onPress={() => void onExport()} />
         <Row icon="account-remove-outline" label={t("deleteAccount")} onPress={() => router.push("/delete-account")} />
+        <Row icon="information-outline" label={t("aboutTitle")} onPress={() => router.push("/about")} />
         <Text style={styles.note}>{t("privacyNote")}</Text>
         <Text style={styles.version}>Dizaster {Application.nativeApplicationVersion ?? ""}</Text>
       </ScrollView>
@@ -81,7 +82,7 @@ export default function ProfileScreen() {
   );
 }
 
-function Row({ icon, label, value, onPress }: { icon: "account-circle-outline" | "bell-outline" | "cloud-upload-outline" | "phone-alert" | "chart-bar" | "gauge" | "storefront-outline" | "cellphone-lock" | "gavel" | "shield-check-outline" | "account-remove-outline" | "download-outline" | "account-edit-outline"; label: string; value?: string; onPress?: () => void }) {
+function Row({ icon, label, value, onPress }: { icon: "account-circle-outline" | "bell-outline" | "cloud-upload-outline" | "phone-alert" | "chart-bar" | "gauge" | "storefront-outline" | "cellphone-lock" | "gavel" | "shield-check-outline" | "account-remove-outline" | "download-outline" | "account-edit-outline" | "information-outline"; label: string; value?: string; onPress?: () => void }) {
   return (
     <Pressable accessibilityRole={onPress ? "button" : "text"} disabled={!onPress} style={styles.row} onPress={onPress}>
       <Icon name={icon} size={22} color={colors.text} />

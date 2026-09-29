@@ -45,3 +45,12 @@ export function resolveTimezone(point: GeoPoint, countryZones: readonly string[]
   if (countryZones?.length === 1) return countryZones[0]!;
   return polygons.at(point);
 }
+
+/** Atribución de los polígonos de zona horaria (se muestra en "Acerca de"). */
+export const TIMEZONE_ATTRIBUTION = {
+  id: "timezone-boundary-builder",
+  name: "timezone-boundary-builder",
+  attribution: "© OpenStreetMap contributors; timezone-boundary-builder (Evan Siroky)",
+  license: "ODbL 1.0",
+  url: "https://github.com/evansiroky/timezone-boundary-builder",
+} as const;

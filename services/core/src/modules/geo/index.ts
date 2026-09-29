@@ -13,7 +13,7 @@ import { polygonTimezones, resolveTimezone, type TimezoneLocator } from "./timez
 export { importDataset, loadManifest, type DatasetSpec, type GeoManifest, type ImportResult } from "./importer.js";
 export { MAX_GRANULARITY, labelFor, toContextualLocation, type ResolvedContext } from "./context.js";
 export { searchKey, titleCaseEs } from "./names.js";
-export { polygonTimezones, resolveTimezone, type TimezoneLocator } from "./timezone.js";
+export { TIMEZONE_ATTRIBUTION, polygonTimezones, resolveTimezone, type TimezoneLocator } from "./timezone.js";
 
 /** Tolerancia para puntos que caen justo fuera de un polígono simplificado (costa, bordes): ~2 km. */
 const EDGE_TOLERANCE_DEG = 0.02;
