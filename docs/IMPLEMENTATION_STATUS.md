@@ -228,6 +228,8 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | Área | Estado | Dónde |
 |---|---|---|
 | Huella del EVENT: palabras clave y hashes de fotos, acotados | ✅ | `event.events.keywords/media_hashes`, ADR 0030 |
+| Spam coordinado: mismo texto de ≥ 3 cuentas en 24 h → cola de moderación | ✅ | `social.posts.text_hash`, ADR 0031 |
+| Reputación baja resta 12 h en "Para ti" (proyección `trust.standing` → `profiles.low_trust`) | ✅ | ADR 0031 |
 | Reglas `dedup-2` con `sim_media` y `sim_texto` reales | ✅ | `packages/geo-kit/src/dedup.ts` |
 | Fotos procesadas después del reporte suman su hash al evento | ✅ | `MediaReady.phash`, `event.media-fingerprint` |
 
@@ -235,8 +237,7 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 
 1. **BLOQUEADA** — Identity real: Sign in with Apple, Google y email; App Attest / Play Integrity. Falta: cuentas de
    Apple Developer y Google (client IDs, Service ID, Team ID) y un proveedor de email aprobado (gasto).
-2. Reputación en la visibilidad del feed y detección de textos idénticos (spam coordinado).
-3. Póster de video (miniatura generada en el dispositivo; el servidor no tiene ffmpeg y no se añade).
+2. Póster de video (miniatura generada en el dispositivo; el servidor no tiene ffmpeg y no se añade).
 
 ## Requiere acción humana
 

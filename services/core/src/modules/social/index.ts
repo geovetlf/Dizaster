@@ -1,6 +1,7 @@
-import { extractMentions, extractTags, type CommentView, type FeedTab, type GeoPoint, type PostAuthor, type ProfileSearchResult, type ProfileView, type TagView } from "@dizaster/contracts";
+import { createHash } from "node:crypto";
+import { extractMentions, extractTags, textFingerprintBase, type CommentView, type FeedTab, type GeoPoint, type PostAuthor, type ProfileSearchResult, type ProfileView, type TagView } from "@dizaster/contracts";
 import type { Queryable } from "../../platform/db.js";
-import type { OutboxDispatcher } from "../../platform/outbox.js";
+import { publish, type OutboxDispatcher } from "../../platform/outbox.js";
 import { DomainError, notFound } from "../../platform/errors.js";
 import { newId } from "../../platform/ids.js";
 
@@ -73,7 +74,12 @@ export const RANK_BOOST_HOURS = {
   perSeverityStep: 1.5,
   distance: [[1000, 6], [5000, 4], [25_000, 2]] as const,
   followedAuthor: 4,
+  /** Autor con reputación baja (ADR 0031): sigue visible, pero medio día detrás en "Para ti". */
+  lowTrustAuthor: -12,
 };
+
+/** Mismo texto de al menos tantas cuentas distintas dentro de la ventana → a revisión humana como posible spam. */
+export const DUPLICATE_TEXT = { minAuthors: 3, windowHours: 24, maxPosts: 50 } as const;
 
 function rankSql(nearSql: string | null): string {
   const B = RANK_BOOST_HOURS;
@@ -87,7 +93,8 @@ function rankSql(nearSql: string | null): string {
     + ${distance}
     + CASE WHEN p.author_visibility = 'PUBLIC' AND EXISTS (
         SELECT 1 FROM social.follows fa WHERE fa.follower_profile_id = $2 AND fa.target_type = p.author_type AND fa.target_id = p.author_id::text)
-      THEN ${B.followedAuthor} ELSE 0 END`;
+      THEN ${B.followedAuthor} ELSE 0 END
+    + CASE WHEN p.author_type = 'PROFILE' AND pr.low_trust THEN ${B.lowTrustAuthor} ELSE 0 END`;
 }
 
 export class SocialService {
@@ -95,6 +102,9 @@ export class SocialService {
     dispatcher.on("AccountDeleted", "social.anonymize-account", async (e, tx) => {
       await this.anonymizeProfile(tx, e.payload.profileId);
       await this.deleteBusinessesOf(tx, e.payload.userId);
+    });
+    dispatcher.on("AuthorStandingChanged", "social.author-standing", async (e, tx) => {
+      await tx.query(`UPDATE social.profiles SET low_trust = $2 WHERE user_id = $1`, [e.payload.userId, e.payload.lowTrust]);
     });
   }
 
@@ -153,14 +163,33 @@ export class SocialService {
 
   async createPost(tx: Queryable, input: CreatePostInput): Promise<string> {
     const id = newId();
+    const base = textFingerprintBase(input.text);
+    const textHash = base ? createHash("sha256").update(base).digest("hex") : null;
     await tx.query(
-      `INSERT INTO social.posts (id, author_type, author_id, kind, author_visibility, text, category_code, public_point)
+      `INSERT INTO social.posts (id, author_type, author_id, kind, author_visibility, text, category_code, public_point, text_hash)
        VALUES ($1, $9, $2, $3, $4, $5, $8,
-               CASE WHEN $6::float8 IS NULL THEN NULL ELSE ST_SetSRID(ST_MakePoint($6, $7), 4326)::geography END)`,
+               CASE WHEN $6::float8 IS NULL THEN NULL ELSE ST_SetSRID(ST_MakePoint($6, $7), 4326)::geography END, $10)`,
       [id, input.businessId ?? input.authorProfileId, input.kind, input.businessId ? "PUBLIC" : input.authorVisibility, input.text,
-        input.publicPoint?.lng ?? null, input.publicPoint?.lat ?? null, input.categoryCode ?? null, input.businessId ? "BUSINESS" : "PROFILE"],
+        input.publicPoint?.lng ?? null, input.publicPoint?.lat ?? null, input.categoryCode ?? null, input.businessId ? "BUSINESS" : "PROFILE", textHash],
     );
+    if (textHash) await this.detectDuplicateText(tx, textHash);
     return id;
+  }
+
+  /**
+   * Spam coordinado (ADR 0031): si varias cuentas distintas publican el mismo texto en pocas horas, todos esos
+   * posts van a la cola de moderación. Nada se oculta solo: decide una persona (un aviso real reenviado de
+   * buena fe también coincide).
+   */
+  private async detectDuplicateText(tx: Queryable, textHash: string): Promise<void> {
+    const { rows } = await tx.query<{ ids: string[]; authors: number }>(
+      `SELECT (array_agg(id ORDER BY created_at DESC))[1:$3] AS ids, count(DISTINCT (author_type, author_id))::int AS authors
+         FROM social.posts
+        WHERE text_hash = $1 AND created_at > now() - make_interval(hours => $2) AND deleted_at IS NULL`,
+      [textHash, DUPLICATE_TEXT.windowHours, DUPLICATE_TEXT.maxPosts],
+    );
+    const r = rows[0];
+    if (r && r.authors >= DUPLICATE_TEXT.minAuthors) await publish(tx, "DuplicateTextDetected", { postIds: r.ids });
   }
 
   /** Adjunta media (ya validada por el Media Engine) a un post. Una media solo puede pertenecer a un post. */

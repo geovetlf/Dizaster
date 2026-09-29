@@ -79,6 +79,12 @@ export class ModerationService {
         await this.systemFlag(tx, "POST", postId, "FALSE_INFO", "Regla: una foto es casi idéntica a otra publicada antes por otra cuenta (posible foto reciclada).");
       }
     });
+    // Mismo texto desde varias cuentas en pocas horas (ADR 0031): cada post entra en la cola, sin ocultarse solo.
+    dispatcher.on("DuplicateTextDetected", "moderation.duplicate-text", async (e, tx) => {
+      for (const postId of e.payload.postIds) {
+        await this.systemFlag(tx, "POST", postId, "SPAM", "Regla: el mismo texto fue publicado por varias cuentas distintas en pocas horas (posible spam coordinado).");
+      }
+    });
   }
 
   /** Señal automática: entra en la cola como una denuncia más, pero nunca cuenta para el límite automático. */

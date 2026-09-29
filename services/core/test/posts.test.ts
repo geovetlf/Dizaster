@@ -1,8 +1,10 @@
-import { createHash } from "node:crypto";
-import { extractMentions, extractTags, normalizeTag, segmentText, type FeedResponse, type MyFollows, type TagView } from "@dizaster/contracts";
+import { createHash, randomUUID } from "node:crypto";
+import { extractMentions, extractTags, normalizeTag, segmentText, textFingerprintBase, type FeedResponse, type MyFollows, type TagView } from "@dizaster/contracts";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createTestContext, createUser, LIMA, reportBody, submit, type TestContext, type TestUser } from "./helpers.js";
 import { makeJpeg } from "./media-fixtures.js";
+import { withTransaction } from "../src/platform/db.js";
+import { publish } from "../src/platform/outbox.js";
 
 describe("etiquetas y menciones en el texto", () => {
   it("extrae etiquetas canónicas sin tildes y menciones en minúsculas", () => {
@@ -135,5 +137,69 @@ describe("publicar sin reporte", () => {
       [spam.profileId],
     );
     expect((await post(spam, { text: "uno más" })).statusCode).toBe(429);
+  });
+});
+
+describe("spam coordinado y reputación baja (ADR 0031)", () => {
+  let t: TestContext;
+  const auth = (u: TestUser) => ({ authorization: `Bearer ${u.token}` });
+  const post = async (u: TestUser, text: string) => {
+    const res = await t.app.inject({ method: "POST", url: "/v1/posts", headers: auth(u), payload: { text } });
+    expect(res.statusCode, res.body).toBe(201);
+    return (res.json() as { postId: string }).postId;
+  };
+  const spamFlags = async () =>
+    (await t.c.db.query<{ target_id: string }>(`SELECT target_id FROM moderation.flags WHERE reason = 'SPAM' ORDER BY target_id`)).rows.map((r) => r.target_id);
+
+  beforeAll(async () => {
+    t = await createTestContext();
+  });
+  afterAll(async () => t.close());
+
+  it("la huella ignora mayúsculas, tildes, signos y espacios; los textos cortos no cuentan", () => {
+    expect(textFingerprintBase("¡Donen AQUÍ ya, cuenta 123 del banco solidario!")).toBe(textFingerprintBase("donen aqui ya cuenta 123 del banco solidario 🙏"));
+    expect(textFingerprintBase("Ayuda por favor")).toBeNull();
+  });
+
+  it("el mismo texto de tres cuentas distintas en pocas horas va a moderación; nada se oculta solo", async () => {
+    const [u1, u2, u3, u4] = await Promise.all(["spam1", "spam2", "spam3", "corto"].map((n) => createUser(t, n)));
+    const p1 = await post(u1!, "Donen aquí YA: cuenta 123-456 del banco solidario");
+    const p1b = await post(u1!, "donen aqui ya cuenta 123456 del banco solidario");
+    const p2 = await post(u2!, "¡Donen aquí ya! Cuenta 123 456, del banco solidario");
+    await t.c.dispatcher.drain();
+    expect(await spamFlags()).toEqual([]);
+    const p3 = await post(u3!, "Donen aquí ya cuenta 123456 del banco solidario 🙏");
+    for (const u of [u2!, u3!, u4!]) await post(u, "Ayuda por favor");
+    await t.c.dispatcher.drain();
+    expect(await spamFlags()).toEqual([p1, p1b, p2, p3].sort());
+    const visible = await t.c.db.query(`SELECT 1 FROM social.posts WHERE id = ANY($1) AND moderation_state = 'VISIBLE'`, [[p1, p2, p3]]);
+    expect(visible.rowCount).toBe(3);
+  });
+
+  it("un autor con reputación baja sigue visible pero queda detrás en Para ti; al revertirse la sanción vuelve", async () => {
+    const [lector, dora, eva] = await Promise.all(["lector", "dora", "eva"].map((n) => createUser(t, n, 24 * 40)));
+    const doraPost = await post(dora!, "Corte de agua en mi cuadra desde la mañana");
+    const evaPost = await post(eva!, "Semáforo apagado en la esquina del mercado");
+    const order = async () => {
+      const feed = (await t.app.inject({ url: "/v1/feed?tab=for_you", headers: auth(lector!) })).json() as FeedResponse;
+      return feed.posts.map((p) => p.id).filter((id) => id === doraPost || id === evaPost);
+    };
+    expect(await order()).toEqual([evaPost, doraPost]);
+
+    const sanction = (actionId: string, action: string, reverses: string | null = null) =>
+      withTransaction(t.c.db, (tx) => publish(tx, "ModerationActionTaken", { actionId, targetType: "POST", targetId: randomUUID(), action, actor: "MODERATOR", affectedUserId: eva!.userId, reverses }));
+    const first = randomUUID();
+    await sanction(first, "REMOVE");
+    await sanction(randomUUID(), "HIDE");
+    await t.c.dispatcher.drain();
+    const low = async () => (await t.c.db.query<{ low_trust: boolean }>(`SELECT low_trust FROM social.profiles WHERE id = $1`, [eva!.profileId])).rows[0]!.low_trust;
+    expect(await low()).toBe(true);
+    expect(await order()).toEqual([doraPost, evaPost]);
+
+    await sanction(randomUUID(), "RESTORE", first);
+    await t.c.dispatcher.drain();
+    expect(await low()).toBe(false);
+    expect(await order()).toEqual([evaPost, doraPost]);
+    expect(await t.c.trust.refreshStanding()).toEqual({ checked: 0, changed: 0 });
   });
 });

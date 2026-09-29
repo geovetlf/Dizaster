@@ -1,5 +1,5 @@
-import type { Db, Queryable } from "../../platform/db.js";
-import type { OutboxDispatcher } from "../../platform/outbox.js";
+import { withTransaction, type Db, type Queryable } from "../../platform/db.js";
+import { publish, type OutboxDispatcher } from "../../platform/outbox.js";
 import type { EventService } from "../event/index.js";
 import type { IdentityService } from "../identity/index.js";
 import { TIER_WEIGHT, TRUST, coordinatedWeights, reportQuota, tierFor, type ReputationSignals, type TrustTier } from "./rules.js";
@@ -26,14 +26,18 @@ export class TrustService {
   registerHandlers(dispatcher: OutboxDispatcher): void {
     dispatcher.on("EventEvidenceAdded", "trust.record-contribution", async (e, tx) => {
       const data = await this.events.evidenceForVerification(tx, e.payload.eventId);
+      const added: string[] = [];
       for (const ev of data.evidence) {
         if (ev.trustTier !== "CITIZEN" || !ev.contributorUserId) continue;
-        await tx.query(
+        const r = await tx.query(
           `INSERT INTO trust.contributions (user_id, event_id, assertion, created_at) VALUES ($1, $2, $3, $4)
            ON CONFLICT (user_id, event_id) DO NOTHING`,
           [ev.contributorUserId, e.payload.eventId, ev.assertion, ev.observedAt],
         );
+        if (r.rowCount) added.push(ev.contributorUserId);
       }
+      // Un reporte que llega a un evento ya desmentido cuenta en ese momento.
+      if (added.length > 0) await this.updateStanding(tx, added);
     });
 
     // Cómo terminó el evento decide si cada reporte fue acertado (también los que lleguen después).
@@ -44,16 +48,56 @@ export class TrustService {
          ON CONFLICT (event_id) DO UPDATE SET outcome = $2, updated_at = now()`,
         [e.payload.eventId, outcome],
       );
+      const { rows } = await tx.query<{ user_id: string }>(`SELECT user_id FROM trust.contributions WHERE event_id = $1`, [e.payload.eventId]);
+      await this.updateStanding(tx, rows.map((r) => r.user_id));
     });
 
     dispatcher.on("ModerationActionTaken", "trust.record-sanction", async (e, tx) => {
       const p = e.payload;
-      if (p.reverses) await tx.query(`UPDATE trust.sanctions SET reversed_at = now() WHERE action_id = $1 AND reversed_at IS NULL`, [p.reverses]);
+      if (p.reverses) {
+        const r = await tx.query<{ user_id: string }>(
+          `UPDATE trust.sanctions SET reversed_at = now() WHERE action_id = $1 AND reversed_at IS NULL RETURNING user_id`, [p.reverses],
+        );
+        await this.updateStanding(tx, r.rows.map((x) => x.user_id));
+      }
       if (p.actor !== "MODERATOR" || !p.affectedUserId || !SANCTIONS.has(p.action)) return;
       await tx.query(
         `INSERT INTO trust.sanctions (action_id, user_id, action) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`,
         [p.actionId, p.affectedUserId, p.action],
       );
+      await this.updateStanding(tx, [p.affectedUserId]);
+    });
+  }
+
+  /**
+   * Proyección "reputación baja sí/no" (ADR 0031) para que el feed ordene sin leer este esquema. Solo publica
+   * cuando cambia; quien nunca estuvo en LOW no ocupa fila.
+   */
+  async updateStanding(q: Queryable, userIds: string[]): Promise<number> {
+    const unique = [...new Set(userIds)];
+    if (unique.length === 0) return 0;
+    const tiers = await this.tiers(q, unique);
+    const { rows } = await q.query<{ user_id: string; low: boolean }>(`SELECT user_id, low FROM trust.standing WHERE user_id = ANY($1)`, [unique]);
+    const current = new Map(rows.map((r) => [r.user_id, r.low]));
+    let changed = 0;
+    for (const u of unique) {
+      const low = tiers.get(u) === "LOW";
+      if ((current.get(u) ?? false) === low) continue;
+      await q.query(
+        `INSERT INTO trust.standing (user_id, low) VALUES ($1, $2) ON CONFLICT (user_id) DO UPDATE SET low = $2, updated_at = now()`,
+        [u, low],
+      );
+      await publish(q, "AuthorStandingChanged", { userId: u, lowTrust: low });
+      changed++;
+    }
+    return changed;
+  }
+
+  /** Tarea diaria: las sanciones caducan a los 90 días, así que quien está en LOW puede dejar de estarlo sin evento. */
+  async refreshStanding(): Promise<{ checked: number; changed: number }> {
+    return withTransaction(this.db, async (tx) => {
+      const { rows } = await tx.query<{ user_id: string }>(`SELECT user_id FROM trust.standing WHERE low`);
+      return { checked: rows.length, changed: await this.updateStanding(tx, rows.map((r) => r.user_id)) };
     });
   }
 

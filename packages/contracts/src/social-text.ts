@@ -102,3 +102,16 @@ export interface TagView {
   followerCount: number;
   followedByMe: boolean;
 }
+
+/** Textos más cortos que esto ("ayuda", "se cayó") coinciden de buena fe y no cuentan como spam. */
+export const TEXT_FINGERPRINT_MIN_CHARS = 25;
+
+/**
+ * Forma canónica para detectar el mismo mensaje pegado por varias cuentas (ADR 0031): sin tildes, minúsculas y
+ * solo letras y números, así cambiar espacios, signos, emojis o mayúsculas no lo esconde. Null si es muy corto.
+ */
+export function textFingerprintBase(text: string | null | undefined): string | null {
+  if (!text) return null;
+  const base = text.normalize("NFKD").replace(/\p{M}/gu, "").toLowerCase().replace(/[^\p{L}\p{N}]/gu, "");
+  return base.length >= TEXT_FINGERPRINT_MIN_CHARS ? base : null;
+}
