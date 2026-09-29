@@ -188,6 +188,8 @@ export const pt: Record<MessageKey, string> = {
   upholdAppeal: "Manter",
   reverseAppeal: "Reverter",
   myModeration: "Avisos de moderação",
+  why_EXTERNAL_DENIAL: "Uma fonte externa diz que não ocorreu: em disputa.",
+  why_EXTERNAL_DENIAL_NAMED: "Uma fonte externa diz que não ocorreu: {sources}, {at}.",
   adminDelays: "Atraso de publicação",
   delayHint: "Minutos que a publicação pública espera em categorias muito sensíveis. O relato é recebido e salvo na hora.",
   delayCatalog: "catálogo",

@@ -37,8 +37,15 @@ describe("explicación completa", () => {
     ]);
   });
 
+  it("negación de una fuente externa (ADR 0115)", () => {
+    const lines = explainLines({
+      explanation: [{ code: "EXTERNAL_DENIAL", params: { count: 1, sources: "USGS", at: "2026-09-29T15:00:00Z" } }],
+    }, es as never, hhmm);
+    expect(lines).toEqual(["Una fuente externa dice que no ocurrió: USGS, 15:00."]);
+  });
+
   it("las cuatro lenguas tienen todas las líneas nuevas", () => {
-    const keys = ["why_CITIZEN_WINDOW", "why_EXTERNAL_NAMED", "why_OFFICIAL_NAMED", "why_OFFICIAL_DENIAL_NAMED", "why_MARKED_FALSE", "why_DISPUTED", "why_NOT_OFFICIAL_YET"];
+    const keys = ["why_CITIZEN_WINDOW", "why_EXTERNAL_NAMED", "why_OFFICIAL_NAMED", "why_OFFICIAL_DENIAL_NAMED", "why_EXTERNAL_DENIAL", "why_EXTERNAL_DENIAL_NAMED", "why_MARKED_FALSE", "why_DISPUTED", "why_NOT_OFFICIAL_YET"];
     for (const lang of ["es", "en", "pt", "fr"] as const) { setLang(lang); for (const k of keys) expect(t(k as MessageKey), `${lang}.${k}`).toBeTruthy(); }
     setLang("es");
   });

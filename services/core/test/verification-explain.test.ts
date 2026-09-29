@@ -50,6 +50,7 @@ describe("explicación de verificación", () => {
   it("líneas de estado y fuentes", () => {
     expect(withStateLines([], "UNVERIFIED", "FALSE").map((e) => e.code)).toEqual(["MARKED_FALSE"]);
     expect(withStateLines([{ code: "OFFICIAL_DENIAL", params: {} }], "UNVERIFIED", "FALSE").map((e) => e.code)).toEqual(["OFFICIAL_DENIAL"]);
+    expect(withStateLines([{ code: "EXTERNAL_DENIAL", params: {} }], "EXTERNALLY_CORROBORATED", "DISPUTED").map((e) => e.code)).toEqual(["EXTERNAL_DENIAL", "NOT_OFFICIAL_YET"]);
     expect(withStateLines([{ code: "NOT_OFFICIAL_YET", params: {} }], "COMMUNITY_CORROBORATED", "DISPUTED").map((e) => e.code)).toEqual(["DISPUTED", "NOT_OFFICIAL_YET"]);
     const at = (h: number) => new Date(Date.UTC(2026, 8, 29, h));
     expect(sourceParams([

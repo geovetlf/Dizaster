@@ -16,7 +16,7 @@ import type { TrustService } from "../trust/index.js";
 import type { IngestionService } from "../ingestion/index.js";
 import type { ReferenceData } from "../reference/index.js";
 
-export const VERIFICATION_RULES_VERSION = "verification-3";
+export const VERIFICATION_RULES_VERSION = "verification-4";
 
 /** Parámetros anti-abuso de la versión de reglas. El peso de cada persona lo da Trust (ADR 0023). */
 const RULES = {
@@ -109,6 +109,9 @@ export class VerificationService {
     const officialConfirm = nonCitizen.filter((e) => registered.get(e.refId)?.trustTier === "OFFICIAL" && e.assertion === "OCCURRING");
     const officialDeny = nonCitizen.filter((e) => registered.get(e.refId)?.trustTier === "OFFICIAL" && e.assertion === "NOT_OCCURRING");
     const external = nonCitizen.filter((e) => registered.get(e.refId)?.trustTier === "EXTERNAL" && e.assertion === "OCCURRING");
+    // verification-4 (ADR 0115): una fuente externa registrada que dice "no ocurrió" (p. ej. USGS borra un sismo) pone
+    // el evento en disputa. Nunca FALSE: eso queda para fuentes oficiales y moderación.
+    const externalDeny = nonCitizen.filter((e) => registered.get(e.refId)?.trustTier === "EXTERNAL" && e.assertion === "NOT_OCCURRING");
 
     const windowMinutes = category?.dedupWindowMinutes ?? 360;
     const confirm = await this.independentWeight(tx, eventId, data.evidence.filter((e) => e.trustTier === "CITIZEN" && e.assertion === "OCCURRING"), windowMinutes);
@@ -141,6 +144,9 @@ export class VerificationService {
       negative = "FALSE"; // solo moderación puede revertir un FALSE
     } else if (officialConfirm.length > 0) {
       negative = "NONE"; // una confirmación oficial prevalece sobre una disputa ciudadana
+    } else if (externalDeny.length > 0) {
+      negative = "DISPUTED";
+      ruleId = "external-denial";
     } else if (denyWeight >= RULES.disputeMinDeniers && denyWeight >= RULES.disputeRatio * confirmWeight) {
       negative = "DISPUTED";
       ruleId = "citizen-dispute";
@@ -155,6 +161,7 @@ export class VerificationService {
     const sources = (items: EvidenceForVerification[]) => sourceParams(items.map((e) => registered.get(e.refId)!));
     if (external.length) explanation.push({ code: "EXTERNAL_SOURCES", params: sources(external) });
     if (officialConfirm.length) explanation.push({ code: "OFFICIAL_CONFIRMATION", params: sources(officialConfirm) });
+    if (externalDeny.length) explanation.push({ code: "EXTERNAL_DENIAL", params: sources(externalDeny) });
     if (officialDeny.length) explanation.push({ code: "OFFICIAL_DENIAL", params: sources(officialDeny) });
 
     return {
@@ -375,7 +382,8 @@ export function withStateLines(base: readonly VerificationExplanation[], level: 
   const out = base.filter((e) => !STATE_CODES.has(e.code));
   const officialDenial = out.some((e) => e.code === "OFFICIAL_DENIAL");
   if (negative === "FALSE" && !officialDenial) out.push({ code: "MARKED_FALSE", params: {} });
-  if (negative === "DISPUTED") out.push({ code: "DISPUTED", params: {} });
+  // La línea genérica de disputa habla de personas en el lugar: si la disputa viene de una fuente externa, ya la explica EXTERNAL_DENIAL.
+  if (negative === "DISPUTED" && !out.some((e) => e.code === "EXTERNAL_DENIAL")) out.push({ code: "DISPUTED", params: {} });
   if (level !== "OFFICIALLY_CONFIRMED" && negative !== "FALSE") out.push({ code: "NOT_OFFICIAL_YET", params: {} });
   return out;
 }

@@ -11,6 +11,7 @@ const CODE_KEY: Record<string, MessageKey> = {
   EXTERNAL_SOURCES: "why_EXTERNAL_SOURCES",
   OFFICIAL_CONFIRMATION: "why_OFFICIAL_CONFIRMATION",
   OFFICIAL_DENIAL: "why_OFFICIAL_DENIAL",
+  EXTERNAL_DENIAL: "why_EXTERNAL_DENIAL",
   MARKED_FALSE: "why_MARKED_FALSE",
   DISPUTED: "why_DISPUTED",
   NOT_OFFICIAL_YET: "why_NOT_OFFICIAL_YET",
@@ -25,6 +26,7 @@ const DETAILED: Record<string, { key: MessageKey; needs: string[] }> = {
   EXTERNAL_SOURCES: { key: "why_EXTERNAL_NAMED", needs: ["sources", "at"] },
   OFFICIAL_CONFIRMATION: { key: "why_OFFICIAL_NAMED", needs: ["sources", "at"] },
   OFFICIAL_DENIAL: { key: "why_OFFICIAL_DENIAL_NAMED", needs: ["sources", "at"] },
+  EXTERNAL_DENIAL: { key: "why_EXTERNAL_DENIAL_NAMED", needs: ["sources", "at"] },
 };
 const TIME_PARAMS = new Set(["from", "to", "at"]);
 
