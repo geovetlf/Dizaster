@@ -321,6 +321,7 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | Ingestión por push firmado por fuente (§9.2) | `POST /v1/ingest/:sourceKey/push`, HMAC-SHA256 con secreto por fuente del entorno, ±5 min, mismo adapter que el sondeo, corrida `trigger=PUSH`; ninguna fuente activada | [0128](adr/0128-ingestion-por-push-firmado.md) |
 | Firma en el dispositivo de la evidencia offline (§8.1, §8.3, C-04) | Ed25519 en almacén seguro, clave pública registrada por dispositivo, veredicto VALID/INVALID/ABSENT, reglas `presence-4` (offline sin firma = testimonio tardío), la cola fija reloj y `capturedOffline` al enviar | [0129](adr/0129-firma-de-evidencia-en-el-dispositivo.md) |
 | Alertas operativas por SLO incumplido y cola atascada (§5.22) | El worker juzga cada 5 min los SLO del día y la antigüedad del outbox (≤ 300 s); push a administración y operación solo al cambiar de estado (`quality.ops_alert_state`) | [0130](adr/0130-alertas-operativas-por-slo.md) |
+| Cupos y reputación por teléfono (§5.20, §8.2, §12.2) | Cupo por hora contado por cuenta y por teléfono; teléfono con cuenta suspendida o 3 señales de manipulación en 30 días cuenta como LOW | [0131](adr/0131-cupos-y-reputacion-por-telefono.md) |
 | Licencias, auditoría, SBOM, Dependabot; respaldo con prueba de restauración en CI | ✅ | ADR 0070, `scripts/supply-chain.mjs`, `scripts/db-restore-check.mjs` |
 | Idioma de la app elegible en el perfil (es/en/pt/fr o del teléfono) | ✅ | ADR 0069, `app/language.tsx` |
 | Varias cuentas en un teléfono corroboran como una (clave seudónima del teléfono) | ✅ | ADR 0068, migración 0036 |
@@ -360,11 +361,10 @@ Revisión del Blueprint del 2026-09-29 (tras ADR 0112): completada con ADR 0113�
 
 Revisión del Blueprint del 2026-09-29 (tras ADR 0129), verificada contra el código, sin bloqueos:
 
-1. Cupos por teléfono y reputación del dispositivo (§5.20, §8.2, §12.2).
-2. Límites por nivel de confianza en posts y comentarios, y tope diario de reportes (§13.3).
-3. Reprocesar ítems externos desde el crudo guardado, por fuente y rango de fechas (§7.3).
-4. Asignación de casos de moderación: tomar y soltar con vencimiento (§7.3).
-5. Informe de transparencia agregado para administración (§13.3).
+1. Límites por nivel de confianza en posts y comentarios, y tope diario de reportes (§13.3).
+2. Reprocesar ítems externos desde el crudo guardado, por fuente y rango de fechas (§7.3).
+3. Asignación de casos de moderación: tomar y soltar con vencimiento (§7.3).
+4. Informe de transparencia agregado para administración (§13.3).
 
 Bloqueadas o en espera:
 

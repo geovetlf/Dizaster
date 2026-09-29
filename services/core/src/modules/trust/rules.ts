@@ -47,6 +47,21 @@ export function tierFor(s: ReputationSignals): TrustTier {
   return "STANDARD";
 }
 
+/**
+ * Reputación del teléfono (Blueprint §5.20, §8.2; ADR 0131). Ajusta el cupo, no la validez: un teléfono con una cuenta
+ * suspendida o con señales repetidas de manipulación en 30 días (ubicación simulada, saltos imposibles, firma que no
+ * corresponde) cuenta como LOW para cualquier cuenta que reporte desde él. Así una cuenta nueva no borra el historial.
+ */
+export interface PhoneSignals { suspendedAccount: boolean; tamperSignals30d: number }
+export const PHONE_TAMPER_REASONS = ["MOCK_LOCATION", "IMPLAUSIBLE_MOVEMENT", "DEVICE_SIGNATURE_INVALID"] as const;
+export const PHONE_TAMPER_LIMIT = 3;
+const TIER_ORDER: TrustTier[] = ["LOW", "NEW", "STANDARD", "TRUSTED"];
+export function withPhone(tier: TrustTier, phone: PhoneSignals | null): TrustTier {
+  if (!phone) return tier;
+  const flagged = phone.suspendedAccount || phone.tamperSignals30d >= PHONE_TAMPER_LIMIT;
+  return flagged && TIER_ORDER.indexOf(tier) > 0 ? "LOW" : tier;
+}
+
 /** Reportes por hora según la reputación: más estrictos para cuentas nuevas o con historial malo, nunca cero. */
 export function reportQuota(tier: TrustTier, base: number): number {
   if (tier === "LOW") return Math.max(1, Math.floor(base / 4));

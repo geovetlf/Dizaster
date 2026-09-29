@@ -22,7 +22,7 @@ import type { AttestationVerifier, IdentityService, Session } from "../identity/
 import type { MediaService } from "../media/index.js";
 import type { ReferenceData } from "../reference/index.js";
 import type { SocialService } from "../social/index.js";
-import type { TrustService } from "../trust/index.js";
+import { PHONE_TAMPER_REASONS, type TrustService } from "../trust/index.js";
 import type { FieldCipher } from "../../platform/field-cipher.js";
 import { verifyEvidence } from "./evidence.js";
 
@@ -67,17 +67,29 @@ export class ReportService {
     if (!category || !ref.isLeaf(req.categoryCode)) return { outcome: "REJECTED", code: "INVALID_CATEGORY", reason: "Categoría no válida" };
     if (!category.citizenReportable) return { outcome: "REJECTED", code: "OFFICIAL_ONLY", reason: "Esta categoría solo la publican fuentes oficiales o externas" };
 
-    const recent = await db.query<{ n: string }>(
-      `SELECT count(*) AS n FROM report.reports WHERE author_user_id = $1 AND received_at > now() - interval '1 hour'`,
-      [session.userId],
-    );
-    // Cuentas nuevas o con mal historial tienen menos cupo (Blueprint §13.3).
-    if (Number(recent.rows[0]!.n) >= (await this.d.trust.reportQuota(db, session.userId, this.d.limits.reportsPerHour))) {
-      throw new DomainError("RATE_LIMITED", "Demasiados reportes en la última hora", 429);
-    }
-
     const device = req.deviceId ? await this.d.identity.ownedDevice(db, session.userId, req.deviceId) : null;
     if (req.deviceId && !device) throw new DomainError("UNKNOWN_DEVICE", "Dispositivo no registrado para este usuario", 403);
+
+    // Cupo por cuenta y por teléfono (ADR 0131): varias cuentas en el mismo teléfono comparten el cupo, y un teléfono
+    // con historial de manipulación o con una cuenta suspendida tiene el cupo más bajo.
+    const phone = device ? await this.d.identity.phoneOf(db, device.id) : null;
+    const phoneDevices = phone?.deviceIds ?? [];
+    const recent = await db.query<{ mine: number; phone: number }>(
+      `SELECT count(*) FILTER (WHERE author_user_id = $1)::int AS mine, count(*) FILTER (WHERE device_id = ANY($2))::int AS phone
+         FROM report.reports WHERE (author_user_id = $1 OR device_id = ANY($2)) AND received_at > now() - interval '1 hour'`,
+      [session.userId, phoneDevices],
+    );
+    const tamper = phoneDevices.length === 0 ? 0 : (await db.query<{ n: number }>(
+      `SELECT count(*)::int AS n FROM report.reports r JOIN report.presence_evidence p ON p.report_id = r.id
+        WHERE r.device_id = ANY($1) AND r.received_at > now() - interval '30 days' AND p.reasons && $2::text[]`,
+      [phoneDevices, [...PHONE_TAMPER_REASONS]],
+    )).rows[0]!.n;
+    const quota = await this.d.trust.reportQuota(db, session.userId, this.d.limits.reportsPerHour,
+      phone ? { suspendedAccount: phone.suspendedAccount, tamperSignals30d: tamper } : null);
+    // Cuentas nuevas o con mal historial tienen menos cupo (Blueprint §13.3).
+    if (Math.max(recent.rows[0]!.mine, recent.rows[0]!.phone) >= quota) {
+      throw new DomainError("RATE_LIMITED", "Demasiados reportes en la última hora", 429);
+    }
     const attachable = await this.d.media.assertAttachable(db, session.profileId, req.mediaIds);
     const mediaProofs = await this.d.media.inAppCaptures(db, session.profileId, req.mediaIds);
 

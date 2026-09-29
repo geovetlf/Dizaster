@@ -255,6 +255,20 @@ export class IdentityService {
     });
   }
 
+  /**
+   * El teléfono de un dispositivo (ADR 0131): todos los registros con la misma clave de hardware (o solo él, sin clave),
+   * y si alguna cuenta de ese teléfono está suspendida. Para cupos y reputación por teléfono, no por cuenta.
+   */
+  async phoneOf(q: Queryable, deviceId: string): Promise<{ deviceIds: string[]; suspendedAccount: boolean }> {
+    const { rows } = await q.query<{ id: string; suspended: boolean }>(
+      `SELECT o.id, u.status = 'SUSPENDED' AS suspended
+         FROM identity.devices d
+         JOIN identity.devices o ON o.id = d.id OR (d.hardware_key IS NOT NULL AND o.hardware_key = d.hardware_key)
+         JOIN identity.users u ON u.id = o.user_id
+        WHERE d.id = $1`, [deviceId]);
+    return { deviceIds: rows.map((r) => r.id), suspendedAccount: rows.some((r) => r.suspended) };
+  }
+
   /** La clave de firma de un dispositivo, con cuándo se registró y, si fue reemplazada, cuándo. */
   async signingKey(q: Queryable, deviceId: string, publicKey: string): Promise<{ createdAt: Date; replacedAt: Date | null } | null> {
     const { rows } = await q.query<{ created_at: Date; replaced_at: Date | null }>(

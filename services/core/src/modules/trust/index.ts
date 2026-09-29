@@ -2,9 +2,9 @@ import { withTransaction, type Db, type Queryable } from "../../platform/db.js";
 import { publish, type OutboxDispatcher } from "../../platform/outbox.js";
 import type { EventService } from "../event/index.js";
 import type { IdentityService } from "../identity/index.js";
-import { TIER_WEIGHT, TRUST, coordinatedWeights, reportQuota, tierFor, type ReputationSignals, type TrustTier } from "./rules.js";
+import { TIER_WEIGHT, TRUST, coordinatedWeights, reportQuota, tierFor, withPhone, type PhoneSignals, type ReputationSignals, type TrustTier } from "./rules.js";
 
-export { TIER_WEIGHT, TRUST, TRUST_RULES_VERSION, coordinatedWeights, reportQuota, tierFor, type ReputationSignals, type TrustTier } from "./rules.js";
+export { PHONE_TAMPER_LIMIT, PHONE_TAMPER_REASONS, TIER_WEIGHT, TRUST, TRUST_RULES_VERSION, coordinatedWeights, reportQuota, tierFor, withPhone, type PhoneSignals, type ReputationSignals, type TrustTier } from "./rules.js";
 
 /** Acciones de moderación que cuentan en contra de la reputación de la persona afectada. */
 const SANCTIONS = new Set(["HIDE", "REMOVE", "SUSPEND_USER"]);
@@ -167,8 +167,9 @@ export class TrustService {
     return reportQuota((await this.tiers(q, [userId])).get(userId) ?? "NEW", baseMb) * 1024 * 1024;
   }
 
-  async reportQuota(q: Queryable, userId: string, base: number): Promise<number> {
-    return reportQuota((await this.tiers(q, [userId])).get(userId) ?? "NEW", base);
+  /** Con `phone`, el cupo también refleja la reputación del teléfono (ADR 0131). */
+  async reportQuota(q: Queryable, userId: string, base: number, phone: PhoneSignals | null = null): Promise<number> {
+    return reportQuota(withPhone((await this.tiers(q, [userId])).get(userId) ?? "NEW", phone), base);
   }
 
   /** Peso de una denuncia (moderación): como al corroborar, pero nunca más de 1. */
