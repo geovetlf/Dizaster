@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:georss="http://www.georss.org/georss">
+  <channel>
+    <title>Diario de ejemplo</title>
+    <item>
+      <title>Incendio forestal avanza en la sierra de Cusco</title>
+      <link>https://noticias.example/incendio-cusco</link>
+      <guid>noticia-1</guid>
+      <pubDate>Mon, 28 Sep 2026 14:00:00 GMT</pubDate>
+      <description>&lt;p&gt;Los bomberos combaten un incendio forestal que ya consumió varias hectáreas. El texto completo del artículo es mucho más largo y no se guarda nunca en Dizaster porque tiene derechos de autor, solo un resumen breve.&lt;/p&gt;</description>
+      <georss:point>-13.53 -71.97</georss:point>
+    </item>
+    <item>
+      <title>Resultados del fútbol del domingo</title>
+      <link>https://noticias.example/futbol</link>
+      <guid>noticia-2</guid>
+      <pubDate>Mon, 28 Sep 2026 15:00:00 GMT</pubDate>
+      <georss:point>-12.05 -77.04</georss:point>
+    </item>
+    <item>
+      <title>Inundaciones en el norte del país</title>
+      <link>http://inseguro.example/inundacion</link>
+      <guid>noticia-3</guid>
+      <pubDate>Mon, 28 Sep 2026 16:00:00 GMT</pubDate>
+    </item>
+  </channel>
+</rss>

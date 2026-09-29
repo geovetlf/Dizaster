@@ -54,6 +54,43 @@ export class GeoService {
     const fc = JSON.parse(readFileSync(join(dataDir, "countries/countries-50m.geojson"), "utf8")) as { features: CountryFeature[] };
     this.locator = new CountryLocator(fc.features);
     this.countryCodes = new Set(fc.features.map((f) => f.properties.iso2));
+    this.countryFeatures = fc.features;
+  }
+
+  private readonly countryFeatures: CountryFeature[];
+  private readonly countryPoints = new Map<string, { point: GeoPoint; radiusM: number } | null>();
+
+  /**
+   * Punto representativo de un país (ADR 0092): centroide del polígono más grande y, si cae fuera (países
+   * cóncavos), el punto interior de una grilla más cercano a él. Radio hasta las esquinas de ese polígono (máx.
+   * 1500 km). Para fuentes que solo nombran el país. NO AI REQUIRED.
+   */
+  countryPoint(iso2: string): { point: GeoPoint; radiusM: number } | null {
+    if (this.countryPoints.has(iso2)) return this.countryPoints.get(iso2)!;
+    const f = this.countryFeatures.find((x) => x.properties.iso2 === iso2);
+    let out: { point: GeoPoint; radiusM: number } | null = null;
+    if (f) {
+      const polys = f.geometry.type === "Polygon" ? [f.geometry.coordinates] : f.geometry.coordinates;
+      const ringArea = (r: number[][]) => Math.abs(r.reduce((a, p, i) => { const q = r[(i + 1) % r.length]!; return a + p[0]! * q[1]! - q[0]! * p[1]!; }, 0)) / 2;
+      const outer = polys.map((p) => p[0] as number[][]).sort((a, b) => ringArea(b) - ringArea(a))[0]!;
+      const xs = outer.map((p) => p[0]!);
+      const ys = outer.map((p) => p[1]!);
+      const [w, e, s, n] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
+      let c = { lng: xs.reduce((a, b) => a + b, 0) / xs.length, lat: ys.reduce((a, b) => a + b, 0) / ys.length };
+      if (this.locator.locate(c) !== iso2) {
+        let best: GeoPoint | null = null;
+        for (let i = 1; i < 20; i++) for (let j = 1; j < 20; j++) {
+          const p = { lng: w + ((e - w) * i) / 20, lat: s + ((n - s) * j) / 20 };
+          if (this.locator.locate(p) === iso2 && (!best || distanceMeters(p, c) < distanceMeters(best, c))) best = p;
+        }
+        if (best) c = best;
+      }
+      const point = { lat: Math.round(c.lat * 1e4) / 1e4, lng: Math.round(c.lng * 1e4) / 1e4 };
+      const corners = [[s, w], [s, e], [n, w], [n, e]] as const;
+      out = { point, radiusM: Math.min(1_500_000, Math.round(Math.max(...corners.map(([lat, lng]) => distanceMeters(point, { lat, lng }))))) };
+    }
+    this.countryPoints.set(iso2, out);
+    return out;
   }
 
   private geocodeSchemes: GeocodeScheme[] | null = null;
@@ -67,6 +104,12 @@ export class GeoService {
   async locateGeocodes(
     q: Queryable, geocodes: readonly { scheme: string; value: string }[],
   ): Promise<{ point: GeoPoint; radiusM: number; areaIds: string[]; area: AreaGeometry | null } | null> {
+    // País entero (ISO 3166-1, p. ej. brotes de la OMS): punto representativo y radio amplio, sin área (ADR 0092).
+    const countries = geocodes.filter((g) => /^ISO\s?3166-?1$/i.test(g.scheme.trim())).map((g) => g.value.trim().toUpperCase()).filter((c) => this.isCountry(c));
+    if (countries.length && countries.length === geocodes.length) {
+      const cp = this.countryPoint(countries[0]!);
+      return cp ? { ...cp, areaIds: [], area: null } : null;
+    }
     const schemes = this.loadGeocodeSchemes();
     const ids: string[] = [];
     const codes: string[] = [];

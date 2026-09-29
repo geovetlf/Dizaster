@@ -1,0 +1,8 @@
+{
+  "value": [
+    { "Id": "a1b2c3", "Title": "Cholera – Haiti", "PublicationDateAndTime": "2026-09-20T12:00:00Z", "UrlName": "2026-DON600" },
+    { "Id": "d4e5f6", "Title": "Dengue - Peru and Ecuador", "PublicationDate": "2026-09-18T00:00:00Z", "UrlName": "2026-DON599" },
+    { "Id": "g7h8i9", "Title": "Avian Influenza A(H5N1) - Multi-country", "PublicationDate": "2026-09-10T00:00:00Z" },
+    { "Title": "Sin id" }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "totalCount": 3,
+  "data": [
+    { "id": 52001, "fields": { "name": "Peru: Floods and Landslides - Mar 2026", "status": "ongoing", "glide": "FL-2026-000042-PER",
+      "url": "https://reliefweb.int/disaster/fl-2026-000042-per", "date": { "created": "2026-03-02T00:00:00+00:00", "event": "2026-03-01T00:00:00+00:00", "changed": "2026-03-05T10:00:00+00:00" },
+      "primary_type": { "code": "FL", "name": "Flood" },
+      "primary_country": { "iso3": "per", "name": "Peru", "location": { "lat": -9.19, "lon": -75.0152 } } } },
+    { "id": 52002, "fields": { "name": "Chile: Earthquake - Jan 2020", "status": "past",
+      "date": { "created": "2020-01-02T00:00:00+00:00" }, "primary_type": { "code": "EQ" },
+      "primary_country": { "iso3": "chl", "name": "Chile", "location": { "lat": -35.68, "lon": -71.54 } } } },
+    { "id": 52003, "fields": { "name": "World: Technological disaster", "status": "ongoing",
+      "date": { "created": "2026-03-02T00:00:00+00:00" }, "primary_type": { "code": "TD" },
+      "primary_country": { "iso3": "wld", "name": "World", "location": { "lat": 0, "lon": 0 } } } }
+  ]
+}

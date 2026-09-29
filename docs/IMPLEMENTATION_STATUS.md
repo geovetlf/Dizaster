@@ -283,6 +283,7 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | Acceso auditado a evidencia de presencia | ✅ | ADR 0089 |
 | MFA TOTP para moderación y administración | ✅ | ADR 0090 |
 | Detección local del idioma del contenido | ✅ | ADR 0091 |
+| Adapters NORMAL: ReliefWeb, OMS DON y RSS de noticias (PLANNED) | ✅ (activación en espera: términos) | ADR 0092 |
 | Licencias, auditoría, SBOM, Dependabot; respaldo con prueba de restauración en CI | ✅ | ADR 0070, `scripts/supply-chain.mjs`, `scripts/db-restore-check.mjs` |
 | Idioma de la app elegible en el perfil (es/en/pt/fr o del teléfono) | ✅ | ADR 0069, `app/language.tsx` |
 | Varias cuentas en un teléfono corroboran como una (clave seudónima del teléfono) | ✅ | ADR 0068, migración 0036 |
@@ -312,7 +313,6 @@ Revisión del Blueprint del 2026-09-29 (tras ADR 0070): completada con ADR 0071�
 
 Revisión del Blueprint del 2026-09-29 (tras ADR 0080), verificada contra el código, sin bloqueos:
 
-1. Adapters del carril NORMAL (ReliefWeb, OMS, RSS de noticias), PLANNED hasta revisar términos (§9.3).
 
 Bloqueadas o en espera:
 
@@ -323,6 +323,9 @@ Bloqueadas o en espera:
 - **BLOQUEADA** — Publicar el mapa propio: `infra/maps/publish.sh --apply` cuando haya bucket; después validar en un
   teléfono la descarga offline con `pmtiles://` (ADR 0041).
 - **En espera de acción humana** — Activar EMSC (ADR 0080): confirmar que sus términos permiten el uso en la app.
+- **En espera de acción humana** — Activar ReliefWeb y OMS DON (ADR 0092): ReliefWeb pide registrar un `appname`
+  y aceptar sus términos; la OMS, confirmar los términos de uso del sitio. Noticias RSS: falta elegir qué medios
+  (decisión de producto y de derechos).
 - **En espera de acción humana** — Fuentes IGP, INDECI y SENAMHI (confirmar formato/URL y términos; si publican CAP,
   activar es solo configuración, ADR 0033).
 - **Requiere al propietario** — Capa de IA (proveedor y presupuesto), enlaces de donación verificados (D-15), textos

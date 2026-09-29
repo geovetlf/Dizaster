@@ -1,5 +1,5 @@
 {
- "version": "sources-2026.09.4",
+ "version": "sources-2026.09.5",
  "sources": [
   {
    "key": "usgs-earthquakes",
@@ -201,6 +201,59 @@
    "urgentCapable": true,
    "urgentPollSeconds": 600,
    "status": "RESEARCH"
+  },
+  {
+   "key": "reliefweb-disasters",
+   "name": "ReliefWeb (OCHA) — desastres",
+   "type": "EXTERNAL",
+   "trustTier": "EXTERNAL",
+   "countryScope": [
+    "*"
+   ],
+   "categories": [
+    "natural.earthquake",
+    "natural.tsunami",
+    "natural.flood",
+    "natural.landslide",
+    "natural.storm",
+    "natural.volcano",
+    "natural.drought",
+    "natural.cold_wave",
+    "fire.wildfire",
+    "health.outbreak"
+   ],
+   "adapter": "reliefweb-disasters-json",
+   "config": {
+    "url": "https://api.reliefweb.int/v2/disasters?appname=dizaster&profile=list&preset=latest&limit=100&fields[include][]=primary_country&fields[include][]=primary_type&fields[include][]=date&fields[include][]=glide&fields[include][]=url&fields[include][]=status"
+   },
+   "license": "Por confirmar: términos de la API de ReliefWeb (requiere appname aprobado)",
+   "termsUrl": "https://apidoc.reliefweb.int/",
+   "scheduleNormal": "0 5 * * *",
+   "urgentCapable": false,
+   "status": "PLANNED",
+   "notes": "Adapter listo (ADR 0092). Solo país: punto del país con incertidumbre de 250 km."
+  },
+  {
+   "key": "who-don",
+   "name": "OMS — Disease Outbreak News",
+   "type": "OFFICIAL",
+   "trustTier": "OFFICIAL",
+   "countryScope": [
+    "*"
+   ],
+   "categories": [
+    "health.outbreak"
+   ],
+   "adapter": "who-don-json",
+   "config": {
+    "url": "https://www.who.int/api/news/diseaseoutbreaknews?$orderby=PublicationDateAndTime%20desc&$top=50"
+   },
+   "license": "Por confirmar: términos de uso del sitio de la OMS",
+   "termsUrl": "https://www.who.int/about/policies/terms-of-use",
+   "scheduleNormal": "0 5 * * *",
+   "urgentCapable": false,
+   "status": "PLANNED",
+   "notes": "Adapter listo (ADR 0092). Ubicación por el país del título (geocódigo ISO3166-1)."
   }
  ]
 }
