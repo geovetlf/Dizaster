@@ -274,6 +274,7 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | Adaptador EMSC (sismos), fuente externa PLANNED hasta revisar términos | ✅ (activación BLOQUEADA: términos) | ADR 0080 |
 | Ventana de tiempo coherente al corroborar (verification-3) | ✅ | ADR 0081 |
 | Kill switches remotos de video y subidas | ✅ | ADR 0082 |
+| Publicación por enlace (GET /v1/posts/:id) y enlaces universales /e/ /p/ | ✅ | ADR 0083 |
 | Licencias, auditoría, SBOM, Dependabot; respaldo con prueba de restauración en CI | ✅ | ADR 0070, `scripts/supply-chain.mjs`, `scripts/db-restore-check.mjs` |
 | Idioma de la app elegible en el perfil (es/en/pt/fr o del teléfono) | ✅ | ADR 0069, `app/language.tsx` |
 | Varias cuentas en un teléfono corroboran como una (clave seudónima del teléfono) | ✅ | ADR 0068, migración 0036 |
@@ -303,16 +304,15 @@ Revisión del Blueprint del 2026-09-29 (tras ADR 0070): completada con ADR 0071�
 
 Revisión del Blueprint del 2026-09-29 (tras ADR 0080), verificada contra el código, sin bloqueos:
 
-1. Detalle de una publicación por enlace y rutas de enlaces universales /e/ y /p/ (§6.3).
-2. ETag e If-None-Match en recursos cacheables de la API (§6.3).
-3. País preferido en el perfil (§5.2).
-4. Explicación legible completa del estado de verificación (§10.4).
-5. Alertas de zonas guardadas según el área oficial, no solo el punto (§5.10, §9.4).
-6. Detección determinista de datos personales en publicaciones → cola de moderación (§13.3, §5.12).
-7. Acceso auditado, con motivo, a la evidencia de presencia para moderación (§7.3, §13.1).
-8. MFA (TOTP) para moderación y administración (§13.1).
-9. Detección local del idioma del contenido (§5.15).
-10. Adapters del carril NORMAL (ReliefWeb, OMS, RSS de noticias), PLANNED hasta revisar términos (§9.3).
+1. ETag e If-None-Match en recursos cacheables de la API (§6.3).
+2. País preferido en el perfil (§5.2).
+3. Explicación legible completa del estado de verificación (§10.4).
+4. Alertas de zonas guardadas según el área oficial, no solo el punto (§5.10, §9.4).
+5. Detección determinista de datos personales en publicaciones → cola de moderación (§13.3, §5.12).
+6. Acceso auditado, con motivo, a la evidencia de presencia para moderación (§7.3, §13.1).
+7. MFA (TOTP) para moderación y administración (§13.1).
+8. Detección local del idioma del contenido (§5.15).
+9. Adapters del carril NORMAL (ReliefWeb, OMS, RSS de noticias), PLANNED hasta revisar términos (§9.3).
 
 Bloqueadas o en espera:
 

@@ -75,6 +75,7 @@ export const OPERATIONS: Record<string, Operation> = {
   "DELETE /v1/posts/:id/like": { summary: "Quitar me gusta" },
   "PUT /v1/posts/:id/reactions/:kind": { summary: "Reacción de contexto" },
   "DELETE /v1/posts/:id/reactions/:kind": { summary: "Quitar reacción" },
+  "GET /v1/posts/:id": { summary: "Una publicación por enlace (ADR 0083)" },
   "GET /v1/posts/:id/comments": { summary: "Comentarios" },
   "POST /v1/posts/:id/comments": { summary: "Comentar o responder", body: C.CreateCommentRequest },
   "DELETE /v1/comments/:id": { summary: "Borrar mi comentario" },

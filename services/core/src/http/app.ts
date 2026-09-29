@@ -606,6 +606,11 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
     return c.social.setReaction(c.db, p.id, session.profileId, p.kind, false);
   });
 
+  // Una publicación por enlace (ADR 0083). Personal (reacciones propias, bloqueos): no se cachea.
+  app.get("/v1/posts/:id", async (req, reply) => {
+    reply.header("cache-control", "no-store");
+    return c.feed.post(c.db, parse(IdParam, req.params).id, req.session?.profileId ?? null);
+  });
   app.get("/v1/posts/:id/comments", async (req) => ({ comments: await c.social.comments(c.db, parse(IdParam, req.params).id, req.session?.profileId ?? null) }));
 
   app.post("/v1/posts/:id/comments", async (req, reply) => {

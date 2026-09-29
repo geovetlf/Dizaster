@@ -1,8 +1,10 @@
-import type { CommentView } from "@dizaster/contracts";
+import type { CommentView, FeedPost } from "@dizaster/contracts";
 import { useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import { Alert, FlatList, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { categoryName } from "../../components/feed-list";
 import { Icon } from "../../components/icon";
+import { PostCard } from "../../components/post-card";
 import { api } from "../../lib/api";
 import { lang, t } from "../../lib/i18n";
 import { canBlock } from "../../lib/moderation/logic";
@@ -13,7 +15,7 @@ import { applyReaction } from "../../lib/social/reactions";
 import { timeAgo } from "../../lib/ui/format";
 import { colors, radius, space } from "../../theme";
 
-/** Comentarios de una publicación. También es destino de enlaces dizaster://post/<id>. */
+/** Una publicación y sus comentarios. Destino de dizaster://post/<id> y https://<dominio>/p/<id> (ADR 0083). */
 export default function PostCommentsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [comments, setComments] = useState<CommentView[]>([]);
@@ -22,9 +24,12 @@ export default function PostCommentsScreen() {
   const [busy, setBusy] = useState(false);
   const [replyTo, setReplyTo] = useState<CommentView | null>(null);
   const me = useMe();
+  const [post, setPost] = useState<FeedPost | null>(null);
 
   useEffect(() => {
-    if (id) api.comments(id).then((r) => setComments(r.comments)).catch(() => setError(t("loadError")));
+    if (!id) return;
+    api.post(id).then(setPost).catch(() => setPost(null));
+    api.comments(id).then((r) => setComments(r.comments)).catch(() => setError(t("loadError")));
   }, [id]);
 
   async function send() {
@@ -71,6 +76,7 @@ export default function PostCommentsScreen() {
         data={threadComments(comments)}
         keyExtractor={(x) => x.comment.id}
         contentContainerStyle={styles.list}
+        ListHeaderComponent={post ? <PostCard post={post} categoryName={categoryName} /> : null}
         renderItem={({ item: { comment: item, reply } }) => {
           const liked = item.myReactions.includes("LIKE");
           return (

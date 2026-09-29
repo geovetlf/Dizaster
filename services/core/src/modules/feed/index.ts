@@ -92,6 +92,17 @@ export class FeedService {
     });
   }
 
+  /**
+   * Una publicación por enlace (ADR 0083): mismas reglas que el feed (pública, visible, bloqueos, negocio activo),
+   * así un enlace compartido nunca muestra lo que el feed escondería. Si no se puede ver, 404.
+   */
+  async post(q: Queryable, postId: string, viewerProfileId: string | null): Promise<FeedPost> {
+    const rows = await this.social.feed(q, { tab: "for_you", ids: [postId], limit: 1, viewerProfileId });
+    const [post] = await this.compose(q, rows, viewerProfileId);
+    if (!post) throw new DomainError("NOT_FOUND", "Publicación no disponible", 404);
+    return post;
+  }
+
   /** Página de un negocio: sus posts, por recientes. */
   async businessPosts(q: Queryable, handle: string, rawQuery: unknown, viewerProfileId: string | null): Promise<FeedResponse> {
     const f = parse(ProfilePostsQuery, rawQuery);
