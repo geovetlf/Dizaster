@@ -166,6 +166,11 @@ export class SocialService {
     if (f.tab === "nearby" && !f.near) return [];
     const params: unknown[] = [f.limit, f.viewerProfileId];
     const where = [`p.deleted_at IS NULL`, `p.visibility = 'PUBLIC'`, `p.moderation_state = 'VISIBLE'`];
+    // Bloqueos: se ocultan los posts con nombre del bloqueado. Los seudónimos se mantienen: pueden ser avisos de
+    // seguridad y ocultarlos no aporta nada (el bloqueador no sabe quién los escribió).
+    if (f.viewerProfileId) {
+      where.push(`NOT (p.author_visibility = 'PUBLIC' AND EXISTS (SELECT 1 FROM social.blocks b WHERE b.blocker_profile_id = $2 AND b.blocked_profile_id = p.author_id))`);
+    }
     const nearSql = f.near ? `ST_SetSRID(ST_MakePoint($${params.push(f.near.lng)}, $${params.push(f.near.lat)}), 4326)::geography` : null;
     if (f.category) {
       where.push(`(p.category_code = $${params.push(f.category)} OR p.category_code LIKE $${params.push(`${f.category}.%`)})`);
@@ -289,14 +294,15 @@ export class SocialService {
   /** Perfil público: los contadores solo incluyen posts con autoría pública. */
   async profile(q: Queryable, handle: string, viewerProfileId: string | null): Promise<ProfileView & { id: string }> {
     const { rows } = await q.query<{
-      id: string; handle: string; display_name: string; created_at: Date; followers: number; following: number; posts: number; followed: boolean;
+      id: string; handle: string; display_name: string; created_at: Date; followers: number; following: number; posts: number; followed: boolean; blocked: boolean;
     }>(
       `SELECT pr.id, pr.handle, pr.display_name, pr.created_at,
               (SELECT count(*) FROM social.follows f WHERE f.target_type = 'PROFILE' AND f.target_id = pr.id::text)::int AS followers,
               (SELECT count(*) FROM social.follows f WHERE f.follower_profile_id = pr.id AND f.target_type = 'PROFILE')::int AS following,
               (SELECT count(*) FROM social.posts p WHERE p.author_id = pr.id AND p.author_visibility = 'PUBLIC' AND p.visibility = 'PUBLIC'
                   AND p.deleted_at IS NULL AND p.moderation_state = 'VISIBLE')::int AS posts,
-              EXISTS (SELECT 1 FROM social.follows f WHERE f.follower_profile_id = $2 AND f.target_type = 'PROFILE' AND f.target_id = pr.id::text) AS followed
+              EXISTS (SELECT 1 FROM social.follows f WHERE f.follower_profile_id = $2 AND f.target_type = 'PROFILE' AND f.target_id = pr.id::text) AS followed,
+              EXISTS (SELECT 1 FROM social.blocks b WHERE b.blocker_profile_id = $2 AND b.blocked_profile_id = pr.id) AS blocked
          FROM social.profiles pr WHERE lower(pr.handle) = lower($1)`,
       [handle, viewerProfileId],
     );
@@ -304,7 +310,7 @@ export class SocialService {
     if (!r) throw notFound("Perfil");
     return {
       id: r.id, handle: r.handle, displayName: r.display_name, createdAt: r.created_at.toISOString(),
-      followerCount: r.followers, followingCount: r.following, postCount: r.posts, followedByMe: r.followed, isMe: r.id === viewerProfileId,
+      followerCount: r.followers, followingCount: r.following, postCount: r.posts, followedByMe: r.followed, blockedByMe: r.blocked, isMe: r.id === viewerProfileId,
     };
   }
 
@@ -367,15 +373,91 @@ export class SocialService {
     return (await this.comments(q, postId)).find((c) => c.id === id)!;
   }
 
-  async comments(q: Queryable, postId: string): Promise<CommentView[]> {
+  async comments(q: Queryable, postId: string, viewerProfileId: string | null = null): Promise<CommentView[]> {
+    await this.assertVisible(q, postId);
     const { rows } = await q.query<{ id: string; handle: string; display_name: string; text: string; created_at: Date }>(
       `SELECT c.id, pr.handle, pr.display_name, c.text, c.created_at
          FROM social.comments c JOIN social.profiles pr ON pr.id = c.author_profile_id
         WHERE c.post_id = $1 AND c.deleted_at IS NULL AND c.moderation_state = 'VISIBLE'
+          AND NOT EXISTS (SELECT 1 FROM social.blocks b WHERE b.blocker_profile_id = $2 AND b.blocked_profile_id = c.author_profile_id)
         ORDER BY c.created_at, c.id LIMIT 200`,
-      [postId],
+      [postId, viewerProfileId],
     );
     return rows.map((r) => ({ id: r.id, author: { handle: r.handle, displayName: r.display_name }, text: r.text, createdAt: r.created_at.toISOString() }));
+  }
+
+  // ───────────── Bloqueos ─────────────
+
+  /** Bloquear también deja de seguir en ambos sentidos. Desbloquear no restaura los seguimientos. */
+  async setBlock(q: Queryable, blockerProfileId: string, blockedProfileId: string, block: boolean): Promise<void> {
+    if (blockerProfileId === blockedProfileId) throw new DomainError("VALIDATION", "No puedes bloquearte");
+    if (!block) {
+      await q.query(`DELETE FROM social.blocks WHERE blocker_profile_id = $1 AND blocked_profile_id = $2`, [blockerProfileId, blockedProfileId]);
+      return;
+    }
+    await q.query(`INSERT INTO social.blocks (blocker_profile_id, blocked_profile_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`, [blockerProfileId, blockedProfileId]);
+    await q.query(
+      `DELETE FROM social.follows WHERE target_type = 'PROFILE'
+         AND ((follower_profile_id = $1 AND target_id = $4) OR (follower_profile_id = $2 AND target_id = $3))`,
+      [blockerProfileId, blockedProfileId, blockerProfileId, blockedProfileId],
+    );
+  }
+
+  async blockedHandles(q: Queryable, blockerProfileId: string): Promise<string[]> {
+    const { rows } = await q.query<{ handle: string }>(
+      `SELECT pr.handle FROM social.blocks b JOIN social.profiles pr ON pr.id = b.blocked_profile_id WHERE b.blocker_profile_id = $1 ORDER BY b.created_at DESC`,
+      [blockerProfileId],
+    );
+    return rows.map((r) => r.handle);
+  }
+
+  // ───────────── Moderación (la usa el módulo moderation) ─────────────
+
+  /**
+   * Objeto denunciable con su autoría interna. `authorHandle` es null si la autoría es seudónima: la moderación
+   * puede actuar sobre la cuenta sin que nadie la vea.
+   */
+  async moderationTarget(q: Queryable, type: "POST" | "COMMENT" | "PROFILE", id: string): Promise<{
+    id: string; text: string | null; authorHandle: string | null; authorUserId: string; state: string; categoryCode: string | null; reach: number; eventId: string | null;
+  } | null> {
+    if (type === "PROFILE") {
+      const { rows } = await q.query<{ id: string; handle: string; display_name: string; user_id: string }>(
+        `SELECT id, handle, display_name, user_id FROM social.profiles WHERE id = $1`, [id],
+      );
+      const r = rows[0];
+      return r ? { id: r.id, text: r.display_name, authorHandle: r.handle, authorUserId: r.user_id, state: "VISIBLE", categoryCode: null, reach: 0, eventId: null } : null;
+    }
+    if (type === "COMMENT") {
+      const { rows } = await q.query<{ id: string; text: string; handle: string; user_id: string; moderation_state: string }>(
+        `SELECT c.id, c.text, pr.handle, pr.user_id, c.moderation_state FROM social.comments c JOIN social.profiles pr ON pr.id = c.author_profile_id
+          WHERE c.id = $1 AND c.deleted_at IS NULL`, [id],
+      );
+      const r = rows[0];
+      return r ? { id: r.id, text: r.text, authorHandle: r.handle, authorUserId: r.user_id, state: r.moderation_state, categoryCode: null, reach: 0, eventId: null } : null;
+    }
+    const { rows } = await q.query<{
+      id: string; text: string | null; handle: string; user_id: string; author_visibility: string; moderation_state: string; category_code: string | null; reach: number; event_id: string | null;
+    }>(
+      `SELECT p.id, p.text, pr.handle, pr.user_id, p.author_visibility, p.moderation_state, p.category_code,
+              ((SELECT count(*) FROM social.reactions r WHERE r.post_id = p.id) + (SELECT count(*) FROM social.comments c WHERE c.post_id = p.id))::int AS reach,
+              (SELECT l.event_id FROM social.post_event_links l WHERE l.post_id = p.id ORDER BY l.created_at LIMIT 1) AS event_id
+         FROM social.posts p JOIN social.profiles pr ON pr.id = p.author_id
+        WHERE p.id = $1 AND p.deleted_at IS NULL`, [id],
+    );
+    const r = rows[0];
+    if (!r) return null;
+    return {
+      id: r.id, text: r.text, authorHandle: r.author_visibility === "PSEUDONYMOUS" ? null : r.handle, authorUserId: r.user_id,
+      state: r.moderation_state, categoryCode: r.category_code, reach: r.reach, eventId: r.event_id,
+    };
+  }
+
+  async setPostModeration(q: Queryable, postId: string, state: "VISIBLE" | "LIMITED" | "HIDDEN" | "REMOVED"): Promise<void> {
+    await q.query(`UPDATE social.posts SET moderation_state = $2, updated_at = now() WHERE id = $1`, [postId, state]);
+  }
+
+  async setCommentModeration(q: Queryable, commentId: string, state: "VISIBLE" | "HIDDEN" | "REMOVED"): Promise<void> {
+    await q.query(`UPDATE social.comments SET moderation_state = $2 WHERE id = $1`, [commentId, state]);
   }
 
   private async assertVisible(q: Queryable, postId: string): Promise<void> {

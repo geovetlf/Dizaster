@@ -71,6 +71,8 @@ export interface ProfileView {
   followingCount: number;
   postCount: number;
   followedByMe: boolean;
+  /** Bloqueaste a esta persona: sus posts y comentarios con nombre no te aparecen. */
+  blockedByMe: boolean;
   isMe: boolean;
 }
 

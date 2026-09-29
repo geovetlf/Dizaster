@@ -33,6 +33,10 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
   app.addHook("onRequest", async (req) => {
     const h = req.headers.authorization;
     if (h?.startsWith("Bearer ")) req.session = await c.identity.verifyToken(h.slice(7));
+    // Cuentas suspendidas: pueden leer y apelar, no publicar ni interactuar.
+    if (req.session && req.method !== "GET" && req.method !== "HEAD" && !/^\/v1\/me\/moderation\/[^/]+\/appeal$/.test(req.url)) {
+      await c.identity.assertCanWrite(req.session.userId);
+    }
   });
 
   // Medición por grupo de rutas (/v1/<grupo>/...): peticiones y bytes de respuesta, agregados en memoria.
@@ -292,7 +296,7 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
     return c.social.setLike(c.db, parse(IdParam, req.params).id, session.profileId, false);
   });
 
-  app.get("/v1/posts/:id/comments", async (req) => ({ comments: await c.social.comments(c.db, parse(IdParam, req.params).id) }));
+  app.get("/v1/posts/:id/comments", async (req) => ({ comments: await c.social.comments(c.db, parse(IdParam, req.params).id, req.session?.profileId ?? null) }));
 
   app.post("/v1/posts/:id/comments", async (req, reply) => {
     const session = requireSession(req);
@@ -366,10 +370,72 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
     return c.cost.setKillSwitch((req.params as { feature: string }).feature, req.body, session.userId);
   });
 
+  // ───────────── Denuncias y bloqueos (cualquier persona) ─────────────
+  app.post("/v1/flags", async (req, reply) => {
+    const session = requireSession(req);
+    await c.moderation.flag(session, req.body);
+    return reply.status(202).send({ received: true });
+  });
+  app.put("/v1/blocks/:handle", async (req) => {
+    const session = requireSession(req);
+    const blocked = await c.social.profileIdByHandle(c.db, (req.params as { handle: string }).handle);
+    await c.social.setBlock(c.db, session.profileId, blocked, true);
+    return { blocked: true };
+  });
+  app.delete("/v1/blocks/:handle", async (req) => {
+    const session = requireSession(req);
+    const blocked = await c.social.profileIdByHandle(c.db, (req.params as { handle: string }).handle);
+    await c.social.setBlock(c.db, session.profileId, blocked, false);
+    return { blocked: false };
+  });
+  app.get("/v1/me/blocks", async (req, reply) => {
+    const session = requireSession(req);
+    reply.header("cache-control", "no-store");
+    return { handles: await c.social.blockedHandles(c.db, session.profileId) };
+  });
+  // Transparencia: qué se hizo con mi contenido o mi cuenta, por qué, y apelación.
+  app.get("/v1/me/moderation", async (req, reply) => {
+    const session = requireSession(req);
+    reply.header("cache-control", "no-store");
+    return { notices: await c.moderation.myNotices(session.userId) };
+  });
+  app.post("/v1/me/moderation/:id/appeal", async (req, reply) => {
+    const session = requireSession(req);
+    return reply.status(201).send(await c.moderation.appeal(session.userId, parse(IdParam, req.params).id, req.body));
+  });
+
   // ───────────── Moderación (rol moderator) ─────────────
-  app.post("/v1/moderation/events/:id/negative-state", async (req) => {
+  const requireModerator = (req: FastifyRequest) => {
     const session = requireSession(req);
     if (!session.roles.includes("moderator") && !session.roles.includes("admin")) throw forbidden("Solo moderación");
+    return session;
+  };
+  app.get("/v1/moderation/cases", async (req, reply) => {
+    requireModerator(req);
+    reply.header("cache-control", "no-store");
+    return c.moderation.queue(req.query);
+  });
+  app.get("/v1/moderation/cases/:id", async (req, reply) => {
+    requireModerator(req);
+    reply.header("cache-control", "no-store");
+    return c.moderation.caseDetail(parse(IdParam, req.params).id);
+  });
+  app.post("/v1/moderation/cases/:id/actions", async (req) => {
+    const session = requireModerator(req);
+    return c.moderation.act(parse(IdParam, req.params).id, session.userId, req.body);
+  });
+  app.get("/v1/moderation/appeals", async (req, reply) => {
+    requireModerator(req);
+    reply.header("cache-control", "no-store");
+    const { status } = parse(z.object({ status: z.enum(["OPEN", "UPHELD", "REVERSED"]).default("OPEN") }), req.query);
+    return { appeals: await c.moderation.appeals(status) };
+  });
+  app.post("/v1/moderation/appeals/:id/decision", async (req) => {
+    const session = requireModerator(req);
+    return c.moderation.decideAppeal(parse(IdParam, req.params).id, session.userId, req.body);
+  });
+  app.post("/v1/moderation/events/:id/negative-state", async (req) => {
+    const session = requireModerator(req);
     const { id } = parse(IdParam, req.params);
     const b = parse(z.object({ to: NegativeState, reason: z.string().max(2000), evidenceRefs: z.array(z.uuid()).max(20).default([]) }), req.body);
     await c.verification.moderatorSetNegative({ eventId: id, moderatorUserId: session.userId, to: b.to, reason: b.reason, evidenceRefs: b.evidenceRefs });

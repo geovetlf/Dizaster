@@ -1,4 +1,4 @@
-import type { CostDashboard, KillSwitchView, AlertPreferences, CategorySubscription, CategorySubscriptionInput, NotificationsResponse, AppConfig, AreaSearchResult, FollowTarget, MyFollows, ProfileSearchResult, ProfileView, CommentView, CreateUploadRequest, FeedResponse, FeedTab, CreateUploadResponse, DevicePlatform, MediaView, RegisterPushTokenRequest, EventMapResponse, EventSummary, NearbyEventsResponse, SubmitReportRequest, SubmitReportResponse, TimelineEntryView } from "@dizaster/contracts";
+import type { AppealView, CaseDetail, CaseSummary, CreateFlagRequest, ModerationActionType, ModerationNotice, CostDashboard, KillSwitchView, AlertPreferences, CategorySubscription, CategorySubscriptionInput, NotificationsResponse, AppConfig, AreaSearchResult, FollowTarget, MyFollows, ProfileSearchResult, ProfileView, CommentView, CreateUploadRequest, FeedResponse, FeedTab, CreateUploadResponse, DevicePlatform, MediaView, RegisterPushTokenRequest, EventMapResponse, EventSummary, NearbyEventsResponse, SubmitReportRequest, SubmitReportResponse, TimelineEntryView } from "@dizaster/contracts";
 import { API_URL } from "./config";
 import type { Sender } from "./report/queue";
 
@@ -70,6 +70,20 @@ export const api = {
   /** Sin ids: marca todo como leído. */
   markNotificationsRead: (ids?: string[]) =>
     request<{ unread: number }>("/v1/me/notifications/read", { method: "POST", ...(ids ? { body: JSON.stringify({ ids }) } : {}) }),
+  flag: (body: CreateFlagRequest) => request<{ received: boolean }>("/v1/flags", { method: "POST", body: JSON.stringify(body) }),
+  block: (handle: string, on: boolean) =>
+    request<{ blocked: boolean }>(`/v1/blocks/${encodeURIComponent(handle)}`, { method: on ? "PUT" : "DELETE" }),
+  myModeration: () => request<{ notices: ModerationNotice[] }>("/v1/me/moderation"),
+  appeal: (actionId: string, text: string) =>
+    request<ModerationNotice>(`/v1/me/moderation/${actionId}/appeal`, { method: "POST", body: JSON.stringify({ text }) }),
+  moderationQueue: (cursor?: string | null) =>
+    request<{ cases: CaseSummary[]; nextCursor: string | null }>(`/v1/moderation/cases${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`),
+  moderationCase: (id: string) => request<CaseDetail>(`/v1/moderation/cases/${id}`),
+  moderationAct: (id: string, action: ModerationActionType, reason: string) =>
+    request<CaseDetail>(`/v1/moderation/cases/${id}/actions`, { method: "POST", body: JSON.stringify({ action, reason }) }),
+  appeals: () => request<{ appeals: AppealView[] }>("/v1/moderation/appeals"),
+  decideAppeal: (id: string, decision: "UPHOLD" | "REVERSE", reason: string) =>
+    request<AppealView>(`/v1/moderation/appeals/${id}/decision`, { method: "POST", body: JSON.stringify({ decision, reason }) }),
   account: () => request<{ roles: string[] }>("/v1/me/account"),
   costDashboard: (days = 30) => request<CostDashboard>(`/v1/admin/cost?days=${days}`),
   setKillSwitch: (feature: string, killed: boolean) =>

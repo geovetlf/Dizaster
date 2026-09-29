@@ -18,12 +18,14 @@ export default function ProfileScreen() {
   const [alerts, setAlerts] = useState(false);
   const [pending, setPending] = useState(0);
   const [handle, setHandle] = useState<string | null>(null);
-  const [admin, setAdmin] = useState(false);
+  const [roles, setRoles] = useState<string[]>([]);
+  const [notices, setNotices] = useState(0);
 
   useEffect(() => {
     if (!session.ready) return;
     api.me().then((p) => setHandle(p.handle)).catch(() => setHandle(null));
-    api.account().then((a) => setAdmin(a.roles.includes("admin"))).catch(() => setAdmin(false));
+    api.account().then((a) => setRoles(a.roles)).catch(() => setRoles([]));
+    api.myModeration().then((r) => setNotices(r.notices.length)).catch(() => setNotices(0));
   }, [session.ready]);
 
   useFocusEffect(
@@ -49,7 +51,9 @@ export default function ProfileScreen() {
         <Row icon="bell-outline" label={t("alerts")} value={alerts ? t("alertsOn") : t("alertsOff")} onPress={() => (alerts ? router.push("/alert-settings") : void turnOnAlerts())} />
         <Row icon="cloud-upload-outline" label={t("pendingReports")} value={String(pending)} />
         <Row icon="phone-alert" label={t("emergencyTitle")} onPress={() => router.push("/emergency")} />
-        {admin ? <Row icon="chart-bar" label={t("costTitle")} onPress={() => router.push("/admin-cost")} /> : null}
+        {notices > 0 ? <Row icon="gavel" label={t("myModeration")} value={String(notices)} onPress={() => router.push("/my-moderation")} /> : null}
+        {roles.includes("moderator") || roles.includes("admin") ? <Row icon="shield-check-outline" label={t("moderation")} onPress={() => router.push("/moderation")} /> : null}
+        {roles.includes("admin") ? <Row icon="chart-bar" label={t("costTitle")} onPress={() => router.push("/admin-cost")} /> : null}
         <Text style={styles.note}>{t("privacyNote")}</Text>
         <Text style={styles.version}>Dizaster {Application.nativeApplicationVersion ?? ""}</Text>
       </ScrollView>
@@ -57,7 +61,7 @@ export default function ProfileScreen() {
   );
 }
 
-function Row({ icon, label, value, onPress }: { icon: "account-circle-outline" | "bell-outline" | "cloud-upload-outline" | "phone-alert" | "chart-bar"; label: string; value?: string; onPress?: () => void }) {
+function Row({ icon, label, value, onPress }: { icon: "account-circle-outline" | "bell-outline" | "cloud-upload-outline" | "phone-alert" | "chart-bar" | "gavel" | "shield-check-outline"; label: string; value?: string; onPress?: () => void }) {
   return (
     <Pressable accessibilityRole={onPress ? "button" : "text"} disabled={!onPress} style={styles.row} onPress={onPress}>
       <Icon name={icon} size={22} color={colors.text} />

@@ -11,6 +11,7 @@ import { EventService } from "./modules/event/index.js";
 import { FeedService } from "./modules/feed/index.js";
 import { AlertService, ApnsSender, FcmSender, LogPushSender, PushGateway, type FcmServiceAccount, type PushSender } from "./modules/alert/index.js";
 import { GeoService } from "./modules/geo/index.js";
+import { ModerationService } from "./modules/moderation/index.js";
 import { DevAttestationVerifier, IdentityService, type AttestationVerifier } from "./modules/identity/index.js";
 import { IngestionScheduler, IngestionService, NodeHttpFetcher, type HttpFetcher } from "./modules/ingestion/index.js";
 import { LocalDiskStorage, MediaService, S3Storage, type StorageProvider } from "./modules/media/index.js";
@@ -39,6 +40,7 @@ export interface Container {
   alerts: AlertService;
   dispatcher: OutboxDispatcher;
   cost: CostService;
+  moderation: ModerationService;
   meter: Meter;
 }
 
@@ -79,10 +81,11 @@ export function buildContainer(env: AppEnv, overrides: { db?: Db; clock?: Clock;
   alerts.registerHandlers(dispatcher);
   // Presupuestos y kill switches persistidos: las funciones de pago empiezan a 0 y apagadas (migración 0009).
   const cost = new CostService(db, identity, media, clock, dataDir);
+  const moderation = new ModerationService(db, social, identity, events, verification);
   dispatcher.on("BudgetThresholdReached", "cost.log-threshold", async (e) => {
     console.warn(JSON.stringify({ msg: "cost.budget.threshold", ...e.payload }));
   });
-  return { env, db, clock, ref, geo, social, identity, events, ingestion, ingestionScheduler, verification, media, storage, reports, feed, alerts, dispatcher, cost, meter };
+  return { env, db, clock, ref, geo, social, identity, events, ingestion, ingestionScheduler, verification, media, storage, reports, feed, alerts, dispatcher, cost, moderation, meter };
 }
 
 /** APNs y FCM directos. Si falta la credencial de una plataforma, sus avisos quedan solo en el historial. */

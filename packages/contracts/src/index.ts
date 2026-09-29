@@ -13,3 +13,4 @@ export * from "./domain-events.js";
 export * from "./social.js";
 export * from "./alert.js";
 export * from "./cost.js";
+export * from "./moderation.js";

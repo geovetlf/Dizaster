@@ -51,6 +51,7 @@ export interface PushTarget {
 
 export class IdentityService {
   private readonly key: Uint8Array;
+  private readonly statusCache = new Map<string, { status: string; at: number }>();
 
   constructor(
     private readonly db: Db,
@@ -70,7 +71,8 @@ export class IdentityService {
       );
       if (existing.rows[0]) {
         const row = existing.rows[0];
-        if (row.status !== "ACTIVE") throw new DomainError("ACCOUNT_INACTIVE", "Cuenta no activa", 403);
+        // Una cuenta suspendida puede entrar (para ver por qué y apelar) pero no publicar; ver assertCanWrite.
+        if (row.status === "DELETED") throw new DomainError("ACCOUNT_INACTIVE", "Cuenta no activa", 403);
         const profile = await this.social.profileForUser(tx, row.user_id);
         return { userId: row.user_id, profileId: profile.id, roles: ["user", ...row.roles] };
       }
@@ -83,6 +85,26 @@ export class IdentityService {
       const profile = await this.social.createProfile(tx, { userId, handleHint });
       return { userId, profileId: profile.id, roles: ["user"] };
     });
+  }
+
+  /** Suspender o reactivar una cuenta (moderación). Surte efecto en todas las instancias en ≤ 30 s. */
+  async setUserStatus(q: Queryable, userId: string, status: "ACTIVE" | "SUSPENDED"): Promise<void> {
+    await q.query(`UPDATE identity.users SET status = $2, updated_at = now() WHERE id = $1 AND status <> 'DELETED'`, [userId, status]);
+    this.statusCache.delete(userId);
+  }
+
+  /** Una cuenta suspendida o borrada no puede escribir. Caché corta: una consulta por cuenta cada 30 s como mucho. */
+  async assertCanWrite(userId: string): Promise<void> {
+    const now = Date.now();
+    let cached = this.statusCache.get(userId);
+    if (!cached || now - cached.at > 30_000) {
+      const { rows } = await this.db.query<{ status: string }>(`SELECT status FROM identity.users WHERE id = $1`, [userId]);
+      cached = { status: rows[0]?.status ?? "DELETED", at: now };
+      this.statusCache.set(userId, cached);
+      if (this.statusCache.size > 10_000) this.statusCache.clear();
+    }
+    if (cached.status === "SUSPENDED") throw new DomainError("ACCOUNT_SUSPENDED", "Tu cuenta está suspendida. Puedes ver el motivo y apelar en Perfil.", 403);
+    if (cached.status !== "ACTIVE") throw new DomainError("ACCOUNT_INACTIVE", "Cuenta no activa", 403);
   }
 
   async grantRole(userId: string, role: Exclude<Role, "user">): Promise<void> {

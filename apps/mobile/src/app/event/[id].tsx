@@ -7,6 +7,7 @@ import { api } from "../../lib/api";
 import { t, VERIFICATION_LABEL, verificationLabel } from "../../lib/i18n";
 import { followablePlace } from "../../lib/social/place";
 import { useFollows } from "../../lib/social/follows";
+import { openFlag } from "../../lib/moderation/menu";
 import { colors, radius, space } from "../../theme";
 
 /** Pantalla de evento. También es el destino de los deep links: dizaster://event/<id> y https://<dominio>/e/<id>. */
@@ -40,6 +41,7 @@ export default function EventScreen() {
         {place ? (
           <FollowChip label={`${t("followPlace")} ${place.name}`} on={follows.following("place", place.id)} onPress={() => void follows.toggle("place", place.id, place.name)} />
         ) : null}
+        <FollowChip label={t("flag")} on={false} onPress={() => openFlag("EVENT", event.id)} />
       </View>
       <Text style={[styles.badge, { backgroundColor: color }]}>{verificationLabel(event.publicVerificationState)}</Text>
       <Text style={styles.meta}>

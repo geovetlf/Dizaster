@@ -19,6 +19,8 @@ export interface DomainEventMap {
   MediaUploaded: { mediaId: string };
   MediaReady: { mediaId: string };
   MediaRejected: { mediaId: string; reason: string };
+  /** Acción de moderación aplicada (por regla o por una persona). */
+  ModerationActionTaken: { actionId: string; targetType: string; targetId: string; action: string; actor: "RULE" | "MODERATOR" };
   /** Un presupuesto cruzó el 50, 80 o 100 % en su periodo. Al 100 % la función se degrada (CostGuard deniega). */
   BudgetThresholdReached: { key: string; threshold: 50 | 80 | 100; periodStart: string; spentUsd: number; limitUsd: number };
 }

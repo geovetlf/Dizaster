@@ -4,6 +4,9 @@ import { useEffect, useState } from "react";
 import { FlatList, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { api } from "../../lib/api";
 import { lang, t } from "../../lib/i18n";
+import { canBlock } from "../../lib/moderation/logic";
+import { openContentMenu } from "../../lib/moderation/menu";
+import { useMe } from "../../lib/social/me";
 import { timeAgo } from "../../lib/ui/format";
 import { colors, radius, space } from "../../theme";
 
@@ -14,6 +17,7 @@ export default function PostCommentsScreen() {
   const [text, setText] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const me = useMe();
 
   useEffect(() => {
     if (id) api.comments(id).then((r) => setComments(r.comments)).catch(() => setError(t("loadError")));
@@ -41,10 +45,19 @@ export default function PostCommentsScreen() {
         keyExtractor={(c) => c.id}
         contentContainerStyle={styles.list}
         renderItem={({ item }) => (
-          <View style={styles.comment}>
+          // Mantener pulsado: denunciar o bloquear (mismo gesto en iOS y Android).
+          <Pressable
+            accessibilityRole="text"
+            accessibilityHint={t("options")}
+            onLongPress={() => openContentMenu(
+              { type: "COMMENT", id: item.id, blockHandle: canBlock({ pseudonymous: false, handle: item.author.handle }, me.handle) ? item.author.handle : null },
+              () => setComments((prev) => prev.filter((c) => c.author.handle !== item.author.handle)),
+            )}
+            style={styles.comment}
+          >
             <Text style={styles.author}>{item.author.displayName} <Text style={styles.time}>· {timeAgo(item.createdAt, lang)}</Text></Text>
             <Text style={styles.text}>{item.text}</Text>
-          </View>
+          </Pressable>
         )}
       />
       {error ? <Text style={styles.error}>{error}</Text> : null}

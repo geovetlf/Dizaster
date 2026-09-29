@@ -119,6 +119,18 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | Precios de referencia versionados como datos | ✅ | `data/cost/prices.json` |
 | Avisar a administradores por push al cruzar un umbral | ⏳ | hoy va al log del worker |
 
+## Etapa 9 — Moderación y bloqueos (hecha)
+
+| Área | Estado | Dónde |
+|---|---|---|
+| Denuncias de posts, comentarios, eventos y perfiles; una por persona; límite por hora | ✅ | `services/core/src/modules/moderation`, ADR 0020 |
+| Cola con prioridad determinista y límite automático tras 5 denuncias de cuentas establecidas | ✅ | `ModerationService.reprioritize`, `autoLimit` |
+| Acciones con motivo obligatorio y registro auditable; suspensión que permite leer y apelar | ✅ | `moderation.actions`, `IdentityService.assertCanWrite` |
+| Transparencia y apelaciones revisadas por otra persona | ✅ | `/v1/me/moderation`, `/v1/moderation/appeals` |
+| Bloquear personas (requisito de las tiendas) | ✅ | `social.blocks`, `/v1/blocks/:handle` |
+| App: denunciar, bloquear, avisos y herramientas de moderación, iOS y Android | ✅ | `apps/mobile/src/app/flag.tsx`, `moderation/`, `my-moderation.tsx` |
+| Difuminado de rostros y matrículas (D-08) | ⏳ | etapa de media |
+
 ## Siguiente etapa (en orden)
 
 1. Métricas de calidad del producto (duplicados, tiempo hasta verificación) y aviso push de umbrales a administración.

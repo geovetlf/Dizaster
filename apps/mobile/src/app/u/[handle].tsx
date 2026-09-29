@@ -6,6 +6,7 @@ import { FeedList } from "../../components/feed-list";
 import { api } from "../../lib/api";
 import { t } from "../../lib/i18n";
 import { initials } from "../../lib/ui/format";
+import { confirmBlock, openFlag } from "../../lib/moderation/menu";
 import { colors, radius, space } from "../../theme";
 
 /** Perfil público: solo publicaciones con autoría pública (los reportes seudónimos nunca aparecen aquí). */
@@ -29,6 +30,16 @@ export default function PublicProfileScreen() {
     await api.follow("profile", profile.handle, on).catch(() => setProfile(prev));
   }
 
+  async function toggleBlock() {
+    if (!profile) return;
+    if (profile.blockedByMe) {
+      await api.block(profile.handle, false).catch(() => undefined);
+      setProfile({ ...profile, blockedByMe: false });
+    } else if (await confirmBlock(profile.handle)) {
+      setProfile({ ...profile, blockedByMe: true, followedByMe: false });
+    }
+  }
+
   const header = useMemo(
     () =>
       profile ? (
@@ -50,6 +61,16 @@ export default function PublicProfileScreen() {
             >
               <Text style={styles.followText}>{profile.followedByMe ? t("followingState") : t("follow")}</Text>
             </Pressable>
+          )}
+          {profile.isMe ? null : (
+            <View style={styles.safety}>
+              <Pressable accessibilityRole="button" onPress={() => void toggleBlock()}>
+                <Text style={styles.safetyText}>{profile.blockedByMe ? t("unblock") : t("block")}</Text>
+              </Pressable>
+              <Pressable accessibilityRole="button" onPress={() => openFlag("PROFILE", profile.handle)}>
+                <Text style={styles.safetyText}>{t("flag")}</Text>
+              </Pressable>
+            </View>
           )}
         </View>
       ) : null,
@@ -89,4 +110,6 @@ const styles = StyleSheet.create({
   follow: { backgroundColor: colors.accent, borderRadius: radius.pill, paddingHorizontal: space.xl, paddingVertical: space.sm, marginBottom: space.md },
   followOn: { backgroundColor: colors.surfaceAlt },
   followText: { color: colors.white, fontWeight: "700" },
+  safety: { flexDirection: "row", gap: space.xl },
+  safetyText: { color: colors.textMuted, fontSize: 13 },
 });

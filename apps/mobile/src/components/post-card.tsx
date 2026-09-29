@@ -4,6 +4,9 @@ import { useState } from "react";
 import { Image, Pressable, Share, StyleSheet, Text, View } from "react-native";
 import { api } from "../lib/api";
 import { LINK_DOMAIN } from "../lib/config";
+import { canBlock } from "../lib/moderation/logic";
+import { openContentMenu } from "../lib/moderation/menu";
+import { useMe } from "../lib/social/me";
 import { lang, t } from "../lib/i18n";
 import { categoryStyle } from "../lib/ui/categories";
 import { duration, initials, mediaLayout, postWhere } from "../lib/ui/format";
@@ -14,6 +17,8 @@ import { Icon } from "./icon";
 export function PostCard({ post, categoryName }: { post: FeedPost; categoryName: (code: string) => string }) {
   const [liked, setLiked] = useState(post.likedByMe);
   const [likes, setLikes] = useState(post.likeCount);
+  const [hidden, setHidden] = useState(false);
+  const me = useMe();
   const style = categoryStyle(post.categoryCode);
   const name = post.author.pseudonymous ? t("citizenReporter") : post.author.displayName;
   const where = postWhere(post, lang);
@@ -38,6 +43,8 @@ export function PostCard({ post, categoryName }: { post: FeedPost; categoryName:
     const url = LINK_DOMAIN ? `https://${LINK_DOMAIN}/${path}` : `dizaster://${post.event ? `event/${post.event.id}` : `post/${post.id}`}`;
     await Share.share({ message: [post.text, url].filter(Boolean).join("\n\n") }).catch(() => undefined);
   }
+
+  if (hidden) return null;
 
   return (
     <View style={styles.card}>
@@ -88,11 +95,14 @@ export function PostCard({ post, categoryName }: { post: FeedPost; categoryName:
           <Text style={styles.count}>{t("share")}</Text>
         </Pressable>
         <View style={styles.spacer} />
-        {post.event ? (
-          <Pressable accessibilityRole="button" accessibilityLabel={t("viewEvent")} onPress={() => router.push(`/event/${post.event!.id}`)}>
-            <Icon name="dots-horizontal" size={24} color={colors.text} />
-          </Pressable>
-        ) : null}
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t("options")}
+          hitSlop={8}
+          onPress={() => openContentMenu({ type: "POST", id: post.id, blockHandle: canBlock(post.author, me.handle) && !post.author.pseudonymous ? post.author.handle : null }, () => setHidden(true))}
+        >
+          <Icon name="dots-horizontal" size={24} color={colors.text} />
+        </Pressable>
       </View>
     </View>
   );
