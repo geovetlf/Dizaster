@@ -109,6 +109,7 @@ export class AlertService {
   registerHandlers(dispatcher: OutboxDispatcher): void {
     const run = (eventId: string, tx: Queryable) => this.evaluate(tx, eventId).then(() => undefined);
     dispatcher.on("EventCreated", "alert.evaluate.created", (e, tx) => run(e.payload.eventId, tx));
+    dispatcher.on("EventPublished", "alert.evaluate.published", (e, tx) => run(e.payload.eventId, tx));
     dispatcher.on("EventEvidenceAdded", "alert.evaluate.evidence", (e, tx) => run(e.payload.eventId, tx));
     dispatcher.on("VerificationChanged", "alert.evaluate.verification", (e, tx) => run(e.payload.eventId, tx));
     dispatcher.on("EventLifecycleChanged", "alert.evaluate.lifecycle", (e, tx) => run(e.payload.eventId, tx));

@@ -53,6 +53,12 @@ export class ReferenceData {
     for (const c of this.categories.categories) {
       if (c.parent && !this.byCode.has(c.parent)) throw new Error(`Categoría ${c.code}: padre ${c.parent} inexistente`);
       for (const x of c.compatibleWith) if (!this.byCode.has(x)) throw new Error(`Categoría ${c.code}: compatible ${x} inexistente`);
+      if (c.publishDelayMinutes > 0 && c.sensitivity !== "HIGHLY_SENSITIVE") throw new Error(`Categoría ${c.code}: el retraso de publicación es solo para HIGHLY_SENSITIVE`);
+    }
+    for (const o of this.categories.regionOverrides) {
+      if ((o.overrides.publishDelayMinutes ?? 0) > 0 && this.byCode.get(o.category)?.sensitivity !== "HIGHLY_SENSITIVE") {
+        throw new Error(`Override ${o.category}/${o.country}: el retraso de publicación es solo para HIGHLY_SENSITIVE`);
+      }
     }
   }
 

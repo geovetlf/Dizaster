@@ -9,6 +9,8 @@ export interface DomainEventMap {
   ReportSubmitted: { reportId: string; eventId: string | null; presenceBand: string; assertion: string };
   ReportDowngradedToPost: { postId: string; reasons: string[] };
   EventCreated: { eventId: string; categoryCode: string };
+  /** Un EVENT con retraso de publicación (ADR 0099) se hizo público. */
+  EventPublished: { eventId: string };
   EventEvidenceAdded: { eventId: string; evidenceId: string; evidenceType: string };
   /** Un moderador unió un duplicado (ADR 0034). Los consumidores redirigen sus referencias al destino. */
   EventMerged: { mergeId: string; targetEventId: string; mergedEventId: string };

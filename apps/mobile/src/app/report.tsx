@@ -11,6 +11,7 @@ import { callTarget, label as serviceLabel, type CallTarget } from "../lib/emerg
 import { localEmergencyDataset } from "../lib/emergency-store";
 import { countryOf } from "../lib/geo/country";
 import { lang, locale, t, tCount, verificationLabel } from "../lib/i18n";
+import { formatInZone } from "../lib/ui/format";
 import { newId } from "../lib/ids";
 import { OFFLINE_FALLBACK_STYLE, providerFromAppConfig } from "../lib/map/provider";
 import { toPresenceSignals } from "../lib/report/presence";
@@ -237,7 +238,7 @@ export default function ReportScreen() {
 }
 
 function describe(r: SubmitReportResponse): string {
-  return outcomeLines(r, t).join("\n");
+  return outcomeLines(r, t, (iso) => formatInZone(iso, lang, undefined, "time") ?? iso).join("\n");
 }
 
 const styles = StyleSheet.create({

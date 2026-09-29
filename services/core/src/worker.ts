@@ -24,6 +24,8 @@ async function loop() {
     if (pushed.SENT + pushed.GROUPED + pushed.FAILED > 0) console.log(JSON.stringify({ msg: "alerts.flush", ...pushed }));
     if (Date.now() - lastIngestionTick > 30_000) {
       lastIngestionTick = Date.now();
+      const published = await c.events.publishDue(c.db, c.clock.now());
+      if (published > 0) console.log(JSON.stringify({ msg: "events.delayed.published", count: published }));
       for (const run of await c.ingestionScheduler.tick()) {
         c.meter.add("ingestion", "fetches", 1, run.sourceKey);
         c.meter.add("ingestion", "items_new", run.itemsNew, run.sourceKey);

@@ -245,21 +245,24 @@ export class EventService {
 
   private async create(tx: Queryable, c: EventCandidate, category: CategoryConfig, country: string | null): Promise<ResolutionResult> {
     const id = newId();
+    // Retraso de publicación (§8.5, ADR 0099): solo lo creado por ciudadanos; una fuente se publica en el acto.
+    const delay = c.trustTier === "CITIZEN" ? publishDelayMinutes(category) : 0;
     const pub = this.geo.generalize(c.point, category.sensitivity);
     // Ubicación contextual: SIEMPRE desde el punto público generalizado, nunca desde el del reportero.
     const place = await this.geo.contextFor(tx, pub.point, category.sensitivity);
     await tx.query(
       `INSERT INTO event.events
          (id, category_code, title, geom, public_geom, public_h3, h3_r7, h3_r9, sensitivity, uncertainty_m, country_code,
-          occurred_start, first_seen_at, last_activity_at, severity, publication_state, region_id, district_id, place)
+          occurred_start, first_seen_at, last_activity_at, severity, publication_state, region_id, district_id, place, publish_after)
        VALUES ($1, $2, $3, ST_SetSRID(ST_MakePoint($4, $5), 4326)::geography, ST_SetSRID(ST_MakePoint($6, $7), 4326)::geography,
-               $8, $9, $10, $11, $12, $13, $14, $15, $15, $16, $17, $18, $19, $20)`,
+               $8, $9, $10, $11, $12, $13, $14, $15, $15, $16, $17, $18, $19, $20,
+               CASE WHEN $21::int > 0 THEN now() + make_interval(mins => $21::int) END)`,
       [
         id, c.categoryCode, JSON.stringify(c.title ?? category.names), c.point.lng, c.point.lat, pub.point.lng, pub.point.lat,
         pub.cell, this.geo.h3(c.point, H3_RES.ZONE), this.geo.h3(c.point, H3_RES.DEDUP), category.sensitivity,
         c.locationUncertaintyM, country, c.occurredAt, c.observedAt, c.severityHint ?? category.defaultSeverity,
-        c.createAsPending ? "PENDING_CORROBORATION" : "PUBLISHED",
-        place?.region?.id ?? null, place?.district?.id ?? null, place ? JSON.stringify(place) : null,
+        c.createAsPending ? "PENDING_CORROBORATION" : delay > 0 ? "DELAYED" : "PUBLISHED",
+        place?.region?.id ?? null, place?.district?.id ?? null, place ? JSON.stringify(place) : null, delay,
       ],
     );
     await this.addTimeline(tx, id, "CREATED", { origin: c.origin, trustTier: c.trustTier });
@@ -338,8 +341,8 @@ export class EventService {
          FROM event.evidence WHERE event_id = $1 AND status = 'ACTIVE' AND assertion = 'OCCURRING'`,
       [eventId],
     );
-    const ev = (await tx.query<{ sensitivity: EventSummary["sensitivity"]; publication_state: string }>(
-      `SELECT sensitivity, publication_state FROM event.events WHERE id = $1`, [eventId],
+    const ev = (await tx.query<{ sensitivity: EventSummary["sensitivity"]; publication_state: string; delay_pending: boolean }>(
+      `SELECT sensitivity, publication_state, coalesce(publish_after > now(), false) AS delay_pending FROM event.events WHERE id = $1`, [eventId],
     )).rows[0];
     if (!ev || rows.length === 0) {
       await tx.query(
@@ -357,7 +360,7 @@ export class EventService {
     const citizens = rows.filter((r) => r.trust_tier === "CITIZEN");
     const distinctContributors = new Set(citizens.map((r) => r.contributor_user_id)).size;
     const hasNonCitizen = rows.some((r) => r.trust_tier !== "CITIZEN");
-    const publication = ev.publication_state === "PENDING_CORROBORATION" && (distinctContributors >= 2 || hasNonCitizen) ? "PUBLISHED" : ev.publication_state;
+    const publication = nextPublication(ev.publication_state, { distinctContributors, hasNonCitizen, delayPending: ev.delay_pending });
     await tx.query(
       `UPDATE event.events SET
           geom = ST_SetSRID(ST_MakePoint($2, $3), 4326)::geography,
@@ -497,6 +500,19 @@ export class EventService {
   }
 
   /** Cola de moderación: pares abiertos cuyos dos eventos siguen sin fusionar, los más antiguos primero. */
+  /** Publica los EVENTs cuyo retraso venció (ADR 0099). Idempotente; lo corre el worker cada 30 s. */
+  async publishDue(db: Db, now: Date): Promise<number> {
+    return withTransaction(db, async (tx) => {
+      const { rows } = await tx.query<{ id: string }>(
+        `UPDATE event.events SET publication_state = 'PUBLISHED', updated_at = now()
+          WHERE publication_state = 'DELAYED' AND publish_after <= $1 RETURNING id`,
+        [now],
+      );
+      for (const r of rows) await publish(tx, "EventPublished", { eventId: r.id });
+      return rows.length;
+    });
+  }
+
   /** Eventos seguidos para "Lo que sigo" (ADR 0097): sin los fusionados, cuyo destino ya se sigue (ADR 0093). */
   async followedSummaries(q: Queryable, ids: string[]): Promise<Map<string, EventSummary>> {
     if (ids.length === 0) return new Map();
@@ -725,7 +741,7 @@ export class EventService {
   // ───────────── Lecturas (públicas: solo geometría generalizada) ─────────────
 
   async getEvent(q: Queryable, id: string): Promise<EventSummary & { mergedIntoId: string | null; publicationState: string }> {
-    const { rows } = await q.query<EventRow>(`SELECT ${PUBLIC_EVENT_COLUMNS} FROM event.events e WHERE e.id = $1 AND e.publication_state <> 'HIDDEN'`, [id]);
+    const { rows } = await q.query<EventRow>(`SELECT ${PUBLIC_EVENT_COLUMNS} FROM event.events e WHERE e.id = $1 AND e.publication_state NOT IN ('HIDDEN','DELAYED')`, [id]);
     const r = rows[0];
     if (!r) throw notFound("Evento");
     return { ...toSummary(r), mergedIntoId: r.merged_into_id, publicationState: r.publication_state };
@@ -745,7 +761,7 @@ export class EventService {
       severity: number; region_id: string | null; district_id: string | null;
     }>(
       `SELECT id, verification_level, negative_state, sensitivity, place, severity, region_id, district_id
-         FROM event.events WHERE id = ANY($1) AND publication_state <> 'HIDDEN'`,
+         FROM event.events WHERE id = ANY($1) AND publication_state NOT IN ('HIDDEN','DELAYED')`,
       [ids],
     );
     return new Map(
@@ -887,7 +903,7 @@ export class EventService {
       `SELECT ${PUBLIC_EVENT_COLUMNS}, ST_Y(e.geom::geometry) AS ilat, ST_X(e.geom::geometry) AS ilng
          FROM event.events e
         WHERE e.status IN ('ACTIVE','MONITORING') AND e.merged_into_id IS NULL AND e.negative_state <> 'FALSE'
-          AND e.publication_state <> 'HIDDEN'
+          AND e.publication_state NOT IN ('HIDDEN','DELAYED')
           AND (e.category_code = ANY($1) OR e.category_code LIKE $2)
           AND ST_DWithin(e.geom, ST_SetSRID(ST_MakePoint($3, $4), 4326)::geography, $5)
           AND e.last_activity_at >= now() - make_interval(mins => $6)
@@ -1078,4 +1094,22 @@ export function mergeOrder<T extends { id: string; verification_level: Verificat
   const [ka, kb] = [key(a), key(b)];
   for (let i = 0; i < ka.length; i++) if (ka[i] !== kb[i]) return ka[i]! > kb[i]! ? [a, b] : [b, a];
   return a.id < b.id ? [a, b] : [b, a];
+}
+
+/** Minutos de retraso de una categoría: solo aplica a HIGHLY_SENSITIVE (§8.5). NO AI REQUIRED. */
+export function publishDelayMinutes(category: Pick<CategoryConfig, "sensitivity" | "publishDelayMinutes">): number {
+  return category.sensitivity === "HIGHLY_SENSITIVE" ? category.publishDelayMinutes ?? 0 : 0;
+}
+
+/**
+ * Transición del estado de publicación al llegar evidencia (ADR 0099). Pura. Una fuente no ciudadana publica en el
+ * acto; un evento pendiente de corroboración que se corrobora espera su retraso si aún no venció. NO AI REQUIRED.
+ */
+export function nextPublication(
+  current: string, s: { distinctContributors: number; hasNonCitizen: boolean; delayPending: boolean },
+): string {
+  if (current !== "PENDING_CORROBORATION" && current !== "DELAYED") return current;
+  if (s.hasNonCitizen) return "PUBLISHED";
+  if (current === "PENDING_CORROBORATION" && s.distinctContributors >= 2) return s.delayPending ? "DELAYED" : "PUBLISHED";
+  return current;
 }

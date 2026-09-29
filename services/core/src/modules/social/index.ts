@@ -24,6 +24,8 @@ export interface CreatePostInput {
   sharedPostId?: string | null;
   /** Publica un negocio (ya comprobado que la persona lo administra). Nunca seudónimo. */
   businessId?: string | null;
+  /** Retraso de publicación (ADR 0099): antes de esta hora solo lo ve su autor. */
+  visibleAfterMinutes?: number;
 }
 
 export interface FeedRow {
@@ -210,13 +212,14 @@ export class SocialService {
     const base = textFingerprintBase(input.text);
     const textHash = base ? createHash("sha256").update(base).digest("hex") : null;
     await tx.query(
-      `INSERT INTO social.posts (id, author_type, author_id, kind, author_visibility, text, category_code, public_point, text_hash, shared_post_id, lang)
+      `INSERT INTO social.posts (id, author_type, author_id, kind, author_visibility, text, category_code, public_point, text_hash, shared_post_id, lang, visible_after)
        VALUES ($1, $9, $2, $3, $4, $5, $8,
-               CASE WHEN $6::float8 IS NULL THEN NULL ELSE ST_SetSRID(ST_MakePoint($6, $7), 4326)::geography END, $10, $11, $12)`,
+               CASE WHEN $6::float8 IS NULL THEN NULL ELSE ST_SetSRID(ST_MakePoint($6, $7), 4326)::geography END, $10, $11, $12,
+               CASE WHEN $13::int > 0 THEN now() + make_interval(mins => $13::int) END)`,
       [id, input.businessId ?? input.authorProfileId, input.kind, input.businessId ? "PUBLIC" : input.authorVisibility, input.text,
         input.publicPoint?.lng ?? null, input.publicPoint?.lat ?? null, input.categoryCode ?? null, input.businessId ? "BUSINESS" : "PROFILE", textHash, input.sharedPostId ?? null,
         // Idioma detectado en el servidor, sin modelo externo (ADR 0091).
-        detectLanguage(input.text)],
+        detectLanguage(input.text), input.visibleAfterMinutes ?? 0],
     );
     if (textHash) await this.detectDuplicateText(tx, textHash);
     // Un negocio publica su propio teléfono y correo a propósito: solo se revisan documentos y tarjetas.
@@ -336,7 +339,9 @@ export class SocialService {
     if (f.tab === "following" && !f.viewerProfileId) return [];
     if (f.tab === "nearby" && !f.near) return [];
     const params: unknown[] = [f.limit, f.viewerProfileId];
-    const where = [`p.deleted_at IS NULL`, `p.visibility = 'PUBLIC'`, `p.moderation_state = 'VISIBLE'`];
+    const where = [`p.deleted_at IS NULL`, `p.visibility = 'PUBLIC'`, `p.moderation_state = 'VISIBLE'`,
+      // Retraso de publicación (ADR 0099): hasta su hora, solo su autor lo ve.
+      `(p.visible_after IS NULL OR p.visible_after <= now() OR (p.author_type = 'PROFILE' AND p.author_id = $2))`];
     // Bloqueos: se ocultan los posts con nombre del bloqueado. Los seudónimos se mantienen: pueden ser avisos de
     // seguridad y ocultarlos no aporta nada (el bloqueador no sabe quién los escribió).
     if (f.viewerProfileId) {

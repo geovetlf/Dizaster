@@ -290,6 +290,7 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | Disputa, falsedad y cola de duplicados en la app de moderación | ✅ | ADR 0096 |
 | "Lo que sigo" y "Bloqueados" en la app | ✅ | ADR 0097 |
 | Administración en la app: presupuestos, sello y ámbito institucional, consultas de presencia, quitar MFA | ✅ | ADR 0098 |
+| Retraso de publicación configurable en HIGHLY_SENSITIVE (valor en espera: 0) | ✅ | ADR 0099 |
 | Licencias, auditoría, SBOM, Dependabot; respaldo con prueba de restauración en CI | ✅ | ADR 0070, `scripts/supply-chain.mjs`, `scripts/db-restore-check.mjs` |
 | Idioma de la app elegible en el perfil (es/en/pt/fr o del teléfono) | ✅ | ADR 0069, `app/language.tsx` |
 | Varias cuentas en un teléfono corroboran como una (clave seudónima del teléfono) | ✅ | ADR 0068, migración 0036 |
@@ -321,10 +322,9 @@ Revisión del Blueprint del 2026-09-29 (tras ADR 0080): completada con ADR 0081�
 
 Revisión del Blueprint del 2026-09-29 (tras ADR 0092), verificada contra el código, sin bloqueos:
 
-1. Retraso de publicación configurable para categorías HIGHLY_SENSITIVE (§8.5); por defecto 0.
-2. Promoción NORMAL→URGENT por regla configurable por fuente (§9.2).
-3. Roles verificador y operador (§13.1 RBAC).
-4. Preparación para idiomas RTL (§5.15).
+1. Promoción NORMAL→URGENT por regla configurable por fuente (§9.2).
+2. Roles verificador y operador (§13.1 RBAC).
+3. Preparación para idiomas RTL (§5.15).
 
 
 Bloqueadas o en espera:
@@ -339,6 +339,8 @@ Bloqueadas o en espera:
 - **En espera de acción humana** — Activar ReliefWeb y OMS DON (ADR 0092): ReliefWeb pide registrar un `appname`
   y aceptar sus términos; la OMS, confirmar los términos de uso del sitio. Noticias RSS: falta elegir qué medios
   (decisión de producto y de derechos).
+- **En espera de decisión de producto** — Minutos de retraso de publicación para `crime.violence` (ADR 0099): hoy 0,
+  sin efecto hasta que se elija un valor.
 - **En espera de acción humana** — Fuentes IGP, INDECI y SENAMHI (confirmar formato/URL y términos; si publican CAP,
   activar es solo configuración, ADR 0033).
 - **Requiere al propietario** — Capa de IA (proveedor y presupuesto), enlaces de donación verificados (D-15), textos

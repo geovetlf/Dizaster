@@ -25,6 +25,11 @@ export const CategoryConfig = z.object({
   compatibleWith: z.array(CategoryCode).default([]),
   /** Si true, la publicación seudónima es obligatoria. */
   forcePseudonymous: z.boolean().default(false),
+  /**
+   * Minutos que espera un EVENT creado por reporte ciudadano, y el post del reporte, antes de ser públicos (§8.5,
+   * ADR 0099). Solo para HIGHLY_SENSITIVE; 0 = sin retraso. Una fuente oficial o externa lo publica en el acto.
+   */
+  publishDelayMinutes: z.number().int().min(0).max(1440).default(0),
 });
 export type CategoryConfig = z.infer<typeof CategoryConfig>;
 
@@ -39,6 +44,7 @@ export const CategoryRegionOverride = z.object({
     dedupWindowMinutes: true,
     communityThreshold: true,
     citizenReportable: true,
+    publishDelayMinutes: true,
   })
     .partial()
     .default({}),

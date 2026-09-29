@@ -16,7 +16,7 @@ import { withTransaction } from "../../platform/db.js";
 import { DomainError, notFound } from "../../platform/errors.js";
 import { newId } from "../../platform/ids.js";
 import { publish, type OutboxDispatcher } from "../../platform/outbox.js";
-import type { EventService } from "../event/index.js";
+import { publishDelayMinutes, type EventService } from "../event/index.js";
 import type { GeoService } from "../geo/index.js";
 import type { AttestationVerifier, IdentityService, Session } from "../identity/index.js";
 import type { MediaService } from "../media/index.js";
@@ -96,6 +96,9 @@ export class ReportService {
 
     return withTransaction(db, async (tx) => {
       const reportId = newId();
+      // Categorías HIGHLY_SENSITIVE con retraso (ADR 0099): el post y el evento que cree esperan antes de ser públicos.
+      const delay = publishDelayMinutes(category);
+      const publishAfter = delay > 0 ? new Date(receivedAt.getTime() + delay * 60_000).toISOString() : null;
       let result: SubmitReportResponse;
       let eventId: string | null = null;
       let downgradeReasons: PresenceRejectionReason[] | null = presence.band === "LOW" ? presence.reasons : null;
@@ -134,6 +137,7 @@ export class ReportService {
         authorVisibility: anonymity,
         categoryCode: req.categoryCode,
         publicPoint: eventId ? generalize(req.pin, category.sensitivity).point : null,
+        visibleAfterMinutes: delay,
       });
       await this.d.social.attachMedia(tx, postId, attachable);
       if (attachable.length > 0 && category.sensitivity !== "NORMAL") await publish(tx, "PostMediaNeedsReview", { postId });
@@ -148,7 +152,7 @@ export class ReportService {
           await this.d.events.addTimeline(tx, eventId, "MEDIA_ADDED", { mediaIds: req.mediaIds, mediaCount: req.mediaIds.length, reportId });
         }
         const created = await this.d.events.wasCreatedBy(tx, eventId, reportId);
-        result = { outcome: created ? "CREATED_EVENT" : "ATTACHED_TO_EVENT", reportId, postId, eventId, presenceBand: presence.band };
+        result = { outcome: created ? "CREATED_EVENT" : "ATTACHED_TO_EVENT", reportId, postId, eventId, presenceBand: presence.band, ...(publishAfter ? { publishAfter } : {}) };
       } else {
         result = { outcome: "DOWNGRADED_TO_POST", postId, reasons: downgradeReasons ?? [] };
       }

@@ -188,6 +188,7 @@ export const fr: Record<MessageKey, string> = {
   upholdAppeal: "Maintenir",
   reverseAppeal: "Annuler la décision",
   myModeration: "Avis de modération",
+  publishDelayed: "Par sécurité, publication à",
   budgetConfirm: "Nouveau plafond en USD. Le relever au-dessus de 0 autorise une dépense réelle pour cette fonction :",
   adminBusinesses: "Commerces et institutions",
   bizSearch: "Rechercher par nom ou @handle",

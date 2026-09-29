@@ -20,3 +20,11 @@ describe("outcomeLines (§8.2)", () => {
     expect(outcomeLines({ outcome: "CREATED_EVENT", reportId: "r", postId: "p", eventId: "e", presenceBand: "ON_SITE" } as never, t as never)).toEqual(["Creado"]);
   });
 });
+
+describe("retraso de publicación (ADR 0099)", () => {
+  it("dice hasta qué hora espera la publicación", () => {
+    const r = { outcome: "CREATED_EVENT", reportId: "r", postId: "p", eventId: "e", presenceBand: "HIGH", publishAfter: "2026-09-29T17:00:00Z" } as never;
+    expect(outcomeLines(r, ((k: string) => (k === "publishDelayed" ? "Se publicará a las" : msgs[k])) as never, (iso) => iso.slice(11, 16)))
+      .toEqual(["Creado", "Se publicará a las 17:00"]);
+  });
+});
