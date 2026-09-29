@@ -60,6 +60,21 @@ describe("subida directa firmada", () => {
     expect(copy.subarray(0, copy.indexOf(Buffer.from("mdat"))).includes(Buffer.from(ANDROID_LOCATION))).toBe(false);
   });
 
+  it("video: la duración y el tamaño salen del archivo, no de lo declarado (ADR 0071)", async () => {
+    const u = await createUser(t, "media_duracion");
+    const honest = await uploadReady(u, makeMp4({ durationMs: 30_500, width: 1920, height: 1080 }), { kind: "VIDEO_RECORDED", mime: "video/mp4", durationMs: 10_000, width: 640, height: 360 });
+    expect(await state(u, honest)).toMatchObject({ state: "READY" });
+    const dims = (await t.c.db.query(`SELECT duration_ms, width, height FROM media.media WHERE id = $1`, [honest])).rows[0];
+    expect(dims).toEqual({ duration_ms: 30_500, width: 1920, height: 1080 });
+
+    const long = await uploadReady(u, makeMp4({ durationMs: 95_000 }), { kind: "VIDEO_RECORDED", mime: "video/mp4", durationMs: 20_000 });
+    expect(await state(u, long)).toMatchObject({ state: "REJECTED" });
+    expect((await state(u, long)).rejectionReason).toContain("Duración real");
+
+    const huge = await uploadReady(u, makeMp4({ width: 7680, height: 4320 }), { kind: "VIDEO_RECORDED", mime: "video/mp4", durationMs: 20_000 });
+    expect((await state(u, huge)).rejectionReason).toContain("Resolución");
+  });
+
   it("video con póster del teléfono: miniatura saneada, hash perceptual y sin original del póster", async () => {
     const u = await createUser(t, "media_poster");
     const file = makeMp4();

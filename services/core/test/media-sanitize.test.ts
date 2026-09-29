@@ -79,3 +79,12 @@ describe("MP4/MOV sin ubicación", () => {
     expect(() => neutralizeIsoBmffLocation(bad)).toThrow(MalformedMediaError);
   });
 });
+
+describe("videoInfo (ADR 0071)", () => {
+  it("lee duración de mvhd y tamaño del tkhd de la pista de video", async () => {
+    const { videoInfo } = await import("../src/modules/media/sanitize.js");
+    expect(videoInfo(makeMp4({ durationMs: 12_345, width: 1080, height: 1920 }))).toEqual({ durationMs: 12_345, width: 1080, height: 1920 });
+    expect(videoInfo(makeMp4({ moovFirst: false })).durationMs).toBe(24_000);
+    expect(() => videoInfo(makeMp4().subarray(0, 30))).toThrow();
+  });
+});

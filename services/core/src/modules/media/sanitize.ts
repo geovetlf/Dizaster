@@ -130,6 +130,50 @@ export function topLevelBoxes(data: Uint8Array): Box[] {
   return boxes;
 }
 
+// ───────────── Duración y tamaño reales del video (ADR 0071) ─────────────
+
+export interface VideoInfo { durationMs: number; width: number | null; height: number | null }
+
+/** Cajas hijas dentro de [from, to). Mismas reglas que las de primer nivel. */
+function childBoxes(data: Uint8Array, from: number, to: number): Box[] {
+  return topLevelBoxes(data.subarray(from, to)).map((b) => ({ ...b, start: b.start + from, end: b.end + from }));
+}
+
+/**
+ * Lee `moov/mvhd` (escala de tiempo y duración) y el `tkhd` de la pista de video (`hdlr` = "vide"). No confía en lo
+ * que declaró el teléfono: el límite de 60 s y las dimensiones guardadas salen del archivo.
+ */
+export function videoInfo(data: Uint8Array): VideoInfo {
+  const moov = topLevelBoxes(data).find((b) => b.type === "moov");
+  if (!moov) throw new MalformedMediaError("Video sin caja moov");
+  const kids = childBoxes(data, moov.start + moov.header, moov.end);
+  const mvhd = kids.find((b) => b.type === "mvhd");
+  if (!mvhd) throw new MalformedMediaError("Video sin mvhd");
+  const p = mvhd.start + mvhd.header;
+  const version = data[p]!;
+  const view = new DataView(data.buffer, data.byteOffset);
+  const need = version === 1 ? 32 : 20;
+  if (p + need > mvhd.end) throw new MalformedMediaError("mvhd truncado");
+  const timescale = version === 1 ? view.getUint32(p + 20) : view.getUint32(p + 12);
+  const duration = version === 1 ? Number(view.getBigUint64(p + 24)) : view.getUint32(p + 16);
+  if (!timescale) throw new MalformedMediaError("Video sin escala de tiempo");
+  let width: number | null = null;
+  let height: number | null = null;
+  for (const trak of kids.filter((b) => b.type === "trak")) {
+    const parts = childBoxes(data, trak.start + trak.header, trak.end);
+    const mdia = parts.find((b) => b.type === "mdia");
+    const hdlr = mdia ? childBoxes(data, mdia.start + mdia.header, mdia.end).find((b) => b.type === "hdlr") : undefined;
+    if (!hdlr || hdlr.start + hdlr.header + 12 > hdlr.end || ascii(data, hdlr.start + hdlr.header + 8, hdlr.start + hdlr.header + 12) !== "vide") continue;
+    const tkhd = parts.find((b) => b.type === "tkhd");
+    if (!tkhd || tkhd.end - 8 < tkhd.start + tkhd.header) continue;
+    // Ancho y alto: los últimos 8 bytes de tkhd, en punto fijo 16.16.
+    width = view.getUint32(tkhd.end - 8) >>> 16;
+    height = view.getUint32(tkhd.end - 4) >>> 16;
+    break;
+  }
+  return { durationMs: Math.round((duration / timescale) * 1000), width, height };
+}
+
 // ───────────── utilidades ─────────────
 
 function readU32(d: Uint8Array, at: number): number {

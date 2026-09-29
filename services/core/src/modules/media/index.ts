@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import {
   CreateUploadRequest,
+  MEDIA_UPLOAD_LIMITS,
   V1_MEDIA_KINDS,
   type ContentWarning,
   type CreateUploadResponse,
@@ -15,7 +16,7 @@ import { DomainError, notFound } from "../../platform/errors.js";
 import { newId } from "../../platform/ids.js";
 import { publish, type OutboxDispatcher } from "../../platform/outbox.js";
 import { NEAR_DUPLICATE_BITS, phashBands, renderImage } from "./images.js";
-import { familyOfMime, MalformedMediaError, sanitize, sniffFamily } from "./sanitize.js";
+import { familyOfMime, MalformedMediaError, sanitize, sniffFamily, videoInfo } from "./sanitize.js";
 import type { StorageProvider } from "./storage/types.js";
 
 export type { StorageProvider } from "./storage/types.js";
@@ -44,6 +45,10 @@ export const POSTER_VARIANT = "POSTER";
 const posterKey = (originalKey: string) => `${originalKey}_poster`;
 /** Una foto casi idéntica a otra de otra persona subida hace más de esto se señala a moderación. */
 export const REUSE_MIN_AGE_HOURS = 1;
+/** Margen sobre los 60 s (redondeo de contenedores y del grabador). */
+export const VIDEO_DURATION_TOLERANCE_MS = 1_000;
+/** Lado mayor máximo de un video (4K). */
+export const MAX_VIDEO_SIDE_PX = 4096;
 
 const EXT: Record<string, string> = { "image/jpeg": "jpg", "video/mp4": "mp4", "video/quicktime": "mov" };
 
@@ -214,6 +219,23 @@ export class MediaService {
       );
       await this.detectReuse(tx, mediaId, row.owner_profile_id, img.phash);
     } else {
+      // Duración y tamaño salen del archivo, no de lo declarado (ADR 0071).
+      let info;
+      try {
+        info = videoInfo(original);
+      } catch (err) {
+        if (err instanceof MalformedMediaError) return this.reject(tx, mediaId, `Video ilegible: ${err.message}`);
+        throw err;
+      }
+      const maxMs = MEDIA_UPLOAD_LIMITS.VIDEO_RECORDED.maxDurationMs + VIDEO_DURATION_TOLERANCE_MS;
+      if (info.durationMs <= 0 || info.durationMs > maxMs) return this.reject(tx, mediaId, `Duración real ${info.durationMs} ms fuera del límite`);
+      if (info.width !== null && info.height !== null && Math.max(info.width, info.height) > MAX_VIDEO_SIDE_PX) {
+        return this.reject(tx, mediaId, `Resolución ${info.width}×${info.height} por encima del máximo`);
+      }
+      await tx.query(
+        `UPDATE media.media SET duration_ms = $2, width = coalesce($3, width), height = coalesce($4, height) WHERE id = $1`,
+        [mediaId, info.durationMs, info.width, info.height],
+      );
       await variant(PUBLIC_VARIANT, `public/${mediaId}.${EXT[row.mime] ?? "bin"}`, result.data, row.mime);
       if (row.poster_sha256) await this.processPoster(tx, row, variant);
     }
