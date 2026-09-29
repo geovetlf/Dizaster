@@ -29,5 +29,5 @@ con el mismo código.
 4. **Campana sin contador.** Aún no hay bandeja de notificaciones; la campana lleva a activar alertas en este teléfono.
 5. **Avatares con iniciales** hasta que existan fotos de perfil. Los reportes seudónimos muestran un escudo y
    "Reporte ciudadano", nunca el nombre.
-6. **"Siguiendo" vacío** hasta que exista seguir perfiles; la búsqueda de usuarios llega con los perfiles públicos.
+6. **"Siguiendo"** reúne personas, eventos y lugares seguidos (ADR 0017); vacío muestra cómo empezar a seguir.
 7. **Videos sin reproducción automática en el feed** (ahorra datos móviles); se reproducen al abrir el evento.

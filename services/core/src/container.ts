@@ -64,11 +64,12 @@ export function buildContainer(env: AppEnv, overrides: { db?: Db; clock?: Clock;
     attestation: overrides.attestation ?? new DevAttestationVerifier(),
     limits: { reportsPerHour: env.REPORTS_PER_HOUR_LIMIT, presenceRetentionDays: env.PRESENCE_RETENTION_DAYS },
   });
-  const feed = new FeedService(social, events, media, ref);
+  const feed = new FeedService(social, events, media, ref, geo);
   const dispatcher = new OutboxDispatcher(db);
   events.registerHandlers(dispatcher);
   verification.registerHandlers(dispatcher);
   media.registerHandlers(dispatcher);
+  feed.registerHandlers(dispatcher);
   // Presupuestos iniciales: las funciones de pago están a 0 hasta que se aprueben (cost-first).
   const cost = new InMemoryCostGuard({ "ai.daily": 0, "sms.daily": 0, "translation.daily": 0 }, { ai: true, sms: true, translation: true });
   return { env, db, clock, ref, geo, social, identity, events, ingestion, ingestionScheduler, verification, media, storage, reports, feed, dispatcher, cost };

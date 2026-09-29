@@ -5,7 +5,7 @@ import { CountryLocator, H3_RES, distanceMeters, generalize, h3, type CountryFea
 import type { Queryable } from "../../platform/db.js";
 import { DomainError } from "../../platform/errors.js";
 import type { ReferenceData } from "../reference/index.js";
-import { toContextualLocation, type ResolvedContext } from "./context.js";
+import { labelFor, toContextualLocation, type ResolvedContext } from "./context.js";
 import { searchKey } from "./names.js";
 
 export { importDataset, loadManifest, type DatasetSpec, type GeoManifest, type ImportResult } from "./importer.js";
@@ -171,6 +171,18 @@ export class GeoService {
       center: { lat: r.lat, lng: r.lng },
       bbox: [r.w, r.s, r.e, r.n],
     }));
+  }
+
+  /** Áreas por id (para nombrar lugares seguidos y validar que existen). */
+  async areasByIds(q: Queryable, ids: string[]): Promise<{ id: string; name: string; label: string }[]> {
+    if (ids.length === 0) return [];
+    const { rows } = await q.query<{ id: string; name: string; parent_name: string | null; country: string }>(
+      `SELECT a.id, a.name, p.name AS parent_name, a.country
+         FROM geo.admin_areas a LEFT JOIN geo.admin_areas p ON p.id = a.parent_id
+        WHERE a.id = ANY($1)`,
+      [ids],
+    );
+    return rows.map((r) => ({ id: r.id, name: r.name, label: labelFor({ name: this.countryName(r.country.trim()) }, null, r.parent_name ? { name: r.parent_name } : null, { name: r.name }) }));
   }
 
   /** Datasets geográficos importados (para atribución de licencias en la app). */

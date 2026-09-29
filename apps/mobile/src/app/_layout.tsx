@@ -17,6 +17,7 @@ export default function RootLayout() {
         <Stack.Screen name="search" options={{ title: t("searchCategories"), presentation: "modal" }} />
         <Stack.Screen name="event/[id]" options={{ title: "" }} />
         <Stack.Screen name="post/[id]" options={{ title: t("comments") }} />
+        <Stack.Screen name="u/[handle]" options={{ title: "" }} />
       </Stack>
     </SessionProvider>
   );

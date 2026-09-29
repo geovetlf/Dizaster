@@ -1,4 +1,4 @@
-import type { AreaSearchResult, CategoryCatalog } from "@dizaster/contracts";
+import type { AreaSearchResult, CategoryCatalog, ProfileSearchResult } from "@dizaster/contracts";
 import { router } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import { Pressable, SectionList, StyleSheet, Text, TextInput, View } from "react-native";
@@ -6,7 +6,7 @@ import { Icon } from "../components/icon";
 import { api } from "../lib/api";
 import { lang, t } from "../lib/i18n";
 import { categoryStyle } from "../lib/ui/categories";
-import { areaRow, bboxParam } from "../lib/ui/format";
+import { areaRow, bboxParam, initials } from "../lib/ui/format";
 import { useCoarseLocation } from "../lib/ui/use-coarse-location";
 import { colors, radius, space } from "../theme";
 
@@ -15,15 +15,19 @@ const catalog = require("../reference-data/categories.json") as CategoryCatalog;
 
 const normalize = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 
-type Row = { type: "area"; area: AreaSearchResult } | { type: "category"; code: string; name: string };
+type Row =
+  | { type: "area"; area: AreaSearchResult }
+  | { type: "person"; person: ProfileSearchResult }
+  | { type: "category"; code: string; name: string };
 
 /**
- * Búsqueda: lugares (índice geográfico propio, sin geocodificador comercial) y categorías (catálogo
- * empaquetado, funciona sin conexión). Usuarios: con los perfiles públicos (siguiente etapa).
+ * Búsqueda: lugares (índice geográfico propio, sin geocodificador comercial), personas y categorías (catálogo
+ * empaquetado, funciona sin conexión).
  */
 export default function SearchScreen() {
   const [q, setQ] = useState("");
   const [areas, setAreas] = useState<AreaSearchResult[]>([]);
+  const [people, setPeople] = useState<ProfileSearchResult[]>([]);
   const location = useCoarseLocation();
   const near = location.point;
 
@@ -34,17 +38,19 @@ export default function SearchScreen() {
 
   useEffect(() => {
     const text = q.trim();
-    if (text.length < 2) { setAreas([]); return; }
+    if (text.length < 2) { setAreas([]); setPeople([]); return; }
     let live = true;
     // Espera a que el usuario deje de escribir: menos peticiones, menos coste.
     const timer = setTimeout(() => {
       api.areas(text, near).then((r) => { if (live) setAreas(r.areas); }).catch(() => { if (live) setAreas([]); });
+      api.searchProfiles(text).then((r) => { if (live) setPeople(r.profiles); }).catch(() => { if (live) setPeople([]); });
     }, 300);
     return () => { live = false; clearTimeout(timer); };
   }, [q, near]);
 
   const sections = [
     ...(areas.length ? [{ title: t("searchPlaces"), data: areas.map((area): Row => ({ type: "area", area })) }] : []),
+    ...(people.length ? [{ title: t("searchPeople"), data: people.map((person): Row => ({ type: "person", person })) }] : []),
     {
       title: t("searchCategories"),
       data: categories.map((c): Row => ({ type: "category", code: c.code, name: c.names[lang] ?? c.names["es"] ?? c.code })),
@@ -60,9 +66,8 @@ export default function SearchScreen() {
       <SectionList
         sections={sections}
         keyboardShouldPersistTaps="handled"
-        keyExtractor={(r) => (r.type === "area" ? r.area.id : r.code)}
+        keyExtractor={(r) => (r.type === "area" ? r.area.id : r.type === "person" ? `@${r.person.handle}` : r.code)}
         renderSectionHeader={({ section }) => <Text style={styles.note}>{section.title}</Text>}
-        ListFooterComponent={<Text style={styles.note}>{t("searchUsersSoon")}</Text>}
         renderItem={({ item }) => {
           if (item.type === "area") {
             const row = areaRow(item.area);
@@ -76,6 +81,17 @@ export default function SearchScreen() {
                 <View style={styles.rowBody}>
                   <Text style={styles.rowText}>{row.title}</Text>
                   <Text style={styles.rowSub}>{row.subtitle}</Text>
+                </View>
+              </Pressable>
+            );
+          }
+          if (item.type === "person") {
+            return (
+              <Pressable accessibilityRole="link" style={styles.row} onPress={() => router.push(`/u/${item.person.handle}`)}>
+                <View style={styles.avatar}><Text style={styles.avatarText}>{initials(item.person.displayName)}</Text></View>
+                <View style={styles.rowBody}>
+                  <Text style={styles.rowText}>{item.person.displayName}</Text>
+                  <Text style={styles.rowSub}>@{item.person.handle} · {item.person.followerCount} {t("followers")}</Text>
                 </View>
               </Pressable>
             );
@@ -102,4 +118,6 @@ const styles = StyleSheet.create({
   rowText: { color: colors.text, fontSize: 16 },
   rowBody: { flex: 1 },
   rowSub: { color: colors.textMuted, fontSize: 13, marginTop: 2 },
+  avatar: { width: 32, height: 32, borderRadius: 16, backgroundColor: colors.surfaceAlt, alignItems: "center", justifyContent: "center" },
+  avatarText: { color: colors.text, fontWeight: "700", fontSize: 12 },
 });

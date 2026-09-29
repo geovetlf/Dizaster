@@ -42,13 +42,21 @@ export function PostCard({ post, categoryName }: { post: FeedPost; categoryName:
   return (
     <View style={styles.card}>
       <View style={styles.head}>
-        <View style={[styles.avatar, post.author.pseudonymous && styles.avatarAnon]}>
-          {post.author.pseudonymous ? <Icon name="shield-account" size={22} color={colors.textMuted} /> : <Text style={styles.avatarText}>{initials(name)}</Text>}
-        </View>
-        <View style={styles.headText}>
-          <Text style={styles.name} numberOfLines={1}>{name}</Text>
-          <Text style={styles.meta} numberOfLines={1}>{where}</Text>
-        </View>
+        {/* Los reportes seudónimos no enlazan a ningún perfil. */}
+        <Pressable
+          accessibilityRole={post.author.pseudonymous ? "text" : "link"}
+          disabled={post.author.pseudonymous}
+          onPress={() => { if (!post.author.pseudonymous) router.push(`/u/${post.author.handle}`); }}
+          style={styles.author}
+        >
+          <View style={[styles.avatar, post.author.pseudonymous && styles.avatarAnon]}>
+            {post.author.pseudonymous ? <Icon name="shield-account" size={22} color={colors.textMuted} /> : <Text style={styles.avatarText}>{initials(name)}</Text>}
+          </View>
+          <View style={styles.headText}>
+            <Text style={styles.name} numberOfLines={1}>{name}</Text>
+            <Text style={styles.meta} numberOfLines={1}>{where}</Text>
+          </View>
+        </Pressable>
         {post.categoryCode ? (
           <Pressable
             accessibilityRole="button"
@@ -126,6 +134,7 @@ const styles = StyleSheet.create({
   avatarAnon: { borderWidth: 1, borderColor: colors.border },
   avatarText: { color: colors.text, fontWeight: "700" },
   headText: { flex: 1 },
+  author: { flex: 1, flexDirection: "row", alignItems: "center", gap: space.md },
   name: { color: colors.text, fontSize: 16, fontWeight: "700" },
   meta: { color: colors.textMuted, fontSize: 13, marginTop: 2 },
   badge: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 10, paddingVertical: 5, borderRadius: radius.sm, maxWidth: 150 },

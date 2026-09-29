@@ -1,4 +1,4 @@
-import type { CategoryCatalog, FeedPost, FeedTab } from "@dizaster/contracts";
+import type { CategoryCatalog, FeedPost, FeedResponse, FeedTab } from "@dizaster/contracts";
 import { useCallback, useEffect, useRef, useState, type ReactElement } from "react";
 import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from "react-native";
 import { api } from "../lib/api";
@@ -11,13 +11,16 @@ const catalog = require("../reference-data/categories.json") as CategoryCatalog;
 const names = new Map(catalog.categories.map((c) => [c.code, c.names[lang] ?? c.names["es"] ?? c.code]));
 const categoryName = (code: string) => names.get(code) ?? names.get(code.split(".")[0]!) ?? code;
 
-/** Lista paginada del feed. La usan el inicio y la pestaña de videos. */
+/** Lista paginada del feed. La usan el inicio, la pestaña de videos y los perfiles (con `fetchPage`). */
 export function FeedList(props: {
   tab: FeedTab;
   category: string | null;
   near: { lat: number; lng: number } | null;
   header?: ReactElement;
   empty?: ReactElement;
+  /** Otra fuente paginada (p. ej. los posts de un perfil); `sourceKey` la identifica para reiniciar la lista. */
+  fetchPage?: (cursor: string | null) => Promise<FeedResponse>;
+  sourceKey?: string;
 }) {
   const [posts, setPosts] = useState<FeedPost[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
@@ -32,7 +35,8 @@ export function FeedList(props: {
     setLoading(true);
     setError(false);
     try {
-      const r = await api.feed({ tab: props.tab, category: props.category, near: props.near, cursor: reset ? null : cursor });
+      const next = reset ? null : cursor;
+      const r = props.fetchPage ? await props.fetchPage(next) : await api.feed({ tab: props.tab, category: props.category, near: props.near, cursor: next });
       if (id !== request.current) return; // respuesta de un filtro anterior
       setPosts((prev) => (reset ? r.posts : [...prev, ...r.posts]));
       setCursor(r.nextCursor);
@@ -41,10 +45,10 @@ export function FeedList(props: {
     } finally {
       if (id === request.current) setLoading(false);
     }
-  }, [props.tab, props.category, props.near, cursor, needsLocation]);
+  }, [props.tab, props.category, props.near, props.fetchPage, cursor, needsLocation]);
 
   // Cambiar pestaña, categoría o ubicación reinicia la lista.
-  useEffect(() => { void load(true); }, [props.tab, props.category, props.near?.lat, props.near?.lng]);
+  useEffect(() => { void load(true); }, [props.tab, props.category, props.near?.lat, props.near?.lng, props.sourceKey]);
 
   return (
     <FlatList

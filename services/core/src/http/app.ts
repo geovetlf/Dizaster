@@ -183,6 +183,49 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
     return c.feed.feed(c.db, req.query, req.session?.profileId ?? null);
   });
 
+  // ───────────── Perfiles y seguir ─────────────
+  const HandleParam = z.object({ handle: z.string().min(2).max(40).regex(/^[A-Za-z0-9_]+$/) });
+  const FollowParams = z.object({ target: z.string(), id: z.string().min(1).max(64) });
+
+  app.get("/v1/profiles", async (req, reply) => {
+    reply.header("cache-control", "no-store");
+    return { profiles: await c.feed.searchProfiles(c.db, req.query, req.session?.profileId ?? null) };
+  });
+
+  app.get("/v1/profiles/:handle", async (req, reply) => {
+    reply.header("cache-control", "no-store");
+    return c.feed.profile(c.db, parse(HandleParam, req.params).handle, req.session?.profileId ?? null);
+  });
+
+  app.get("/v1/profiles/:handle/posts", async (req, reply) => {
+    reply.header("cache-control", "no-store");
+    return c.feed.profilePosts(c.db, parse(HandleParam, req.params).handle, req.query, req.session?.profileId ?? null);
+  });
+
+  app.get("/v1/me", async (req, reply) => {
+    const session = requireSession(req);
+    reply.header("cache-control", "no-store");
+    return c.feed.me(c.db, session.profileId);
+  });
+
+  app.get("/v1/me/follows", async (req, reply) => {
+    const session = requireSession(req);
+    reply.header("cache-control", "no-store");
+    return c.feed.myFollows(c.db, session.profileId);
+  });
+
+  app.put("/v1/follows/:target/:id", async (req) => {
+    const session = requireSession(req);
+    const p = parse(FollowParams, req.params);
+    return c.feed.setFollow(c.db, session.profileId, p.target, p.id, true);
+  });
+
+  app.delete("/v1/follows/:target/:id", async (req) => {
+    const session = requireSession(req);
+    const p = parse(FollowParams, req.params);
+    return c.feed.setFollow(c.db, session.profileId, p.target, p.id, false);
+  });
+
   app.put("/v1/posts/:id/like", async (req) => {
     const session = requireSession(req);
     return c.social.setLike(c.db, parse(IdParam, req.params).id, session.profileId, true);

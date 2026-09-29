@@ -29,7 +29,7 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | Planificador NORMAL/URGENT, peticiones condicionales, circuit breaker, registro de ejecuciones | ✅ | `ingestion/scheduler.ts`, migración 0002, ADR 0011 |
 | Ciclo de vida por inactividad | ✅ | `EventService.applyLifecycle` (worker, cada hora) |
 
-**Pruebas:** 171 (contratos 5, geo-kit 26, backend 103 con PostgreSQL real, móvil 37), más 3 del cliente S3 contra un servidor compatible en CI. JS de la app compila para iOS y Android y los proyectos nativos se generan en CI.
+**Pruebas:** 183 (contratos 5, geo-kit 26, backend 113 con PostgreSQL real, móvil 39), más 3 del cliente S3 contra un servidor compatible en CI. JS de la app compila para iOS y Android y los proyectos nativos se generan en CI.
 
 ## Paridad Android e iOS (hecha)
 
@@ -65,7 +65,7 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | Me gusta y comentarios | ✅ | `/v1/posts/:id/like`, `/v1/posts/:id/comments` |
 | Perfil: alertas, reportes pendientes, emergencia | ✅ | `src/app/(tabs)/profile.tsx` |
 | Nombres de lugar ("Miraflores, Lima") y búsqueda de lugares | ✅ | Etapa 5 |
-| Seguir perfiles y búsqueda de usuarios | ⏳ | siguiente etapa |
+| Seguir perfiles y búsqueda de usuarios | ✅ | Etapa 6 |
 
 ## Etapa 5 — Geo Engine: índice geográfico abierto (hecha)
 
@@ -81,12 +81,24 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | 8 distritos de Perú sin polígono en la fuente (p. ej. Santa Anita, La Punta) y nombres sin tildes | ⚠️ | Se muestra la ciudad; ver ADR 0016 |
 | Zonas horarias por polígono (países con varias) | ⏳ | timezone-boundary-builder |
 
+## Etapa 6 — Seguir y orden del feed (hecha)
+
+| Área | Estado | Dónde |
+|---|---|---|
+| Seguir personas, eventos y lugares (distrito o región) | ✅ | `social.follows`, `/v1/follows/...`, ADR 0017 |
+| Pestaña "Siguiendo" con contenido real, sin exponer posts seudónimos | ✅ | `SocialService.feed` |
+| "Para ti" con orden determinista (verificación, severidad, cercanía, autores seguidos) y cursor estable | ✅ | `RANK_BOOST_HOURS` |
+| Proyección de señales de eventos vía outbox (sin leer el esquema event) | ✅ | `social.event_signals` |
+| Perfil público, búsqueda de personas, "Mi perfil público" | ✅ | `apps/mobile/src/app/u/[handle].tsx`, `search.tsx` |
+| Seguir evento y lugar desde la pantalla del evento | ✅ | `apps/mobile/src/app/event/[id].tsx` |
+| Seguir negocios y etiquetas | ⏳ | modelo listo (`target_type`) |
+
 ## Siguiente etapa (en orden)
 
-1. Seguir perfiles, búsqueda de usuarios y ranking del feed.
-2. Identity real: Sign in with Apple, Google y email; App Attest / Play Integrity (necesita cuentas de Apple y Google).
-3. Social: comentarios, reacciones, seguir, feed cercano.
-4. Tablero de costo persistido y métricas por módulo.
+1. Identity real: Sign in with Apple, Google y email; App Attest / Play Integrity (necesita cuentas de Apple y Google).
+2. Alertas push de lo que sigo (eventos y lugares) por APNs/FCM directos.
+3. Tablero de costo persistido y métricas por módulo.
+4. Social: negocios, etiquetas y menciones.
 
 ## Requiere acción humana
 

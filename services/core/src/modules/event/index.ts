@@ -331,14 +331,24 @@ export class EventService {
   async publicStates(
     q: Queryable,
     ids: string[],
-  ): Promise<Map<string, { publicVerificationState: PublicVerificationState; sensitivity: Sensitivity; place: ContextualLocation | null }>> {
+  ): Promise<Map<string, {
+    publicVerificationState: PublicVerificationState; sensitivity: Sensitivity; place: ContextualLocation | null;
+    severity: number; regionId: string | null; districtId: string | null;
+  }>> {
     if (ids.length === 0) return new Map();
-    const { rows } = await q.query<{ id: string; verification_level: VerificationLevel; negative_state: NegativeState; sensitivity: Sensitivity; place: ContextualLocation | null }>(
-      `SELECT id, verification_level, negative_state, sensitivity, place FROM event.events WHERE id = ANY($1) AND publication_state <> 'HIDDEN'`,
+    const { rows } = await q.query<{
+      id: string; verification_level: VerificationLevel; negative_state: NegativeState; sensitivity: Sensitivity; place: ContextualLocation | null;
+      severity: number; region_id: string | null; district_id: string | null;
+    }>(
+      `SELECT id, verification_level, negative_state, sensitivity, place, severity, region_id, district_id
+         FROM event.events WHERE id = ANY($1) AND publication_state <> 'HIDDEN'`,
       [ids],
     );
     return new Map(
-      rows.map((r) => [r.id, { publicVerificationState: publicVerificationState(r.verification_level, r.negative_state), sensitivity: r.sensitivity, place: r.place }]),
+      rows.map((r) => [r.id, {
+        publicVerificationState: publicVerificationState(r.verification_level, r.negative_state), sensitivity: r.sensitivity, place: r.place,
+        severity: r.severity, regionId: r.region_id, districtId: r.district_id,
+      }]),
     );
   }
 

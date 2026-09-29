@@ -1,11 +1,13 @@
 import type { EventSummary, MediaView, TimelineEntryView } from "@dizaster/contracts";
 import { useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
-import { FlatList, StyleSheet, Text, View } from "react-native";
+import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import { EventMedia } from "../../components/event-media";
 import { api } from "../../lib/api";
 import { t, VERIFICATION_LABEL, verificationLabel } from "../../lib/i18n";
-import { colors } from "../../theme";
+import { followablePlace } from "../../lib/social/place";
+import { useFollows } from "../../lib/social/follows";
+import { colors, radius, space } from "../../theme";
 
 /** Pantalla de evento. También es el destino de los deep links: dizaster://event/<id> y https://<dominio>/e/<id>. */
 export default function EventScreen() {
@@ -14,6 +16,7 @@ export default function EventScreen() {
   const [timeline, setTimeline] = useState<TimelineEntryView[]>([]);
   const [media, setMedia] = useState<MediaView[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const follows = useFollows();
 
   useEffect(() => {
     if (!id) return;
@@ -27,10 +30,17 @@ export default function EventScreen() {
   if (error) return <Text style={[styles.container, styles.entry]}>{error}</Text>;
   if (!event) return <View style={styles.container} />;
   const color = VERIFICATION_LABEL[event.publicVerificationState]?.color ?? "#8a94a6";
+  const place = followablePlace(event.place);
   return (
     <View style={styles.container}>
       <Text style={styles.title}>{event.title?.["es"] ?? event.categoryCode}</Text>
       {event.place ? <Text style={styles.place}>{event.place.label}</Text> : null}
+      <View style={styles.follows}>
+        <FollowChip label={t("followEvent")} on={follows.following("event", event.id)} onPress={() => void follows.toggle("event", event.id)} />
+        {place ? (
+          <FollowChip label={`${t("followPlace")} ${place.name}`} on={follows.following("place", place.id)} onPress={() => void follows.toggle("place", place.id, place.name)} />
+        ) : null}
+      </View>
       <Text style={[styles.badge, { backgroundColor: color }]}>{verificationLabel(event.publicVerificationState)}</Text>
       <Text style={styles.meta}>
         {event.reportCount} {t("reports")} · {event.sourceCount} {t("sources")} · {new Date(event.firstSeenAt).toLocaleString()}
@@ -48,7 +58,19 @@ export default function EventScreen() {
   );
 }
 
+function FollowChip({ label, on, onPress }: { label: string; on: boolean; onPress: () => void }) {
+  return (
+    <Pressable accessibilityRole="button" accessibilityState={{ selected: on }} onPress={onPress} style={[styles.chip, on && styles.chipOn]}>
+      <Text style={styles.chipText}>{on ? `✓ ${label}` : label}</Text>
+    </Pressable>
+  );
+}
+
 const styles = StyleSheet.create({
+  follows: { flexDirection: "row", flexWrap: "wrap", gap: space.sm, marginVertical: space.sm },
+  chip: { borderWidth: 1, borderColor: colors.accent, borderRadius: radius.pill, paddingHorizontal: space.md, paddingVertical: 6 },
+  chipOn: { backgroundColor: colors.accent },
+  chipText: { color: colors.text, fontWeight: "600" },
   container: { flex: 1, padding: 16, backgroundColor: colors.bg },
   title: { fontSize: 22, fontWeight: "700", color: colors.text },
   place: { fontSize: 15, color: colors.textMuted, marginTop: 4 },

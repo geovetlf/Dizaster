@@ -1,21 +1,27 @@
 import * as Application from "expo-application";
 import * as Notifications from "expo-notifications";
 import { router, useFocusEffect } from "expo-router";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Icon } from "../../components/icon";
+import { api } from "../../lib/api";
 import { enablePush } from "../../lib/device/push";
 import { t } from "../../lib/i18n";
 import { reportQueue } from "../../lib/report/outbox";
 import { useSession } from "../../lib/session";
 import { colors, radius, space } from "../../theme";
 
-/** Perfil: ajustes de este teléfono. Perfil público, seguidores e historial llegan con la identidad real. */
+/** Perfil: acceso al perfil público y ajustes de este teléfono. */
 export default function ProfileScreen() {
   const session = useSession();
   const [alerts, setAlerts] = useState(false);
   const [pending, setPending] = useState(0);
+  const [handle, setHandle] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (session.ready) api.me().then((p) => setHandle(p.handle)).catch(() => setHandle(null));
+  }, [session.ready]);
 
   useFocusEffect(
     useCallback(() => {
@@ -33,6 +39,7 @@ export default function ProfileScreen() {
     <SafeAreaView style={styles.safe} edges={["top"]}>
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={styles.title}>{t("profile")}</Text>
+        {handle ? <Row icon="account-circle-outline" label={t("myPublicProfile")} value={`@${handle}`} onPress={() => router.push(`/u/${handle}`)} /> : null}
         <Row icon="bell-outline" label={t("alerts")} value={alerts ? t("alertsOn") : t("alertsOff")} {...(alerts ? {} : { onPress: () => void turnOnAlerts() })} />
         <Row icon="cloud-upload-outline" label={t("pendingReports")} value={String(pending)} />
         <Row icon="phone-alert" label={t("emergencyTitle")} onPress={() => router.push("/emergency")} />
@@ -43,7 +50,7 @@ export default function ProfileScreen() {
   );
 }
 
-function Row({ icon, label, value, onPress }: { icon: "bell-outline" | "cloud-upload-outline" | "phone-alert"; label: string; value?: string; onPress?: () => void }) {
+function Row({ icon, label, value, onPress }: { icon: "account-circle-outline" | "bell-outline" | "cloud-upload-outline" | "phone-alert"; label: string; value?: string; onPress?: () => void }) {
   return (
     <Pressable accessibilityRole={onPress ? "button" : "text"} disabled={!onPress} style={styles.row} onPress={onPress}>
       <Icon name={icon} size={22} color={colors.text} />

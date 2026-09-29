@@ -39,12 +39,14 @@ describe("feed", () => {
     const video = await upload(author, makeMp4(), { kind: "VIDEO_RECORDED", mime: "video/mp4", durationMs: 24_000 });
     await submit(t, author, { ...reportBody(author, { category: "accident.traffic", pin: offset(LIMA, 6000), text: "Choque" }), mediaIds: [video] });
     await submit(t, hidden, { ...reportBody(hidden, { category: "crime.robbery", pin: FAR, text: "Robo" }), anonymityMode: "PSEUDONYMOUS" });
+    await t.c.dispatcher.drain(); // proyecta severidad y estado de cada evento para el orden del feed
   });
 
-  it("para ti: recientes primero, con autor, categoría, estado del evento y media saneada", async () => {
+  it("para ti: orden determinista (a igual recencia, más grave primero), con autor, categoría, estado y media saneada", async () => {
     const { posts } = await feed("tab=for_you", author);
-    expect(posts.map((p) => p.text)).toEqual(["Robo", "Choque", "Humo en el edificio"]);
-    const fire = posts[2]!;
+    // Incendio (severidad 4) sobre robo y choque (3); entre iguales, el más reciente.
+    expect(posts.map((p) => p.text)).toEqual(["Humo en el edificio", "Robo", "Choque"]);
+    const fire = posts[0]!;
     expect(fire).toMatchObject({ kind: "REPORT", categoryCode: "fire.structure", author: { pseudonymous: false }, likeCount: 0, commentCount: 0, likedByMe: false });
     expect(fire.event?.publicVerificationState).toBeTruthy();
     expect(fire.media).toHaveLength(1);
@@ -76,7 +78,8 @@ describe("feed", () => {
     expect(posts[0]!.media[0]).toMatchObject({ kind: "VIDEO_RECORDED", durationMs: 24_000 });
   });
 
-  it("siguiendo: vacío hasta que exista seguir perfiles", async () => {
+  it("siguiendo: vacío sin sesión o sin nada seguido", async () => {
+    expect((await feed("tab=following")).posts).toEqual([]);
     expect((await feed("tab=following", author)).posts).toEqual([]);
   });
 
@@ -84,7 +87,8 @@ describe("feed", () => {
     const first = await feed("tab=for_you&limit=2");
     expect(first.posts).toHaveLength(2);
     const second = await feed(`tab=for_you&limit=2&cursor=${first.nextCursor}`);
-    expect(second.posts.map((p) => p.text)).toEqual(["Humo en el edificio"]);
+    expect(second.posts.map((p) => p.text)).toEqual(["Choque"]);
+    expect(first.posts.map((p) => p.text)).toEqual(["Humo en el edificio", "Robo"]);
     expect(second.nextCursor).toBeNull();
     expect((await t.app.inject({ url: "/v1/feed?cursor=basura" })).statusCode).toBe(400);
   });

@@ -12,7 +12,7 @@ export const FeedQuery = z.object({
   category: z.string().max(80).optional(),
   lat: z.coerce.number().min(-90).max(90).optional(),
   lng: z.coerce.number().min(-180).max(180).optional(),
-  /** Paginación por cursor opaco (fecha + id del último post). */
+  /** Paginación por cursor opaco (puntuación de orden + id del último post). */
   cursor: z.string().max(200).optional(),
   limit: z.coerce.number().int().min(1).max(30).default(15),
 });
@@ -57,3 +57,42 @@ export interface CommentView {
   text: string;
   createdAt: string;
 }
+
+/** Qué se puede seguir en V1 (en la URL): personas, eventos y lugares del índice geográfico. */
+export const FollowTarget = z.enum(["profile", "event", "place"]);
+export type FollowTarget = z.infer<typeof FollowTarget>;
+
+/** Perfil público. Nunca incluye los posts seudónimos de la persona ni cuenta con ellos. */
+export interface ProfileView {
+  handle: string;
+  displayName: string;
+  createdAt: string;
+  followerCount: number;
+  followingCount: number;
+  postCount: number;
+  followedByMe: boolean;
+  isMe: boolean;
+}
+
+export const ProfileSearchQuery = z.object({
+  q: z.string().trim().min(2).max(40),
+  limit: z.coerce.number().int().min(1).max(20).default(10),
+});
+
+export interface ProfileSearchResult {
+  handle: string;
+  displayName: string;
+  followerCount: number;
+  followedByMe: boolean;
+}
+
+export interface MyFollows {
+  profiles: { handle: string; displayName: string }[];
+  events: { id: string }[];
+  places: { id: string; name: string; label: string }[];
+}
+
+export const ProfilePostsQuery = z.object({
+  cursor: z.string().max(200).optional(),
+  limit: z.coerce.number().int().min(1).max(30).default(15),
+});
