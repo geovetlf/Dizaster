@@ -262,6 +262,7 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | Pantalla "Acerca de / licencias" con atribuciones ODbL (§11.3) | ✅ | ADR 0051, `GET /v1/about/attributions`, `app/about.tsx` |
 | Contrato OpenAPI 3.1 desde los contratos zod y trazas OpenTelemetry opcionales (§4.3, §5.22) | ✅ | ADR 0052, `GET /v1/openapi.json`, `src/telemetry.ts` |
 | Moderación cambia el ciclo de vida de un evento, auditado (§5.7) | ✅ | ADR 0053, `POST /v1/moderation/events/:id/status` |
+| Adaptador NASA FIRMS (focos VIIRS/MODIS → incendio forestal) y secretos de fuentes por entorno | ✅ | ADR 0067; activar espera `SOURCE_KEY_FIRMS` (BLOQUEADA: MAP_KEY) |
 | Lectura sin conexión de avisos, mapa y eventos abiertos (SQLite local) | ✅ | ADR 0066, `lib/offline/read-cache.ts` |
 | Búsqueda de eventos por categoría, lugar (con subdivisiones) y título, sin IA | ✅ | ADR 0065, `GET /v1/search/events` |
 | AI CORE opcional + conectores (IA, traducción, SMS, voz) + modo costo cero | ✅ | ADR 0064, `platform/connectors/`, `docs/ENGINES_AND_CONNECTORS.md` |
@@ -282,10 +283,9 @@ E. ✅ Auditoría de IA y APIs externas (ninguna en uso); AI CORE único, opcion
 
 Revisión del Blueprint del 2026-09-29 (tras ADR 0054), verificada contra el código:
 
-1. Adaptador FIRMS (VIIRS CSV → candidatos de incendio); activarlo espera la MAP_KEY (§9.3).
-2. Reputación por dispositivo: varias cuentas en un teléfono cuentan como una (§5.20, §13.3).
-3. Idioma de la app elegible en el perfil (§5.2).
-4. Cadena de suministro y respaldos: Dependabot, audit, SBOM, licencias; `pg_dump` con prueba de restauración (§13.1).
+1. Reputación por dispositivo: varias cuentas en un teléfono cuentan como una (§5.20, §13.3).
+2. Idioma de la app elegible en el perfil (§5.2).
+3. Cadena de suministro y respaldos: Dependabot, audit, SBOM, licencias; `pg_dump` con prueba de restauración (§13.1).
 
 
 Bloqueadas o en espera:

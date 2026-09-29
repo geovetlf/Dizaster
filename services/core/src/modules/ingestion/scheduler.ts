@@ -71,6 +71,25 @@ export interface RunSummary { sourceKey: string; lane: Lane; status: string; ite
 const BREAKER_THRESHOLD = 3;
 
 /**
+ * Las claves de fuentes (p. ej. la MAP_KEY de FIRMS) nunca van en `data/`: la URL lleva `{secret:SOURCE_KEY_…}` y el
+ * valor sale del entorno. Sin el secreto la fuente falla con un mensaje claro (y el breaker la pausa).
+ */
+export function resolveSourceUrl(url: string, secrets: Readonly<Record<string, string | undefined>>): string {
+  return url.replace(/\{secret:(SOURCE_KEY_[A-Z0-9_]+)\}/g, (_, name: string) => {
+    const v = secrets[name];
+    if (!v) throw new Error(`Falta el secreto ${name}`);
+    return encodeURIComponent(v);
+  });
+}
+
+/** Quita de un mensaje de error cualquier secreto que pudiera traer (una URL en un error de red). */
+function redactSecrets(msg: string, secrets: Readonly<Record<string, string | undefined>>): string {
+  let out = msg;
+  for (const v of Object.values(secrets)) if (v && v.length >= 4) out = out.split(v).join("[secret]").split(encodeURIComponent(v)).join("[secret]");
+  return out;
+}
+
+/**
  * Planificador de ingestión con dos carriles independientes:
  *  - URGENT: sondeo corto solo de fuentes críticas; solo ingiere lo que el adapter considera urgente.
  *  - NORMAL: una ejecución por horario (≈ 24 h); ingiere todo.
@@ -82,6 +101,7 @@ export class IngestionScheduler {
     private readonly ingestion: IngestionService,
     private readonly fetcher: HttpFetcher,
     private readonly clock: Clock,
+    private readonly secrets: Readonly<Record<string, string | undefined>> = {},
   ) {}
 
   async tick(): Promise<RunSummary[]> {
@@ -119,8 +139,9 @@ export class IngestionScheduler {
     const summary: RunSummary = { sourceKey: s.key, lane, status: "OK", itemsSeen: 0, itemsNew: 0, itemsUrgent: 0 };
     const isUrgentLane = lane === "URGENT";
     try {
-      const url = String(s.config["url"] ?? "");
-      if (!url) throw new Error("Fuente sin URL configurada");
+      const template = String(s.config["url"] ?? "");
+      if (!template) throw new Error("Fuente sin URL configurada");
+      const url = resolveSourceUrl(template, this.secrets);
       const res = await this.fetcher.get(url, {
         etag: isUrgentLane ? s.etag_urgent : s.etag_normal,
         lastModified: isUrgentLane ? s.last_modified_urgent : s.last_modified_normal,
@@ -172,7 +193,7 @@ export class IngestionScheduler {
            open_until = CASE WHEN $3 > 0 THEN $4::timestamptz + make_interval(mins => $3) END, updated_at = now()`,
         [s.id, failures, openMinutes, now],
       );
-      const error = String(err instanceof Error ? err.message : err).slice(0, 2000);
+      const error = redactSecrets(String(err instanceof Error ? err.message : err), this.secrets).slice(0, 2000);
       await this.db.query(`UPDATE ingestion.runs SET finished_at = now(), status = 'FAILED', error = $2 WHERE id = $1`, [runId, error]);
       // §9.2: el carril URGENT nunca se desactiva en silencio. Se avisa una vez, cuando el breaker se abre.
       if (s.urgent_capable && failures === BREAKER_THRESHOLD) {
