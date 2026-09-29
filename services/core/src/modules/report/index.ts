@@ -22,7 +22,7 @@ import type { AttestationVerifier, IdentityService, Session } from "../identity/
 import type { MediaService } from "../media/index.js";
 import type { ReferenceData } from "../reference/index.js";
 import type { SocialService } from "../social/index.js";
-import { PHONE_TAMPER_REASONS, type TrustService } from "../trust/index.js";
+import { PHONE_TAMPER_REASONS, REPORTS_PER_DAY_FACTOR, type TrustService } from "../trust/index.js";
 import type { FieldCipher } from "../../platform/field-cipher.js";
 import { verifyEvidence } from "./evidence.js";
 
@@ -74,9 +74,12 @@ export class ReportService {
     // con historial de manipulación o con una cuenta suspendida tiene el cupo más bajo.
     const phone = device ? await this.d.identity.phoneOf(db, device.id) : null;
     const phoneDevices = phone?.deviceIds ?? [];
-    const recent = await db.query<{ mine: number; phone: number }>(
-      `SELECT count(*) FILTER (WHERE author_user_id = $1)::int AS mine, count(*) FILTER (WHERE device_id = ANY($2))::int AS phone
-         FROM report.reports WHERE (author_user_id = $1 OR device_id = ANY($2)) AND received_at > now() - interval '1 hour'`,
+    const recent = await db.query<{ mine: number; phone: number; mine_day: number; phone_day: number }>(
+      `SELECT count(*) FILTER (WHERE author_user_id = $1 AND received_at > now() - interval '1 hour')::int AS mine,
+              count(*) FILTER (WHERE device_id = ANY($2) AND received_at > now() - interval '1 hour')::int AS phone,
+              count(*) FILTER (WHERE author_user_id = $1)::int AS mine_day,
+              count(*) FILTER (WHERE device_id = ANY($2))::int AS phone_day
+         FROM report.reports WHERE (author_user_id = $1 OR device_id = ANY($2)) AND received_at > now() - interval '24 hours'`,
       [session.userId, phoneDevices],
     );
     const tamper = phoneDevices.length === 0 ? 0 : (await db.query<{ n: number }>(
@@ -89,6 +92,10 @@ export class ReportService {
     // Cuentas nuevas o con mal historial tienen menos cupo (Blueprint §13.3).
     if (Math.max(recent.rows[0]!.mine, recent.rows[0]!.phone) >= quota) {
       throw new DomainError("RATE_LIMITED", "Demasiados reportes en la última hora", 429);
+    }
+    // Tope diario (ADR 0132): un múltiplo del cupo por hora, así la reputación también lo escala.
+    if (Math.max(recent.rows[0]!.mine_day, recent.rows[0]!.phone_day) >= quota * REPORTS_PER_DAY_FACTOR) {
+      throw new DomainError("RATE_LIMITED", "Demasiados reportes en las últimas 24 horas", 429);
     }
     const attachable = await this.d.media.assertAttachable(db, session.profileId, req.mediaIds);
     const mediaProofs = await this.d.media.inAppCaptures(db, session.profileId, req.mediaIds);

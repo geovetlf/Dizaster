@@ -62,6 +62,19 @@ export function withPhone(tier: TrustTier, phone: PhoneSignals | null): TrustTie
   return flagged && TIER_ORDER.indexOf(tier) > 0 ? "LOW" : tier;
 }
 
+/**
+ * Límites sociales por reputación (Blueprint §13.3, ADR 0132): cuentas nuevas o con mal historial publican y comentan
+ * menos. Nunca cero: nadie queda mudo por un límite automático.
+ */
+export const SOCIAL_LIMITS: Record<TrustTier, { postsPerHour: number; commentsPerMinute: number }> = {
+  TRUSTED: { postsPerHour: 20, commentsPerMinute: 10 },
+  STANDARD: { postsPerHour: 20, commentsPerMinute: 10 },
+  NEW: { postsPerHour: 10, commentsPerMinute: 5 },
+  LOW: { postsPerHour: 5, commentsPerMinute: 3 },
+};
+/** Tope diario de reportes: este múltiplo del cupo por hora de la cuenta (ADR 0132). */
+export const REPORTS_PER_DAY_FACTOR = 4;
+
 /** Reportes por hora según la reputación: más estrictos para cuentas nuevas o con historial malo, nunca cero. */
 export function reportQuota(tier: TrustTier, base: number): number {
   if (tier === "LOW") return Math.max(1, Math.floor(base / 4));

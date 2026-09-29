@@ -786,13 +786,13 @@ export class SocialService {
     };
   }
 
-  async addComment(q: Queryable, postId: string, profileId: string, text: string, parentId?: string): Promise<CommentView> {
+  async addComment(q: Queryable, postId: string, profileId: string, text: string, parentId?: string, perMinute = 10): Promise<CommentView> {
     await this.assertVisible(q, postId);
     const recent = await q.query<{ n: number }>(
       `SELECT count(*)::int AS n FROM social.comments WHERE author_profile_id = $1 AND created_at > now() - interval '1 minute'`,
       [profileId],
     );
-    if (recent.rows[0]!.n >= 10) throw new DomainError("RATE_LIMITED", "Demasiados comentarios seguidos", 429);
+    if (recent.rows[0]!.n >= perMinute) throw new DomainError("RATE_LIMITED", "Demasiados comentarios seguidos", 429);
     let parent: string | null = null;
     if (parentId) {
       // Un solo nivel: responder a una respuesta cuelga del comentario raíz.

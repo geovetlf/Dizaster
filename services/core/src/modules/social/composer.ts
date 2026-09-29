@@ -22,6 +22,8 @@ export class PostComposer {
     private readonly media: MediaService,
     private readonly events: EventService,
     private readonly business: BusinessService,
+    /** Cupo por hora según la reputación (ADR 0132); sin él, el fijo. */
+    private readonly postsPerHour: (userId: string) => Promise<number> = async () => POSTS_PER_HOUR,
   ) {}
 
   async create(session: { userId: string; profileId: string }, raw: unknown): Promise<{ postId: string; eventId: string | null; tags: string[]; mentions: string[] }> {
@@ -99,7 +101,7 @@ export class PostComposer {
           AND (p.author_id = $1 OR p.author_id IN (SELECT id FROM social.business_profiles WHERE owner_user_id = $2))`,
       [session.profileId, session.userId],
     );
-    if (recent.rows[0]!.n >= POSTS_PER_HOUR) throw new DomainError("RATE_LIMITED", "Demasiadas publicaciones en la última hora", 429);
+    if (recent.rows[0]!.n >= (await this.postsPerHour(session.userId))) throw new DomainError("RATE_LIMITED", "Demasiadas publicaciones en la última hora", 429);
   }
 
   /** Publicar como negocio: solo quien lo administra, nunca de forma seudónima. */

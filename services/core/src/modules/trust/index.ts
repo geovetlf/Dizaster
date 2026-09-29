@@ -2,9 +2,9 @@ import { withTransaction, type Db, type Queryable } from "../../platform/db.js";
 import { publish, type OutboxDispatcher } from "../../platform/outbox.js";
 import type { EventService } from "../event/index.js";
 import type { IdentityService } from "../identity/index.js";
-import { TIER_WEIGHT, TRUST, coordinatedWeights, reportQuota, tierFor, withPhone, type PhoneSignals, type ReputationSignals, type TrustTier } from "./rules.js";
+import { SOCIAL_LIMITS, TIER_WEIGHT, TRUST, coordinatedWeights, reportQuota, tierFor, withPhone, type PhoneSignals, type ReputationSignals, type TrustTier } from "./rules.js";
 
-export { PHONE_TAMPER_LIMIT, PHONE_TAMPER_REASONS, TIER_WEIGHT, TRUST, TRUST_RULES_VERSION, coordinatedWeights, reportQuota, tierFor, withPhone, type PhoneSignals, type ReputationSignals, type TrustTier } from "./rules.js";
+export { REPORTS_PER_DAY_FACTOR, SOCIAL_LIMITS, PHONE_TAMPER_LIMIT, PHONE_TAMPER_REASONS, TIER_WEIGHT, TRUST, TRUST_RULES_VERSION, coordinatedWeights, reportQuota, tierFor, withPhone, type PhoneSignals, type ReputationSignals, type TrustTier } from "./rules.js";
 
 /** Acciones de moderación que cuentan en contra de la reputación de la persona afectada. */
 const SANCTIONS = new Set(["HIDE", "REMOVE", "SUSPEND_USER"]);
@@ -165,6 +165,11 @@ export class TrustService {
   /** Bytes que la cuenta puede subir en 24 h (ADR 0072): misma escala que el cupo de reportes. */
   async uploadBytesQuota(q: Queryable, userId: string, baseMb: number): Promise<number> {
     return reportQuota((await this.tiers(q, [userId])).get(userId) ?? "NEW", baseMb) * 1024 * 1024;
+  }
+
+  /** Publicaciones por hora y comentarios por minuto según la reputación (ADR 0132). */
+  async socialLimits(q: Queryable, userId: string): Promise<{ postsPerHour: number; commentsPerMinute: number }> {
+    return SOCIAL_LIMITS[(await this.tiers(q, [userId])).get(userId) ?? "NEW"];
   }
 
   /** Con `phone`, el cupo también refleja la reputación del teléfono (ADR 0131). */
