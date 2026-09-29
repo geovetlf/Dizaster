@@ -24,6 +24,9 @@ export class PostComposer {
     private readonly business: BusinessService,
     /** Cupo por hora según la reputación (ADR 0132); sin él, el fijo. */
     private readonly postsPerHour: (userId: string) => Promise<number> = async () => POSTS_PER_HOUR,
+    /** Comprueba sello y ámbito institucional para una actualización oficial (ADR 0153); sin él, nadie puede. */
+    private readonly officialUpdateCheck: (userId: string, handle: string, event: { categoryCode: string; countryCode: string | null }) => Promise<void> =
+      async () => { throw new DomainError("NOT_INSTITUTIONAL", "Este perfil no puede pronunciarse oficialmente", 403); },
   ) {}
 
   async create(session: { userId: string; profileId: string }, raw: unknown): Promise<{ postId: string; eventId: string | null; tags: string[]; mentions: string[] }> {
@@ -45,12 +48,15 @@ export class PostComposer {
       const target = e.mergedIntoId ? await this.events.getEvent(this.db, e.mergedIntoId) : e;
       if (target.publicationState !== "PUBLISHED") throw notFound("Evento");
       event = { id: target.id, categoryCode: target.categoryCode, sensitivity: target.sensitivity };
+      if (req.official && req.asBusiness) await this.officialUpdateCheck(session.userId, req.asBusiness, target);
     }
+    // Actualización oficial (ADR 0153): la publica una institución sobre un evento concreto.
+    if (req.official && (!req.asBusiness || !event)) throw new DomainError("VALIDATION", "Una actualización oficial se publica como institución y sobre un evento");
 
     return withTransaction(this.db, async (tx) => {
       const postId = await this.social.createPost(tx, {
         authorProfileId: profileId,
-        kind: "STANDARD",
+        kind: req.official ? "OFFICIAL_UPDATE" : "STANDARD",
         text: req.text,
         authorVisibility: req.anonymityMode,
         categoryCode: event?.categoryCode ?? null,
@@ -61,7 +67,7 @@ export class PostComposer {
       if (media.length > 0 && event && event.sensitivity !== "NORMAL") await publish(tx, "PostMediaNeedsReview", { postId });
       for (const mediaId of await this.media.reuseSuspected(tx, media.map((m) => m.id))) await publish(tx, "MediaReuseDetected", { mediaId });
       for (const mediaId of await this.media.heldByBlocklist(tx, media.map((m) => m.id))) await publish(tx, "BlockedMediaMatched", { mediaId });
-      if (event) await this.social.linkPostToEvent(tx, postId, event.id, "MENTION");
+      if (event) await this.social.linkPostToEvent(tx, postId, event.id, req.official ? "UPDATE" : "MENTION");
       const indexed = await this.social.indexPostText(tx, postId, profileId, req.text);
       return { postId, eventId: event?.id ?? null, ...indexed };
     });
@@ -98,7 +104,7 @@ export class PostComposer {
   private async checkHourlyQuota(session: { userId: string; profileId: string }): Promise<void> {
     const recent = await this.db.query<{ n: number }>(
       `SELECT count(*)::int AS n FROM social.posts p
-        WHERE p.kind IN ('STANDARD','SHARE') AND p.created_at > now() - interval '1 hour'
+        WHERE p.kind IN ('STANDARD','SHARE','OFFICIAL_UPDATE') AND p.created_at > now() - interval '1 hour'
           AND (p.author_id = $1 OR p.author_id IN (SELECT id FROM social.business_profiles WHERE owner_user_id = $2))`,
       [session.profileId, session.userId],
     );

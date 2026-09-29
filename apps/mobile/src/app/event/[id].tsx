@@ -112,6 +112,10 @@ export default function EventScreen() {
         {institutions.filter((i) => canStateOn(i.scope, event)).map((i) => (
           <FollowChip key={i.handle} label={`${t("officialStatement")} · ${i.name}`} on={false} onPress={() => officialStatement(i.handle, i.name)} />
         ))}
+        {institutions.filter((i) => canStateOn(i.scope, event)).map((i) => (
+          <FollowChip key={`u-${i.handle}`} label={`${t("officialUpdate")} · ${i.name}`} on={false}
+            onPress={() => router.push({ pathname: "/compose", params: { eventId: event.id, asBusiness: i.handle, official: "1" } })} />
+        ))}
       </View>
       <Text style={[styles.badge, { backgroundColor: color }]}>{verificationLabel(event.publicVerificationState)}</Text>
       <Text style={styles.meta}>

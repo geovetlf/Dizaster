@@ -16,7 +16,9 @@ import { colors, radius, space } from "../theme";
  * menciona, sin sumar al pin ni a la verificación. No usa la ubicación. Igual en Android e iOS.
  */
 export default function ComposeScreen() {
-  const params = useLocalSearchParams<{ eventId?: string; text?: string; asBusiness?: string; shareOf?: string }>();
+  const params = useLocalSearchParams<{ eventId?: string; text?: string; asBusiness?: string; shareOf?: string; official?: string }>();
+  // Actualización oficial (ADR 0153): se abre desde el evento con la institución ya elegida.
+  const official = params.official === "1" && !!params.eventId && !!params.asBusiness;
   // Compartir dentro de la app (ADR 0046): comentario opcional, sin fotos ni evento propios.
   const sharing = !!params.shareOf;
   const [text, setText] = useState(params.text ?? "");
@@ -50,7 +52,7 @@ export default function ComposeScreen() {
         if (!r.ok) throw new Error(r.error);
         mediaIds.push(r.mediaId);
       }
-      await api.createPost({ text: text.trim(), mediaIds, anonymityMode: pseudonymous && !asBusiness ? "PSEUDONYMOUS" : "PUBLIC", ...(asBusiness ? { asBusiness } : {}), ...(params.eventId ? { eventId: params.eventId } : {}) });
+      await api.createPost({ text: text.trim(), mediaIds, anonymityMode: pseudonymous && !asBusiness ? "PSEUDONYMOUS" : "PUBLIC", ...(asBusiness ? { asBusiness } : {}), ...(params.eventId ? { eventId: params.eventId } : {}), ...(official ? { official: true } : {}) });
       for (const m of media) discardLocal(m);
       router.back();
     } catch (e) {
@@ -62,7 +64,7 @@ export default function ComposeScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-      {params.eventId ? <Text style={styles.note}>{t("postAboutEvent")}</Text> : null}
+      {official ? <Text style={styles.note}>{t("officialUpdateNote")}</Text> : params.eventId ? <Text style={styles.note}>{t("postAboutEvent")}</Text> : null}
       {sharing ? <Text style={styles.note}>{t("sharingNote")}</Text> : null}
       <TextInput
         style={styles.input}
@@ -81,7 +83,7 @@ export default function ComposeScreen() {
         <Text style={styles.note}>{[...tags.map((x) => `#${x.display}`), ...mentions.map((m) => `@${m}`)].join("  ")}</Text>
       ) : null}
       {sharing ? null : <MediaAttachments items={media} onChange={setMedia} />}
-      {businesses.length > 0 ? (
+      {businesses.length > 0 && !official ? (
         <View style={styles.chips}>
           <Text style={styles.note}>{t("postAs")}</Text>
           {[null, ...businesses.map((b) => b.handle)].map((h) => (

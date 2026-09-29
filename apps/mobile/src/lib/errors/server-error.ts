@@ -34,6 +34,8 @@ export const SERVER_ERROR_KEYS: Readonly<Record<string, MessageKey>> = {
   CASE_CLOSED: "errConflict",
   POST_NOT_EDITABLE: "errPostNotEditable",
   EDIT_WINDOW_CLOSED: "errPostNotEditable",
+  NOT_INSTITUTIONAL: "errNotInstitutional",
+  OUT_OF_SCOPE: "errOutOfScope",
   INTERNAL: "errInternal",
 };
 

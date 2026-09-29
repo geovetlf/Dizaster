@@ -75,6 +75,28 @@ export class InstitutionService {
     );
   }
 
+  /** Quien administra el perfil, con el sello vigente, visible y con ámbito activo. */
+  private async authorized(userId: string, handle: string): Promise<{ id: string; scope: OfficialScopeView }> {
+    const b = await this.business.officialInfo(this.db, handle);
+    if (!b || b.ownerUserId !== userId) throw notFound("Negocio");
+    const scope = await this.scope(this.db, b.id);
+    if (b.verification !== "INSTITUTIONAL_OFFICIAL" || !b.visible || !scope?.active) {
+      throw new DomainError("NOT_INSTITUTIONAL", "Este perfil no puede pronunciarse oficialmente", 403);
+    }
+    return { id: b.id, scope };
+  }
+
+  private assertInScope(scope: OfficialScopeView, event: { categoryCode: string; countryCode: string | null }): void {
+    if (!inOfficialScope({ categories: scope.categories, country_scope: scope.countries }, event.categoryCode, event.countryCode)) {
+      throw new DomainError("OUT_OF_SCOPE", "El evento está fuera del ámbito de esta institución", 403);
+    }
+  }
+
+  /** Publicar una actualización oficial (ADR 0153): mismas condiciones que una declaración. */
+  async assertCanPostUpdate(userId: string, handle: string, event: { categoryCode: string; countryCode: string | null }): Promise<void> {
+    this.assertInScope((await this.authorized(userId, handle)).scope, event);
+  }
+
   /**
    * Confirmar o desmentir un EVENT como la institución. Solo quien administra el perfil, con el sello vigente,
    * dentro de su ámbito y sobre un evento activo. Una institución se pronuncia una sola vez por evento: repetir lo
@@ -82,17 +104,10 @@ export class InstitutionService {
    */
   async statement(userId: string, handle: string, raw: unknown): Promise<{ eventId: string; assertion: "OCCURRING" | "NOT_OCCURRING" }> {
     const req = parseBody(OfficialStatementRequest, raw);
-    const b = await this.business.officialInfo(this.db, handle);
-    if (!b || b.ownerUserId !== userId) throw notFound("Negocio");
-    const scope = await this.scope(this.db, b.id);
-    if (b.verification !== "INSTITUTIONAL_OFFICIAL" || !b.visible || !scope?.active) {
-      throw new DomainError("NOT_INSTITUTIONAL", "Este perfil no puede confirmar eventos oficialmente", 403);
-    }
+    const b = await this.authorized(userId, handle);
     let event = await this.events.getEvent(this.db, req.eventId);
     for (let hops = 0; event.mergedIntoId && hops < 5; hops++) event = await this.events.getEvent(this.db, event.mergedIntoId);
-    if (!inOfficialScope({ categories: scope.categories, country_scope: scope.countries }, event.categoryCode, event.countryCode)) {
-      throw new DomainError("OUT_OF_SCOPE", "El evento está fuera del ámbito de esta institución", 403);
-    }
+    this.assertInScope(b.scope, event);
     const key = institutionSourceKey(b.id);
     const { rows: previous } = await this.db.query<{ assertion: string }>(
       `SELECT i.assertion FROM ingestion.external_items i JOIN ingestion.sources s ON s.id = i.source_id

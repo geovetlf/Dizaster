@@ -112,3 +112,41 @@ describe("declaraciones y fusiones (ADR 0149)", () => {
     expect((await declare(owner, "bomberos_pe", b)).statusCode).toBe(200);
   });
 });
+
+describe("actualizaciones oficiales (ADR 0153)", () => {
+  const post = (u: TestUser, payload: Record<string, unknown>) => t.app.inject({ method: "POST", url: "/v1/posts", headers: auth(u), payload });
+
+  it("solo la institución, dentro de su ámbito y sobre un evento; se vincula como UPDATE y no verifica", async () => {
+    await setVerification("bomberos_pe", "INSTITUTIONAL_OFFICIAL");
+    await setScope("bomberos_pe", { categories: ["fire"], countries: ["PE"] });
+    const eventId = await fireEvent("vecino_update", { lat: -12.5, lng: -76.6 });
+    const text = "Tres unidades trabajando en la zona; eviten la avenida.";
+
+    expect((await post(owner, { text, official: true, asBusiness: "bomberos_pe" })).statusCode).toBe(400);
+    expect((await post(owner, { text, official: true, eventId })).statusCode).toBe(400);
+    const intruder = await createUser(t, "intruso_update");
+    expect((await post(intruder, { text, official: true, eventId, asBusiness: "bomberos_pe" })).statusCode).toBe(404);
+    const u = await createUser(t, "choque_update");
+    const crash = (await submit(t, u, reportBody(u, { category: "accident.traffic", pin: { lat: -12.55, lng: -76.55 } }))).body.eventId!;
+    await t.c.dispatcher.drain();
+    const out = await post(owner, { text, official: true, eventId: crash, asBusiness: "bomberos_pe" });
+    expect(out.statusCode).toBe(403);
+    expect(out.json()).toMatchObject({ error: "OUT_OF_SCOPE" });
+
+    const ok = await post(owner, { text, official: true, eventId, asBusiness: "bomberos_pe" });
+    expect(ok.statusCode, ok.body).toBe(201);
+    const postId = ok.json().postId as string;
+    expect((await t.c.db.query(`SELECT kind FROM social.posts WHERE id = $1`, [postId])).rows[0]).toEqual({ kind: "OFFICIAL_UPDATE" });
+    expect((await t.c.db.query(`SELECT link_type FROM social.post_event_links WHERE post_id = $1`, [postId])).rows[0]).toEqual({ link_type: "UPDATE" });
+    await t.c.dispatcher.drain();
+    expect((await state(eventId)).level).toBe("UNVERIFIED");
+    const feed = (await t.app.inject({ url: `/v1/events/${eventId}/posts` })).json() as { posts: { id: string; kind: string }[] };
+    expect(feed.posts.find((p) => p.id === postId)?.kind).toBe("OFFICIAL_UPDATE");
+    // Una actualización oficial no se edita (queda como la publicó la institución).
+    expect((await t.app.inject({ method: "PATCH", url: `/v1/posts/${postId}`, headers: auth(owner), payload: { text: "otra cosa" } })).statusCode).toBe(409);
+
+    // Sin sello deja de poder publicarlas.
+    await setVerification("bomberos_pe", "VERIFIED");
+    expect((await post(owner, { text, official: true, eventId, asBusiness: "bomberos_pe" })).statusCode).toBe(403);
+  });
+});

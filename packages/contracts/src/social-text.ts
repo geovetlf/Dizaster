@@ -85,6 +85,11 @@ export const CreatePostRequest = z.object({
   anonymityMode: z.enum(["PUBLIC", "PSEUDONYMOUS"]).default("PUBLIC"),
   /** Publicar como uno de mis negocios (handle). Un negocio nunca publica de forma seudónima. */
   asBusiness: z.string().trim().toLowerCase().max(30).optional(),
+  /**
+   * Actualización oficial (ADR 0153): solo un perfil institucional con sello y ámbito vigentes, sobre un evento dentro
+   * de su ámbito (exige `asBusiness` y `eventId`). Se destaca, pero no confirma ni desmiente: eso es la declaración.
+   */
+  official: z.boolean().default(false),
 });
 export type CreatePostRequest = z.infer<typeof CreatePostRequest>;
 

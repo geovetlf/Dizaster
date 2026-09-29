@@ -74,7 +74,13 @@ export function PostCard({ post, categoryName }: { post: FeedPost; categoryName:
   if (hidden) return null;
 
   return (
-    <View style={styles.card}>
+    <View style={[styles.card, post.kind === "OFFICIAL_UPDATE" && styles.official]}>
+      {post.kind === "OFFICIAL_UPDATE" ? (
+        <View style={styles.officialRow}>
+          <Icon name="bullhorn-outline" size={16} color={colors.link} />
+          <Text style={styles.officialText}>{t("officialUpdate")}</Text>
+        </View>
+      ) : null}
       <View style={styles.head}>
         {/* Los reportes seudónimos no enlazan a ningún perfil. */}
         <Pressable
@@ -218,6 +224,10 @@ function TileContent({ m, style, small }: { m: MediaView; style: object; small: 
 const styles = StyleSheet.create({
   card: { backgroundColor: colors.surface, borderRadius: radius.lg, padding: space.lg, marginBottom: space.md, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
   head: { flexDirection: "row", alignItems: "center", gap: space.md, marginBottom: space.sm },
+  // Actualización oficial de una institución (ADR 0153): borde y rótulo, sin cambiar el resto de la tarjeta.
+  official: { borderColor: colors.link, borderWidth: 1.5 },
+  officialRow: { flexDirection: "row", alignItems: "center", gap: space.xs, marginBottom: space.sm },
+  officialText: { color: colors.link, fontWeight: "700", fontSize: 13 },
   avatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.surfaceAlt, alignItems: "center", justifyContent: "center" },
   avatarAnon: { borderWidth: 1, borderColor: colors.border },
   headText: { flex: 1 },

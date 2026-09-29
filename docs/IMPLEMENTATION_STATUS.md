@@ -343,6 +343,7 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | 0150 | Prioridad de casos de moderación al día: se recalcula con cambios de verificación y ciclo del evento y en un barrido horario | ✅ |
 | 0151 | Informe de transparencia en la app de administración: periodos, desgloses sin sumar los "<5" y texto para compartir | ✅ |
 | 0152 | Catálogo de categorías remoto con etag y ajustes por país en la app; misma regla efectiva en servidor y app | ✅ |
+| 0153 | Posts de actualización oficial de perfiles institucionales dentro de su ámbito; destacados, no editables y sin efecto en la verificación | ✅ |
 | Licencias, auditoría, SBOM, Dependabot; respaldo con prueba de restauración en CI | ✅ | ADR 0070, `scripts/supply-chain.mjs`, `scripts/db-restore-check.mjs` |
 | Idioma de la app elegible en el perfil (es/en/pt/fr o del teléfono) | ✅ | ADR 0069, `app/language.tsx` |
 | Varias cuentas en un teléfono corroboran como una (clave seudónima del teléfono) | ✅ | ADR 0068, migración 0036 |
@@ -382,10 +383,10 @@ Revisión del Blueprint del 2026-09-29 (tras ADR 0112): completada con ADR 0113�
 
 Revisión del Blueprint del 2026-09-29 (tras ADR 0148), verificada contra el código, sin bloqueos:
 
-1. Posts de actualización oficial OFFICIAL_UPDATE de perfiles institucionales (§7.3)
-2. Preferencias de alerta por zona guardada (§7.3 SavedPlace.alert_prefs)
-3. Detalles de datos: ERROR en ítems externos, compartidos externos, seguidores al dividir (§7.3)
-4. "¿Es el mismo evento?" tras un adjunto dudoso (§8.4); la respuesta "No" espera decisión D2
+1. Preferencias de alerta por zona guardada (§7.3 SavedPlace.alert_prefs)
+2. Detalles de datos: ERROR en ítems externos, compartidos externos, seguidores al dividir (§7.3)
+3. "¿Es el mismo evento?" tras un adjunto dudoso (§8.4); la respuesta "No" espera decisión D2
+4. Aviso push de actualizaciones oficiales a quienes siguen el evento (ADR 0153)
 
 
 Bloqueadas o en espera:
