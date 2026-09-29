@@ -7,7 +7,7 @@ import { defaultDataDir } from "./platform/paths.js";
 import { EventService } from "./modules/event/index.js";
 import { GeoService } from "./modules/geo/index.js";
 import { DevAttestationVerifier, IdentityService, type AttestationVerifier } from "./modules/identity/index.js";
-import { IngestionService } from "./modules/ingestion/index.js";
+import { IngestionScheduler, IngestionService, NodeHttpFetcher, type HttpFetcher } from "./modules/ingestion/index.js";
 import { MediaService } from "./modules/media/index.js";
 import { ReferenceData } from "./modules/reference/index.js";
 import { ReportService } from "./modules/report/index.js";
@@ -25,6 +25,7 @@ export interface Container {
   identity: IdentityService;
   events: EventService;
   ingestion: IngestionService;
+  ingestionScheduler: IngestionScheduler;
   verification: VerificationService;
   media: MediaService;
   reports: ReportService;
@@ -32,7 +33,7 @@ export interface Container {
   cost: InMemoryCostGuard;
 }
 
-export function buildContainer(env: AppEnv, overrides: { db?: Db; clock?: Clock; attestation?: AttestationVerifier } = {}): Container {
+export function buildContainer(env: AppEnv, overrides: { db?: Db; clock?: Clock; attestation?: AttestationVerifier; fetcher?: HttpFetcher } = {}): Container {
   const db = overrides.db ?? createPool(env.DATABASE_URL);
   const clock = overrides.clock ?? systemClock;
   const dataDir = env.DATA_DIR ?? defaultDataDir();
@@ -42,6 +43,7 @@ export function buildContainer(env: AppEnv, overrides: { db?: Db; clock?: Clock;
   const identity = new IdentityService(db, social, env.AUTH_JWT_SECRET);
   const events = new EventService(ref, geo);
   const ingestion = new IngestionService(db, events);
+  const ingestionScheduler = new IngestionScheduler(db, ingestion, overrides.fetcher ?? new NodeHttpFetcher(), clock);
   const verification = new VerificationService(db, ref, events, ingestion, identity);
   const media = new MediaService();
   if (env.NODE_ENV === "production" && !overrides.attestation) {
@@ -57,5 +59,5 @@ export function buildContainer(env: AppEnv, overrides: { db?: Db; clock?: Clock;
   verification.registerHandlers(dispatcher);
   // Presupuestos iniciales: las funciones de pago están a 0 hasta que se aprueben (cost-first).
   const cost = new InMemoryCostGuard({ "ai.daily": 0, "sms.daily": 0, "translation.daily": 0 }, { ai: true, sms: true, translation: true });
-  return { env, db, clock, ref, geo, social, identity, events, ingestion, verification, media, reports, dispatcher, cost };
+  return { env, db, clock, ref, geo, social, identity, events, ingestion, ingestionScheduler, verification, media, reports, dispatcher, cost };
 }

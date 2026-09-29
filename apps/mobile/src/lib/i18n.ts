@@ -27,6 +27,10 @@ const catalogs = {
     timeline: "Cronología",
     reports: "reportes",
     sources: "fuentes",
+    adjustPin: "Toca el mapa para ajustar el pin (solo cerca de donde estás).",
+    sameEvent: "¿Es alguno de estos?",
+    newEvent: "No, es otro acontecimiento",
+    selected: "Seleccionado",
   },
   en: {
     report: "Report",
@@ -52,6 +56,10 @@ const catalogs = {
     timeline: "Timeline",
     reports: "reports",
     sources: "sources",
+    adjustPin: "Tap the map to adjust the pin (only near where you are).",
+    sameEvent: "Is it one of these?",
+    newEvent: "No, it's something else",
+    selected: "Selected",
   },
 } as const;
 

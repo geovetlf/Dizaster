@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:gdacs="http://www.gdacs.org" xmlns:geo="http://www.w3.org/2003/01/geo/wgs84_pos#" xmlns:dc="http://purl.org/dc/elements/1.1/">
+  <channel>
+    <title>GDACS RSS information</title>
+    <item>
+      <title>Orange flood alert in Peru</title>
+      <link>https://www.gdacs.org/report.aspx?eventtype=FL&amp;eventid=1102001</link>
+      <pubDate>Mon, 29 Sep 2026 03:00:00 GMT</pubDate>
+      <gdacs:fromdate>Sun, 28 Sep 2026 00:00:00 GMT</gdacs:fromdate>
+      <gdacs:eventtype>FL</gdacs:eventtype>
+      <gdacs:alertlevel>Orange</gdacs:alertlevel>
+      <gdacs:eventid>1102001</gdacs:eventid>
+      <gdacs:episodeid>3</gdacs:episodeid>
+      <gdacs:country>Peru</gdacs:country>
+      <gdacs:iscurrent>true</gdacs:iscurrent>
+      <geo:Point><geo:lat>-5.19</geo:lat><geo:long>-80.63</geo:long></geo:Point>
+    </item>
+    <item>
+      <title>Green earthquake alert (Magnitude 4.7M) in Chile</title>
+      <link>https://www.gdacs.org/report.aspx?eventtype=EQ&amp;eventid=1500001</link>
+      <pubDate>Mon, 29 Sep 2026 02:00:00 GMT</pubDate>
+      <gdacs:eventtype>EQ</gdacs:eventtype>
+      <gdacs:alertlevel>Green</gdacs:alertlevel>
+      <gdacs:eventid>1500001</gdacs:eventid>
+      <gdacs:episodeid>1</gdacs:episodeid>
+      <geo:Point><geo:lat>-30.1</geo:lat><geo:long>-71.4</geo:long></geo:Point>
+    </item>
+    <item>
+      <title>Unknown type</title>
+      <gdacs:eventtype>XX</gdacs:eventtype>
+      <gdacs:eventid>1</gdacs:eventid>
+      <geo:Point><geo:lat>0</geo:lat><geo:long>0</geo:long></geo:Point>
+    </item>
+  </channel>
+</rss>

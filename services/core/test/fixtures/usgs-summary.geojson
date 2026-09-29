@@ -1,0 +1,18 @@
+{
+  "type": "FeatureCollection",
+  "metadata": { "generated": 1759122000000, "title": "USGS Magnitude 2.5+ Earthquakes, Past Day", "status": 200, "count": 4 },
+  "features": [
+    { "type": "Feature", "id": "us7000pe01",
+      "properties": { "mag": 5.8, "place": "35 km SW of Ica, Peru", "time": 1759118400000, "updated": 1759119000000, "url": "https://earthquake.usgs.gov/earthquakes/eventpage/us7000pe01", "status": "reviewed", "tsunami": 0, "type": "earthquake", "title": "M 5.8 - 35 km SW of Ica, Peru", "alert": "green" },
+      "geometry": { "type": "Point", "coordinates": [-75.95, -14.28, 33.5] } },
+    { "type": "Feature", "id": "us7000pe02",
+      "properties": { "mag": 3.1, "place": "12 km N of Arequipa, Peru", "time": 1759110000000, "updated": 1759110500000, "url": "https://earthquake.usgs.gov/earthquakes/eventpage/us7000pe02", "status": "automatic", "tsunami": 0, "type": "earthquake", "title": "M 3.1 - 12 km N of Arequipa, Peru", "alert": null },
+      "geometry": { "type": "Point", "coordinates": [-71.53, -16.30, 110.2] } },
+    { "type": "Feature", "id": "uu60001",
+      "properties": { "mag": 2.6, "place": "Utah quarry", "time": 1759100000000, "updated": 1759100000000, "status": "reviewed", "tsunami": 0, "type": "quarry blast", "title": "M 2.6 Quarry Blast" },
+      "geometry": { "type": "Point", "coordinates": [-112.1, 40.5, 0] } },
+    { "type": "Feature", "id": "ak0001",
+      "properties": { "mag": null, "place": "Alaska", "time": 1759100000000, "type": "earthquake" },
+      "geometry": { "type": "Point", "coordinates": [-150, 61, 10] } }
+  ]
+}

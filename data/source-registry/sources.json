@@ -6,42 +6,69 @@
       "name": "USGS Earthquake Hazards Program",
       "type": "OFFICIAL",
       "trustTier": "OFFICIAL",
-      "countryScope": ["*"],
-      "categories": ["natural.earthquake"],
+      "countryScope": [
+        "*"
+      ],
+      "categories": [
+        "natural.earthquake"
+      ],
       "adapter": "usgs-geojson",
-      "config": { "url": "https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/2.5_hour.geojson" },
+      "config": {
+        "url": "https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/2.5_day.geojson",
+        "minMagnitude": 2.5,
+        "urgentMinMagnitude": 4.5
+      },
       "license": "Dominio público (EE. UU.)",
       "termsUrl": "https://www.usgs.gov/information-policies-and-instructions/copyrights-and-credits",
       "scheduleNormal": "0 5 * * *",
       "urgentCapable": true,
       "urgentPollSeconds": 120,
-      "status": "PLANNED"
+      "status": "ACTIVE"
     },
     {
       "key": "gdacs",
       "name": "GDACS — Global Disaster Alert and Coordination System",
       "type": "OFFICIAL",
       "trustTier": "OFFICIAL",
-      "countryScope": ["*"],
-      "categories": ["natural.earthquake", "natural.tsunami", "natural.flood", "natural.storm", "natural.volcano", "fire.wildfire", "natural.drought"],
+      "countryScope": [
+        "*"
+      ],
+      "categories": [
+        "natural.earthquake",
+        "natural.tsunami",
+        "natural.flood",
+        "natural.storm",
+        "natural.volcano",
+        "fire.wildfire",
+        "natural.drought"
+      ],
       "adapter": "gdacs-rss",
-      "config": { "url": "https://www.gdacs.org/xml/rss.xml" },
+      "config": {
+        "url": "https://www.gdacs.org/xml/rss.xml"
+      },
       "license": "Revisar términos antes de producción",
       "termsUrl": "https://www.gdacs.org/About/termsofuse.aspx",
       "scheduleNormal": "0 5 * * *",
       "urgentCapable": true,
       "urgentPollSeconds": 300,
-      "status": "PLANNED"
+      "status": "PLANNED",
+      "notes": "Adapter listo; se activa cuando se revisen los términos de uso."
     },
     {
       "key": "nasa-firms",
       "name": "NASA FIRMS (focos de calor VIIRS/MODIS)",
       "type": "OPEN_DATA",
       "trustTier": "EXTERNAL",
-      "countryScope": ["*"],
-      "categories": ["fire.wildfire"],
+      "countryScope": [
+        "*"
+      ],
+      "categories": [
+        "fire.wildfire"
+      ],
       "adapter": "firms-csv",
-      "config": { "requiresApiKey": true },
+      "config": {
+        "requiresApiKey": true
+      },
       "license": "Datos abiertos NASA; requiere clave MAP_KEY gratuita",
       "termsUrl": "https://firms.modaps.eosdis.nasa.gov/",
       "scheduleNormal": "0 */6 * * *",
@@ -54,8 +81,12 @@
       "name": "Instituto Geofísico del Perú — sismos reportados",
       "type": "OFFICIAL",
       "trustTier": "OFFICIAL",
-      "countryScope": ["PE"],
-      "categories": ["natural.earthquake"],
+      "countryScope": [
+        "PE"
+      ],
+      "categories": [
+        "natural.earthquake"
+      ],
       "adapter": "to-be-defined",
       "config": {},
       "license": "Por confirmar",
@@ -70,8 +101,15 @@
       "name": "INDECI — emergencias y alertas (Perú)",
       "type": "OFFICIAL",
       "trustTier": "OFFICIAL",
-      "countryScope": ["PE"],
-      "categories": ["natural.flood", "natural.landslide", "natural.cold_wave", "fire.wildfire"],
+      "countryScope": [
+        "PE"
+      ],
+      "categories": [
+        "natural.flood",
+        "natural.landslide",
+        "natural.cold_wave",
+        "fire.wildfire"
+      ],
       "adapter": "to-be-defined",
       "config": {},
       "license": "Por confirmar",
@@ -86,8 +124,13 @@
       "name": "SENAMHI — avisos meteorológicos (Perú)",
       "type": "OFFICIAL",
       "trustTier": "OFFICIAL",
-      "countryScope": ["PE"],
-      "categories": ["natural.storm", "natural.cold_wave"],
+      "countryScope": [
+        "PE"
+      ],
+      "categories": [
+        "natural.storm",
+        "natural.cold_wave"
+      ],
       "adapter": "to-be-defined",
       "config": {},
       "license": "Por confirmar",

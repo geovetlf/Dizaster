@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   CountryLocator,
+  clampToRadius,
   computePresence,
   decideDedup,
   distanceMeters,
@@ -180,5 +181,18 @@ describe("país por coordenadas (offline)", () => {
 
   it("alta mar devuelve null", () => {
     expect(locator.locate({ lat: -20, lng: -100 })).toBeNull();
+  });
+});
+
+describe("pin ajustable", () => {
+  it("deja el pin donde está si está dentro del radio", () => {
+    const p = { lat: LIMA.lat + 0.001, lng: LIMA.lng };
+    expect(clampToRadius(LIMA, p, 300)).toEqual(p);
+  });
+  it("proyecta el pin al borde del radio permitido", () => {
+    const far = { lat: LIMA.lat + 0.05, lng: LIMA.lng + 0.05 };
+    const c = clampToRadius(LIMA, far, 300);
+    expect(distanceMeters(LIMA, c)).toBeGreaterThan(295);
+    expect(distanceMeters(LIMA, c)).toBeLessThanOrEqual(301);
   });
 });

@@ -103,3 +103,9 @@ export const EventMapResponse = z.object({
   clusters: z.array(EventCluster),
 });
 export type EventMapResponse = z.infer<typeof EventMapResponse>;
+
+/** "¿Es este el mismo evento?": candidatos cercanos que el reportero puede elegir antes de enviar. */
+export const NearbyEvent = EventSummary.extend({ matchScore: z.number(), distanceBucket: z.enum(["<100m", "<500m", "<2km", ">2km"]) });
+export type NearbyEvent = z.infer<typeof NearbyEvent>;
+export const NearbyEventsResponse = z.object({ events: z.array(NearbyEvent) });
+export type NearbyEventsResponse = z.infer<typeof NearbyEventsResponse>;

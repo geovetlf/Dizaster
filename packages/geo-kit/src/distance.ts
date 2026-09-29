@@ -33,3 +33,15 @@ export function weightedMedianPoint(points: ReadonlyArray<{ point: GeoPoint; wei
     lng: median(safe.map((p) => ({ v: p.point.lng, w: p.weight }))),
   };
 }
+
+/**
+ * Limita el pin elegido por el usuario a un radio alrededor de su posición real.
+ * Si el usuario arrastra el pin más lejos, el pin se proyecta sobre el borde del círculo.
+ */
+export function clampToRadius(center: GeoPoint, target: GeoPoint, radiusM: number): GeoPoint {
+  const d = distanceMeters(center, target);
+  if (d <= radiusM || d === 0) return target;
+  const f = radiusM / d;
+  // Interpolación en coordenadas locales: exacta para radios de hasta decenas de km.
+  return { lat: center.lat + (target.lat - center.lat) * f, lng: center.lng + (target.lng - center.lng) * f };
+}

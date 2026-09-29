@@ -7,6 +7,9 @@ import { newId } from "../../platform/ids.js";
 import { publish } from "../../platform/outbox.js";
 import type { EventService, ResolutionResult } from "../event/index.js";
 
+export { FEED_ADAPTERS, type FeedAdapter } from "./adapters/index.js";
+export { IngestionScheduler, NodeHttpFetcher, lastScheduledAt, type HttpFetcher, type FetchResult, type RunSummary } from "./scheduler.js";
+
 /** Ítem ya normalizado al esquema común, independiente del formato de la fuente. */
 export interface NormalizedItem {
   externalId: string;

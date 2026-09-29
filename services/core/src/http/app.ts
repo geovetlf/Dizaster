@@ -119,6 +119,17 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
     return c.events.queryMap(c.db, { bbox: q.bbox as [number, number, number, number], zoom: q.zoom, ...(q.categories ? { categories: q.categories } : {}) });
   });
 
+  // "¿Es este el mismo evento?" — requiere sesión: solo quien está reportando lo consulta.
+  app.get("/v1/events/nearby", async (req, reply) => {
+    requireSession(req);
+    const q = parse(
+      z.object({ lat: z.coerce.number().min(-90).max(90), lng: z.coerce.number().min(-180).max(180), category: z.string().max(64) }),
+      req.query,
+    );
+    reply.header("cache-control", "private, no-store");
+    return { events: await c.events.nearby(c.db, { point: { lat: q.lat, lng: q.lng }, categoryCode: q.category }) };
+  });
+
   const IdParam = z.object({ id: z.uuid() });
   app.get("/v1/events/:id", async (req) => c.events.getEvent(c.db, parse(IdParam, req.params).id));
   app.get("/v1/events/:id/timeline", async (req) => ({ entries: await c.events.timeline(c.db, parse(IdParam, req.params).id) }));

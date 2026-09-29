@@ -1,5 +1,6 @@
 import type {
   CategoryConfig,
+  NearbyEvent,
   EventCandidate,
   EventMapResponse,
   EventSummary,
@@ -16,6 +17,8 @@ import {
   clusterResolutionForZoom,
   decideDedup,
   categoryCompatibility,
+  distanceMeters,
+  matchScore,
   weightedMedianPoint,
   type DedupCandidateEvent,
 } from "@dizaster/geo-kit";
@@ -350,6 +353,71 @@ export class EventService {
       mode: "clusters",
       events: [],
       clusters: rows.map((r) => ({ h3: r.cell, point: { lat: r.lat, lng: r.lng }, count: Number(r.count), maxSeverity: r.max_severity })),
+    };
+  }
+
+  /**
+   * Eventos cercanos para la pregunta "¿es este?" antes de reportar. La distancia se devuelve por tramos
+   * (no exacta) para no permitir triangular la ubicación interna del evento.
+   */
+  async nearby(q: Queryable, input: { point: GeoPoint; categoryCode: string }): Promise<NearbyEvent[]> {
+    const country = this.geo.countryOf(input.point);
+    const category = this.ref.category(input.categoryCode, country);
+    if (!category) return [];
+    const root = input.categoryCode.split(".")[0]!;
+    const { rows } = await q.query<EventRow & { ilat: number; ilng: number }>(
+      `SELECT ${PUBLIC_EVENT_COLUMNS}, ST_Y(e.geom::geometry) AS ilat, ST_X(e.geom::geometry) AS ilng
+         FROM event.events e
+        WHERE e.status IN ('ACTIVE','MONITORING') AND e.merged_into_id IS NULL AND e.negative_state <> 'FALSE'
+          AND e.publication_state <> 'HIDDEN'
+          AND (e.category_code = ANY($1) OR e.category_code LIKE $2)
+          AND ST_DWithin(e.geom, ST_SetSRID(ST_MakePoint($3, $4), 4326)::geography, $5)
+          AND e.last_activity_at >= now() - make_interval(mins => $6)
+        LIMIT 20`,
+      [[input.categoryCode, ...category.compatibleWith], `${root}.%`, input.point.lng, input.point.lat, category.dedupRadiusM * 1.5, category.dedupWindowMinutes],
+    );
+    const now = new Date();
+    return rows
+      .map((r) => {
+        const internal = { lat: r.ilat, lng: r.ilng };
+        const score = matchScore(
+          { categoryCode: input.categoryCode, point: input.point, observedAt: now, dedupRadiusM: category.dedupRadiusM * 1.5, dedupWindowMinutes: category.dedupWindowMinutes, compatibleWith: category.compatibleWith },
+          { id: r.id, categoryCode: r.category_code, point: internal, lastActivityAt: r.last_activity_at },
+        );
+        const d = distanceMeters(input.point, internal);
+        const distanceBucket = d < 100 ? "<100m" : d < 500 ? "<500m" : d < 2000 ? "<2km" : ">2km";
+        return { ...toSummary(r), matchScore: score, distanceBucket } as NearbyEvent;
+      })
+      .filter((e) => e.matchScore > 0)
+      .sort((a, b) => b.matchScore - a.matchScore)
+      .slice(0, 5);
+  }
+
+  /**
+   * Ciclo de vida por inactividad (determinista y barato, en lote): ACTIVE → MONITORING tras 2 ventanas de
+   * deduplicación sin actividad; MONITORING → RESOLVED tras 6 (mínimo 24 h). Cada cambio queda en la timeline.
+   */
+  async applyLifecycle(q: Queryable, now: Date): Promise<{ monitoring: number; resolved: number }> {
+    const cats = this.ref.categories.categories;
+    const codes = cats.map((c) => c.code);
+    const monitorMin = cats.map((c) => c.dedupWindowMinutes * 2);
+    const resolveMin = cats.map((c) => Math.max(c.dedupWindowMinutes * 6, 1440));
+    const moved = await q.query<{ id: string; status: string }>(
+      `WITH cfg AS (SELECT * FROM unnest($1::text[], $2::int[], $3::int[]) AS t(code, monitor_min, resolve_min))
+       UPDATE event.events e SET
+          status = CASE WHEN e.last_activity_at < $4::timestamptz - make_interval(mins => cfg.resolve_min) THEN 'RESOLVED' ELSE 'MONITORING' END,
+          updated_at = now()
+         FROM cfg
+        WHERE cfg.code = e.category_code AND e.merged_into_id IS NULL
+          AND ((e.status = 'ACTIVE' AND e.last_activity_at < $4::timestamptz - make_interval(mins => cfg.monitor_min))
+            OR (e.status = 'MONITORING' AND e.last_activity_at < $4::timestamptz - make_interval(mins => cfg.resolve_min)))
+       RETURNING e.id, e.status`,
+      [codes, monitorMin, resolveMin, now],
+    );
+    for (const r of moved.rows) await this.addTimeline(q, r.id, "STATUS_CHANGED", { to: r.status, cause: "INACTIVITY" });
+    return {
+      monitoring: moved.rows.filter((r) => r.status === "MONITORING").length,
+      resolved: moved.rows.filter((r) => r.status === "RESOLVED").length,
     };
   }
 

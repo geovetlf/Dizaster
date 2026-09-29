@@ -16,6 +16,7 @@
   "dependencies": {
     "@dizaster/contracts": "workspace:*",
     "@dizaster/geo-kit": "workspace:*",
+    "fast-xml-parser": "^5.11.2",
     "fastify": "^5.12.5",
     "jose": "^6.2.12",
     "pg": "^8.23.0",

@@ -1,4 +1,4 @@
-import type { AppConfig, EventMapResponse, EventSummary, SubmitReportRequest, SubmitReportResponse, TimelineEntryView } from "@dizaster/contracts";
+import type { AppConfig, EventMapResponse, EventSummary, NearbyEventsResponse, SubmitReportRequest, SubmitReportResponse, TimelineEntryView } from "@dizaster/contracts";
 import { API_URL } from "./config";
 import type { Sender } from "./report/queue";
 
@@ -23,6 +23,8 @@ export const api = {
     request<EventMapResponse>(`/v1/events?bbox=${bbox.map((n) => n.toFixed(5)).join(",")}&zoom=${Math.round(zoom)}`),
   event: (id: string) => request<EventSummary>(`/v1/events/${id}`),
   timeline: (id: string) => request<{ entries: TimelineEntryView[] }>(`/v1/events/${id}/timeline`),
+  nearby: (lat: number, lng: number, category: string) =>
+    request<NearbyEventsResponse>(`/v1/events/nearby?lat=${lat.toFixed(6)}&lng=${lng.toFixed(6)}&category=${encodeURIComponent(category)}`),
   submitReport: (body: SubmitReportRequest) => request<SubmitReportResponse>("/v1/reports", { method: "POST", body: JSON.stringify(body) }),
 };
 

@@ -142,3 +142,44 @@ describe("mapa", () => {
     expect(res.statusCode).toBe(400);
   });
 });
+
+describe("¿es este el mismo evento?", () => {
+  it("sugiere el evento cercano compatible y el reporte elegido se suma a él", async () => {
+    const pin = offset(LIMA, 70000, 70000);
+    const a = await createUser(t, "cercano1");
+    const b = await createUser(t, "cercano2");
+    const r1 = await submit(t, a, reportBody(a, { pin, category: "infra.road_blocked" }));
+    const near = offset(pin, 200);
+    const res = await t.app.inject({ url: `/v1/events/nearby?lat=${near.lat}&lng=${near.lng}&category=accident.traffic`, headers: { authorization: `Bearer ${b.token}` } });
+    const events = res.json().events as Array<{ id: string; distanceBucket: string; point: { lat: number } }>;
+    expect(events[0]).toMatchObject({ id: r1.body.eventId, distanceBucket: "<500m" });
+    expect(res.body).not.toContain(String(pin.lat));
+    const r2 = await submit(t, b, reportBody(b, { pin: near, category: "accident.traffic", targetEventId: r1.body.eventId! }));
+    expect(r2.body).toMatchObject({ outcome: "ATTACHED_TO_EVENT", eventId: r1.body.eventId });
+  });
+
+  it("requiere sesión", async () => {
+    expect((await t.app.inject({ url: `/v1/events/nearby?lat=0&lng=0&category=fire.structure` })).statusCode).toBe(401);
+  });
+
+  it("no ofrece eventos incompatibles ni lejanos", async () => {
+    const u = await createUser(t, "cercano3");
+    const p = offset(LIMA, 70000, 70000);
+    const res = await t.app.inject({ url: `/v1/events/nearby?lat=${p.lat}&lng=${p.lng}&category=fire.structure`, headers: { authorization: `Bearer ${u.token}` } });
+    expect(res.json().events).toEqual([]);
+  });
+});
+
+describe("ciclo de vida", () => {
+  it("un evento sin actividad pasa a MONITORING y luego a RESOLVED, con registro en la timeline", async () => {
+    const u = await createUser(t, "ciclo");
+    const r = await submit(t, u, reportBody(u, { pin: offset(LIMA, -90000) }));
+    const inFiveHours = new Date(Date.now() + 5 * 3600_000); // accidente: ventana 120 min → monitoreo a las 4 h
+    await t.c.events.applyLifecycle(t.c.db, inFiveHours);
+    expect((await t.app.inject({ url: `/v1/events/${r.body.eventId}` })).json().status).toBe("MONITORING");
+    await t.c.events.applyLifecycle(t.c.db, new Date(Date.now() + 25 * 3600_000));
+    expect((await t.app.inject({ url: `/v1/events/${r.body.eventId}` })).json().status).toBe("RESOLVED");
+    const tl = (await t.app.inject({ url: `/v1/events/${r.body.eventId}/timeline` })).json().entries as Array<{ type: string }>;
+    expect(tl.filter((e) => e.type === "STATUS_CHANGED")).toHaveLength(2);
+  });
+});
