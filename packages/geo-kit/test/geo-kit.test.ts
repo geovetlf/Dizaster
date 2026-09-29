@@ -4,6 +4,7 @@ import {
   CountryLocator,
   clampToRadius,
   computePresence,
+  PRESENCE_RULES_V1,
   decideDedup,
   DEDUP_RULES,
   hammingHex,
@@ -214,5 +215,50 @@ describe("pin ajustable", () => {
     const c = clampToRadius(LIMA, far, 300);
     expect(distanceMeters(LIMA, c)).toBeGreaterThan(295);
     expect(distanceMeters(LIMA, c)).toBeLessThanOrEqual(301);
+  });
+});
+
+describe("presencia: bonificación por media capturada en la app (ADR 0073)", () => {
+  const now = new Date("2026-09-29T10:00:30Z");
+  // Señales flojas: GPS de 400 m y fix de hace ~16 min → banda media sin media.
+  const weak = (): PresenceInput => ({
+    pin: { lat: LIMA.lat + 0.0005, lng: LIMA.lng },
+    signals: {
+      fix: { ...LIMA, accuracyM: 400, fixTime: "2026-09-29T09:43:30Z", provider: "GNSS" },
+      mockLocation: false, attestationToken: "x", recentFixes: [], deviceClock: "2026-09-29T10:00:28Z",
+    },
+    category: { presenceRadiusM: 300, offlineToleranceMinutes: 60 },
+    capturedAt: new Date("2026-09-29T10:00:10Z"),
+    capturedOffline: false,
+    receivedAt: now,
+    attestation: "GENUINE",
+  });
+  const photo = (capturedAt: string, serverSeenAt = "2026-09-29T10:00:20Z") => ({ capturedAt: new Date(capturedAt), serverSeenAt: new Date(serverSeenAt) });
+
+  it("una foto de la cámara tomada junto al reporte suma evidencia", () => {
+    expect(computePresence(weak()).band).toBe("MEDIUM");
+    const r = computePresence({ ...weak(), mediaProofs: [photo("2026-09-29T10:00:00Z")] });
+    expect(r.breakdown["mediaInApp"]).toBe(1);
+    expect(r.band).toBe("HIGH");
+    expect(r.ruleVersion).toBe("presence-2");
+  });
+
+  it("una foto vieja o con horas incoherentes no suma", () => {
+    expect(computePresence({ ...weak(), mediaProofs: [photo("2026-09-29T08:00:00Z")] }).breakdown["mediaInApp"]).toBe(0);
+    // El servidor vio la subida una hora antes de la supuesta captura: fecha retocada.
+    expect(computePresence({ ...weak(), mediaProofs: [photo("2026-09-29T10:00:00Z", "2026-09-29T09:00:00Z")] }).breakdown["mediaInApp"]).toBe(0);
+  });
+
+  it("no rompe los topes de radio ni de atestación", () => {
+    const far = { ...weak(), pin: { lat: LIMA.lat + 0.03, lng: LIMA.lng }, mediaProofs: [photo("2026-09-29T10:00:00Z")] };
+    expect(computePresence(far).band).toBe("LOW");
+    const noAttest = { ...weak(), attestation: "UNAVAILABLE" as const, mediaProofs: [photo("2026-09-29T10:00:00Z")] };
+    expect(computePresence(noAttest).band).not.toBe("HIGH");
+  });
+
+  it("presence-1 queda igual para auditar reportes viejos", () => {
+    const r = computePresence({ ...weak(), mediaProofs: [photo("2026-09-29T10:00:00Z")] }, PRESENCE_RULES_V1);
+    expect(r.band).toBe("MEDIUM");
+    expect(r.ruleVersion).toBe("presence-1");
   });
 });

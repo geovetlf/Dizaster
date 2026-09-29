@@ -14,29 +14,44 @@ import { distanceMeters } from "./distance.js";
  */
 export interface PresenceRuleSet {
   version: string;
-  weights: { distance: number; accuracy: number; freshness: number; attestation: number };
+  /** `mediaInApp` es una bonificación sobre los otros cuatro (que suman 1): nunca basta sola. */
+  weights: { distance: number; accuracy: number; freshness: number; attestation: number; mediaInApp: number };
   penalties: { mockLocation: number; clockSkew: number; implausibleMovement: number };
   accuracyGoodM: number;
   accuracyMaxM: number;
   freshnessGoodS: number;
   freshnessMaxS: number;
   clockSkewToleranceS: number;
+  /** Foto/video de la cámara de la app: bonificación completa hasta `good` segundos del reporte, cero en `max`. */
+  mediaGoodS: number;
+  mediaMaxS: number;
   maxPlausibleSpeedMps: number;
   bands: { high: number; medium: number };
 }
 
 export const PRESENCE_RULES_V1: PresenceRuleSet = {
   version: "presence-1",
-  weights: { distance: 0.4, accuracy: 0.2, freshness: 0.2, attestation: 0.2 },
+  weights: { distance: 0.4, accuracy: 0.2, freshness: 0.2, attestation: 0.2, mediaInApp: 0 },
   penalties: { mockLocation: 0.8, clockSkew: 0.2, implausibleMovement: 0.4 },
   accuracyGoodM: 50,
   accuracyMaxM: 500,
   freshnessGoodS: 120,
   freshnessMaxS: 1800,
   clockSkewToleranceS: 300,
+  mediaGoodS: 300,
+  mediaMaxS: 1800,
   maxPlausibleSpeedMps: 90, // ~324 km/h: por encima es un "teletransporte"
   bands: { high: 0.75, medium: 0.5 },
 };
+
+/** presence-2 (ADR 0073): igual que presence-1 más la bonificación por media capturada en la app (§8.2, w5). */
+export const PRESENCE_RULES_V2: PresenceRuleSet = {
+  ...PRESENCE_RULES_V1,
+  version: "presence-2",
+  weights: { ...PRESENCE_RULES_V1.weights, mediaInApp: 0.1 },
+};
+
+export const PRESENCE_RULES_CURRENT = PRESENCE_RULES_V2;
 
 export interface PresenceInput {
   pin: GeoPoint;
@@ -48,6 +63,12 @@ export interface PresenceInput {
   receivedAt: Date;
   /** Veredicto verificado en el servidor (nunca el que dice el cliente). */
   attestation: AttestationVerdict;
+  /**
+   * Fotos/videos adjuntos que la app dice haber capturado con su cámara: hora de captura declarada y hora en que
+   * el servidor vio por primera vez la subida. Sin firma de la app (pendiente de App Attest / Play Integrity), por
+   * eso la bonificación es pequeña y no rompe los topes de radio ni de atestación.
+   */
+  mediaProofs?: { capturedAt: Date; serverSeenAt: Date }[];
 }
 
 export interface PresenceResult {
@@ -65,7 +86,7 @@ const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
 /** 1 hasta `good`, decae linealmente hasta 0 en `max`. */
 const ramp = (value: number, good: number, max: number) => (value <= good ? 1 : clamp01(1 - (value - good) / (max - good)));
 
-export function computePresence(input: PresenceInput, rules: PresenceRuleSet = PRESENCE_RULES_V1): PresenceResult {
+export function computePresence(input: PresenceInput, rules: PresenceRuleSet = PRESENCE_RULES_CURRENT): PresenceResult {
   const { signals, pin, category } = input;
   const reasons: PresenceRejectionReason[] = [];
   const fixPoint = { lat: signals.fix.lat, lng: signals.fix.lng };
@@ -85,6 +106,8 @@ export function computePresence(input: PresenceInput, rules: PresenceRuleSet = P
 
   const fAttestation = input.attestation === "GENUINE" ? 1 : input.attestation === "UNAVAILABLE" ? 0.5 : 0;
   if (input.attestation === "FAILED") reasons.push("ATTESTATION_FAILED");
+
+  const fMedia = mediaFactor(input, rules);
 
   let penalty = 0;
   if (signals.mockLocation === true) {
@@ -107,7 +130,7 @@ export function computePresence(input: PresenceInput, rules: PresenceRuleSet = P
   }
 
   const w = rules.weights;
-  const raw = w.distance * fDistance + w.accuracy * fAccuracy + w.freshness * fFreshness + w.attestation * fAttestation;
+  const raw = w.distance * fDistance + w.accuracy * fAccuracy + w.freshness * fFreshness + w.attestation * fAttestation + w.mediaInApp * fMedia;
   // Fuera del radio el reporte no puede afirmar presencia, aunque el resto de señales sean perfectas.
   let score = clamp01(fDistance === 0 ? Math.min(raw - penalty, rules.bands.medium - 0.01) : raw - penalty);
   // Sin integridad de app verificada no se alcanza HIGH: el reporte puede sumarse a un evento, pero no crearlo solo.
@@ -128,10 +151,27 @@ export function computePresence(input: PresenceInput, rules: PresenceRuleSet = P
     band,
     reasons,
     fixToPinM: Math.round(fixToPinM),
-    breakdown: { distance: fDistance, accuracy: fAccuracy, freshness: fFreshness, attestation: fAttestation, penalty },
+    breakdown: { distance: fDistance, accuracy: fAccuracy, freshness: fFreshness, attestation: fAttestation, mediaInApp: fMedia, penalty },
     ruleVersion: rules.version,
     lateOffline,
   };
+}
+
+/**
+ * La mejor prueba de media: 1 si se capturó a ≤ `mediaGoodS` del reporte, decae hasta `mediaMaxS`. Una prueba
+ * incoherente no cuenta: el servidor no pudo ver la subida antes de que la foto existiera, y en un envío en línea la
+ * foto tiene que ser reciente respecto de la hora del servidor (no vale una foto vieja con fecha retocada).
+ */
+function mediaFactor(input: PresenceInput, rules: PresenceRuleSet): number {
+  let best = 0;
+  for (const m of input.mediaProofs ?? []) {
+    const takenMs = m.capturedAt.getTime();
+    if (m.serverSeenAt.getTime() < takenMs - rules.clockSkewToleranceS * 1000) continue;
+    if (!input.capturedOffline && Math.abs(input.receivedAt.getTime() - takenMs) / 1000 > rules.mediaMaxS) continue;
+    const gapS = Math.abs(input.capturedAt.getTime() - takenMs) / 1000;
+    best = Math.max(best, ramp(gapS, rules.mediaGoodS, rules.mediaMaxS));
+  }
+  return best;
 }
 
 function hasImplausibleMovement(signals: PresenceSignals, maxSpeedMps: number): boolean {

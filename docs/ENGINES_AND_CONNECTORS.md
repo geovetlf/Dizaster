@@ -44,7 +44,7 @@ traducción y voz apagados; hay mocks (`fixture`, `log`) para desarrollo.
 
 | FUNCTION | PURPOSE | IMPLEMENTATION | AI_REQUIRED | EXTERNAL_API_REQUIRED | COST | FALLBACK | PROVIDER | PRIVACY_IMPACT |
 |---|---|---|---|---|---|---|---|---|
-| Enviar reporte | Registrar lo que pasa, con presencia | Reglas de presencia + outbox | NO AI REQUIRED | No | 0 | Cola offline en el teléfono | Propio | Ubicación precisa cifrada (AES-GCM), nunca pública |
+| Enviar reporte | Registrar lo que pasa, con presencia | Reglas de presencia (presence-2, bonificación por media de la cámara, ADR 0073) + outbox | NO AI REQUIRED | No | 0 | Cola offline en el teléfono | Propio | Ubicación precisa cifrada (AES-GCM), nunca pública |
 | Agrupar en EVENT / duplicados | Un evento por suceso | H3 + radio/ventana por categoría | NO AI REQUIRED (IA opcional futura solo para ambiguos) | No | 0 | Cola de moderación | Propio | Solo ubicación generalizada |
 | Verificación | Estado público del evento | Reglas versionadas | NO AI REQUIRED; IA nunca confirma | No | 0 | — | Propio | Explicación sin identidades |
 | Confirmación oficial | OFFICIALLY_CONFIRMED | Fuente oficial registrada, en ámbito | NO AI REQUIRED | Feeds abiertos | 0 | Queda EXTERNALLY_CORROBORATED | USGS/GDACS/CAP | Ninguno |

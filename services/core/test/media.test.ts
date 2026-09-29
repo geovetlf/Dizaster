@@ -183,6 +183,21 @@ describe("subida directa firmada", () => {
 });
 
 describe("media en reportes y eventos", () => {
+  it("la foto de la cámara de la app tomada junto al reporte suma a la presencia (ADR 0073)", async () => {
+    const breakdown = async (reportId: unknown) => (await t.c.db.query<{ score_breakdown: Record<string, number>; rule_version: string }>(
+      `SELECT score_breakdown, rule_version FROM report.presence_evidence WHERE report_id = $1`, [reportId],
+    )).rows[0]!;
+    const u = await createUser(t, "media_presence");
+    const cam = await uploadReady(u, makeJpeg(), { capturedAt: new Date().toISOString() });
+    const r = await submit(t, u, { ...reportBody(u, { pin: { lat: -12.9, lng: -77.03 } }), mediaIds: [cam] });
+    expect(await breakdown(r.body.reportId)).toMatchObject({ rule_version: "presence-2", score_breakdown: { mediaInApp: 1 } });
+
+    const g = await createUser(t, "media_gallery");
+    const gallery = await uploadReady(g, makeJpeg({ exif: false }), { capturedAt: new Date().toISOString(), capturedInApp: false });
+    const r2 = await submit(t, g, { ...reportBody(g, { pin: { lat: -12.95, lng: -77.03 } }), mediaIds: [gallery] });
+    expect((await breakdown(r2.body.reportId)).score_breakdown["mediaInApp"]).toBe(0);
+  });
+
   it("la foto de un reporte aparece en la timeline y en la media pública del evento, saneada", async () => {
     const u = await createUser(t, "media_report");
     const id = await uploadReady(u, makeJpeg());

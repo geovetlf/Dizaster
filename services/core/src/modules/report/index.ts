@@ -72,6 +72,7 @@ export class ReportService {
     const device = req.deviceId ? await this.d.identity.ownedDevice(db, session.userId, req.deviceId) : null;
     if (req.deviceId && !device) throw new DomainError("UNKNOWN_DEVICE", "Dispositivo no registrado para este usuario", 403);
     const attachable = await this.d.media.assertAttachable(db, session.profileId, req.mediaIds);
+    const mediaProofs = await this.d.media.inAppCaptures(db, session.profileId, req.mediaIds);
 
     const receivedAt = clock.now();
     const attestation = await this.d.attestation.verify(req.presence.attestationToken, device?.platform ?? null);
@@ -83,6 +84,7 @@ export class ReportService {
       capturedOffline: req.capturedOffline,
       receivedAt,
       attestation,
+      mediaProofs,
     });
     const anonymity = category.forcePseudonymous ? "PSEUDONYMOUS" : req.anonymityMode;
 
