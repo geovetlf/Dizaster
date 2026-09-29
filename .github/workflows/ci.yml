@@ -44,6 +44,10 @@ jobs:
       - run: pnpm test
         env:
           S3_TEST_ENDPOINT: http://127.0.0.1:9900
+      - name: Prueba de restauración del respaldo (pg_dump → base temporal → mismas filas)
+        run: pnpm db:restore-check
+        env:
+          DATABASE_URL: ${{ env.TEST_DATABASE_URL }}
 
       - name: Empaquetado móvil (JS, iOS + Android)
         working-directory: apps/mobile
@@ -52,3 +56,22 @@ jobs:
       - name: Proyectos nativos iOS + Android (paridad de permisos, push y enlaces)
         working-directory: apps/mobile
         run: pnpm run native:check
+
+  supply-chain:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Licencias permitidas y avisos de seguridad (ADR 0070)
+        run: pnpm supply-chain
+      - run: pnpm sbom
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sbom-cyclonedx
+          path: sbom.cdx.json

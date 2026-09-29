@@ -1,0 +1,23 @@
+# Actualizaciones de dependencias (ADR 0070). Agrupadas y semanales para no inundar de PRs; Expo se actualiza
+# por SDK completo (npx expo install --fix), así que sus paquetes se ignoran aquí salvo parches de seguridad.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule: { interval: weekly, day: monday }
+    open-pull-requests-limit: 5
+    groups:
+      dev-tooling:
+        dependency-type: development
+      production:
+        dependency-type: production
+        update-types: [minor, patch]
+    ignore:
+      - dependency-name: "expo"
+      - dependency-name: "expo-*"
+      - dependency-name: "react-native"
+      - dependency-name: "react-native-*"
+      - dependency-name: "react"
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: monthly }

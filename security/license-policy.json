@@ -1,0 +1,11 @@
+{
+ "note": "Licencias permitidas para dependencias de producción (ADR 0070). Una excepción necesita motivo y alcance.",
+ "allowed": ["MIT", "ISC", "BSD-2-Clause", "BSD-3-Clause", "Apache-2.0", "0BSD", "BlueOak-1.0.0", "Unlicense", "CC0-1.0", "Python-2.0", "CC-BY-4.0", "MPL-2.0"],
+ "exceptions": [
+  {
+   "package": "@img/sharp-libvips-*",
+   "license": "LGPL-3.0-or-later",
+   "reason": "Biblioteca nativa libvips de sharp, enlazada dinámicamente y sin modificar; solo en el servidor (no se distribuye en la app)."
+  }
+ ]
+}

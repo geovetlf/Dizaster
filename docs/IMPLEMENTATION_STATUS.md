@@ -262,6 +262,7 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | Pantalla "Acerca de / licencias" con atribuciones ODbL (§11.3) | ✅ | ADR 0051, `GET /v1/about/attributions`, `app/about.tsx` |
 | Contrato OpenAPI 3.1 desde los contratos zod y trazas OpenTelemetry opcionales (§4.3, §5.22) | ✅ | ADR 0052, `GET /v1/openapi.json`, `src/telemetry.ts` |
 | Moderación cambia el ciclo de vida de un evento, auditado (§5.7) | ✅ | ADR 0053, `POST /v1/moderation/events/:id/status` |
+| Licencias, auditoría, SBOM, Dependabot; respaldo con prueba de restauración en CI | ✅ | ADR 0070, `scripts/supply-chain.mjs`, `scripts/db-restore-check.mjs` |
 | Idioma de la app elegible en el perfil (es/en/pt/fr o del teléfono) | ✅ | ADR 0069, `app/language.tsx` |
 | Varias cuentas en un teléfono corroboran como una (clave seudónima del teléfono) | ✅ | ADR 0068, migración 0036 |
 | Adaptador NASA FIRMS (focos VIIRS/MODIS → incendio forestal) y secretos de fuentes por entorno | ✅ | ADR 0067; activar espera `SOURCE_KEY_FIRMS` (BLOQUEADA: MAP_KEY) |
@@ -283,9 +284,8 @@ E. ✅ Auditoría de IA y APIs externas (ninguna en uso); AI CORE único, opcion
    (traducción, SMS, voz; video en vivo ya existía); modo costo cero; tabla por función en
    `docs/ENGINES_AND_CONNECTORS.md` (ADR 0064). Elegir proveedor de IA/SMS/traducción: BLOQUEADA (propietario).
 
-Revisión del Blueprint del 2026-09-29 (tras ADR 0054), verificada contra el código:
-
-1. Cadena de suministro y respaldos: Dependabot, audit, SBOM, licencias; `pg_dump` con prueba de restauración (§13.1).
+Revisión del Blueprint del 2026-09-29 (tras ADR 0054): completada con ADR 0055–0070. Lo que sigue depende de
+decisiones o credenciales del propietario (lista de abajo); mientras tanto se continúa con mejoras sin bloqueo.
 
 
 Bloqueadas o en espera:
