@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Feed Atom con alertas CAP incrustadas (emisor ficticio, solo para pruebas). -->
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>Alertas de ejemplo</title>
+  <entry>
+    <id>urn:ej:1</id>
+    <content type="text/xml">
+      <alert xmlns="urn:oasis:names:tc:emergency:cap:1.2">
+        <identifier>EJ-SISMO-2</identifier><sender>alertas@example.org</sender><sent>2026-09-20T10:05:00Z</sent>
+        <status>Actual</status><msgType>Update</msgType>
+        <references>alertas@example.org,EJ-SISMO-1,2026-09-20T10:00:00Z</references>
+        <info><language>es</language><category>Geo</category><event>Sismo</event><urgency>Immediate</urgency>
+          <severity>Moderate</severity><certainty>Observed</certainty><effective>2026-09-20T09:58:00Z</effective>
+          <headline>Sismo de magnitud 5,1 cerca de Ica</headline>
+          <area><areaDesc>Ica</areaDesc><circle>-14.07,-75.73 30</circle></area></info>
+      </alert>
+    </content>
+  </entry>
+  <entry>
+    <id>urn:ej:2</id>
+    <content type="text/xml">
+      <alert xmlns="urn:oasis:names:tc:emergency:cap:1.2">
+        <identifier>EJ-SIMULACRO</identifier><sender>alertas@example.org</sender><sent>2026-09-20T11:00:00Z</sent>
+        <status>Exercise</status><msgType>Alert</msgType>
+        <info><language>es</language><category>Geo</category><event>Sismo</event><urgency>Immediate</urgency><severity>Extreme</severity>
+          <certainty>Observed</certainty><area><areaDesc>Lima</areaDesc><circle>-12.05,-77.04 50</circle></area></info>
+      </alert>
+    </content>
+  </entry>
+  <entry>
+    <id>urn:ej:3</id>
+    <content type="text/xml">
+      <alert xmlns="urn:oasis:names:tc:emergency:cap:1.2">
+        <identifier>EJ-CANCELA</identifier><sender>alertas@example.org</sender><sent>2026-09-20T12:00:00Z</sent>
+        <status>Actual</status><msgType>Cancel</msgType><references>alertas@example.org,EJ-X,2026-09-19T00:00:00Z</references>
+        <info><language>es</language><category>Met</category><event>Lluvias intensas</event><urgency>Past</urgency><severity>Minor</severity>
+          <certainty>Observed</certainty><area><areaDesc>Piura</areaDesc><circle>-5.19,-80.63 20</circle></area></info>
+      </alert>
+    </content>
+  </entry>
+  <entry>
+    <id>urn:ej:4</id>
+    <content type="text/xml">
+      <alert xmlns="urn:oasis:names:tc:emergency:cap:1.2">
+        <identifier>EJ-OLEAJE</identifier><sender>alertas@example.org</sender><sent>2026-09-20T13:00:00Z</sent>
+        <status>Actual</status><msgType>Alert</msgType>
+        <info><language>es</language><category>Met</category><event>Oleaje anómalo</event><urgency>Expected</urgency><severity>Moderate</severity>
+          <certainty>Likely</certainty><area><areaDesc>Litoral</areaDesc><circle>-12.1,-77.1 100</circle></area></info>
+      </alert>
+    </content>
+  </entry>
+  <entry>
+    <id>urn:ej:5</id>
+    <content type="text/xml">
+      <alert xmlns="urn:oasis:names:tc:emergency:cap:1.2">
+        <identifier>EJ-HELADA</identifier><sender>alertas@example.org</sender><sent>2026-09-20T14:00:00Z</sent>
+        <status>Actual</status><msgType>Alert</msgType>
+        <info><language>es</language><category>Met</category><event>Heladas</event><urgency>Future</urgency><severity>Minor</severity>
+          <certainty>Possible</certainty><area><areaDesc>Solo geocódigo</areaDesc><geocode><valueName>UBIGEO</valueName><value>080101</value></geocode></area></info>
+      </alert>
+    </content>
+  </entry>
+</feed>

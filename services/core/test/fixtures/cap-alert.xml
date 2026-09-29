@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Alerta CAP 1.2 de ejemplo (emisor ficticio, solo para pruebas). -->
+<alert xmlns="urn:oasis:names:tc:emergency:cap:1.2">
+  <identifier>EJ-2026-0915-001</identifier>
+  <sender>alertas@example.org</sender>
+  <sent>2026-09-15T06:00:00-05:00</sent>
+  <status>Actual</status>
+  <msgType>Alert</msgType>
+  <scope>Public</scope>
+  <info>
+    <language>es-PE</language>
+    <category>Met</category>
+    <event>Lluvias intensas</event>
+    <urgency>Expected</urgency>
+    <severity>Severe</severity>
+    <certainty>Likely</certainty>
+    <onset>2026-09-15T12:00:00-05:00</onset>
+    <expires>2026-09-16T12:00:00-05:00</expires>
+    <headline>Aviso de lluvias intensas en la sierra sur</headline>
+    <area>
+      <areaDesc>Cusco; Puno</areaDesc>
+      <polygon>-13.0,-72.5 -13.0,-70.0 -15.0,-70.0 -15.0,-72.5 -13.0,-72.5</polygon>
+    </area>
+  </info>
+  <info>
+    <language>en-US</language>
+    <category>Met</category>
+    <event>Heavy rain</event>
+    <urgency>Expected</urgency>
+    <severity>Severe</severity>
+    <certainty>Likely</certainty>
+    <headline>Heavy rain warning for the southern highlands</headline>
+    <area><areaDesc>Cusco; Puno</areaDesc></area>
+  </info>
+</alert>

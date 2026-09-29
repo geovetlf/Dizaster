@@ -6,6 +6,16 @@ import { createTestContext, type TestContext } from "./helpers.js";
 const fixture = (f: string) => readFileSync(new URL(`./fixtures/${f}`, import.meta.url), "utf8");
 const usgs = FEED_ADAPTERS.get("usgs-geojson")!;
 const gdacs = FEED_ADAPTERS.get("gdacs-rss")!;
+const cap = FEED_ADAPTERS.get("cap-1.2")!;
+const CAP_CONFIG = {
+  languages: ["es", "en"],
+  eventMap: [
+    { match: "sismo", category: "natural.earthquake" },
+    { match: "lluvia", category: "natural.flood" },
+    { match: "friaje", category: "natural.cold_wave" },
+    { match: "helada", category: "natural.cold_wave" },
+  ],
+};
 
 describe("adapters (sin red)", () => {
   it("USGS: normaliza sismos, descarta explosiones y magnitudes nulas", () => {
@@ -24,6 +34,38 @@ describe("adapters (sin red)", () => {
     ]);
     expect(gdacs.isUrgent(items[0]!, {})).toBe(true);
     expect(gdacs.isUrgent(items[1]!, {})).toBe(false);
+  });
+
+  it("CAP: alerta suelta con título por idioma, centro y radio del polígono, carril urgente por severidad", () => {
+    const [a, ...rest] = cap.parse(fixture("cap-alert.xml"), CAP_CONFIG);
+    expect(rest).toEqual([]);
+    expect(a).toMatchObject({
+      externalId: "EJ-2026-0915-001", categoryCode: "natural.flood", severity: 4, point: { lat: -14, lng: -71.25 },
+      occurredAt: "2026-09-15T17:00:00.000Z", publishedAt: "2026-09-15T11:00:00.000Z",
+      title: { es: "Aviso de lluvias intensas en la sierra sur", en: "Heavy rain warning for the southern highlands" },
+      raw: { urgency: "Expected", areaDesc: "Cusco; Puno", expires: "2026-09-16T17:00:00.000Z" },
+    });
+    expect(a!.uncertaintyM).toBeGreaterThan(150_000);
+    expect(a!.uncertaintyM).toBeLessThan(200_000);
+    expect(cap.isUrgent(a!, CAP_CONFIG)).toBe(true);
+    expect(cap.parse(fixture("cap-alert.xml"), {})).toEqual([]); // sin eventMap no se inventa categoría
+  });
+
+  it("CAP en Atom: la actualización conserva el id original; simulacros, cancelaciones, eventos sin mapear y geocódigos sueltos no crean nada", () => {
+    const items = cap.parse(fixture("cap-atom.xml"), CAP_CONFIG);
+    expect(items.map((i) => [i.externalId, i.categoryCode, i.point])).toEqual([
+      ["EJ-SISMO-1", "natural.earthquake", { lat: -14.07, lng: -75.73 }],
+      ["EJ-HELADA", "natural.cold_wave", null],
+    ]);
+    expect(items[0]!.uncertaintyM).toBe(30_000);
+    expect(cap.isUrgent(items[0]!, CAP_CONFIG)).toBe(false);
+    expect(cap.isUrgent(items[0]!, { urgentMinSeverity: "Moderate" })).toBe(true);
+  });
+
+  it("CAP con el perfil Atom cap:*", () => {
+    const [f] = cap.parse(fixture("cap-atom-profile.xml"), CAP_CONFIG);
+    expect(f).toMatchObject({ externalId: "urn:ej:perfil:1", categoryCode: "natural.cold_wave", severity: 5, title: { en: "Aviso de friaje en la selva sur" } });
+    expect(f!.point).not.toBeNull();
   });
 
   it("horario del carril NORMAL", () => {
