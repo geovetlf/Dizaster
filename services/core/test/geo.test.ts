@@ -86,7 +86,7 @@ describe("resolveAdmin: país → región → ciudad → distrito sin API extern
 
   it("fuera del piloto usa datos globales: región Natural Earth y ciudad por cercanía", async () => {
     const ctx = await t.c.geo.contextFor(t.c.db, TOKYO, "NORMAL");
-    expect(ctx).toMatchObject({ country: { code: "JP", name: "Japón" }, region: { id: "NE1:JPN-1860", name: "Tokio" }, city: { name: "Tokyo" }, district: null, timezone: null });
+    expect(ctx).toMatchObject({ country: { code: "JP", name: "Japón" }, region: { id: "NE1:JPN-1860", name: "Tokio" }, city: { name: "Tokyo" }, district: null, timezone: "Asia/Tokyo" });
   });
 
   it("memoriza por celda H3 y la importación invalida la memoria", async () => {

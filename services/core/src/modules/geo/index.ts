@@ -8,10 +8,12 @@ import type { Meter } from "../../platform/metrics.js";
 import type { ReferenceData } from "../reference/index.js";
 import { labelFor, toContextualLocation, type ResolvedContext } from "./context.js";
 import { searchKey } from "./names.js";
+import { polygonTimezones, resolveTimezone, type TimezoneLocator } from "./timezone.js";
 
 export { importDataset, loadManifest, type DatasetSpec, type GeoManifest, type ImportResult } from "./importer.js";
 export { MAX_GRANULARITY, labelFor, toContextualLocation, type ResolvedContext } from "./context.js";
 export { searchKey, titleCaseEs } from "./names.js";
+export { polygonTimezones, resolveTimezone, type TimezoneLocator } from "./timezone.js";
 
 /** Tolerancia para puntos que caen justo fuera de un polígono simplificado (costa, bordes): ~2 km. */
 const EDGE_TOLERANCE_DEG = 0.02;
@@ -37,6 +39,7 @@ export class GeoService {
     dataDir: string,
     private readonly ref: ReferenceData,
     private readonly meter?: Meter,
+    private readonly timezones: TimezoneLocator = polygonTimezones(),
   ) {
     const fc = JSON.parse(readFileSync(join(dataDir, "countries/countries-50m.geojson"), "utf8")) as { features: CountryFeature[] };
     this.locator = new CountryLocator(fc.features);
@@ -114,13 +117,12 @@ export class GeoService {
       city = c ? { id: c.id, name: c.name } : null;
     }
     if (!city && countryCode) city = await this.nearestPlace(q, point, countryCode);
-    const timezones = countryCode ? this.ref.country(countryCode)?.timezones : undefined;
     return {
       country: countryCode ? { code: countryCode, name: this.countryName(countryCode) } : null,
       region,
       city,
       district,
-      timezone: timezones?.length === 1 ? timezones[0]! : null,
+      timezone: resolveTimezone(point, countryCode ? this.ref.country(countryCode)?.timezones : undefined, this.timezones),
     };
   }
 
