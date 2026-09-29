@@ -86,3 +86,14 @@ describe("reacciones de contexto (ADR 0040)", () => {
     expect(reactionKindsFor({ event: { id: "e" } })).toContain("SEEN_TOO");
   });
 });
+
+describe("hilos de comentarios (ADR 0045)", () => {
+  it("pone cada respuesta bajo su comentario y huérfanas como raíz", async () => {
+    const { threadComments } = await import("../src/lib/social/comments");
+    const c = (id: string, parentId: string | null) => ({
+      id, parentId, author: { handle: "a", displayName: "A" }, text: id, createdAt: "2026-01-01T00:00:00Z", mine: false, reactions: {}, myReactions: [],
+    });
+    const out = threadComments([c("1", null), c("2", null), c("1a", "1"), c("2a", "2"), c("1b", "1"), c("xa", "borrado")]);
+    expect(out.map((x) => `${x.reply ? "  " : ""}${x.comment.id}`)).toEqual(["1", "  1a", "  1b", "2", "  2a", "xa"]);
+  });
+});

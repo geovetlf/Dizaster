@@ -154,6 +154,35 @@ describe("feed", () => {
     expect((await t.app.inject({ url: "/v1/events/00000000-0000-7000-8000-000000000000/posts" })).statusCode).toBe(404);
   });
 
+  it("comentarios: respuestas de un nivel, borrar el propio y reacciones", async () => {
+    const a = await createUser(t, "hilo_a");
+    const b = await createUser(t, "hilo_b");
+    const post = (await feed("tab=for_you")).posts.find((p) => p.text === "Robo")!;
+    const say = (u: TestUser, text: string, parentId?: string) =>
+      t.app.inject({ method: "POST", url: `/v1/posts/${post.id}/comments`, headers: auth(u), payload: { text, ...(parentId ? { parentId } : {}) } });
+    const root = (await say(a, "¿Alguien sabe si hay heridos?")).json();
+    expect(root).toMatchObject({ parentId: null, mine: true, reactions: {}, myReactions: [] });
+    const reply = (await say(b, "No, todos bien", root.id)).json();
+    expect(reply.parentId).toBe(root.id);
+    // Responder a una respuesta cuelga del mismo hilo.
+    expect((await say(a, "Gracias", reply.id)).json().parentId).toBe(root.id);
+    expect((await say(a, "x", "00000000-0000-7000-8000-000000000000")).statusCode).toBe(404);
+
+    const like = await t.app.inject({ method: "PUT", url: `/v1/comments/${reply.id}/reactions/USEFUL`, headers: auth(a) });
+    expect(like.json()).toEqual({ reactions: { USEFUL: 1 }, myReactions: ["USEFUL"] });
+    expect((await t.app.inject({ method: "PUT", url: `/v1/comments/${reply.id}/reactions/SEEN_TOO`, headers: auth(a) })).statusCode).toBe(400);
+    const seenByA = (await t.app.inject({ url: `/v1/posts/${post.id}/comments`, headers: auth(a) })).json().comments;
+    expect(seenByA.find((c: { id: string }) => c.id === reply.id)).toMatchObject({ mine: false, reactions: { USEFUL: 1 }, myReactions: ["USEFUL"] });
+
+    // Solo quien lo escribió puede borrarlo; las respuestas siguen visibles.
+    expect((await t.app.inject({ method: "DELETE", url: `/v1/comments/${root.id}`, headers: auth(b) })).statusCode).toBe(404);
+    expect((await t.app.inject({ method: "DELETE", url: `/v1/comments/${root.id}`, headers: auth(a) })).statusCode).toBe(204);
+    expect((await t.app.inject({ method: "DELETE", url: `/v1/comments/${root.id}`, headers: auth(a) })).statusCode).toBe(204);
+    const after = (await t.app.inject({ url: `/v1/posts/${post.id}/comments` })).json().comments.map((c: { id: string }) => c.id);
+    expect(after).not.toContain(root.id);
+    expect(after).toContain(reply.id);
+  });
+
   it("los posts ocultos por moderación no aparecen ni aceptan interacción", async () => {
     const u = await createUser(t, "feed_mod");
     const r = await submit(t, u, reportBody(u, { pin: offset(LIMA, 9000), text: "ocultar" }));

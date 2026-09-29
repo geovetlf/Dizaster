@@ -60,13 +60,23 @@ export interface FeedResponse {
   nextCursor: string | null;
 }
 
-export const CreateCommentRequest = z.object({ text: z.string().trim().min(1).max(1000) });
+export const CreateCommentRequest = z.object({
+  text: z.string().trim().min(1).max(1000),
+  /** Responder a un comentario. Si ese ya es una respuesta, la nueva cuelga del mismo hilo (un nivel). */
+  parentId: z.uuid().optional(),
+});
 
 export interface CommentView {
   id: string;
+  /** Respuesta a otro comentario (un solo nivel, ADR 0045). */
+  parentId: string | null;
   author: { handle: string; displayName: string };
   text: string;
   createdAt: string;
+  /** Lo escribió quien mira: puede borrarlo. */
+  mine: boolean;
+  reactions: ReactionCounts;
+  myReactions: ReactionKind[];
 }
 
 /** Qué se puede seguir en V1 (en la URL): personas, eventos, lugares del índice geográfico y etiquetas. */
@@ -122,6 +132,9 @@ export const ReactionKind = z.enum(["LIKE", "SUPPORT", "USEFUL", "SEEN_TOO"]);
 export type ReactionKind = z.infer<typeof ReactionKind>;
 export type ReactionCounts = Partial<Record<ReactionKind, number>>;
 export interface ReactionState { reactions: ReactionCounts; myReactions: ReactionKind[] }
+/** En comentarios no hay "yo también lo vi": solo tiene sentido sobre el evento. */
+export const CommentReactionKind = z.enum(["LIKE", "SUPPORT", "USEFUL"]);
+export type CommentReactionKind = z.infer<typeof CommentReactionKind>;
 /** Tipos que se ofrecen según el post: sin evento no hay "yo también lo vi". */
 export function reactionKindsFor(post: { event: unknown }): ReactionKind[] {
   return post.event ? ["LIKE", "SUPPORT", "USEFUL", "SEEN_TOO"] : ["LIKE", "SUPPORT", "USEFUL"];

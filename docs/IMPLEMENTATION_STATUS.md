@@ -243,6 +243,7 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | Difuminado manual de rostros y matrículas en fotos (aplicado en el servidor) | ✅ | ADR 0042 |
 | Feed de un evento en su pantalla (`/v1/events/:id/posts`) | ✅ | ADR 0043 |
 | Editar mi perfil (nombre, bio, unidades) y unidades aplicadas en la app | ✅ | ADR 0044 |
+| Comentarios con respuestas de un nivel, borrado propio y reacciones | ✅ | ADR 0045 |
 | Reglas `dedup-2` con `sim_media` y `sim_texto` reales | ✅ | `packages/geo-kit/src/dedup.ts` |
 | Fotos procesadas después del reporte suman su hash al evento | ✅ | `MediaReady.phash`, `event.media-fingerprint` |
 
@@ -250,15 +251,14 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 
 Revisión del Blueprint del 2026-09-29 (tras ADR 0042), verificada contra el código:
 
-1. Comentarios: respuestas de un nivel, borrar el propio, reacciones en comentarios (RF-02, §7.3).
-2. Compartir dentro de la app (`Post.kind = SHARE`) (RF-02, §7.3).
-3. Límite general de peticiones por IP y por sesión, en proceso (§12.2, §13.1).
-4. Cifrado por columna de la ubicación precisa con clave del entorno (§13.1).
-5. Edad mínima de 16 años en el registro (D-13; el texto legal lo pone el propietario).
-6. Zona horaria por polígonos (timezone-boundary-builder) (§5.5).
-7. Pantalla "Acerca de / licencias" con atribuciones ODbL (§11.3).
-8. Observabilidad OpenTelemetry y contrato OpenAPI (§5.22, §4.3).
-9. Moderación: cambiar el ciclo de vida de un evento; menciones y bloqueo de negocios.
+1. Compartir dentro de la app (`Post.kind = SHARE`) (RF-02, §7.3).
+2. Límite general de peticiones por IP y por sesión, en proceso (§12.2, §13.1).
+3. Cifrado por columna de la ubicación precisa con clave del entorno (§13.1).
+4. Edad mínima de 16 años en el registro (D-13; el texto legal lo pone el propietario).
+5. Zona horaria por polígonos (timezone-boundary-builder) (§5.5).
+6. Pantalla "Acerca de / licencias" con atribuciones ODbL (§11.3).
+7. Observabilidad OpenTelemetry y contrato OpenAPI (§5.22, §4.3).
+8. Moderación: cambiar el ciclo de vida de un evento; menciones y bloqueo de negocios.
 
 Bloqueadas o en espera:
 

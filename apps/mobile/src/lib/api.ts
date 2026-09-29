@@ -81,8 +81,11 @@ export const api = {
   setReaction: (postId: string, kind: ReactionKind, on: boolean) =>
     request<ReactionState>(`/v1/posts/${postId}/reactions/${kind}`, { method: on ? "PUT" : "DELETE" }),
   comments: (postId: string) => request<{ comments: CommentView[] }>(`/v1/posts/${postId}/comments`),
-  addComment: (postId: string, text: string) =>
-    request<CommentView>(`/v1/posts/${postId}/comments`, { method: "POST", body: JSON.stringify({ text }) }),
+  addComment: (postId: string, text: string, parentId?: string) =>
+    request<CommentView>(`/v1/posts/${postId}/comments`, { method: "POST", body: JSON.stringify({ text, ...(parentId ? { parentId } : {}) }) }),
+  deleteComment: (commentId: string) => request<void>(`/v1/comments/${commentId}`, { method: "DELETE" }),
+  setCommentReaction: (commentId: string, kind: "LIKE" | "SUPPORT" | "USEFUL", on: boolean) =>
+    request<ReactionState>(`/v1/comments/${commentId}/reactions/${kind}`, { method: on ? "PUT" : "DELETE" }),
   /** Lugares del índice geográfico propio. La ubicación, si se envía, va redondeada (~1 km) solo para ordenar. */
   areas: (q: string, near?: { lat: number; lng: number } | null) => {
     const p = new URLSearchParams({ q });

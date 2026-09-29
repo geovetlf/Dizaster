@@ -1,7 +1,7 @@
 import Fastify, { type FastifyInstance, type FastifyRequest } from "fastify";
 import { z } from "zod";
 import {
-  BBox, CreateCommentRequest, DevicePlatform, MEDIA_UPLOAD_LIMITS, MergeEventsRequest, NegativeState, ReactionKind, RegisterPushTokenRequest, RevertMergeRequest,
+  BBox, CreateCommentRequest, DevicePlatform, MEDIA_UPLOAD_LIMITS, MergeEventsRequest, NegativeState, ReactionKind, CommentReactionKind, RegisterPushTokenRequest, RevertMergeRequest,
   SplitEventRequest, DATA_EXPORT_FORMAT, type AppConfig, type DataExport, type EmergencyNumbersResponse,
 } from "@dizaster/contracts";
 import { LocalDiskStorage } from "../modules/media/index.js";
@@ -501,8 +501,26 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
 
   app.post("/v1/posts/:id/comments", async (req, reply) => {
     const session = requireSession(req);
-    const { text } = parse(CreateCommentRequest, req.body);
-    return reply.status(201).send(await c.social.addComment(c.db, parse(IdParam, req.params).id, session.profileId, text));
+    const { text, parentId } = parse(CreateCommentRequest, req.body);
+    return reply.status(201).send(await c.social.addComment(c.db, parse(IdParam, req.params).id, session.profileId, text, parentId));
+  });
+
+  // Comentarios: borrar el propio y reaccionar (ADR 0045).
+  app.delete("/v1/comments/:id", async (req, reply) => {
+    const session = requireSession(req);
+    await c.social.deleteComment(c.db, parse(IdParam, req.params).id, session.profileId);
+    return reply.status(204).send();
+  });
+  const CommentReactionParams = IdParam.extend({ kind: CommentReactionKind });
+  app.put("/v1/comments/:id/reactions/:kind", async (req) => {
+    const session = requireSession(req);
+    const p = parse(CommentReactionParams, req.params);
+    return c.social.setCommentReaction(c.db, p.id, session.profileId, p.kind, true);
+  });
+  app.delete("/v1/comments/:id/reactions/:kind", async (req) => {
+    const session = requireSession(req);
+    const p = parse(CommentReactionParams, req.params);
+    return c.social.setCommentReaction(c.db, p.id, session.profileId, p.kind, false);
   });
 
   // ───────────── Media (subida directa al almacenamiento) ─────────────

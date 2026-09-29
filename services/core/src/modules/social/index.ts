@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { extractMentions, extractTags, textFingerprintBase, type CommentView, type FeedTab, type GeoPoint, type PostAuthor, type ProfileSearchResult, type ReactionCounts, type ReactionKind, type ReactionState, type Units, type UpdateProfileRequest, type ProfileView, type TagView } from "@dizaster/contracts";
+import { extractMentions, extractTags, textFingerprintBase, type CommentView, type FeedTab, type GeoPoint, type PostAuthor, type ProfileSearchResult, type ReactionCounts, type ReactionKind, type ReactionState, type CommentReactionKind, type Units, type UpdateProfileRequest, type ProfileView, type TagView } from "@dizaster/contracts";
 import type { Queryable } from "../../platform/db.js";
 import { publish, type OutboxDispatcher } from "../../platform/outbox.js";
 import { DomainError, notFound } from "../../platform/errors.js";
@@ -144,6 +144,7 @@ export class SocialService {
     );
     await q.query(`UPDATE social.comments SET text = '-', deleted_at = COALESCE(deleted_at, now()) WHERE author_profile_id = $1`, [profileId]);
     await q.query(`DELETE FROM social.reactions WHERE profile_id = $1`, [profileId]);
+    await q.query(`DELETE FROM social.comment_reactions WHERE profile_id = $1`, [profileId]);
     await q.query(`DELETE FROM social.post_mentions WHERE profile_id = $1`, [profileId]);
     await q.query(`DELETE FROM social.follows WHERE follower_profile_id = $1 OR (target_type = 'PROFILE' AND target_id = $1::text)`, [profileId]);
     await q.query(`DELETE FROM social.blocks WHERE blocker_profile_id = $1 OR blocked_profile_id = $1`, [profileId]);
@@ -622,29 +623,84 @@ export class SocialService {
     };
   }
 
-  async addComment(q: Queryable, postId: string, profileId: string, text: string): Promise<CommentView> {
+  async addComment(q: Queryable, postId: string, profileId: string, text: string, parentId?: string): Promise<CommentView> {
     await this.assertVisible(q, postId);
     const recent = await q.query<{ n: number }>(
       `SELECT count(*)::int AS n FROM social.comments WHERE author_profile_id = $1 AND created_at > now() - interval '1 minute'`,
       [profileId],
     );
     if (recent.rows[0]!.n >= 10) throw new DomainError("RATE_LIMITED", "Demasiados comentarios seguidos", 429);
+    let parent: string | null = null;
+    if (parentId) {
+      // Un solo nivel: responder a una respuesta cuelga del comentario raíz.
+      const p = await q.query<{ root: string }>(
+        `SELECT coalesce(parent_comment_id, id) AS root FROM social.comments
+          WHERE id = $1 AND post_id = $2 AND deleted_at IS NULL AND moderation_state = 'VISIBLE'`,
+        [parentId, postId],
+      );
+      if (!p.rows[0]) throw notFound("Comentario");
+      parent = p.rows[0].root;
+    }
     const id = newId();
-    await q.query(`INSERT INTO social.comments (id, post_id, author_profile_id, text) VALUES ($1, $2, $3, $4)`, [id, postId, profileId, text]);
-    return (await this.comments(q, postId)).find((c) => c.id === id)!;
+    await q.query(`INSERT INTO social.comments (id, post_id, author_profile_id, text, parent_comment_id) VALUES ($1, $2, $3, $4, $5)`, [id, postId, profileId, text, parent]);
+    return (await this.comments(q, postId, profileId)).find((c) => c.id === id)!;
   }
 
   async comments(q: Queryable, postId: string, viewerProfileId: string | null = null): Promise<CommentView[]> {
     await this.assertVisible(q, postId);
-    const { rows } = await q.query<{ id: string; handle: string; display_name: string; text: string; created_at: Date }>(
-      `SELECT c.id, pr.handle, pr.display_name, c.text, c.created_at
+    const { rows } = await q.query<{
+      id: string; parent_comment_id: string | null; handle: string; display_name: string; text: string; created_at: Date; mine: boolean;
+      reactions: ReactionCounts | null; my_reactions: ReactionKind[];
+    }>(
+      `SELECT c.id, c.parent_comment_id, pr.handle, pr.display_name, c.text, c.created_at, c.author_profile_id = $2 AS mine,
+              (SELECT json_object_agg(g.kind, g.n) FROM (SELECT r.kind, count(*)::int AS n FROM social.comment_reactions r
+                 WHERE r.comment_id = c.id GROUP BY r.kind) g) AS reactions,
+              (SELECT coalesce(array_agg(r.kind ORDER BY r.kind), '{}') FROM social.comment_reactions r WHERE r.comment_id = c.id AND r.profile_id = $2) AS my_reactions
          FROM social.comments c JOIN social.profiles pr ON pr.id = c.author_profile_id
         WHERE c.post_id = $1 AND c.deleted_at IS NULL AND c.moderation_state = 'VISIBLE'
           AND NOT EXISTS (SELECT 1 FROM social.blocks b WHERE b.blocker_profile_id = $2 AND b.blocked_profile_id = c.author_profile_id)
         ORDER BY c.created_at, c.id LIMIT 200`,
       [postId, viewerProfileId],
     );
-    return rows.map((r) => ({ id: r.id, author: { handle: r.handle, displayName: r.display_name }, text: r.text, createdAt: r.created_at.toISOString() }));
+    return rows.map((r) => ({
+      id: r.id, parentId: r.parent_comment_id, author: { handle: r.handle, displayName: r.display_name }, text: r.text,
+      createdAt: r.created_at.toISOString(), mine: r.mine === true, reactions: r.reactions ?? {}, myReactions: r.my_reactions,
+    }));
+  }
+
+  /** Borrar mi comentario (ADR 0045). Sus respuestas quedan visibles, sin el comentario al que respondían. */
+  async deleteComment(q: Queryable, commentId: string, profileId: string): Promise<void> {
+    const res = await q.query(
+      `UPDATE social.comments SET deleted_at = now() WHERE id = $1 AND author_profile_id = $2 AND deleted_at IS NULL`,
+      [commentId, profileId],
+    );
+    if (res.rowCount === 0) {
+      const gone = await q.query(`SELECT 1 FROM social.comments WHERE id = $1 AND author_profile_id = $2`, [commentId, profileId]);
+      if (gone.rowCount === 0) throw notFound("Comentario"); // no existe o no es tuyo (misma respuesta)
+    }
+    await q.query(`DELETE FROM social.comment_reactions WHERE comment_id = $1`, [commentId]);
+  }
+
+  /** Reacción en un comentario visible, idempotente. */
+  async setCommentReaction(q: Queryable, commentId: string, profileId: string, kind: CommentReactionKind, on: boolean): Promise<ReactionState> {
+    const c = await q.query<{ post_id: string }>(
+      `SELECT post_id FROM social.comments WHERE id = $1 AND deleted_at IS NULL AND moderation_state = 'VISIBLE'`, [commentId],
+    );
+    if (!c.rows[0]) throw notFound("Comentario");
+    await this.assertVisible(q, c.rows[0].post_id);
+    if (on) {
+      await q.query(`INSERT INTO social.comment_reactions (comment_id, profile_id, kind) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`, [commentId, profileId, kind]);
+    } else {
+      await q.query(`DELETE FROM social.comment_reactions WHERE comment_id = $1 AND profile_id = $2 AND kind = $3`, [commentId, profileId, kind]);
+    }
+    const { rows } = await q.query<{ kind: ReactionKind; n: number; mine: boolean }>(
+      `SELECT kind, count(*)::int AS n, bool_or(profile_id = $2) AS mine FROM social.comment_reactions WHERE comment_id = $1 GROUP BY kind`,
+      [commentId, profileId],
+    );
+    return {
+      reactions: Object.fromEntries(rows.map((r) => [r.kind, r.n])) as ReactionCounts,
+      myReactions: rows.filter((r) => r.mine).map((r) => r.kind).sort(),
+    };
   }
 
   // ───────────── Bloqueos ─────────────
@@ -770,15 +826,16 @@ export class SocialService {
         ORDER BY p.created_at DESC LIMIT 10000`,
       [p, who.userId],
     );
-    const comments = await q.query(`SELECT id, post_id, text, moderation_state, created_at, deleted_at FROM social.comments WHERE author_profile_id = $1 ORDER BY created_at DESC LIMIT 10000`, [p]);
+    const comments = await q.query(`SELECT id, post_id, parent_comment_id, text, moderation_state, created_at, deleted_at FROM social.comments WHERE author_profile_id = $1 ORDER BY created_at DESC LIMIT 10000`, [p]);
     const reactions = await q.query(`SELECT post_id, kind, created_at FROM social.reactions WHERE profile_id = $1 ORDER BY created_at DESC LIMIT 10000`, [p]);
+    const commentReactions = await q.query(`SELECT comment_id, kind, created_at FROM social.comment_reactions WHERE profile_id = $1 ORDER BY created_at DESC LIMIT 10000`, [p]);
     const follows = await q.query(`SELECT target_type, target_id, created_at FROM social.follows WHERE follower_profile_id = $1`, [p]);
     const blocks = await q.query(
       `SELECT pr.handle AS blocked_handle, b.created_at FROM social.blocks b JOIN social.profiles pr ON pr.id = b.blocked_profile_id WHERE b.blocker_profile_id = $1`, [p],
     );
     return {
       profile: profile.rows, businesses: businesses.rows, posts: posts.rows, comments: comments.rows,
-      reactions: reactions.rows, follows: follows.rows, blocks: blocks.rows,
+      reactions: reactions.rows, commentReactions: commentReactions.rows, follows: follows.rows, blocks: blocks.rows,
     };
   }
 }
