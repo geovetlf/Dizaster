@@ -139,6 +139,7 @@ export const OPERATIONS: Record<string, Operation> = {
   "GET /v1/moderation/appeals": { summary: "Apelaciones" },
   "POST /v1/moderation/appeals/:id/decision": { summary: "Decidir una apelación", body: C.DecideAppealRequest },
   "GET /v1/moderation/events/:id": { summary: "Evento visto por moderación" },
+  "POST /v1/moderation/events/:id/notes": { summary: "Nota de moderación en la línea de tiempo del evento (solo visible para moderación)", body: C.AddModeratorNoteRequest },
   "POST /v1/moderation/events/:id/merge": { summary: "Fusionar eventos", body: C.MergeEventsRequest },
   "POST /v1/moderation/merges/:id/revert": { summary: "Revertir una fusión", body: C.RevertMergeRequest },
   "GET /v1/moderation/duplicates": { summary: "Cola de posibles eventos duplicados (ADR 0076)" },

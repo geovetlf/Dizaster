@@ -33,6 +33,8 @@ export const TimelineEntryType = z.enum([
   /** Moderación ocultó o retiró un reporte: deja de contar (ADR 0143). Restaurar lo devuelve. */
   "REPORT_MODERATED",
   "REPORT_RESTORED",
+  /** Nota de moderación (ADR 0147): INTERNA, nunca sale por la timeline pública. */
+  "MODERATOR_NOTE",
   "LIVE_STARTED",
   "LIVE_ENDED",
 ]);
@@ -258,7 +260,12 @@ export interface ModeratorEventDetail {
   evidence: ModeratorEvidenceView[];
   merges: EventMergeView[];
   statusChanges: EventStatusChangeView[];
+  /** Notas de moderación en la línea de tiempo (ADR 0147): visibles solo para moderación, las más recientes primero. */
+  notes: ModeratorNoteView[];
 }
+export interface ModeratorNoteView { id: string; text: string; byUserId: string | null; at: string }
+export const AddModeratorNoteRequest = z.object({ text: z.string().trim().min(3).max(2000) });
+export type AddModeratorNoteRequest = z.infer<typeof AddModeratorNoteRequest>;
 
 /** Cambio manual del ciclo de vida (ADR 0053): siempre con motivo; reactivar reinicia el reloj de inactividad. */
 export const SetEventStatusRequest = z.object({

@@ -25,6 +25,7 @@ export default function EventToolsScreen() {
   const [nearby, setNearby] = useState<NearbyEvent[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [reason, setReason] = useState("");
+  const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -76,6 +77,18 @@ export default function EventToolsScreen() {
 
       <TextInput value={reason} onChangeText={setReason} multiline maxLength={1000} placeholder={t("actionReason")} placeholderTextColor={colors.textMuted} style={styles.input} />
       {error ? <Text style={styles.error}>{error}</Text> : null}
+
+      {/* Notas internas (ADR 0147): solo moderación las ve; nunca salen en la línea de tiempo pública. */}
+      <Text style={styles.section}>{t("moderatorNotes")}</Text>
+      <TextInput value={note} onChangeText={setNote} multiline maxLength={2000} placeholder={t("moderatorNoteHint")} placeholderTextColor={colors.textMuted} style={styles.input} />
+      <Pressable accessibilityRole="button" accessibilityState={{ disabled: note.trim().length < 3 || busy }} disabled={note.trim().length < 3 || busy}
+        style={[styles.button, (note.trim().length < 3 || busy) && styles.disabled]}
+        onPress={() => void run(async () => { await api.addModeratorNote(event.id, note.trim()); setNote(""); })}>
+        <Text style={styles.buttonText}>{t("authorityAddNote")}</Text>
+      </Pressable>
+      {detail.notes.map((n) => (
+        <Text key={n.id} style={styles.meta}>{timeAgo(n.at, lang)} · {n.text}</Text>
+      ))}
 
       {!merged ? (
         <>

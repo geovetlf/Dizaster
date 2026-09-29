@@ -215,6 +215,8 @@ export const api = {
     request<{ mergeIds: string[]; event: ModeratorEventDetail }>(`/v1/moderation/events/${targetId}/merge`, { method: "POST", body: JSON.stringify({ sourceEventIds, reason }) }),
   revertMerge: (mergeId: string, reason: string) =>
     request<{ targetEventId: string; restoredEventId: string }>(`/v1/moderation/merges/${mergeId}/revert`, { method: "POST", body: JSON.stringify({ reason }) }),
+  addModeratorNote: (id: string, text: string) =>
+    request<ModeratorEventDetail>(`/v1/moderation/events/${id}/notes`, { method: "POST", body: JSON.stringify({ text }) }),
   setEventStatus: (id: string, to: EventStatus, reason: string) =>
     request<ModeratorEventDetail>(`/v1/moderation/events/${id}/status`, { method: "POST", body: JSON.stringify({ to, reason }) }),
   splitEvent: (id: string, evidenceIds: string[], reason: string) =>

@@ -50,3 +50,17 @@ describe("ciclo de vida manual de un evento (ADR 0053)", () => {
     expect(rows[0]!.status).toBe("ACTIVE");
   });
 });
+
+describe("notas de moderación en la línea de tiempo (ADR 0147)", () => {
+  it("solo moderación las escribe y las ve; la timeline pública no las muestra", async () => {
+    const note = (u: TestUser, text: string) => t.app.inject({ method: "POST", url: `/v1/moderation/events/${id}/notes`, headers: auth(u), payload: { text } });
+    expect((await note(user, "Nota de alguien sin rol")).statusCode).toBe(403);
+    expect((await note(mod, "no")).statusCode).toBe(400);
+    const res = await note(mod, "Llamé a bomberos: confirman dos dotaciones en el lugar");
+    expect(res.statusCode).toBe(201);
+    expect((res.json() as ModeratorEventDetail).notes[0]).toMatchObject({ text: "Llamé a bomberos: confirman dos dotaciones en el lugar", byUserId: mod.userId });
+    const tl = JSON.stringify((await t.app.inject({ url: `/v1/events/${id}/timeline` })).json());
+    expect(tl).not.toContain("MODERATOR_NOTE");
+    expect(tl).not.toContain("bomberos: confirman");
+  });
+});

@@ -797,6 +797,10 @@ export class EventService {
          FROM event.merge_log WHERE target_event_id = $1 OR merged_event_id = $1 ORDER BY at DESC LIMIT 50`,
       [eventId],
     );
+    const notes = await q.query<{ id: string; payload: { text?: string; byUserId?: string | null }; at: Date }>(
+      `SELECT id, payload, at FROM event.timeline WHERE event_id = $1 AND type = 'MODERATOR_NOTE' AND visibility = 'INTERNAL' ORDER BY at DESC, id DESC LIMIT 100`,
+      [eventId],
+    );
     const changes = await q.query<{ from_status: EventStatus; to_status: EventStatus; reason: string; at: Date }>(
       `SELECT from_status, to_status, reason, at FROM event.status_log WHERE event_id = $1 ORDER BY at DESC LIMIT 20`,
       [eventId],
@@ -806,6 +810,7 @@ export class EventService {
       status: ev.status,
       mergedIntoId: ev.merged_into_id,
       statusChanges: changes.rows.map((r) => ({ from: r.from_status, to: r.to_status, reason: r.reason, at: r.at.toISOString() })),
+      notes: notes.rows.map((r) => ({ id: r.id, text: r.payload.text ?? "", byUserId: r.payload.byUserId ?? null, at: r.at.toISOString() })),
       evidence: evidence.rows.map((r) => ({
         id: r.id, evidenceType: r.evidence_type, trustTier: r.trust_tier, assertion: r.assertion, presenceBand: r.presence_band,
         matchConfidence: r.match_confidence, observedAt: r.observed_at.toISOString(),
@@ -815,6 +820,16 @@ export class EventService {
         at: r.at.toISOString(), revertedAt: r.reverted_at?.toISOString() ?? null,
       })),
     };
+  }
+
+  /**
+   * Nota de moderación en la línea de tiempo (§7.3 MODERATOR_NOTE, ADR 0147; decisión del propietario: solo
+   * moderación la ve). Queda INTERNAL: la timeline pública filtra por visibilidad. No se edita ni se borra.
+   */
+  async addModeratorNote(q: Queryable, eventId: string, text: string, byUserId: string): Promise<void> {
+    const ev = (await q.query(`SELECT 1 FROM event.events WHERE id = $1`, [eventId])).rowCount;
+    if (!ev) throw notFound("Evento");
+    await this.addTimeline(q, eventId, "MODERATOR_NOTE", { text, byUserId }, "INTERNAL");
   }
 
   async addTimeline(tx: Queryable, eventId: string, type: TimelineEntryView["type"], payload: Record<string, unknown>, visibility: "PUBLIC" | "INTERNAL" = "PUBLIC"): Promise<void> {
