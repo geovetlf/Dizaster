@@ -1,6 +1,6 @@
 import { createHash, randomBytes } from "node:crypto";
 import { SignJWT, jwtVerify } from "jose";
-import { PUSH_PROVIDER_BY_PLATFORM, type AttestationVerdict, type DevicePlatform, type RegisterPushTokenRequest } from "@dizaster/contracts";
+import { PUSH_PROVIDER_BY_PLATFORM, type AttestationVerdict, type DevicePlatform, type RegisterPushTokenRequest, type SessionView } from "@dizaster/contracts";
 import type { Db, Queryable } from "../../platform/db.js";
 import { withTransaction } from "../../platform/db.js";
 import { DomainError } from "../../platform/errors.js";
@@ -14,6 +14,8 @@ export interface Session {
   userId: string;
   profileId: string;
   roles: Role[];
+  /** Inicio de sesión (familia de refresh tokens) al que pertenece el token de acceso. */
+  sessionId?: string;
 }
 
 /**
@@ -274,7 +276,54 @@ export class IdentityService {
        VALUES ($1, $2, $3, $4, $5, now() + make_interval(days => $6))`,
       [newId(), familyId, session.userId, deviceId, hashToken(refreshToken), REFRESH_TTL_DAYS],
     );
-    return { token: await this.issueToken(session), refreshToken, expiresIn: ACCESS_TTL_SECONDS };
+    return { token: await this.issueToken({ ...session, sessionId: familyId }), refreshToken, expiresIn: ACCESS_TTL_SECONDS };
+  }
+
+  // ───────────── Sesiones abiertas (ADR 0029) ─────────────
+
+  /** Inicios de sesión activos de la cuenta, el más reciente primero. */
+  async sessions(userId: string, currentSessionId: string | null): Promise<SessionView[]> {
+    const { rows } = await this.db.query<{ family_id: string; platform: DevicePlatform | null; app_version: string | null; started: Date; last: Date }>(
+      `SELECT s.family_id, d.platform, d.app_version, min(s.created_at) AS started, max(s.created_at) AS last
+         FROM identity.sessions s LEFT JOIN identity.devices d ON d.id = s.device_id
+        WHERE s.user_id = $1
+        GROUP BY s.family_id, d.platform, d.app_version
+       HAVING bool_or(s.revoked_at IS NULL AND s.rotated_at IS NULL AND s.expires_at > now())
+        ORDER BY max(s.created_at) DESC`,
+      [userId],
+    );
+    return rows.map((r) => ({
+      id: r.family_id, platform: r.platform, appVersion: r.app_version, startedAt: r.started.toISOString(), lastActiveAt: r.last.toISOString(),
+      current: r.family_id === currentSessionId,
+    }));
+  }
+
+  /**
+   * Cierra inicios de sesión: uno concreto o todos menos el actual. El token de acceso que ya tuviera ese
+   * dispositivo deja de renovarse y caduca en ≤ 15 min. Si un dispositivo queda sin sesiones, deja de recibir
+   * avisos (un teléfono perdido no sigue mostrando alertas).
+   */
+  async revokeSessions(userId: string, which: { id: string } | { allExcept: string | null }): Promise<number> {
+    return withTransaction(this.db, async (tx) => {
+      const { rows } = await tx.query<{ device_id: string | null }>(
+        "id" in which
+          ? `UPDATE identity.sessions SET revoked_at = now(), revoke_reason = 'REVOKED_BY_USER'
+              WHERE user_id = $1 AND family_id = $2 AND revoked_at IS NULL RETURNING device_id`
+          : `UPDATE identity.sessions SET revoked_at = now(), revoke_reason = 'REVOKED_BY_USER'
+              WHERE user_id = $1 AND ($2::uuid IS NULL OR family_id <> $2) AND revoked_at IS NULL RETURNING device_id`,
+        [userId, "id" in which ? which.id : which.allExcept],
+      );
+      const devices = [...new Set(rows.flatMap((r) => (r.device_id ? [r.device_id] : [])))];
+      if (devices.length) {
+        await tx.query(
+          `UPDATE identity.devices d SET push_token = NULL, push_provider = NULL, push_environment = NULL, push_token_updated_at = now()
+            WHERE d.id = ANY($1) AND d.user_id = $2
+              AND NOT EXISTS (SELECT 1 FROM identity.sessions s WHERE s.device_id = d.id AND s.revoked_at IS NULL AND s.rotated_at IS NULL AND s.expires_at > now())`,
+          [devices, userId],
+        );
+      }
+      return rows.length;
+    });
   }
 
   // ───────────── Borrar cuenta (exigido por App Store y Google Play) ─────────────
@@ -297,7 +346,7 @@ export class IdentityService {
   }
 
   async issueToken(session: Session, ttlSeconds = ACCESS_TTL_SECONDS): Promise<string> {
-    return new SignJWT({ pid: session.profileId, roles: session.roles })
+    return new SignJWT({ pid: session.profileId, roles: session.roles, ...(session.sessionId ? { sid: session.sessionId } : {}) })
       .setProtectedHeader({ alg: "HS256" })
       .setSubject(session.userId)
       .setIssuedAt()
@@ -309,7 +358,10 @@ export class IdentityService {
   async verifyToken(token: string): Promise<Session> {
     try {
       const { payload } = await jwtVerify(token, this.key, { issuer: "dizaster", algorithms: ["HS256"] });
-      return { userId: String(payload.sub), profileId: String(payload.pid), roles: (payload.roles as Role[]) ?? ["user"] };
+      return {
+        userId: String(payload.sub), profileId: String(payload.pid), roles: (payload.roles as Role[]) ?? ["user"],
+        ...(typeof payload.sid === "string" ? { sessionId: payload.sid } : {}),
+      };
     } catch {
       throw new DomainError("UNAUTHENTICATED", "Sesión inválida o expirada", 401);
     }

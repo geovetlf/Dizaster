@@ -215,13 +215,20 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | App: mis negocios, formulario, página de negocio, "Publicar como", búsqueda, iOS y Android | ✅ | `app/my-businesses.tsx`, `app/business-edit.tsx`, `app/b/[handle].tsx` |
 | Mencionar/bloquear negocios, varios administradores | ⏳ | siguiente iteración |
 
+## Etapa 18 — Sesiones y dispositivos (hecha)
+
+| Área | Estado | Dónde |
+|---|---|---|
+| Ver sesiones abiertas (sin IP ni ubicación) y cerrar una o todas las demás | ✅ | `IdentityService.sessions/revokeSessions`, `/v1/me/sessions`, ADR 0029 |
+| Dispositivo sin sesiones deja de recibir avisos | ✅ | `identity.devices.push_token` |
+| App: "Sesiones y dispositivos", iOS y Android | ✅ | `apps/mobile/src/app/sessions.tsx` |
+
 ## Siguiente etapa (en orden)
 
 1. **BLOQUEADA** — Identity real: Sign in with Apple, Google y email; App Attest / Play Integrity. Falta: cuentas de
    Apple Developer y Google (client IDs, Service ID, Team ID) y un proveedor de email aprobado (gasto).
-2. Pantalla de sesiones y dispositivos (cerrar sesión en otros dispositivos).
-3. Póster de video y `sim_media` en la deduplicación de EVENTs.
-4. Reputación en la visibilidad del feed y detección de textos idénticos.
+2. Póster de video y `sim_media` en la deduplicación de EVENTs.
+3. Reputación en la visibilidad del feed y detección de textos idénticos.
 
 ## Requiere acción humana
 

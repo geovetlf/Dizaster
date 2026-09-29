@@ -172,3 +172,37 @@ describe("borrar la cuenta", () => {
     expect((await t.app.inject({ method: "DELETE", url: "/v1/me", headers: auth(yo), payload: { confirm: "DELETE" } })).statusCode).toBe(202);
   });
 });
+
+describe("sesiones abiertas", () => {
+  it("lista los inicios de sesión y cierra otros; el dispositivo cerrado deja de recibir avisos", async () => {
+    const a = await devSignIn("multisesion");
+    const b = await devSignIn("multisesion");
+    expect(b.userId).toBe(a.userId);
+    expect((await t.app.inject({ method: "PUT", url: `/v1/devices/${a.deviceId}/push-token`, headers: auth(a), payload: { provider: "APNS", token: `apns-${"a".repeat(40)}` } })).statusCode).toBe(204);
+    // Renovar no crea otra sesión: es la misma familia.
+    const b2 = (await refresh(b.refreshToken)).json() as { token: string; refreshToken: string };
+
+    const list = (await t.app.inject({ url: "/v1/me/sessions", headers: auth(b2) })).json().sessions as { id: string; current: boolean; platform: string }[];
+    expect(list).toHaveLength(2);
+    expect(list.filter((s) => s.current)).toHaveLength(1);
+    expect(list.every((s) => s.platform === "IOS")).toBe(true);
+    const other = list.find((s) => !s.current)!;
+
+    expect((await t.app.inject({ method: "DELETE", url: `/v1/me/sessions/${other.id}`, headers: auth(b2) })).statusCode).toBe(204);
+    expect((await refresh(a.refreshToken)).statusCode).toBe(401);
+    expect((await t.c.db.query(`SELECT push_token FROM identity.devices WHERE id = $1`, [a.deviceId])).rows[0]).toEqual({ push_token: null });
+    expect(((await t.app.inject({ url: "/v1/me/sessions", headers: auth(b2) })).json().sessions as unknown[])).toHaveLength(1);
+    expect((await t.app.inject({ method: "DELETE", url: `/v1/me/sessions/${other.id}`, headers: auth(b2) })).statusCode).toBe(404);
+
+    // Otra persona no puede cerrar mis sesiones.
+    const intruder = await devSignIn("intrusa");
+    const mine = (await t.app.inject({ url: "/v1/me/sessions", headers: auth(b2) })).json().sessions[0].id as string;
+    expect((await t.app.inject({ method: "DELETE", url: `/v1/me/sessions/${mine}`, headers: auth(intruder) })).statusCode).toBe(404);
+
+    const c = await devSignIn("multisesion");
+    const r = await t.app.inject({ method: "POST", url: "/v1/me/sessions/revoke-others", headers: auth(b2) });
+    expect(r.json()).toEqual({ revoked: 1 });
+    expect((await refresh(c.refreshToken)).statusCode).toBe(401);
+    expect((await refresh(b2.refreshToken)).statusCode).toBe(200);
+  });
+});

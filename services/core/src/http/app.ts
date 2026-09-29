@@ -25,8 +25,8 @@ function requireSession(req: FastifyRequest): Session {
 }
 
 
-/** Escrituras permitidas a una cuenta suspendida: apelar, cerrar sesión, renovar sesión, borrar sus posts y borrar la cuenta. */
-const WRITE_ALLOWED_WHEN_SUSPENDED = /^(POST \/v1\/me\/moderation\/[^/]+\/appeal|POST \/v1\/auth\/(refresh|logout)|DELETE \/v1\/me|DELETE \/v1\/posts\/[^/]+)$/;
+/** Escrituras permitidas a una cuenta suspendida: apelar, cerrar y renovar sesiones, borrar sus posts y borrar la cuenta. */
+const WRITE_ALLOWED_WHEN_SUSPENDED = /^(POST \/v1\/me\/moderation\/[^/]+\/appeal|POST \/v1\/auth\/(refresh|logout)|DELETE \/v1\/me|DELETE \/v1\/posts\/[^/]+|DELETE \/v1\/me\/sessions\/[^/]+|POST \/v1\/me\/sessions\/revoke-others)$/;
 
 export async function buildApp(c: Container): Promise<FastifyInstance> {
   const app = Fastify({
@@ -138,6 +138,23 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
     const b = parse(z.object({ refreshToken: z.string().min(20).max(200) }), req.body);
     reply.header("cache-control", "no-store");
     return c.identity.refresh(b.refreshToken);
+  });
+
+  // Sesiones abiertas (ADR 0029): ver y cerrar inicios de sesión en otros dispositivos.
+  app.get("/v1/me/sessions", async (req, reply) => {
+    const session = requireSession(req);
+    reply.header("cache-control", "no-store");
+    return { sessions: await c.identity.sessions(session.userId, session.sessionId ?? null) };
+  });
+  app.delete("/v1/me/sessions/:id", async (req, reply) => {
+    const session = requireSession(req);
+    const n = await c.identity.revokeSessions(session.userId, { id: parse(IdParam, req.params).id });
+    if (n === 0) throw new DomainError("NOT_FOUND", "Sesión no encontrada", 404);
+    return reply.status(204).send();
+  });
+  app.post("/v1/me/sessions/revoke-others", async (req) => {
+    const session = requireSession(req);
+    return { revoked: await c.identity.revokeSessions(session.userId, { allExcept: session.sessionId ?? null }) };
   });
 
   app.post("/v1/auth/logout", async (req, reply) => {

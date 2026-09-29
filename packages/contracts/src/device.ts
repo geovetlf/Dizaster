@@ -20,3 +20,16 @@ export const RegisterPushTokenRequest = z.object({
   environment: z.enum(["development", "production"]).default("production"),
 });
 export type RegisterPushTokenRequest = z.infer<typeof RegisterPushTokenRequest>;
+
+/**
+ * Sesiones abiertas de la cuenta (una por inicio de sesión, aunque el token se renueve). Sin IP ni ubicación:
+ * solo plataforma, versión de la app y fechas.
+ */
+export interface SessionView {
+  id: string;
+  platform: DevicePlatform | null;
+  appVersion: string | null;
+  startedAt: string;
+  lastActiveAt: string;
+  current: boolean;
+}
