@@ -65,7 +65,7 @@ export function buildContainer(env: AppEnv, overrides: { db?: Db; clock?: Clock;
   const ref = new ReferenceData(dataDir);
   const geo = new GeoService(dataDir, ref, meter);
   // Números públicos (emergencias) en dígitos: publicarlos no es exponer datos personales (ADR 0088).
-  const social = new SocialService(new Set(ref.emergency.numbers.map((n) => n.number.replace(/\D/g, "")).filter((d) => d.length >= 8)));
+  const social = new SocialService(new Set(ref.emergency.numbers.map((n) => n.number.replace(/\D/g, "")).filter((d) => d.length >= 8)), ref.moderationTerms);
   const identity = new IdentityService(db, social, env.AUTH_JWT_SECRET);
   const events = new EventService(ref, geo, { archiveAfterDays: env.EVENT_ARCHIVE_AFTER_DAYS });
   const ingestion = new IngestionService(db, events, geo);

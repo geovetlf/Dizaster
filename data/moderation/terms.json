@@ -1,0 +1,10 @@
+{
+  "version": "2026.09.1",
+  "note": "Listas de términos que envían contenido a revisión humana (ADR 0148). VACÍAS a propósito: las configura el propietario o el equipo de moderación. Cada término es una palabra o frase exacta (sin distinguir mayúsculas ni tildes), con el motivo de denuncia que abre en la cola. Nunca ocultan contenido por sí solas.",
+  "languages": {
+    "es": [],
+    "en": [],
+    "pt": [],
+    "fr": []
+  }
+}

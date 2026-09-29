@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { ChronoPageQuery, POST_EDIT_WINDOW_HOURS, type MentionsFrom, detectLanguage, detectPersonalData, extractMentions, extractTags, textFingerprintBase, type CommentView, type FeedTab, type GeoPoint, type PostAuthor, type ProfileSearchResult, type ReactionCounts, type ReactionKind, type ReactionState, type CommentReactionKind, type Units, type UpdateProfileRequest, type ProfileView, type TagView } from "@dizaster/contracts";
+import { ChronoPageQuery, POST_EDIT_WINDOW_HOURS, compileTerms, matchTerms, type CompiledTerms, type ModerationTermList, type MentionsFrom, detectLanguage, detectPersonalData, extractMentions, extractTags, textFingerprintBase, type CommentView, type FeedTab, type GeoPoint, type PostAuthor, type ProfileSearchResult, type ReactionCounts, type ReactionKind, type ReactionState, type CommentReactionKind, type Units, type UpdateProfileRequest, type ProfileView, type TagView } from "@dizaster/contracts";
 import type { Queryable } from "../../platform/db.js";
 import { publish, type OutboxDispatcher } from "../../platform/outbox.js";
 import { DomainError, notFound } from "../../platform/errors.js";
@@ -121,7 +121,10 @@ function rankSql(nearSql: string | null): string {
 
 export class SocialService {
   /** Números públicos conocidos (dataset de emergencias), en dígitos: no cuentan como teléfono personal (ADR 0088). */
-  constructor(private readonly publicNumbers: ReadonlySet<string> = new Set()) {}
+  private readonly terms: CompiledTerms;
+  constructor(private readonly publicNumbers: ReadonlySet<string> = new Set(), termList: ModerationTermList = { version: "none", languages: {} }) {
+    this.terms = compileTerms(termList);
+  }
 
   registerHandlers(dispatcher: OutboxDispatcher): void {
     // Media rechazada al procesarse (ADR 0121): se suelta del post para que no quede "en proceso" para siempre.
@@ -247,6 +250,9 @@ export class SocialService {
   ): Promise<void> {
     const kinds = detectPersonalData(text, this.publicNumbers).filter((k) => !only || only.includes(k));
     if (kinds.length) await publish(q, "PersonalDataDetected", { targetType, targetId, kinds });
+    // Listas de términos (ADR 0148): mismo momento (crear y editar); con listas vacías no hace nada.
+    const matches = matchTerms(text, this.terms);
+    if (matches.length) await publish(q, "ModerationTermsMatched", { targetType, targetId, matches: matches.slice(0, 10) });
   }
 
   /**

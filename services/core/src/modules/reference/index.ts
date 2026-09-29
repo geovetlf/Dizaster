@@ -4,6 +4,7 @@ import {
   CategoryCatalog,
   DEFAULT_MIN_AGE,
   EmergencyDataset,
+  ModerationTermList,
   type CategoryConfig,
   type EmergencyNumber,
 } from "@dizaster/contracts";
@@ -35,6 +36,8 @@ export class ReferenceData {
   readonly countriesVersion: string;
   private readonly defaultMinAge: number;
   readonly sources: Array<Record<string, unknown>>;
+  /** Listas de términos que envían a revisión (ADR 0148). Empiezan vacías. */
+  readonly moderationTerms: ModerationTermList;
 
   constructor(readonly dataDir: string) {
     const read = (p: string) => JSON.parse(readFileSync(join(dataDir, p), "utf8")) as unknown;
@@ -46,6 +49,7 @@ export class ReferenceData {
     this.countriesVersion = countryFile.version;
     this.countries = new Map(countryFile.countries.map((c) => [c.iso2, c]));
     this.sources = (read("source-registry/sources.json") as { sources: Array<Record<string, unknown>> }).sources;
+    this.moderationTerms = ModerationTermList.parse(read("moderation/terms.json"));
     this.validate();
   }
 

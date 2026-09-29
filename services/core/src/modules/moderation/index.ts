@@ -114,6 +114,12 @@ export class ModerationService {
       await this.systemFlag(tx, e.payload.targetType, e.payload.targetId, "PRIVACY",
         `Regla: el texto parece incluir datos personales (${e.payload.kinds.join(", ")}). Revisar si expone a alguien (doxxing).`);
     });
+    // Listas de términos (ADR 0148): a la cola con el motivo del término más grave; nunca se oculta solo.
+    dispatcher.on("ModerationTermsMatched", "moderation.terms", async (e, tx) => {
+      const reasons = [...new Set(e.payload.matches.map((m) => m.reason as FlagReason))].sort((a, b) => REASON_WEIGHT[b] - REASON_WEIGHT[a]);
+      await this.systemFlag(tx, e.payload.targetType, e.payload.targetId, reasons[0] ?? "OTHER",
+        `Regla: el texto contiene términos de las listas de moderación (${e.payload.matches.map((m) => m.term).join(", ")}).`);
+    });
     // Mismo texto desde varias cuentas en pocas horas (ADR 0031): cada post entra en la cola, sin ocultarse solo.
     dispatcher.on("DuplicateTextDetected", "moderation.duplicate-text", async (e, tx) => {
       for (const postId of e.payload.postIds) {
