@@ -1,4 +1,4 @@
-import type { AppConfig, DevicePlatform, RegisterPushTokenRequest, EventMapResponse, EventSummary, NearbyEventsResponse, SubmitReportRequest, SubmitReportResponse, TimelineEntryView } from "@dizaster/contracts";
+import type { AppConfig, CreateUploadRequest, CreateUploadResponse, DevicePlatform, MediaView, RegisterPushTokenRequest, EventMapResponse, EventSummary, NearbyEventsResponse, SubmitReportRequest, SubmitReportResponse, TimelineEntryView } from "@dizaster/contracts";
 import { API_URL } from "./config";
 import type { Sender } from "./report/queue";
 
@@ -30,6 +30,9 @@ export const api = {
   timeline: (id: string) => request<{ entries: TimelineEntryView[] }>(`/v1/events/${id}/timeline`),
   nearby: (lat: number, lng: number, category: string) =>
     request<NearbyEventsResponse>(`/v1/events/nearby?lat=${lat.toFixed(6)}&lng=${lng.toFixed(6)}&category=${encodeURIComponent(category)}`),
+  createUpload: (body: CreateUploadRequest) => request<CreateUploadResponse>("/v1/media/uploads", { method: "POST", body: JSON.stringify(body) }),
+  completeUpload: (mediaId: string) => request<{ mediaId: string; state: string }>(`/v1/media/${mediaId}/complete`, { method: "POST" }),
+  eventMedia: (eventId: string) => request<{ media: MediaView[] }>(`/v1/events/${eventId}/media`),
   submitReport: (body: SubmitReportRequest) => request<SubmitReportResponse>("/v1/reports", { method: "POST", body: JSON.stringify(body) }),
 };
 

@@ -27,6 +27,8 @@ async function loop() {
       lastDaily = Date.now();
       const generalized = await c.reports.generalizeExpiredPresence();
       console.log(JSON.stringify({ msg: "retention.presence.generalized", count: generalized }));
+      const media = await c.media.applyRetention();
+      console.log(JSON.stringify({ msg: "retention.media", ...media }));
     }
     if (n === 0) await new Promise((r) => setTimeout(r, 1000));
   }

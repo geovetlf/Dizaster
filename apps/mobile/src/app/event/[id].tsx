@@ -1,7 +1,8 @@
-import type { EventSummary, TimelineEntryView } from "@dizaster/contracts";
+import type { EventSummary, MediaView, TimelineEntryView } from "@dizaster/contracts";
 import { useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import { FlatList, StyleSheet, Text, View } from "react-native";
+import { EventMedia } from "../../components/event-media";
 import { api } from "../../lib/api";
 import { t, VERIFICATION_LABEL, verificationLabel } from "../../lib/i18n";
 
@@ -10,6 +11,7 @@ export default function EventScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [event, setEvent] = useState<EventSummary | null>(null);
   const [timeline, setTimeline] = useState<TimelineEntryView[]>([]);
+  const [media, setMedia] = useState<MediaView[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -17,6 +19,8 @@ export default function EventScreen() {
     Promise.all([api.event(id), api.timeline(id)])
       .then(([e, tl]) => { setEvent(e); setTimeline(tl.entries); })
       .catch((e: Error) => setError(e.message));
+    // La media es secundaria: si falla, el evento se muestra igual.
+    api.eventMedia(id).then((r) => setMedia(r.media)).catch(() => setMedia([]));
   }, [id]);
 
   if (error) return <Text style={styles.container}>{error}</Text>;
@@ -29,6 +33,7 @@ export default function EventScreen() {
       <Text style={styles.meta}>
         {event.reportCount} {t("reports")} · {event.sourceCount} {t("sources")} · {new Date(event.firstSeenAt).toLocaleString()}
       </Text>
+      <EventMedia media={media} />
       <Text style={styles.section}>{t("timeline")}</Text>
       <FlatList
         data={timeline}

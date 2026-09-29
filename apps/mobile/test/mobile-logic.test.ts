@@ -36,7 +36,7 @@ describe("cola offline", () => {
     await q.enqueue(body("01928c1e-7b1a-7cc0-8a9e-2c4f5d6e7f81"), new Date("2026-09-29T10:00:00Z"));
     await q.enqueue(body("01928c1e-7b1a-7cc0-8a9e-2c4f5d6e7f82"), new Date("2026-09-29T10:01:00Z"));
     const offline = await q.flush(async () => ({ ok: false, retryable: true, error: "Network request failed" }));
-    expect(offline).toEqual({ sent: [], failed: 2, dropped: 0 });
+    expect(offline).toMatchObject({ sent: [], failed: 2, dropped: 0 });
     expect((await q.pending()).map((p) => p.attempts)).toEqual([1, 1]);
 
     const seen: string[] = [];

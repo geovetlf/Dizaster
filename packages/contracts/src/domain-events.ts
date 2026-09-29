@@ -13,6 +13,9 @@ export interface DomainEventMap {
   EventMerged: { targetEventId: string; mergedEventId: string };
   VerificationChanged: { eventId: string; from: string; to: string; negativeState: string };
   ExternalItemIngested: { externalItemId: string; sourceId: string; lane: "NORMAL" | "URGENT" };
+  MediaUploaded: { mediaId: string };
+  MediaReady: { mediaId: string };
+  MediaRejected: { mediaId: string; reason: string };
 }
 export type DomainEventType = keyof DomainEventMap;
 

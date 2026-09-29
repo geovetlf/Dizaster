@@ -118,8 +118,12 @@ export class ReportService {
         authorVisibility: anonymity,
         publicPoint: eventId ? generalize(req.pin, category.sensitivity).point : null,
       });
+      await this.d.social.attachMedia(tx, postId, req.mediaIds);
       if (eventId) {
         await this.d.social.linkPostToEvent(tx, postId, eventId, "REPORT");
+        if (req.mediaIds.length > 0) {
+          await this.d.events.addTimeline(tx, eventId, "MEDIA_ADDED", { mediaIds: req.mediaIds, mediaCount: req.mediaIds.length });
+        }
         const created = await this.d.events.wasCreatedBy(tx, eventId, reportId);
         result = { outcome: created ? "CREATED_EVENT" : "ATTACHED_TO_EVENT", reportId, postId, eventId, presenceBand: presence.band };
       } else {

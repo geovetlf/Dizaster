@@ -5,19 +5,19 @@ import * as Location from "expo-location";
 import { router } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { FlatList, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
-import { api, sendReport } from "../lib/api";
+import { MediaAttachments } from "../components/media-attachments";
+import { api } from "../lib/api";
 import { t, verificationLabel } from "../lib/i18n";
 import { newId } from "../lib/ids";
 import { OFFLINE_FALLBACK_STYLE, providerFromAppConfig } from "../lib/map/provider";
 import { toPresenceSignals } from "../lib/report/presence";
-import { ReportQueue } from "../lib/report/queue";
-import { SqliteQueueStorage } from "../lib/report/sqlite-storage";
+import type { LocalMedia } from "../lib/media/local-media";
+import { flushUntilSent, reportQueue } from "../lib/report/outbox";
 import { useSession } from "../lib/session";
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const catalog = require("../reference-data/categories.json") as CategoryCatalog;
 const lang = Intl.DateTimeFormat().resolvedOptions().locale.startsWith("en") ? "en" : "es";
-const queue = new ReportQueue(new SqliteQueueStorage());
 
 type Phase = "category" | "locating" | "compose";
 
@@ -35,6 +35,7 @@ export default function ReportScreen() {
   const [target, setTarget] = useState<string | null>(null);
   const [styleUrl, setStyleUrl] = useState<string | null>(null);
   const [text, setText] = useState("");
+  const [media, setMedia] = useState<LocalMedia[]>([]);
   const [pseudonymous, setPseudonymous] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -90,10 +91,10 @@ export default function ReportScreen() {
         ...(session.deviceId ? { deviceId: session.deviceId } : {}),
         ...(target ? { targetEventId: target } : {}),
       };
-      await queue.enqueue(body, now);
-      setStatus(t("sending"));
-      const result = await queue.flush(sendReport);
-      const mine = result.sent[result.sent.length - 1];
+      await reportQueue.enqueue(body, now, media);
+      setMedia([]);
+      setStatus(media.length ? t("uploadingMedia") : t("sending"));
+      const mine = await flushUntilSent(body.clientReportId);
       if (!mine) {
         setStatus(t("queuedOffline"));
         return;
@@ -176,6 +177,7 @@ export default function ReportScreen() {
         </View>
       ) : null}
 
+      <MediaAttachments items={media} onChange={setMedia} />
       <TextInput style={styles.input} multiline maxLength={2000} value={text} onChangeText={setText} placeholder="…" />
       {category.forcePseudonymous ? (
         <Text style={styles.note}>{t("pseudonymousForced")}</Text>

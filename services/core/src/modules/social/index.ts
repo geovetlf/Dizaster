@@ -1,6 +1,6 @@
 import type { GeoPoint } from "@dizaster/contracts";
 import type { Queryable } from "../../platform/db.js";
-import { notFound } from "../../platform/errors.js";
+import { DomainError, notFound } from "../../platform/errors.js";
 import { newId } from "../../platform/ids.js";
 
 /**
@@ -43,6 +43,17 @@ export class SocialService {
       [id, input.authorProfileId, input.kind, input.authorVisibility, input.text, input.publicPoint?.lng ?? null, input.publicPoint?.lat ?? null],
     );
     return id;
+  }
+
+  /** Adjunta media (ya validada por el Media Engine) a un post. Una media solo puede pertenecer a un post. */
+  async attachMedia(tx: Queryable, postId: string, mediaIds: string[]): Promise<void> {
+    if (mediaIds.length === 0) return;
+    const taken = await tx.query(`SELECT 1 FROM social.post_media WHERE media_id = ANY($1) LIMIT 1`, [mediaIds]);
+    if (taken.rowCount) throw new DomainError("MEDIA_ALREADY_ATTACHED", "La media ya está adjunta a otra publicación", 409);
+    await tx.query(
+      `INSERT INTO social.post_media (post_id, media_id, position) SELECT $1, m, i - 1 FROM unnest($2::uuid[]) WITH ORDINALITY AS t(m, i)`,
+      [postId, mediaIds],
+    );
   }
 
   async linkPostToEvent(tx: Queryable, postId: string, eventId: string, linkType: "REPORT" | "MENTION" | "UPDATE"): Promise<void> {

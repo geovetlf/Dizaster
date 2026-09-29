@@ -1,3 +1,6 @@
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import type { FastifyInstance } from "fastify";
 import { v7 } from "uuid";
 import { buildContainer, type Container } from "../src/container.js";
@@ -34,6 +37,9 @@ export async function createTestContext(): Promise<TestContext> {
     AUTH_JWT_SECRET: "test-secret-test-secret-test-secret-000",
     DEV_AUTH_ENABLED: "true",
     REPORTS_PER_HOUR_LIMIT: "5",
+    STORAGE_DRIVER: "local",
+    STORAGE_LOCAL_DIR: mkdtempSync(join(tmpdir(), "dizaster-storage-")),
+    MEDIA_UPLOADS_PER_HOUR_LIMIT: "6",
   });
   const c = buildContainer(env);
   await c.ingestion.syncRegistry(c.ref.sources);

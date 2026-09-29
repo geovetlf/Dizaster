@@ -36,7 +36,14 @@ jobs:
       - run: pnpm check:boundaries
       - run: pnpm typecheck
       - run: pnpm build
+      - name: Servidor compatible con S3 para probar el cliente de almacenamiento
+        run: |
+          pipx install --quiet "moto[server]"
+          nohup ~/.local/bin/moto_server -p 9900 > /tmp/moto.log 2>&1 &
+          for i in $(seq 1 20); do curl -fs http://127.0.0.1:9900/ >/dev/null && break; sleep 1; done
       - run: pnpm test
+        env:
+          S3_TEST_ENDPOINT: http://127.0.0.1:9900
 
       - name: Empaquetado móvil (JS, iOS + Android)
         working-directory: apps/mobile

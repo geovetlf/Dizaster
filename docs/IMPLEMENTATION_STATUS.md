@@ -1,6 +1,6 @@
 # Estado de la implementación
 
-Actualizado: 2026-09-29 (etapa 2 + paridad Android/iOS)
+Actualizado: 2026-09-29 (etapa 3: fotos y videos)
 
 ## Etapa 1 — Fundación (hecha)
 
@@ -29,7 +29,7 @@ Actualizado: 2026-09-29 (etapa 2 + paridad Android/iOS)
 | Planificador NORMAL/URGENT, peticiones condicionales, circuit breaker, registro de ejecuciones | ✅ | `ingestion/scheduler.ts`, migración 0002, ADR 0011 |
 | Ciclo de vida por inactividad | ✅ | `EventService.applyLifecycle` (worker, cada hora) |
 
-**Pruebas:** 102 (contratos 5, geo-kit 26, backend 52 con PostgreSQL real, móvil 19 con paridad de plataformas). El empaquetado JS de la app compila para iOS y Android.
+**Pruebas:** 135 (contratos 5, geo-kit 26, backend 77 con PostgreSQL real, móvil 27). Además 3 pruebas del cliente S3 contra un servidor compatible en CI. JS de la app compila para iOS y Android.
 
 ## Paridad Android e iOS (hecha)
 
@@ -43,9 +43,21 @@ Actualizado: 2026-09-29 (etapa 2 + paridad Android/iOS)
 | Identidad del dispositivo en Keychain / Keystore | ✅ | `apps/mobile/src/lib/device` |
 | Guía de pasos que requieren cuenta Apple / Google | ✅ | `docs/MOBILE_PLATFORMS.md` |
 
+## Etapa 3 — Fotos y videos (hecha)
+
+| Área | Estado | Dónde |
+|---|---|---|
+| Subida directa con URL firmada (S3 compatible y disco local en desarrollo) | ✅ | `services/core/src/modules/media`, ADR 0014 |
+| Validación de hash, tamaño y tipo real en el worker | ✅ | `MediaService.process` |
+| Eliminación de ubicación en fotos (Exif) y videos (ISO 6709, loci) | ✅ | `media/sanitize.ts` |
+| Media en reportes, timeline `MEDIA_ADDED` y galería pública del evento | ✅ | `GET /v1/events/:id/media` |
+| Retención de originales y limpieza de subidas abandonadas | ✅ | worker diario |
+| App: foto, video y galería con compresión; subida en la cola offline; reenvío automático al volver a la app | ✅ | `apps/mobile/src/lib/media`, `src/lib/report/outbox.ts` |
+| Miniaturas, hash perceptual, difuminado de rostros | ⏳ | ADR 0014 (pendiente) |
+
 ## Siguiente etapa (en orden)
 
-1. Media Engine: subida directa con URL firmada, compresión en el dispositivo, miniaturas, captura en la app (necesita elegir object storage para producción; en desarrollo, almacenamiento local).
+1. Interfaz según la imagen de referencia del propietario (inicio, mapa, reportar, videos, perfil) y feed social.
 2. Identity real: Sign in with Apple, Google y email; App Attest / Play Integrity (necesita cuentas de Apple y Google).
 3. Social: comentarios, reacciones, seguir, feed cercano.
 4. Tablero de costo persistido y métricas por módulo.
@@ -55,7 +67,7 @@ Actualizado: 2026-09-29 (etapa 2 + paridad Android/iOS)
 | Qué | Por qué no lo puede hacer el agente | Qué hacer |
 |---|---|---|
 | Repositorio GitHub propio de Dizaster | Las herramientas de esta sesión no permiten crear repositorios | Crear un repositorio vacío (p. ej. `dizaster`) e instalar la app de Claude en él |
-| Cuenta cloud, dominio y object storage | Implican gasto y titularidad legal | Aprobar proveedor y presupuesto (Blueprint D-18, D-21) |
+| Cuenta cloud, dominio y object storage | Implican gasto y titularidad legal | Aprobar proveedor y presupuesto (Blueprint D-18, D-21). Para media basta un bucket S3 compatible (recomendado: sin egreso) y sus claves |
 | Cuenta Expo (gratis) y token `EXPO_TOKEN` | Crear cuentas es personal | Ver `docs/MOBILE_PLATFORMS.md`; con eso el agente compila el APK para tu Android |
 | Apple Developer Program (US$99/año) y clave de App Store Connect API | Titularidad, pago y decisión legal (individual u organización) | Ver `docs/MOBILE_PLATFORMS.md` |
 | Firebase (FCM, gratis) y Google Play Console (US$25) | Titularidad y pago | Ver `docs/MOBILE_PLATFORMS.md` |

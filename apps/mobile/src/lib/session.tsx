@@ -4,6 +4,7 @@ import { api, setToken } from "./api";
 import { ensureAlertChannel, registerPushIfPermitted, watchPushTokenRotation } from "./device/push";
 import { loadIdentity, saveIdentity } from "./device/secure-session";
 import { newId } from "./ids";
+import { startAutoFlush } from "./report/outbox";
 
 interface SessionState {
   ready: boolean;
@@ -22,6 +23,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<SessionState>({ ready: false, deviceId: null, error: null });
   useEffect(() => {
     let stopWatching: (() => void) | undefined;
+    let stopFlush: (() => void) | undefined;
     const platform = Platform.OS === "ios" ? "IOS" : "ANDROID";
     (async () => {
       const stored = await loadIdentity();
@@ -30,13 +32,15 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       setToken(s.token);
       await saveIdentity({ handle, deviceId: s.deviceId }).catch(() => undefined);
       setState({ ready: true, deviceId: s.deviceId, error: null });
+      // Reportes guardados sin conexión: se envían en cuanto hay sesión y cada vez que la app vuelve al frente.
+      stopFlush = startAutoFlush();
       if (s.deviceId) {
         await ensureAlertChannel().catch(() => undefined);
         await registerPushIfPermitted(s.deviceId).catch(() => false);
         stopWatching = watchPushTokenRotation(s.deviceId);
       }
     })().catch((e: Error) => setState({ ready: true, deviceId: null, error: e.message }));
-    return () => stopWatching?.();
+    return () => { stopWatching?.(); stopFlush?.(); };
   }, []);
   return <SessionContext.Provider value={state}>{children}</SessionContext.Provider>;
 }

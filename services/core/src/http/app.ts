@@ -1,6 +1,7 @@
 import Fastify, { type FastifyInstance, type FastifyRequest } from "fastify";
 import { z } from "zod";
-import { BBox, DevicePlatform, NegativeState, RegisterPushTokenRequest, type AppConfig } from "@dizaster/contracts";
+import { BBox, DevicePlatform, MEDIA_UPLOAD_LIMITS, NegativeState, RegisterPushTokenRequest, type AppConfig } from "@dizaster/contracts";
+import { LocalDiskStorage } from "../modules/media/index.js";
 import type { Container } from "../container.js";
 import { DomainError, forbidden } from "../platform/errors.js";
 import type { Session } from "../modules/identity/index.js";
@@ -152,6 +153,60 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
   app.get("/v1/events/:id", async (req) => c.events.getEvent(c.db, parse(IdParam, req.params).id));
   app.get("/v1/events/:id/timeline", async (req) => ({ entries: await c.events.timeline(c.db, parse(IdParam, req.params).id) }));
   app.get("/v1/events/:id/verification", async (req) => c.verification.view(c.db, parse(IdParam, req.params).id));
+
+  // Media pública del evento: solo variantes saneadas; en categorías sensibles, solo la aprobada por moderación.
+  app.get("/v1/events/:id/media", async (req) => {
+    const { id } = parse(IdParam, req.params);
+    const event = await c.events.getEvent(c.db, id);
+    const mediaIds = (await c.events.timeline(c.db, id))
+      .filter((t) => t.type === "MEDIA_ADDED")
+      .flatMap((t) => (Array.isArray(t.payload["mediaIds"]) ? (t.payload["mediaIds"] as string[]) : []));
+    return { media: await c.media.publicViews(c.db, mediaIds, { requireApproval: event.sensitivity !== "NORMAL" }) };
+  });
+
+  // ───────────── Media (subida directa al almacenamiento) ─────────────
+  app.post("/v1/media/uploads", async (req, reply) => {
+    const session = requireSession(req);
+    return reply.status(201).send(await c.media.createUpload(session.profileId, req.body));
+  });
+
+  app.post("/v1/media/:id/complete", async (req) => {
+    const session = requireSession(req);
+    return c.media.completeUpload(session.profileId, parse(IdParam, req.params).id);
+  });
+
+  app.get("/v1/media/:id", async (req, reply) => {
+    const session = requireSession(req);
+    reply.header("cache-control", "no-store");
+    return c.media.ownerState(session.profileId, parse(IdParam, req.params).id);
+  });
+
+  // Almacenamiento local de desarrollo: imita la subida firmada de S3. No existe en producción (config lo impide).
+  if (c.storage instanceof LocalDiskStorage) {
+    const local = c.storage;
+    await app.register(async (sub) => {
+      sub.addContentTypeParser(
+        [...new Set(Object.values(MEDIA_UPLOAD_LIMITS).flatMap((l) => [...l.mimes]))],
+        { parseAs: "buffer", bodyLimit: Math.max(...Object.values(MEDIA_UPLOAD_LIMITS).map((l) => l.maxBytes)) },
+        (_req, body, done) => done(null, body),
+      );
+      sub.put(`${LocalDiskStorage.ROUTE}/*`, async (req, reply) => {
+        const key = decodeURIComponent((req.params as { "*": string })["*"]);
+        const body = req.body as Buffer | undefined;
+        const err = local.verifyPut(key, req.query as Record<string, string>, req.headers["content-type"], body?.length ?? 0);
+        if (err || !body) return reply.status(403).send({ error: "FORBIDDEN", message: err ?? "Sin contenido" });
+        await local.put(key, body, req.headers["content-type"]!);
+        return reply.status(200).send();
+      });
+      // Solo las variantes públicas; los originales nunca se sirven.
+      sub.get(`${LocalDiskStorage.ROUTE}/public/*`, async (req, reply) => {
+        const key = `public/${decodeURIComponent((req.params as { "*": string })["*"])}`;
+        const obj = await local.stat(key);
+        if (!obj) return reply.status(404).send({ error: "NOT_FOUND" });
+        return reply.header("content-type", obj.contentType ?? "application/octet-stream").send(Buffer.from(await local.get(key)));
+      });
+    });
+  }
 
   // ───────────── Moderación (rol moderator) ─────────────
   app.post("/v1/moderation/events/:id/negative-state", async (req) => {

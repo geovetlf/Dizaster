@@ -16,6 +16,21 @@ const Env = z.object({
   REPORTS_PER_HOUR_LIMIT: z.coerce.number().int().positive().default(10),
   PRESENCE_RETENTION_DAYS: z.coerce.number().int().positive().default(30),
   DATA_DIR: z.string().optional(),
+  // Media. "local" solo fuera de producción; producción usa un almacenamiento compatible con S3.
+  STORAGE_DRIVER: z.enum(["local", "s3"]).default("local"),
+  STORAGE_LOCAL_DIR: z.string().default(".data/storage"),
+  /** URL con la que los dispositivos alcanzan esta API (para las rutas de almacenamiento local). */
+  PUBLIC_API_URL: z.string().default("http://localhost:8080"),
+  S3_ENDPOINT: z.string().optional(),
+  S3_REGION: z.string().default("auto"),
+  S3_BUCKET: z.string().optional(),
+  S3_ACCESS_KEY_ID: z.string().optional(),
+  S3_SECRET_ACCESS_KEY: z.string().optional(),
+  S3_FORCE_PATH_STYLE: z.enum(["true", "false"]).default("false").transform((v) => v === "true"),
+  MEDIA_PUBLIC_BASE_URL: z.string().optional(),
+  MEDIA_UPLOADS_PER_HOUR_LIMIT: z.coerce.number().int().positive().default(30),
+  MEDIA_UPLOAD_URL_TTL_SECONDS: z.coerce.number().int().min(60).max(3600).default(900),
+  MEDIA_ORIGINAL_RETENTION_DAYS: z.coerce.number().int().positive().default(30),
 });
 
 export type AppEnv = z.infer<typeof Env>;
@@ -24,6 +39,12 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): AppEnv {
   const env = Env.parse(source);
   if (env.NODE_ENV === "production" && env.DEV_AUTH_ENABLED) {
     throw new Error("DEV_AUTH_ENABLED no puede estar activo en producción");
+  }
+  if (env.NODE_ENV === "production" && env.STORAGE_DRIVER === "local") {
+    throw new Error("El almacenamiento local no se permite en producción: usar STORAGE_DRIVER=s3");
+  }
+  if (env.STORAGE_DRIVER === "s3" && !(env.S3_ENDPOINT && env.S3_BUCKET && env.S3_ACCESS_KEY_ID && env.S3_SECRET_ACCESS_KEY)) {
+    throw new Error("STORAGE_DRIVER=s3 requiere S3_ENDPOINT, S3_BUCKET, S3_ACCESS_KEY_ID y S3_SECRET_ACCESS_KEY");
   }
   return env;
 }
