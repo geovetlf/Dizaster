@@ -121,6 +121,14 @@ export const EventCluster = z.object({
 });
 export type EventCluster = z.infer<typeof EventCluster>;
 
+/**
+ * Ventana de tiempo del mapa (§6.3 `since`, ADR 0123): actividad en las últimas N horas. Ventanas fijas y no una
+ * fecha libre, para que la misma tesela tenga la misma URL para todos y la CDN la comparta.
+ */
+export const MapWindow = z.enum(["6h", "24h", "7d"]);
+export type MapWindow = z.infer<typeof MapWindow>;
+export const MAP_WINDOW_HOURS: Record<MapWindow, number> = { "6h": 6, "24h": 24, "7d": 168 };
+
 export const EventMapResponse = z.object({
   mode: z.enum(["points", "clusters"]),
   events: z.array(EventSummary),

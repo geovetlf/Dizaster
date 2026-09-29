@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View, type NativeSyntheticEvent } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { categoryStyle, homeChips } from "../../lib/ui/categories";
-import { VERIFICATION_STROKE, mapFilterQuery, pointOpacity, type MapFilter } from "../../lib/map/event-style";
+import { VERIFICATION_STROKE, mapFilterQuery, nextMapWindow, pointOpacity, type MapFilter } from "../../lib/map/event-style";
 import { parseBboxParam } from "../../lib/ui/format";
 import { useCoarseLocation } from "../../lib/ui/use-coarse-location";
 import { colors } from "../../theme";
@@ -128,6 +128,11 @@ export default function MapScreen() {
           <Pressable accessibilityRole="button" accessibilityState={{ selected: filter.verifiedOnly }}
             style={[styles.chip, filter.verifiedOnly && styles.chipOn]} onPress={() => applyFilter({ ...filter, verifiedOnly: !filter.verifiedOnly })}>
             <Text style={styles.chipText}>{filter.verifiedOnly ? "✓ " : ""}{t("verifiedOnly")}</Text>
+          </Pressable>
+          {/* Ventana de tiempo (ADR 0123): cada toque pasa a la siguiente. */}
+          <Pressable accessibilityRole="button" accessibilityState={{ selected: !!filter.window }} accessibilityHint={t("mapWindowHint")}
+            style={[styles.chip, !!filter.window && styles.chipOn]} onPress={() => applyFilter({ ...filter, window: nextMapWindow(filter.window) })}>
+            <Text style={styles.chipText}>{t(filter.window ? `mapWindow_${filter.window}` : "mapWindowAny")}</Text>
           </Pressable>
           {chips.map((c) => {
             const on = filter.category === c.code;

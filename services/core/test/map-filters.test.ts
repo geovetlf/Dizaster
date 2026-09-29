@@ -35,3 +35,15 @@ describe("filtros del mapa (ADR 0057)", () => {
     expect((await t.app.inject({ url: "/v1/events?bbox=-78,-13,-76,-11&zoom=15&verified=si" })).statusCode).toBe(400);
   });
 });
+
+describe("ventana de tiempo del mapa (ADR 0123)", () => {
+  it("solo eventos con actividad dentro de la ventana; ventanas fijas", async () => {
+    await t.c.db.query(`UPDATE event.events SET last_activity_at = now() - interval '30 hours' WHERE id = $1`, [citizen]);
+    expect(await map("&window=24h")).toEqual([official]);
+    expect(await map("&window=7d")).toEqual(expect.arrayContaining([citizen, official]));
+    expect(await map("&window=6h&categories=fire")).toEqual([]);
+    const tile = (await t.app.inject({ url: "/v1/events/tiles/15/9372/17644?window=24h" })).statusCode;
+    expect(tile).toBe(200);
+    expect((await t.app.inject({ url: "/v1/events?bbox=-78,-13,-76,-11&zoom=15&window=3d" })).statusCode).toBe(400);
+  });
+});

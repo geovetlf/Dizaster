@@ -1,4 +1,4 @@
-import type { PublicVerificationState } from "@dizaster/contracts";
+import type { MapWindow, PublicVerificationState } from "@dizaster/contracts";
 
 /**
  * Cómo se ve un evento en el mapa según su estado público (Blueprint §11.4, ADR 0057): el relleno es la categoría y
@@ -22,9 +22,17 @@ export interface MapFilter {
   /** Categoría raíz ("fire") o null para todas. */
   category: string | null;
   verifiedOnly: boolean;
+  /** Ventana de actividad (ADR 0123) o null = sin límite de fecha. */
+  window?: MapWindow | null;
 }
 
 /** Parámetros extra de /v1/events para el filtro (vacío si no hay filtro: la URL sin filtro se cachea mejor). */
 export function mapFilterQuery(f: MapFilter): string {
-  return `${f.category ? `&categories=${encodeURIComponent(f.category)}` : ""}${f.verifiedOnly ? "&verified=1" : ""}`;
+  return `${f.category ? `&categories=${encodeURIComponent(f.category)}` : ""}${f.verifiedOnly ? "&verified=1" : ""}${f.window ? `&window=${f.window}` : ""}`;
+}
+
+/** El chip de tiempo recorre: sin límite → 24 h → 6 h → 7 días → sin límite. */
+const WINDOW_CYCLE: (MapWindow | null)[] = [null, "24h", "6h", "7d"];
+export function nextMapWindow(w: MapWindow | null | undefined): MapWindow | null {
+  return WINDOW_CYCLE[(WINDOW_CYCLE.indexOf(w ?? null) + 1) % WINDOW_CYCLE.length]!;
 }

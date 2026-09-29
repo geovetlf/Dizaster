@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { MEDIA_KILL_SWITCHES, MfaCodeRequest, MfaVerifyRequest, can, isStaff, type MfaStatus, type Permission } from "@dizaster/contracts";
+import { MAP_WINDOW_HOURS, MEDIA_KILL_SWITCHES, MapWindow, MfaCodeRequest, MfaVerifyRequest, can, isStaff, type MfaStatus, type Permission } from "@dizaster/contracts";
 import { isValidTile, tileBounds } from "@dizaster/geo-kit";
 import Fastify, { type FastifyInstance, type FastifyRequest } from "fastify";
 import { z } from "zod";
@@ -299,12 +299,14 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
         zoom: z.coerce.number().min(0).max(22),
         categories: z.string().optional().transform((s) => (s ? s.split(",").filter(Boolean).slice(0, 20) : undefined)),
         verified: z.enum(["0", "1"]).optional(),
+        window: MapWindow.optional(),
       }),
       req.query,
     );
     reply.header("cache-control", "public, max-age=30");
     return c.events.queryMap(c.db, {
       bbox: q.bbox as [number, number, number, number], zoom: q.zoom, ...(q.categories ? { categories: q.categories } : {}), verifiedOnly: q.verified === "1",
+      ...(q.window ? { windowHours: MAP_WINDOW_HOURS[q.window] } : {}),
     });
   });
 
@@ -316,12 +318,14 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
       z.object({
         categories: z.string().optional().transform((s) => (s ? [...new Set(s.split(",").filter(Boolean))].sort().slice(0, 20) : undefined)),
         verified: z.enum(["0", "1"]).optional(),
+        window: MapWindow.optional(),
       }),
       req.query,
     );
     reply.header("cache-control", "public, max-age=30, s-maxage=60, stale-while-revalidate=30");
     return c.events.queryMap(c.db, {
       bbox: tileBounds(tile), zoom: tile.z, ...(q.categories ? { categories: q.categories } : {}), verifiedOnly: q.verified === "1",
+      ...(q.window ? { windowHours: MAP_WINDOW_HOURS[q.window] } : {}),
     });
   });
 
