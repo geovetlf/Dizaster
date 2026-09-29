@@ -1,3 +1,4 @@
+import { transparencyCount, type TransparencyReport } from "@dizaster/contracts";
 import type { AppealView, CaseDetail, CaseSummary, CommentView, FeedResponse, ModerationNotice, ProfileView } from "@dizaster/contracts";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { AUTO_LIMIT_FLAGGERS } from "../src/modules/moderation/index.js";
@@ -222,5 +223,29 @@ describe("tomar casos (ADR 0134)", () => {
     const closed = (await t.c.db.query(`SELECT status, claimed_by FROM moderation.cases WHERE id = $1`, [caseId])).rows[0];
     expect(closed).toEqual({ status: "DISMISSED", claimed_by: null });
     expect((await claim(mod)).json()).toMatchObject({ error: "CASE_CLOSED" });
+  });
+});
+
+describe("informe de transparencia (ADR 0135)", () => {
+  it("solo administración; conteos agregados sin personas y cifras chicas ocultas", async () => {
+    const admin = await asRole("transparencia", "admin");
+    expect((await t.app.inject({ url: "/v1/admin/transparency", headers: auth(mod) })).statusCode).toBe(403);
+    expect((await t.app.inject({ url: "/v1/admin/transparency?days=0", headers: auth(admin) })).statusCode).toBe(400);
+    const res = await t.app.inject({ url: "/v1/admin/transparency?days=30", headers: auth(admin) });
+    expect(res.statusCode).toBe(200);
+    const r = res.json() as TransparencyReport;
+    expect(r.period.days).toBe(30);
+    const flags = (await t.c.db.query<{ n: number }>(`SELECT count(*)::int AS n FROM moderation.flags`)).rows[0]!.n;
+    expect(r.flags.total).toBe(transparencyCount(flags));
+    expect(flags).toBeGreaterThanOrEqual(5);
+    expect(r.actions.some((a) => a.action === "DISMISS" && a.actor === "MODERATOR")).toBe(true);
+    for (const a of r.actions) expect(a.count === "<5" || a.count >= 5 || a.count === 0).toBe(true);
+    const json = JSON.stringify(r);
+    for (const u of [mod, mod2]) expect(json).not.toContain(u.userId);
+    expect(json).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}-/);
+  });
+
+  it("las cifras de 1 a 4 se informan como <5", () => {
+    expect([0, 1, 4, 5, 12].map(transparencyCount)).toEqual([0, "<5", "<5", 5, 12]);
   });
 });

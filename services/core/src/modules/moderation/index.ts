@@ -1,5 +1,8 @@
 import {
   CASE_CLAIM_MINUTES,
+  TransparencyQuery,
+  transparencyCount,
+  type TransparencyReport,
   AppealRequest,
   CaseQueueQuery,
   CreateFlagRequest,
@@ -258,6 +261,51 @@ export class ModerationService {
       }
     });
     return this.caseDetail(caseId, moderatorUserId);
+  }
+
+  /**
+   * Informe de transparencia agregado (§13.3, ADR 0135): denuncias por motivo, casos, acciones por tipo y autor (regla
+   * o persona), reversiones y apelaciones del periodo. Solo conteos, con las cifras chicas ocultas. NO AI REQUIRED.
+   */
+  async transparency(rawQuery: unknown, now: Date): Promise<TransparencyReport> {
+    const { days } = parse(TransparencyQuery, rawQuery ?? {});
+    const toDay = now.toISOString().slice(0, 10);
+    const from = new Date(Date.parse(`${toDay}T00:00:00Z`) - (days - 1) * 86_400_000);
+    const q = this.db;
+    const k = transparencyCount;
+    const flags = (await q.query<{ reason: FlagReason; n: number }>(
+      `SELECT reason, count(*)::int AS n FROM moderation.flags WHERE created_at >= $1 AND created_at <= $2 GROUP BY reason ORDER BY reason`, [from, now])).rows;
+    const cases = (await q.query<{ opened: number; resolved: number; dismissed: number; median_h: number | null }>(
+      `SELECT count(*) FILTER (WHERE opened_at >= $1)::int AS opened,
+              count(*) FILTER (WHERE status = 'RESOLVED' AND resolved_at >= $1)::int AS resolved,
+              count(*) FILTER (WHERE status = 'DISMISSED' AND resolved_at >= $1)::int AS dismissed,
+              percentile_cont(0.5) WITHIN GROUP (ORDER BY extract(epoch FROM resolved_at - opened_at) / 3600)
+                FILTER (WHERE resolved_at >= $1) AS median_h
+         FROM moderation.cases WHERE (opened_at >= $1 OR resolved_at >= $1) AND opened_at <= $2`, [from, now])).rows[0]!;
+    const actions = (await q.query<{ action: ModerationActionType; actor: "RULE" | "MODERATOR"; target_type: string; n: number }>(
+      `SELECT action, actor, target_type, count(*)::int AS n FROM moderation.actions WHERE created_at >= $1 AND created_at <= $2
+        GROUP BY action, actor, target_type ORDER BY action, actor, target_type`, [from, now])).rows;
+    const reversals = (await q.query<{ n: number }>(
+      `SELECT count(*)::int AS n FROM moderation.actions WHERE reverses_action_id IS NOT NULL AND created_at >= $1 AND created_at <= $2`, [from, now])).rows[0]!.n;
+    const appeals = (await q.query<{ received: number; upheld: number; reversed: number; open: number }>(
+      `SELECT count(*) FILTER (WHERE created_at >= $1)::int AS received,
+              count(*) FILTER (WHERE status = 'UPHELD' AND decided_at >= $1)::int AS upheld,
+              count(*) FILTER (WHERE status = 'REVERSED' AND decided_at >= $1)::int AS reversed,
+              count(*) FILTER (WHERE status = 'OPEN')::int AS open
+         FROM moderation.appeals WHERE created_at <= $2`, [from, now])).rows[0]!;
+    return {
+      period: { from: from.toISOString().slice(0, 10), to: toDay, days },
+      generatedAt: now.toISOString(),
+      flags: { total: k(flags.reduce((s, f) => s + f.n, 0)), byReason: Object.fromEntries(flags.map((f) => [f.reason, k(f.n)])) },
+      cases: {
+        opened: k(cases.opened), resolved: k(cases.resolved), dismissed: k(cases.dismissed),
+        // La mediana se informa solo con suficientes casos cerrados, por la misma razón que las cifras chicas.
+        medianHoursToClose: cases.resolved + cases.dismissed >= 5 && cases.median_h !== null ? Math.round(cases.median_h * 10) / 10 : null,
+      },
+      actions: actions.map((a) => ({ action: a.action, actor: a.actor, targetType: a.target_type, count: k(a.n) })),
+      reversals: k(reversals),
+      appeals: { received: k(appeals.received), upheld: k(appeals.upheld), reversed: k(appeals.reversed), open: k(appeals.open) },
+    };
   }
 
   /**

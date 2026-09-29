@@ -20,6 +20,7 @@
     "grant-role": "pnpm --filter @dizaster/core run build && pnpm --filter @dizaster/core run grant-role",
     "source-status": "pnpm --filter @dizaster/core run build && pnpm --filter @dizaster/core run source-status",
     "reprocess-source": "pnpm --filter @dizaster/core run build && pnpm --filter @dizaster/core run reprocess-source",
+    "transparency-report": "pnpm --filter @dizaster/core run build && pnpm --filter @dizaster/core run transparency-report",
     "supply-chain": "node scripts/supply-chain.mjs licenses && node scripts/supply-chain.mjs audit",
     "sbom": "node scripts/supply-chain.mjs sbom sbom.cdx.json",
     "db:backup": "scripts/db-backup.sh",

@@ -862,6 +862,12 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
     reply.header("cache-control", "no-store");
     return c.cost.dashboard(req.query);
   });
+  // Informe de transparencia agregado (ADR 0135): solo administración; pensado para publicarse.
+  app.get("/v1/admin/transparency", async (req, reply) => {
+    await requireAdmin(req);
+    reply.header("cache-control", "no-store");
+    return c.moderation.transparency(req.query, c.clock.now());
+  });
   app.get("/v1/admin/quality", async (req, reply) => {
     await requirePermission(req, "ops.view");
     await c.meter.flush(c.cost);

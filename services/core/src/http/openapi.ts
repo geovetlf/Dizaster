@@ -104,6 +104,7 @@ export const OPERATIONS: Record<string, Operation> = {
   "POST /v1/media/:id/complete": { summary: "Confirmar una subida" },
   "GET /v1/media/:id": { summary: "Estado y enlaces de una media" },
   "GET /v1/admin/cost": { summary: "Tablero de costo (admin)", query: C.CostDashboardQuery },
+  "GET /v1/admin/transparency": { summary: "Informe de transparencia agregado (denuncias, casos, acciones, apelaciones; cifras 1–4 como \"<5\")", query: C.TransparencyQuery },
   "GET /v1/admin/quality": { summary: "Métricas de calidad (admin)", query: C.QualityQuery },
   "PUT /v1/admin/cost/budgets/:key": { summary: "Cambiar un presupuesto (admin)", body: C.UpdateBudgetRequest },
   "GET /v1/admin/categories/:code/publish-delay": { summary: "Retraso de publicación de una categoría (admin, ADR 0109)" },

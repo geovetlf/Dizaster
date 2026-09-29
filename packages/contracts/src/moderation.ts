@@ -162,3 +162,23 @@ export const MfaVerifyRequest = z.union([
   z.object({ recoveryCode: z.string().trim().min(8).max(12) }),
 ]);
 export type MfaVerifyRequest = z.infer<typeof MfaVerifyRequest>;
+
+/**
+ * Informe de transparencia agregado (Blueprint §13.3, ADR 0135): solo conteos del periodo, sin personas ni objetos.
+ * Una cifra entre 1 y 4 se informa como "<5" para que el informe se pueda publicar sin señalar casos concretos.
+ */
+export const TransparencyQuery = z.object({
+  days: z.coerce.number().int().min(1).max(366).default(90),
+});
+export type TransparencyCount = number | "<5";
+export interface TransparencyReport {
+  period: { from: string; to: string; days: number };
+  generatedAt: string;
+  flags: { total: TransparencyCount; byReason: Partial<Record<FlagReason, TransparencyCount>> };
+  cases: { opened: TransparencyCount; resolved: TransparencyCount; dismissed: TransparencyCount; medianHoursToClose: number | null };
+  actions: { action: ModerationActionType; actor: "RULE" | "MODERATOR"; targetType: string; count: TransparencyCount }[];
+  reversals: TransparencyCount;
+  appeals: { received: TransparencyCount; upheld: TransparencyCount; reversed: TransparencyCount; open: TransparencyCount };
+}
+export const TRANSPARENCY_MIN_COUNT = 5;
+export const transparencyCount = (n: number): TransparencyCount => (n > 0 && n < TRANSPARENCY_MIN_COUNT ? "<5" : n);
