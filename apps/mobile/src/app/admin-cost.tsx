@@ -1,8 +1,9 @@
-import type { CostDashboard } from "@dizaster/contracts";
+import type { BudgetView, CostDashboard } from "@dizaster/contracts";
 import { useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
-import { Pressable, RefreshControl, ScrollView, StyleSheet, Switch, Text, View } from "react-native";
+import { Alert, Pressable, RefreshControl, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
 import { api } from "../lib/api";
+import { parseUsd } from "../lib/admin/admin-tools";
 import { barHeights, budgetTone, formatBytes, formatUnits, formatUsd, moduleRows } from "../lib/admin/cost-format";
 import { lang, t } from "../lib/i18n";
 import { colors, radius, space } from "../theme";
@@ -15,6 +16,7 @@ export default function AdminCostScreen() {
   const [days, setDays] = useState<(typeof RANGES)[number]>(30);
   const [d, setD] = useState<CostDashboard | null>(null);
   const [error, setError] = useState(false);
+  const [editing, setEditing] = useState<string | null>(null);
 
   const load = useCallback(async (n: number) => {
     try {
@@ -73,10 +75,13 @@ export default function AdminCostScreen() {
 
           <Text style={styles.section}>{t("costBudgets")}</Text>
           {d.budgets.map((b) => (
-            <View key={b.key} style={styles.row}>
-              <View style={[styles.dot, { backgroundColor: TONE[budgetTone(b.percent)] }]} />
-              <Text style={styles.rowLabel}>{b.key} · {b.period === "DAILY" ? "24 h" : t("costMonth")}</Text>
-              <Text style={styles.amount}>{usd(b.spentUsd)} / {usd(b.limitUsd)}</Text>
+            <View key={b.key}>
+              <Pressable accessibilityRole="button" style={styles.row} onPress={() => setEditing(editing === b.key ? null : b.key)}>
+                <View style={[styles.dot, { backgroundColor: TONE[budgetTone(b.percent)] }]} />
+                <Text style={styles.rowLabel}>{b.key} · {b.period === "DAILY" ? "24 h" : t("costMonth")}</Text>
+                <Text style={styles.amount}>{usd(b.spentUsd)} / {usd(b.limitUsd)}</Text>
+              </Pressable>
+              {editing === b.key ? <BudgetEditor budget={b} onSaved={() => { setEditing(null); void load(days); }} /> : null}
             </View>
           ))}
 
@@ -97,7 +102,45 @@ export default function AdminCostScreen() {
   );
 }
 
+/**
+ * Cambiar un tope (ADR 0098). Subirlo de 0 autoriza gasto real: por eso pide confirmación y la decisión queda
+ * registrada en el servidor con quién la tomó.
+ */
+function BudgetEditor({ budget, onSaved }: { budget: BudgetView; onSaved: () => void }) {
+  const [text, setText] = useState(String(budget.limitUsd));
+  const [period, setPeriod] = useState(budget.period);
+  const [error, setError] = useState<string | null>(null);
+  const value = parseUsd(text);
+  function save() {
+    if (value === null) return;
+    Alert.alert(budget.key, `${t("budgetConfirm")} ${formatUsd(value, lang) ?? value}`, [
+      { text: t("cancel"), style: "cancel" },
+      { text: t("apply"), onPress: () => void api.setBudget(budget.key, period, value).then(onSaved).catch((e: Error) => setError(e.message)) },
+    ]);
+  }
+  return (
+    <View style={styles.editor}>
+      <View style={styles.ranges}>
+        {(["DAILY", "MONTHLY"] as const).map((p) => (
+          <Pressable key={p} accessibilityRole="button" accessibilityState={{ selected: p === period }} style={[styles.range, p === period && styles.rangeOn]} onPress={() => setPeriod(p)}>
+            <Text style={styles.rangeText}>{p === "DAILY" ? "24 h" : t("costMonth")}</Text>
+          </Pressable>
+        ))}
+      </View>
+      <TextInput value={text} onChangeText={setText} keyboardType="decimal-pad" placeholder="USD" placeholderTextColor={colors.textMuted} style={styles.input} />
+      {error ? <Text style={styles.note}>{error}</Text> : null}
+      <Pressable accessibilityRole="button" disabled={value === null} style={[styles.save, value === null && styles.disabled]} onPress={save}>
+        <Text style={styles.rangeText}>{t("apply")}</Text>
+      </Pressable>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
+  editor: { backgroundColor: colors.surface, borderRadius: radius.md, padding: space.md, marginBottom: space.sm, gap: space.sm },
+  input: { color: colors.text, backgroundColor: colors.bg, borderRadius: radius.md, padding: space.md },
+  save: { backgroundColor: colors.accent, borderRadius: radius.md, padding: space.sm, alignItems: "center" },
+  disabled: { opacity: 0.4 },
   container: { flex: 1, backgroundColor: colors.bg },
   content: { padding: space.lg },
   ranges: { flexDirection: "row", gap: space.sm, marginBottom: space.md },

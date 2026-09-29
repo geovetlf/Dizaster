@@ -1,7 +1,7 @@
 import type { MfaEnrollResponse, MfaStatus } from "@dizaster/contracts";
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
-import { Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Alert, Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { api } from "../lib/api";
 import { cleanTotp, groupSecret } from "../lib/auth/mfa";
 import { t } from "../lib/i18n";
@@ -34,6 +34,11 @@ export default function MfaScreen() {
     await api.mfaVerify(recoveryMode ? { recoveryCode: code.trim() } : { code });
     router.back();
   });
+  // Quitar el autenticador (ADR 0098): pide un código vigente; con MFA obligatoria habrá que volver a darlo de alta.
+  const disable = () => Alert.alert(t("mfaDisable"), t("mfaDisableConfirm"), [
+    { text: t("cancel"), style: "cancel" },
+    { text: t("mfaDisable"), style: "destructive", onPress: () => void run(async () => { await api.mfaDisable(code); setCode(""); setStatus(await api.mfaStatus()); }) },
+  ]);
 
   if (recovery) {
     return (
@@ -85,6 +90,11 @@ export default function MfaScreen() {
           {status?.enrolled ? (
             <Pressable accessibilityRole="button" onPress={() => { setRecoveryMode(!recoveryMode); setCode(""); }}>
               <Text style={styles.link}>{recoveryMode ? t("mfaCode") : t("mfaUseRecovery")}</Text>
+            </Pressable>
+          ) : null}
+          {status?.enrolled && !enroll && !recoveryMode ? (
+            <Pressable accessibilityRole="button" disabled={!valid || busy} onPress={disable}>
+              <Text style={[styles.link, (!valid || busy) && styles.disabled]}>{t("mfaDisable")}</Text>
             </Pressable>
           ) : null}
         </>

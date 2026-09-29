@@ -1,4 +1,4 @@
-import type { DuplicateCandidateView, OfficialScopeView, MyReportView, MfaEnrollResponse, MfaStatus, PresenceReview, EventSourceView, EventStatus, MyProfile, UpdateProfileRequest, ReactionKind, ReactionState, DataExport, VerificationView, ModeratorEventDetail, SavedZone, SavedZoneInput, AppealView, CaseDetail, CaseSummary, CreateFlagRequest, ModerationActionType, ModerationNotice, CostDashboard, KillSwitchView, QualityReport, CreatePostRequest, TagView, BusinessView, SessionView, CreateBusinessRequest, UpdateBusinessRequest, AlertPreferences, CategorySubscription, CategorySubscriptionInput, NotificationsResponse, AppConfig, AttributionsResponse, AreaSearchResult, FollowTarget, MyFollows, ProfileSearchResult, ProfileView, CommentView, CreateUploadRequest, FeedPost, FeedResponse, FeedTab, CreateUploadResponse, DevicePlatform, MediaView, RegisterPushTokenRequest, EventMapResponse, EventDetail, EventSummary, NearbyEventsResponse, SubmitReportRequest, SubmitReportResponse, TimelineEntryView } from "@dizaster/contracts";
+import type { PresenceAccessEntry, DuplicateCandidateView, OfficialScopeView, MyReportView, MfaEnrollResponse, MfaStatus, PresenceReview, EventSourceView, EventStatus, MyProfile, UpdateProfileRequest, ReactionKind, ReactionState, DataExport, VerificationView, ModeratorEventDetail, SavedZone, SavedZoneInput, AppealView, CaseDetail, CaseSummary, CreateFlagRequest, ModerationActionType, ModerationNotice, CostDashboard, KillSwitchView, QualityReport, CreatePostRequest, TagView, BusinessView, SessionView, CreateBusinessRequest, UpdateBusinessRequest, AlertPreferences, CategorySubscription, CategorySubscriptionInput, NotificationsResponse, AppConfig, AttributionsResponse, AreaSearchResult, FollowTarget, MyFollows, ProfileSearchResult, ProfileView, CommentView, CreateUploadRequest, FeedPost, FeedResponse, FeedTab, CreateUploadResponse, DevicePlatform, MediaView, RegisterPushTokenRequest, EventMapResponse, EventDetail, EventSummary, NearbyEventsResponse, SubmitReportRequest, SubmitReportResponse, TimelineEntryView } from "@dizaster/contracts";
 import { mergeMapTiles, tilesForView } from "@dizaster/geo-kit";
 import { canRetryWithRefresh, singleFlight } from "./auth/refresh";
 import { API_URL } from "./config";
@@ -197,6 +197,14 @@ export const api = {
   /** Copia de mis datos (ADR 0038). El servidor limita a una por minuto. */
   exportData: () => request<DataExport>("/v1/me/export"),
   costDashboard: (days = 30) => request<CostDashboard>(`/v1/admin/cost?days=${days}`),
+  setBudget: (key: string, period: "DAILY" | "MONTHLY", limitUsd: number) =>
+    request<unknown>(`/v1/admin/cost/budgets/${encodeURIComponent(key)}`, { method: "PUT", body: JSON.stringify({ period, limitUsd }) }),
+  setBusinessVerification: (handle: string, verification: BusinessView["verification"]) =>
+    request<BusinessView>(`/v1/admin/businesses/${encodeURIComponent(handle)}/verification`, { method: "PUT", body: JSON.stringify({ verification }) }),
+  setOfficialScope: (handle: string, categories: string[], countries: string[]) =>
+    request<OfficialScopeView>(`/v1/admin/businesses/${encodeURIComponent(handle)}/official-scope`, { method: "PUT", body: JSON.stringify({ categories, countries }) }),
+  presenceAccessLog: () => request<{ entries: PresenceAccessEntry[] }>("/v1/admin/presence-access"),
+  mfaDisable: (code: string) => request<void>("/v1/me/mfa/totp/disable", { method: "POST", body: JSON.stringify({ code }) }),
   qualityReport: (days = 7) => request<QualityReport>(`/v1/admin/quality?days=${days}`),
   setKillSwitch: (feature: string, killed: boolean) =>
     request<KillSwitchView>(`/v1/admin/kill-switches/${encodeURIComponent(feature)}`, { method: "PUT", body: JSON.stringify({ killed }) }),

@@ -49,6 +49,8 @@ export default function RootLayout() {
         <Stack.Screen name="my-reports" options={{ title: t("myReports") }} />
         <Stack.Screen name="following" options={{ title: t("followingTitle") }} />
         <Stack.Screen name="blocked" options={{ title: t("blockedTitle") }} />
+        <Stack.Screen name="admin-businesses" options={{ title: t("adminBusinesses") }} />
+        <Stack.Screen name="admin-presence" options={{ title: t("presenceLogTitle") }} />
         <Stack.Screen name="delete-account" options={{ title: t("deleteAccount") }} />
         <Stack.Screen name="age-check" options={{ title: t("ageTitle"), presentation: "modal" }} />
         <Stack.Screen name="profile-edit" options={{ title: t("editProfile") }} />

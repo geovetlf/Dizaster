@@ -74,6 +74,9 @@ export default function ProfileScreen() {
         {roles.includes("moderator") || roles.includes("admin") ? <Row icon="shield-check-outline" label={t("moderation")} onPress={() => router.push("/moderation")} /> : null}
         {roles.includes("admin") ? <Row icon="chart-bar" label={t("costTitle")} onPress={() => router.push("/admin-cost")} /> : null}
         {roles.includes("admin") ? <Row icon="gauge" label={t("qualityTitle")} onPress={() => router.push("/admin-quality")} /> : null}
+        {roles.includes("admin") ? <Row icon="storefront-check-outline" label={t("adminBusinesses")} onPress={() => router.push("/admin-businesses")} /> : null}
+        {roles.includes("admin") ? <Row icon="map-marker-account-outline" label={t("presenceLogTitle")} onPress={() => router.push("/admin-presence")} /> : null}
+        {roles.includes("moderator") || roles.includes("admin") ? <Row icon="two-factor-authentication" label={t("mfaTitle")} onPress={() => router.push("/mfa")} /> : null}
         <Row icon="storefront-outline" label={t("myBusinesses")} onPress={() => router.push("/my-businesses")} />
         <Row icon="cellphone-lock" label={t("sessionsTitle")} onPress={() => router.push("/sessions")} />
         <Row icon="download-outline" label={t("exportData")} value={exporting ? t("exportPreparing") : undefined} onPress={() => void onExport()} />
