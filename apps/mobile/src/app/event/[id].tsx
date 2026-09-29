@@ -1,7 +1,7 @@
 import type { EventSourceView, EventSummary, OfficialScopeView, MediaView, TimelineEntryView, VerificationView } from "@dizaster/contracts";
 import { router, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
-import { Alert, Linking, Pressable, StyleSheet, Text, View } from "react-native";
+import { Alert, Linking, Pressable, Share, StyleSheet, Text, View } from "react-native";
 import { FeedList } from "../../components/feed-list";
 import { EventMedia } from "../../components/event-media";
 import { OfflineNote } from "../../components/offline-note";
@@ -14,6 +14,8 @@ import { evidenceLine, explainLines, timelineLabel } from "../../lib/verificatio
 import { followablePlace } from "../../lib/social/place";
 import { useFollows } from "../../lib/social/follows";
 import { mergedTarget } from "../../lib/events/merged";
+import { LINK_DOMAIN } from "../../lib/config";
+import { shareUrl } from "../../lib/links";
 import { canStateOn } from "../../lib/social/business";
 import { openFlag } from "../../lib/moderation/menu";
 import { colors, radius, space } from "../../theme";
@@ -86,6 +88,12 @@ export default function EventScreen() {
           <FollowChip label={`${t("followPlace")} ${place.name}`} on={follows.following("place", place.id)} onPress={() => void follows.toggle("place", place.id, place.name)} />
         ) : null}
         <FollowChip label={t("postAboutThis")} on={false} onPress={() => router.push({ pathname: "/compose", params: { eventId: event.id } })} />
+        {event.status === "ACTIVE" || event.status === "MONITORING" ? (
+          <FollowChip label={t("seenTooChip")} on={false}
+            onPress={() => router.push({ pathname: "/report", params: { eventId: event.id, category: event.categoryCode } })} />
+        ) : null}
+        <FollowChip label={t("share")} on={false}
+          onPress={() => void Share.share({ message: `${eventTitle(event, lang)}\n\n${shareUrl("event", event.id, LINK_DOMAIN)}` }).catch(() => undefined)} />
         <FollowChip label={t("nothingHere")} on={false}
           onPress={() => router.push({ pathname: "/report", params: { eventId: event.id, category: event.categoryCode, deny: "1" } })} />
         <FollowChip label={t("flag")} on={false} onPress={() => openFlag("EVENT", event.id)} />

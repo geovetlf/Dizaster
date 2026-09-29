@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Alert, Image, Pressable, Share, StyleSheet, Text, View } from "react-native";
 import { api } from "../lib/api";
 import { LINK_DOMAIN } from "../lib/config";
+import { shareUrl } from "../lib/links";
 import { canBlock } from "../lib/moderation/logic";
 import { openContentMenu, openOwnPostMenu } from "../lib/moderation/menu";
 import { verificationIcon } from "../lib/social/business";
@@ -53,8 +54,7 @@ export function PostCard({ post, categoryName }: { post: FeedPost; categoryName:
 
   async function shareOutside() {
     // Se comparte el evento (o el post) con enlace a la app; sin dominio aprobado se usa el esquema propio.
-    const path = post.event ? `e/${post.event.id}` : `p/${post.id}`;
-    const url = LINK_DOMAIN ? `https://${LINK_DOMAIN}/${path}` : `dizaster://${post.event ? `event/${post.event.id}` : `post/${post.id}`}`;
+    const url = post.event ? shareUrl("event", post.event.id, LINK_DOMAIN) : shareUrl("post", post.id, LINK_DOMAIN);
     await Share.share({ message: [post.text, url].filter(Boolean).join("\n\n") }).catch(() => undefined);
   }
 

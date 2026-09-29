@@ -10,3 +10,11 @@ export function rewriteSharedLinkPath(path: string): string {
   if (!m) return path;
   return `/${m[1]!.toLowerCase() === "e" ? "event" : "post"}/${m[2]!.toLowerCase()}`;
 }
+
+/**
+ * Enlace para compartir fuera de la app (ADR 0083, ADR 0104): corto con el dominio aprobado o, sin él, el esquema
+ * propio de la app. NO AI REQUIRED.
+ */
+export function shareUrl(kind: "event" | "post", id: string, domain: string | null): string {
+  return domain ? `https://${domain}/${kind === "event" ? "e" : "p"}/${id}` : `dizaster://${kind}/${id}`;
+}
