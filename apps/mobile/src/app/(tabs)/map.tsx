@@ -8,6 +8,7 @@ import { parseBboxParam } from "../../lib/ui/format";
 import { useCoarseLocation } from "../../lib/ui/use-coarse-location";
 import { colors } from "../../theme";
 import { api } from "../../lib/api";
+import { limitAmbientCache } from "../../lib/map/offline";
 import { t } from "../../lib/i18n";
 import { OFFLINE_FALLBACK_STYLE, providerFromAppConfig, type MapProvider } from "../../lib/map/provider";
 
@@ -29,6 +30,7 @@ export default function MapScreen() {
 
   useEffect(() => {
     api.config().then((c) => setProvider(providerFromAppConfig(c))).catch(() => setProvider(null));
+    void limitAmbientCache();
   }, []);
 
   const onRegionDidChange = useCallback((e: NativeSyntheticEvent<ViewStateChangeEvent>) => {

@@ -13,3 +13,4 @@ apps/mobile/android/
 
 # Paquetes descargados para herramientas locales; nunca van al repo.
 *.whl
+infra/maps/out/

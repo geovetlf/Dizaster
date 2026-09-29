@@ -4,11 +4,14 @@ import { router, useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
 import { Icon } from "../components/icon";
+import { ZoneMapButton } from "../components/zone-map-button";
 import { cycle, QUIET_PRESETS, quietLabel, sameQuiet, zoneKindInfo, zoneTitle, type PermissionView } from "../lib/alerts/logic";
 import { sendNearMe, setNearMeEnabled } from "../lib/alerts/notifications";
 import { api } from "../lib/api";
 import { enablePush, openSystemSettings, pushPermission } from "../lib/device/push";
 import { countryOf } from "../lib/geo/country";
+import { deleteZoneMap } from "../lib/map/offline";
+import { providerFromAppConfig } from "../lib/map/provider";
 import { lang, t, type MessageKey } from "../lib/i18n";
 import { useSession } from "../lib/session";
 import { categoryStyle } from "../lib/ui/categories";
@@ -41,6 +44,14 @@ export default function AlertSettingsScreen() {
   const [subs, setSubs] = useState<CategorySubscription[]>([]);
   const [zones, setZones] = useState<SavedZone[]>([]);
   const [error, setError] = useState(false);
+  const [offlineStyle, setOfflineStyle] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Solo si el proveedor de mapa permite descargas por región (config remota).
+    api.config()
+      .then((c) => setOfflineStyle(c.map.kind !== "NONE" && c.map.offlineRegions ? providerFromAppConfig(c)?.styleUrl("light") ?? null : null))
+      .catch(() => setOfflineStyle(null));
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
@@ -83,6 +94,7 @@ export default function AlertSettingsScreen() {
 
   async function removeZone(id: string) {
     setZones(zones.filter((z) => z.id !== id));
+    await deleteZoneMap(id).catch(() => undefined);
     await api.removeZone(id).catch(() => undefined);
   }
 
@@ -127,6 +139,7 @@ export default function AlertSettingsScreen() {
               <View key={z.id} style={styles.row}>
                 <Icon name={k.icon} size={22} color={colors.text} />
                 <Text style={styles.label}>{zoneTitle(z, t)} · {z.radiusKm} km</Text>
+                <ZoneMapButton zone={z} styleUrl={offlineStyle} />
                 <Pressable accessibilityRole="button" accessibilityLabel={t("remove")} hitSlop={8} onPress={() => void removeZone(z.id)}>
                   <Icon name="close" size={20} color={colors.textMuted} />
                 </Pressable>

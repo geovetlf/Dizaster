@@ -11,6 +11,9 @@ importers:
       '@eslint/js':
         specifier: ^10.0.0
         version: 10.0.1(eslint@10.11.0)
+      '@protomaps/basemaps':
+        specifier: 5.7.2
+        version: 5.7.2
       eslint:
         specifier: ^10.11.0
         version: 10.11.0
@@ -1279,6 +1282,10 @@ packages:
 
   '@pinojs/redact@0.4.0':
     resolution: {integrity: sha512-k2ENnmBugE/rzQfEcdWHcCY+/FM3VLzH9cYEsbdsoqrvzAKRhUZeRNhAZvB8OitQJ1TBed3yqWtdjzS6wJKBwg==}
+
+  '@protomaps/basemaps@5.7.2':
+    resolution: {integrity: sha512-K1Yk6bWdULulYg+R2QRVXx4NzJZan5YQhpejEG0c1/sXruJrfPIPZuakpf3jwAgVmjIRVQwAv+yRafDeN0aaUQ==}
+    hasBin: true
 
   '@radix-ui/primitive@1.1.7':
     resolution: {integrity: sha512-rqWnm76nYT8HoNNqEjpgJ7Pw/DrBj5iBTrmEPo6HTX5+VJyBNOqTdv4g89G63HuR5g0AaENoAcH7Is5fF2kZ8Q==}
@@ -5472,6 +5479,8 @@ snapshots:
   '@oxc-project/types@0.151.0': {}
 
   '@pinojs/redact@0.4.0': {}
+
+  '@protomaps/basemaps@5.7.2': {}
 
   '@radix-ui/primitive@1.1.7': {}
 
