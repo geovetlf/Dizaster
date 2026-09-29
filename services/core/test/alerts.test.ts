@@ -281,3 +281,69 @@ describe("privacidad y mantenimiento", () => {
     expect(mine.map((n) => n.kind)).toEqual(["RESOLVED", "NEW_EVENT"]);
   });
 });
+
+describe("Alert Engine: zonas guardadas y cerca de mí (D-16)", () => {
+  const CHORRILLOS = { lat: -12.1686, lng: -77.0247 };
+  const zone = (u: TestUser, payload: object) => t.app.inject({ method: "POST", url: "/v1/me/zones", headers: auth(u), payload });
+
+  it("guarda zonas generalizadas, con límite, y solo las ve su dueña", async () => {
+    const u = await createUser(t, "zonas");
+    const otra = await createUser(t, "zonas_otra");
+    const res = await zone(u, { kind: "HOME", name: "Casa", lat: -12.16861, lng: -77.02471, radiusKm: 2 });
+    expect(res.statusCode, res.body).toBe(201);
+    const z = res.json();
+    // El punto guardado es el centro de una celda r8, no el que se envió.
+    expect(z.center).not.toEqual({ lat: -12.16861, lng: -77.02471 });
+    expect(Math.abs(z.center.lat - -12.16861)).toBeLessThan(0.01);
+    expect((await zone(u, { kind: "NOPE", lat: 0, lng: 0 })).statusCode).toBe(400);
+    expect((await zone(u, { kind: "WORK", lat: 0, lng: 0, radiusKm: 80 })).statusCode).toBe(400);
+    for (let i = 0; i < 4; i++) expect((await zone(u, { kind: "OTHER", lat: i, lng: i })).statusCode).toBe(201);
+    expect((await zone(u, { kind: "OTHER", lat: 9, lng: 9 })).statusCode).toBe(409);
+
+    const edit = await t.app.inject({ method: "PUT", url: `/v1/me/zones/${z.id}`, headers: auth(u), payload: { kind: "HOME", lat: -12.1686, lng: -77.0247, radiusKm: 5 } });
+    expect(edit.json()).toMatchObject({ radiusKm: 5, name: null });
+    expect((await t.app.inject({ method: "PUT", url: `/v1/me/zones/${z.id}`, headers: auth(otra), payload: { kind: "HOME", lat: 0, lng: 0 } })).statusCode).toBe(404);
+    expect((await t.app.inject({ url: "/v1/me/zones", headers: auth(otra) })).json().zones).toEqual([]);
+    await t.app.inject({ method: "DELETE", url: `/v1/me/zones/${z.id}`, headers: auth(otra) });
+    expect((await t.app.inject({ url: "/v1/me/zones", headers: auth(u) })).json().zones).toHaveLength(5);
+  });
+
+  it("'cerca de mí' solo guarda la ubicación si está activado, y apagarlo la borra", async () => {
+    const u = await createUser(t, "cerca_off");
+    const put = () => t.app.inject({ method: "PUT", url: "/v1/me/approximate-location", headers: auth(u), payload: offset(CHORRILLOS, 300) });
+    expect((await put()).json()).toEqual({ stored: false });
+    await setPrefs(u, { nearMe: true });
+    expect((await put()).json()).toEqual({ stored: true });
+    const row = (await t.c.db.query<{ lat: number }>(`SELECT ST_Y(center::geometry) AS lat FROM alert.last_locations WHERE profile_id = $1`, [u.profileId])).rows[0]!;
+    expect(row.lat).not.toBeCloseTo(offset(CHORRILLOS, 300).lat, 6);
+    await setPrefs(u, { nearMe: false });
+    expect((await t.c.db.query(`SELECT 1 FROM alert.last_locations WHERE profile_id = $1`, [u.profileId])).rowCount).toBe(0);
+  });
+
+  it("avisa por zona guardada y por cercanía; lo lejano, lo caducado o lo desactivado no", async () => {
+    const enZona = await createUser(t, "en_zona");
+    const cerca = await createUser(t, "cerca_si");
+    const caducada = await createUser(t, "cerca_vieja");
+    const lejos = await createUser(t, "lejos");
+    const sinZonas = await createUser(t, "sin_zonas");
+    expect((await zone(enZona, { kind: "FAMILY", lat: CHORRILLOS.lat, lng: CHORRILLOS.lng, radiusKm: 5 })).statusCode).toBe(201);
+    expect((await zone(sinZonas, { kind: "HOME", lat: CHORRILLOS.lat, lng: CHORRILLOS.lng, radiusKm: 5 })).statusCode).toBe(201);
+    await setPrefs(sinZonas, { savedZones: false });
+    expect((await zone(lejos, { kind: "WORK", lat: CALLAO.lat, lng: CALLAO.lng, radiusKm: 2 })).statusCode).toBe(201);
+    for (const u of [cerca, caducada]) {
+      await setPrefs(u, { nearMe: true });
+      await t.app.inject({ method: "PUT", url: "/v1/me/approximate-location", headers: auth(u), payload: offset(CHORRILLOS, 4000) });
+    }
+    await t.c.db.query(`UPDATE alert.last_locations SET seen_at = now() - interval '4 days' WHERE profile_id = $1`, [caducada.profileId]);
+
+    const { eventId } = await corroborated("fire.structure", CHORRILLOS, "chorri");
+    const got = async (u: TestUser) => (await inbox(u)).notifications.filter((n) => n.eventId === eventId);
+    expect((await got(enZona)).map((n) => n.match)).toEqual(["SAVED_ZONE"]);
+    expect((await got(cerca)).map((n) => n.match)).toEqual(["NEAR_ME"]);
+    expect(await got(caducada)).toEqual([]);
+    expect(await got(lejos)).toEqual([]);
+    expect(await got(sinZonas)).toEqual([]);
+    // El texto no menciona la zona ni su nombre privado.
+    expect((await got(enZona))[0]!.title).not.toMatch(/FAMILY|familia/i);
+  });
+});

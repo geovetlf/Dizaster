@@ -1,4 +1,4 @@
-import type { AppealView, CaseDetail, CaseSummary, CreateFlagRequest, ModerationActionType, ModerationNotice, CostDashboard, KillSwitchView, AlertPreferences, CategorySubscription, CategorySubscriptionInput, NotificationsResponse, AppConfig, AreaSearchResult, FollowTarget, MyFollows, ProfileSearchResult, ProfileView, CommentView, CreateUploadRequest, FeedResponse, FeedTab, CreateUploadResponse, DevicePlatform, MediaView, RegisterPushTokenRequest, EventMapResponse, EventSummary, NearbyEventsResponse, SubmitReportRequest, SubmitReportResponse, TimelineEntryView } from "@dizaster/contracts";
+import type { SavedZone, SavedZoneInput, AppealView, CaseDetail, CaseSummary, CreateFlagRequest, ModerationActionType, ModerationNotice, CostDashboard, KillSwitchView, AlertPreferences, CategorySubscription, CategorySubscriptionInput, NotificationsResponse, AppConfig, AreaSearchResult, FollowTarget, MyFollows, ProfileSearchResult, ProfileView, CommentView, CreateUploadRequest, FeedResponse, FeedTab, CreateUploadResponse, DevicePlatform, MediaView, RegisterPushTokenRequest, EventMapResponse, EventSummary, NearbyEventsResponse, SubmitReportRequest, SubmitReportResponse, TimelineEntryView } from "@dizaster/contracts";
 import { canRetryWithRefresh, singleFlight } from "./auth/refresh";
 import { API_URL } from "./config";
 import type { Sender } from "./report/queue";
@@ -99,6 +99,12 @@ export const api = {
   addAlertSubscription: (body: Partial<CategorySubscriptionInput> & Pick<CategorySubscriptionInput, "categoryCode" | "areaId">) =>
     request<CategorySubscription>("/v1/me/alert-subscriptions", { method: "POST", body: JSON.stringify(body) }),
   removeAlertSubscription: (id: string) => request<void>(`/v1/me/alert-subscriptions/${id}`, { method: "DELETE" }),
+  zones: () => request<{ zones: SavedZone[] }>("/v1/me/zones"),
+  addZone: (body: Omit<SavedZoneInput, "radiusKm"> & { radiusKm?: number }) =>
+    request<SavedZone>("/v1/me/zones", { method: "POST", body: JSON.stringify(body) }),
+  removeZone: (id: string) => request<void>(`/v1/me/zones/${id}`, { method: "DELETE" }),
+  setApproximateLocation: (p: { lat: number; lng: number }) =>
+    request<{ stored: boolean }>("/v1/me/approximate-location", { method: "PUT", body: JSON.stringify(p) }),
   notifications: (cursor?: string | null, limit = 20) =>
     request<NotificationsResponse>(`/v1/me/notifications?${new URLSearchParams({ limit: String(limit), ...(cursor ? { cursor } : {}) })}`),
   /** Sin ids: marca todo como leído. */

@@ -282,6 +282,40 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
     return reply.status(204).send();
   });
 
+  // Zonas guardadas y ubicación aproximada (D-16). Personales: nunca se cachean.
+  app.get("/v1/me/zones", async (req, reply) => {
+    const session = requireSession(req);
+    reply.header("cache-control", "no-store");
+    return { zones: await c.alerts.zones(c.db, session.profileId) };
+  });
+
+  app.post("/v1/me/zones", async (req, reply) => {
+    const session = requireSession(req);
+    return reply.status(201).send(await c.alerts.saveZone(c.db, session.profileId, req.body));
+  });
+
+  app.put("/v1/me/zones/:id", async (req) => {
+    const session = requireSession(req);
+    return c.alerts.saveZone(c.db, session.profileId, req.body, parse(IdParam, req.params).id);
+  });
+
+  app.delete("/v1/me/zones/:id", async (req, reply) => {
+    const session = requireSession(req);
+    await c.alerts.deleteZone(c.db, session.profileId, parse(IdParam, req.params).id);
+    return reply.status(204).send();
+  });
+
+  app.put("/v1/me/approximate-location", async (req) => {
+    const session = requireSession(req);
+    return c.alerts.setApproximateLocation(c.db, session.profileId, req.body);
+  });
+
+  app.delete("/v1/me/approximate-location", async (req, reply) => {
+    const session = requireSession(req);
+    await c.alerts.clearApproximateLocation(c.db, session.profileId);
+    return reply.status(204).send();
+  });
+
   app.get("/v1/me/notifications", async (req, reply) => {
     const session = requireSession(req);
     reply.header("cache-control", "no-store");

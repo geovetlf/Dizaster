@@ -34,6 +34,8 @@ export const DEFAULT_PREFERENCES: AlertPreferences = {
   enabled: true,
   followedEvents: true,
   followedPlaces: true,
+  savedZones: true,
+  nearMe: false,
   categories: true,
   statusChanges: true,
   minSeverity: 3,
@@ -69,7 +71,7 @@ export function decideAlerts(prev: SeenState | null, snap: EventSnapshot): Alert
 }
 
 /** Prioridad cuando una persona coincide por varios motivos: se guarda el más directo. */
-export const MATCH_PRIORITY: AlertMatch[] = ["FOLLOWED_EVENT", "FOLLOWED_PLACE", "CATEGORY", "PREVIOUSLY_ALERTED"];
+export const MATCH_PRIORITY: AlertMatch[] = ["FOLLOWED_EVENT", "SAVED_ZONE", "NEAR_ME", "FOLLOWED_PLACE", "CATEGORY", "PREVIOUSLY_ALERTED"];
 
 /** ¿Quiere esta persona este aviso según sus preferencias? */
 export function wants(p: AlertPreferences, kind: AlertKind, match: AlertMatch, severity: number): boolean {
@@ -80,6 +82,8 @@ export function wants(p: AlertPreferences, kind: AlertKind, match: AlertMatch, s
   }
   if (match === "FOLLOWED_EVENT") return p.followedEvents;
   if (severity < p.minSeverity) return false;
+  if (match === "SAVED_ZONE") return p.savedZones;
+  if (match === "NEAR_ME") return p.nearMe;
   if (match === "FOLLOWED_PLACE") return p.followedPlaces;
   if (match === "CATEGORY") return p.categories;
   return false;

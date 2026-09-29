@@ -15,7 +15,7 @@ const easProjectId = process.env["DIZASTER_EAS_PROJECT_ID"];
 const apnsMode = process.env["DIZASTER_APNS_MODE"] === "production" ? "production" : "development";
 
 const LOCATION_TEXT =
-  "Dizaster usa tu ubicación solo cuando reportas un incidente, para comprobar que estás en el lugar. Tu ubicación exacta no se publica.";
+  "Dizaster usa tu ubicación mientras usas la app: al reportar, para comprobar que estás en el lugar, y si lo activas, para mostrarte y avisarte de lo que pasa cerca. Tu ubicación exacta nunca se publica.";
 const CAMERA_TEXT = "Dizaster usa la cámara para tomar fotos o videos del incidente que reportas.";
 const PHOTOS_TEXT = "Dizaster accede a las fotos y videos que elijas para adjuntarlos a un reporte.";
 const MIC_TEXT = "Dizaster usa el micrófono para grabar el audio de los videos que adjuntas a un reporte.";

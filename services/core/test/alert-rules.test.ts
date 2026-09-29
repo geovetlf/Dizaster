@@ -42,6 +42,12 @@ describe("wants", () => {
     expect(wants(p, "NEW_EVENT", "FOLLOWED_EVENT", 1)).toBe(true);
     expect(wants({ ...p, followedPlaces: false }, "NEW_EVENT", "FOLLOWED_PLACE", 5)).toBe(false);
     expect(wants({ ...p, statusChanges: false }, "STATE_CHANGED", "FOLLOWED_EVENT", 5)).toBe(false);
+    expect(wants(p, "NEW_EVENT", "SAVED_ZONE", 3)).toBe(true);
+    expect(wants({ ...p, savedZones: false }, "NEW_EVENT", "SAVED_ZONE", 5)).toBe(false);
+    // "Cerca de mí" viene apagado por defecto: requiere que la persona lo active.
+    expect(wants(p, "NEW_EVENT", "NEAR_ME", 5)).toBe(false);
+    expect(wants({ ...p, nearMe: true }, "NEW_EVENT", "NEAR_ME", 2)).toBe(false);
+    expect(wants({ ...p, nearMe: true }, "NEW_EVENT", "NEAR_ME", 3)).toBe(true);
     expect(wants({ ...p, followedEvents: false }, "RESOLVED", "FOLLOWED_EVENT", 5)).toBe(false);
     expect(wants({ ...p, followedEvents: false }, "RESOLVED", "PREVIOUSLY_ALERTED", 5)).toBe(true);
     expect(wants({ ...p, enabled: false }, "NEW_EVENT", "FOLLOWED_EVENT", 5)).toBe(false);

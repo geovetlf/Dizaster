@@ -1,6 +1,11 @@
 import {
   AlertPreferences,
+  ApproximateLocationRequest,
   CategorySubscriptionInput,
+  MAX_SAVED_ZONES,
+  SavedZoneInput,
+  type SavedZone,
+  type SavedZoneKind,
   NotificationsQuery,
   UpdateAlertPreferences,
   type AlertKind,
@@ -10,6 +15,7 @@ import {
   type NotificationView,
   type NotificationsResponse,
 } from "@dizaster/contracts";
+import { H3_RES, h3, h3Center } from "@dizaster/geo-kit";
 import type { z } from "zod";
 import type { Clock } from "../../platform/clock.js";
 import { withTransaction, type Db, type Queryable } from "../../platform/db.js";
@@ -44,19 +50,24 @@ export { DEFAULT_PREFERENCES, alertText, decideAlerts, groupText, inQuietHours, 
 export const OFFSHORE_COUNTRY_RADIUS_M = 300_000;
 
 const MAX_SUBSCRIPTIONS = 50;
+/** Radio de "cerca de mí" y cuánto vale la última ubicación aproximada (D-16). */
+export const NEAR_ME_RADIUS_M = 10_000;
+export const LAST_LOCATION_TTL_HOURS = 72;
 const FLUSH_BATCH = 1000;
 
 interface Recipient { profileId: string; userId: string; match: AlertMatch; prefs: AlertPreferences }
 
 interface PrefRow {
-  profile_id: string; enabled: boolean; followed_events: boolean; followed_places: boolean; categories: boolean; status_changes: boolean;
+  profile_id: string; enabled: boolean; followed_events: boolean; followed_places: boolean; saved_zones: boolean; near_me: boolean;
+  categories: boolean; status_changes: boolean;
   min_severity: number; max_per_hour: number; quiet_start: number | null; quiet_end: number | null; timezone: string; lang: "es" | "en";
 }
 
 const toPrefs = (r: PrefRow | undefined): AlertPreferences =>
   r
     ? {
-        enabled: r.enabled, followedEvents: r.followed_events, followedPlaces: r.followed_places, categories: r.categories,
+        enabled: r.enabled, followedEvents: r.followed_events, followedPlaces: r.followed_places, savedZones: r.saved_zones,
+        nearMe: r.near_me, categories: r.categories,
         statusChanges: r.status_changes, minSeverity: r.min_severity, maxPerHour: r.max_per_hour,
         quietHours: r.quiet_start === null || r.quiet_end === null ? null : { start: r.quiet_start, end: r.quiet_end },
         timezone: r.timezone, lang: r.lang,
@@ -98,6 +109,8 @@ export class AlertService {
       await tx.query(`DELETE FROM alert.notifications WHERE profile_id = $1`, [e.payload.profileId]);
       await tx.query(`DELETE FROM alert.subscriptions WHERE profile_id = $1`, [e.payload.profileId]);
       await tx.query(`DELETE FROM alert.preferences WHERE profile_id = $1`, [e.payload.profileId]);
+      await tx.query(`DELETE FROM alert.zones WHERE profile_id = $1`, [e.payload.profileId]);
+      await tx.query(`DELETE FROM alert.last_locations WHERE profile_id = $1`, [e.payload.profileId]);
     });
   }
 
@@ -180,8 +193,20 @@ export class AlertService {
           WHERE ($1 = category_code OR $1 LIKE category_code || '.%') AND area_id = ANY($2) AND min_severity <= $3`,
         [snap.categoryCode, areas, snap.severity],
       );
-      const users = await this.social.userIdsForProfiles(tx, subs.rows.map((r) => r.profile_id));
+      // Zonas guardadas y "cerca de mí": se mide desde la ubicación pública del EVENT (ya generalizada según su
+      // sensibilidad), así que una zona nunca revela más que el mapa.
+      const near = await tx.query<{ profile_id: string; match: "SAVED_ZONE" | "NEAR_ME" }>(
+        `SELECT DISTINCT profile_id, 'SAVED_ZONE' AS match FROM alert.zones
+          WHERE ST_DWithin(center, ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography, radius_m)
+         UNION
+         SELECT profile_id, 'NEAR_ME' FROM alert.last_locations
+          WHERE seen_at > now() - make_interval(hours => $3)
+            AND ST_DWithin(center, ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography, $4)`,
+        [snap.point.lng, snap.point.lat, LAST_LOCATION_TTL_HOURS, NEAR_ME_RADIUS_M],
+      );
+      const users = await this.social.userIdsForProfiles(tx, [...subs.rows, ...near.rows].map((r) => r.profile_id));
       for (const r of subs.rows) { const u = users.get(r.profile_id); if (u) add(r.profile_id, u, "CATEGORY"); }
+      for (const r of near.rows) { const u = users.get(r.profile_id); if (u) add(r.profile_id, u, r.match); }
     } else {
       for (const f of await this.social.followersOf(tx, { eventId: snap.id, placeIds: [] })) add(f.profileId, f.userId, "FOLLOWED_EVENT");
       // Quien ya recibió un aviso de este evento merece saber si se confirmó, resultó falso o terminó.
@@ -374,15 +399,77 @@ export class AlertService {
     const p = AlertPreferences.parse({ ...(await this.preferences(q, profileId)), ...patch });
     await q.query(
       `INSERT INTO alert.preferences (profile_id, enabled, followed_events, followed_places, categories, status_changes, min_severity,
-                                      max_per_hour, quiet_start, quiet_end, timezone, lang)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+                                      max_per_hour, quiet_start, quiet_end, timezone, lang, saved_zones, near_me)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
        ON CONFLICT (profile_id) DO UPDATE SET enabled = $2, followed_events = $3, followed_places = $4, categories = $5,
          status_changes = $6, min_severity = $7, max_per_hour = $8, quiet_start = $9, quiet_end = $10, timezone = $11, lang = $12,
-         updated_at = now()`,
+         saved_zones = $13, near_me = $14, updated_at = now()`,
       [profileId, p.enabled, p.followedEvents, p.followedPlaces, p.categories, p.statusChanges, p.minSeverity, p.maxPerHour,
-        p.quietHours?.start ?? null, p.quietHours?.end ?? null, p.timezone, p.lang],
+        p.quietHours?.start ?? null, p.quietHours?.end ?? null, p.timezone, p.lang, p.savedZones, p.nearMe],
     );
+    // Apagar "cerca de mí" borra en el acto la última ubicación guardada.
+    if (!p.nearMe) await q.query(`DELETE FROM alert.last_locations WHERE profile_id = $1`, [profileId]);
     return p;
+  }
+
+  // ───────────── Zonas guardadas y ubicación aproximada (D-16) ─────────────
+
+  async zones(q: Queryable, profileId: string): Promise<SavedZone[]> {
+    const { rows } = await q.query<{ id: string; kind: SavedZoneKind; name: string | null; lat: number; lng: number; radius_m: number }>(
+      `SELECT id, kind, name, ST_Y(center::geometry) AS lat, ST_X(center::geometry) AS lng, radius_m
+         FROM alert.zones WHERE profile_id = $1 ORDER BY created_at, id`,
+      [profileId],
+    );
+    return rows.map((r) => ({ id: r.id, kind: r.kind, name: r.name, center: { lat: r.lat, lng: r.lng }, radiusKm: r.radius_m / 1000 }));
+  }
+
+  /** Crea (sin id) o reemplaza una zona. El punto se reduce al centro de su celda H3 r8 antes de guardarlo. */
+  async saveZone(q: Queryable, profileId: string, raw: unknown, zoneId?: string): Promise<SavedZone> {
+    const z = parse(SavedZoneInput, raw);
+    const c = h3Center(h3({ lat: z.lat, lng: z.lng }, H3_RES.SENSITIVE));
+    const name = z.name ? z.name : null;
+    if (zoneId) {
+      const { rowCount } = await q.query(
+        `UPDATE alert.zones SET kind = $3, name = $4, center = ST_SetSRID(ST_MakePoint($5, $6), 4326)::geography, radius_m = $7, updated_at = now()
+          WHERE id = $1 AND profile_id = $2`,
+        [zoneId, profileId, z.kind, name, c.lng, c.lat, z.radiusKm * 1000],
+      );
+      if (!rowCount) throw new DomainError("NOT_FOUND", "Zona no encontrada", 404);
+      return { id: zoneId, kind: z.kind, name, center: c, radiusKm: z.radiusKm };
+    }
+    const id = newId();
+    const ins = await q.query(
+      `INSERT INTO alert.zones (id, profile_id, kind, name, center, radius_m)
+       SELECT $1, $2, $3, $4, ST_SetSRID(ST_MakePoint($5, $6), 4326)::geography, $7
+        WHERE (SELECT count(*) FROM alert.zones WHERE profile_id = $2) < $8`,
+      [id, profileId, z.kind, name, c.lng, c.lat, z.radiusKm * 1000, MAX_SAVED_ZONES],
+    );
+    if (!ins.rowCount) throw new DomainError("LIMIT_REACHED", `Máximo ${MAX_SAVED_ZONES} zonas`, 409);
+    return { id, kind: z.kind, name, center: c, radiusKm: z.radiusKm };
+  }
+
+  async deleteZone(q: Queryable, profileId: string, zoneId: string): Promise<void> {
+    await q.query(`DELETE FROM alert.zones WHERE id = $1 AND profile_id = $2`, [zoneId, profileId]);
+  }
+
+  /**
+   * La app la envía al abrirse si la persona activó "cerca de mí". Solo se guarda el centro de la celda H3 r7
+   * (~5 km²) y se sobrescribe: no hay historial de dónde estuvo nadie. Sin la preferencia activa no se guarda.
+   */
+  async setApproximateLocation(q: Queryable, profileId: string, raw: unknown): Promise<{ stored: boolean }> {
+    const p = parse(ApproximateLocationRequest, raw);
+    if (!(await this.preferences(q, profileId)).nearMe) return { stored: false };
+    const c = h3Center(h3(p, H3_RES.ZONE));
+    await q.query(
+      `INSERT INTO alert.last_locations (profile_id, center, seen_at) VALUES ($1, ST_SetSRID(ST_MakePoint($2, $3), 4326)::geography, now())
+       ON CONFLICT (profile_id) DO UPDATE SET center = EXCLUDED.center, seen_at = now()`,
+      [profileId, c.lng, c.lat],
+    );
+    return { stored: true };
+  }
+
+  async clearApproximateLocation(q: Queryable, profileId: string): Promise<void> {
+    await q.query(`DELETE FROM alert.last_locations WHERE profile_id = $1`, [profileId]);
   }
 
   async subscriptions(q: Queryable, profileId: string): Promise<CategorySubscription[]> {

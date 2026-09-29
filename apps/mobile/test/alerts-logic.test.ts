@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   badgeText, cycle, deliveryNoteKey, devicePrefsPatch, formatMinutes, permissionView, QUIET_PRESETS, quietLabel, routeForNotificationUrl, sameQuiet,
+  NEAR_ME_MIN_INTERVAL_MS, roundForUpload, shouldSendNearMe, zoneKindInfo, zoneTitle,
 } from "../src/lib/alerts/logic";
 
 const ID = "01a0ebfd-052d-724a-aaa4-93d0dbec0a7f";
@@ -52,5 +53,27 @@ describe("historial", () => {
     expect(badgeText(0)).toBeNull();
     expect(badgeText(7)).toBe("7");
     expect(badgeText(250)).toBe("99+");
+  });
+});
+
+describe("zonas y cerca de mí", () => {
+  it("envía la ubicación aproximada como mucho cada 30 minutos y solo si está activado", () => {
+    const now = 1_000_000_000;
+    expect(shouldSendNearMe(false, null, now)).toBe(false);
+    expect(shouldSendNearMe(true, null, now)).toBe(true);
+    expect(shouldSendNearMe(true, now - NEAR_ME_MIN_INTERVAL_MS + 1, now)).toBe(false);
+    expect(shouldSendNearMe(true, now - NEAR_ME_MIN_INTERVAL_MS, now)).toBe(true);
+  });
+
+  it("redondea a ~1 km antes de enviar", () => {
+    expect(roundForUpload({ lat: -12.16861, lng: -77.02471 })).toEqual({ lat: -12.17, lng: -77.02 });
+  });
+
+  it("nombre visible de una zona", () => {
+    const label = (k: string) => ({ zoneHOME: "Casa", zoneOTHER: "Otra" })[k] ?? k;
+    expect(zoneTitle({ kind: "HOME", name: null }, label)).toBe("Casa");
+    expect(zoneTitle({ kind: "HOME", name: "  " }, label)).toBe("Casa");
+    expect(zoneTitle({ kind: "WORK", name: "Oficina" }, label)).toBe("Oficina");
+    expect(zoneKindInfo("RARO").kind).toBe("OTHER");
   });
 });

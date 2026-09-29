@@ -96,7 +96,9 @@ describe("borrar la cuenta", () => {
     await t.app.inject({ method: "PUT", url: `/v1/follows/profile/${h}`, headers: auth(otra) });
     await t.app.inject({ method: "PUT", url: `/v1/follows/profile/${h2}`, headers: auth(yo) });
     expect((await t.app.inject({ method: "POST", url: "/v1/me/alert-subscriptions", headers: auth(yo), payload: { categoryCode: "natural", areaId: "PE" } })).statusCode).toBe(201);
-    await t.app.inject({ method: "PUT", url: "/v1/me/alert-preferences", headers: auth(yo), payload: { quietHours: null } });
+    await t.app.inject({ method: "PUT", url: "/v1/me/alert-preferences", headers: auth(yo), payload: { quietHours: null, nearMe: true } });
+    expect((await t.app.inject({ method: "POST", url: "/v1/me/zones", headers: auth(yo), payload: { kind: "HOME", ...LIMA } })).statusCode).toBe(201);
+    expect((await t.app.inject({ method: "PUT", url: "/v1/me/approximate-location", headers: auth(yo), payload: LIMA })).json()).toEqual({ stored: true });
 
     const file = makeJpeg();
     const up = await t.app.inject({
@@ -149,7 +151,7 @@ describe("borrar la cuenta", () => {
     expect(await q(`SELECT 1 FROM media.variants WHERE media_id = $1`, [mediaId])).toEqual([]);
     for (const k of keys) expect(await t.c.storage.stat(k)).toBeNull();
 
-    for (const table of ["notifications", "subscriptions", "preferences"]) {
+    for (const table of ["notifications", "subscriptions", "preferences", "zones", "last_locations"]) {
       expect(await q(`SELECT 1 FROM alert.${table} WHERE profile_id = $1`, [yo.profileId])).toEqual([]);
     }
 

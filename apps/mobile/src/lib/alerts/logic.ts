@@ -72,3 +72,29 @@ export function deliveryNoteKey(status: NotificationStatus): "deliveryQuiet" | "
 
 /** Texto del contador de la campana: nunca más de dos cifras. */
 export const badgeText = (n: number) => (n <= 0 ? null : n > 99 ? "99+" : String(n));
+
+/** "Cerca de mí": como mucho un envío cada 30 minutos aunque la app se abra muchas veces. */
+export const NEAR_ME_MIN_INTERVAL_MS = 30 * 60_000;
+
+export function shouldSendNearMe(enabled: boolean, lastSentAt: number | null, now: number): boolean {
+  return enabled && (lastSentAt === null || now - lastSentAt >= NEAR_ME_MIN_INTERVAL_MS);
+}
+
+/** La app redondea antes de enviar (~1 km); el servidor además solo guarda la celda H3 r7. */
+export const roundForUpload = (p: { lat: number; lng: number }) => ({ lat: Math.round(p.lat * 100) / 100, lng: Math.round(p.lng * 100) / 100 });
+
+/** Icono y texto de cada tipo de zona guardada. */
+export const ZONE_KINDS = [
+  { kind: "HOME", icon: "home-outline", label: "zoneHOME" },
+  { kind: "WORK", icon: "briefcase-outline", label: "zoneWORK" },
+  { kind: "FAMILY", icon: "account-heart-outline", label: "zoneFAMILY" },
+  { kind: "SCHOOL", icon: "school-outline", label: "zoneSCHOOL" },
+  { kind: "OTHER", icon: "map-marker-radius-outline", label: "zoneOTHER" },
+] as const;
+
+export type ZoneKindInfo = (typeof ZONE_KINDS)[number];
+export const zoneKindInfo = (kind: string): ZoneKindInfo => ZONE_KINDS.find((k) => k.kind === kind) ?? ZONE_KINDS[4];
+
+/** Nombre visible de una zona: el suyo si lo tiene, si no el de su tipo. */
+export const zoneTitle = (z: { kind: string; name: string | null }, kindLabel: (key: ZoneKindInfo["label"]) => string) =>
+  z.name?.trim() || kindLabel(zoneKindInfo(z.kind).label);

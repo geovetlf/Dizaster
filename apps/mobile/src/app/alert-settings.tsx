@@ -1,9 +1,11 @@
-import type { AlertPreferences, AreaSearchResult, CategoryCatalog, CategorySubscription } from "@dizaster/contracts";
-import { useFocusEffect } from "expo-router";
+import { MAX_SAVED_ZONES, type AlertPreferences, type AreaSearchResult, type CategoryCatalog, type CategorySubscription, type SavedZone } from "@dizaster/contracts";
+import * as Location from "expo-location";
+import { router, useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
 import { Icon } from "../components/icon";
-import { cycle, QUIET_PRESETS, quietLabel, sameQuiet, type PermissionView } from "../lib/alerts/logic";
+import { cycle, QUIET_PRESETS, quietLabel, sameQuiet, zoneKindInfo, zoneTitle, type PermissionView } from "../lib/alerts/logic";
+import { sendNearMe, setNearMeEnabled } from "../lib/alerts/notifications";
 import { api } from "../lib/api";
 import { enablePush, openSystemSettings, pushPermission } from "../lib/device/push";
 import { countryOf } from "../lib/geo/country";
@@ -37,13 +39,14 @@ export default function AlertSettingsScreen() {
   const [permission, setPermission] = useState<PermissionView | null>(null);
   const [prefs, setPrefs] = useState<AlertPreferences | null>(null);
   const [subs, setSubs] = useState<CategorySubscription[]>([]);
+  const [zones, setZones] = useState<SavedZone[]>([]);
   const [error, setError] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
       pushPermission().then(setPermission).catch(() => setPermission("ask"));
-      Promise.all([api.alertPreferences(), api.alertSubscriptions()])
-        .then(([p, s]) => { setPrefs(p); setSubs(s.subscriptions); setError(false); })
+      Promise.all([api.alertPreferences(), api.alertSubscriptions(), api.zones()])
+        .then(([p, s, z]) => { setPrefs(p); setSubs(s.subscriptions); setZones(z.zones); setError(false); })
         .catch(() => setError(true));
     }, []),
   );
@@ -65,6 +68,22 @@ export default function AlertSettingsScreen() {
     } catch {
       setPrefs(before);
     }
+  }
+
+  /** "Cerca de mí" necesita permiso de ubicación mientras se usa la app (nunca en segundo plano). */
+  async function toggleNearMe(on: boolean) {
+    if (on) {
+      const p = await Location.requestForegroundPermissionsAsync().catch(() => null);
+      if (!p?.granted) return;
+    }
+    await update({ nearMe: on });
+    setNearMeEnabled(on);
+    if (on) await sendNearMe(true);
+  }
+
+  async function removeZone(id: string) {
+    setZones(zones.filter((z) => z.id !== id));
+    await api.removeZone(id).catch(() => undefined);
   }
 
   if (!prefs) {
@@ -100,6 +119,28 @@ export default function AlertSettingsScreen() {
             onPress={() => void update({ quietHours: cycle(QUIET_PRESETS, prefs.quietHours, sameQuiet) })}
           />
           <Text style={styles.note}>{t("quietNote")}</Text>
+          <Text style={styles.section}>{t("zonesTitle")}</Text>
+          <SwitchRow label={t("prefSavedZones")} value={prefs.savedZones} onChange={(v) => void update({ savedZones: v })} />
+          {zones.map((z) => {
+            const k = zoneKindInfo(z.kind);
+            return (
+              <View key={z.id} style={styles.row}>
+                <Icon name={k.icon} size={22} color={colors.text} />
+                <Text style={styles.label}>{zoneTitle(z, t)} · {z.radiusKm} km</Text>
+                <Pressable accessibilityRole="button" accessibilityLabel={t("remove")} hitSlop={8} onPress={() => void removeZone(z.id)}>
+                  <Icon name="close" size={20} color={colors.textMuted} />
+                </Pressable>
+              </View>
+            );
+          })}
+          {zones.length < MAX_SAVED_ZONES ? (
+            <Pressable accessibilityRole="button" style={styles.row} onPress={() => router.push("/zone-edit")}>
+              <Icon name="plus" size={22} color={colors.accent} />
+              <Text style={[styles.label, styles.action]}>{t("addZone")}</Text>
+            </Pressable>
+          ) : null}
+          <SwitchRow label={t("prefNearMe")} value={prefs.nearMe} onChange={(v) => void toggleNearMe(v)} />
+          <Text style={styles.note}>{t("nearMeNote")}</Text>
           <Subscriptions subs={subs} onChange={setSubs} />
         </>
       ) : null}
