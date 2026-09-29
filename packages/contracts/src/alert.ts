@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { Lang } from "./common.js";
+import { CategoryCode, Lang } from "./common.js";
 
 /**
  * Por qué le llega una alerta a esta persona. SAVED_ZONE: una de sus zonas guardadas. NEAR_ME: cerca de la
@@ -116,6 +116,9 @@ export const SavedZoneInput = z.object({
   lat,
   lng,
   radiusKm: z.number().int().min(1).max(50).default(5),
+  /** Preferencias de la zona (ADR 0154): gravedad mínima y categorías (vacío = todas; una raíz cubre sus hijas). */
+  minSeverity: z.number().int().min(1).max(5).default(1),
+  categories: z.array(CategoryCode).max(20).default([]),
 });
 export type SavedZoneInput = z.infer<typeof SavedZoneInput>;
 
@@ -126,6 +129,8 @@ export interface SavedZone {
   /** Centro guardado: el de una celda H3 r8 (~0,7 km²), nunca el punto exacto que se eligió. */
   center: { lat: number; lng: number };
   radiusKm: number;
+  minSeverity: number;
+  categories: string[];
 }
 
 /** Ubicación aproximada al abrir la app. El servidor solo guarda la celda H3 r7 (~5 km²) y la olvida a las 72 h. */

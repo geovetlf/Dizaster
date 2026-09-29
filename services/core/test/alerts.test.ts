@@ -348,4 +348,28 @@ describe("Alert Engine: zonas guardadas y cerca de mí (D-16)", () => {
     // El texto no menciona la zona ni su nombre privado.
     expect((await got(enZona))[0]!.title).not.toMatch(/FAMILY|familia/i);
   });
+
+  it("cada zona filtra por gravedad mínima y categorías (ADR 0154)", async () => {
+    const SURCO = { lat: -12.145, lng: -76.99 };
+    const todas = await createUser(t, "zona_todas");
+    const soloFuego = await createUser(t, "zona_fuego");
+    const soloAccidentes = await createUser(t, "zona_accidentes");
+    const soloGraves = await createUser(t, "zona_graves");
+    const base = { kind: "HOME", lat: SURCO.lat, lng: SURCO.lng, radiusKm: 5 };
+    expect((await zone(soloFuego, { ...base, categories: ["no.existe"] })).statusCode).toBe(400);
+    expect((await zone(soloFuego, { ...base, minSeverity: 9 })).statusCode).toBe(400);
+    expect((await zone(todas, base)).json()).toMatchObject({ minSeverity: 1, categories: [] });
+    expect((await zone(soloFuego, { ...base, categories: ["fire", "fire"] })).json()).toMatchObject({ categories: ["fire"] });
+    await zone(soloAccidentes, { ...base, categories: ["accident"] });
+    await zone(soloGraves, { ...base, minSeverity: 5 });
+
+    const { eventId } = await corroborated("fire.structure", SURCO, "surco");
+    const severity = (await t.c.db.query<{ severity: number }>(`SELECT severity FROM event.events WHERE id = $1`, [eventId])).rows[0]!.severity;
+    expect(severity).toBeLessThan(5);
+    const got = async (u: TestUser) => (await inbox(u)).notifications.filter((n) => n.eventId === eventId).map((n) => n.match);
+    expect(await got(todas)).toEqual(["SAVED_ZONE"]);
+    expect(await got(soloFuego)).toEqual(["SAVED_ZONE"]);
+    expect(await got(soloAccidentes)).toEqual([]);
+    expect(await got(soloGraves)).toEqual([]);
+  });
 });

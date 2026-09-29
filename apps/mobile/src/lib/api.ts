@@ -172,8 +172,10 @@ export const api = {
     request<CategorySubscription>("/v1/me/alert-subscriptions", { method: "POST", body: JSON.stringify(body) }),
   removeAlertSubscription: (id: string) => request<void>(`/v1/me/alert-subscriptions/${id}`, { method: "DELETE" }),
   zones: () => request<{ zones: SavedZone[] }>("/v1/me/zones"),
-  addZone: (body: Omit<SavedZoneInput, "radiusKm"> & { radiusKm?: number }) =>
+  addZone: (body: Omit<SavedZoneInput, "radiusKm" | "minSeverity" | "categories"> & { radiusKm?: number; minSeverity?: number; categories?: string[] }) =>
     request<SavedZone>("/v1/me/zones", { method: "POST", body: JSON.stringify(body) }),
+  updateZone: (id: string, body: Omit<SavedZoneInput, "radiusKm" | "minSeverity" | "categories"> & { radiusKm?: number; minSeverity?: number; categories?: string[] }) =>
+    request<SavedZone>(`/v1/me/zones/${id}`, { method: "PUT", body: JSON.stringify(body) }),
   removeZone: (id: string) => request<void>(`/v1/me/zones/${id}`, { method: "DELETE" }),
   setApproximateLocation: (p: { lat: number; lng: number }) =>
     request<{ stored: boolean }>("/v1/me/approximate-location", { method: "PUT", body: JSON.stringify(p) }),

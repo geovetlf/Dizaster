@@ -101,3 +101,17 @@ export const zoneKindInfo = (kind: string): ZoneKindInfo => ZONE_KINDS.find((k) 
 /** Nombre visible de una zona: el suyo si lo tiene, si no el de su tipo. */
 export const zoneTitle = (z: { kind: string; name: string | null }, kindLabel: (key: ZoneKindInfo["label"]) => string) =>
   z.name?.trim() || kindLabel(zoneKindInfo(z.kind).label);
+
+/** Añade o quita una categoría de las de una zona (ADR 0154); lista vacía = todas. */
+export function toggleZoneCategory(list: readonly string[], code: string): string[] {
+  return list.includes(code) ? list.filter((c) => c !== code) : [...list, code].sort();
+}
+
+/** Resumen de las preferencias de una zona ("≥ 3/5 · Incendios, Accidentes"); null si avisa de todo. */
+export function zonePrefsSummary(z: { minSeverity: number; categories: readonly string[] }, categoryName: (code: string) => string): string | null {
+  const parts = [
+    ...(z.minSeverity > 1 ? [`≥ ${z.minSeverity}/5`] : []),
+    ...(z.categories.length ? [z.categories.map(categoryName).join(", ")] : []),
+  ];
+  return parts.length ? parts.join(" · ") : null;
+}

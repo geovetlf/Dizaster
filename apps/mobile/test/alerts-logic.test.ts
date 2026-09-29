@@ -82,3 +82,16 @@ describe("zonas y cerca de mí", () => {
     expect(zoneKindInfo("RARO").kind).toBe("OTHER");
   });
 });
+
+describe("preferencias por zona (ADR 0154)", () => {
+  it("alterna categorías y resume solo lo que filtra", async () => {
+    const { toggleZoneCategory, zonePrefsSummary } = await import("../src/lib/alerts/logic");
+    expect(toggleZoneCategory([], "fire")).toEqual(["fire"]);
+    expect(toggleZoneCategory(["fire", "accident"].sort(), "fire")).toEqual(["accident"]);
+    expect(toggleZoneCategory(["fire"], "accident")).toEqual(["accident", "fire"]);
+    const name = (c: string) => ({ fire: "Incendios", accident: "Accidentes" })[c] ?? c;
+    expect(zonePrefsSummary({ minSeverity: 1, categories: [] }, name)).toBeNull();
+    expect(zonePrefsSummary({ minSeverity: 3, categories: ["fire"] }, name)).toBe("≥ 3/5 · Incendios");
+    expect(zonePrefsSummary({ minSeverity: 1, categories: ["accident", "fire"] }, name)).toBe("Accidentes, Incendios");
+  });
+});

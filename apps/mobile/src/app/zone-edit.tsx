@@ -1,10 +1,11 @@
 import { ZONE_RADII_KM, type AreaSearchResult, type SavedZoneKind } from "@dizaster/contracts";
-import { router } from "expo-router";
-import { useEffect, useState } from "react";
+import { router, Stack, useLocalSearchParams } from "expo-router";
+import { useEffect, useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { Icon } from "../components/icon";
-import { ZONE_KINDS } from "../lib/alerts/logic";
+import { toggleZoneCategory, ZONE_KINDS } from "../lib/alerts/logic";
 import { api } from "../lib/api";
+import { categoryLabel, pickerCategories, useCategoryCatalogVersion } from "../lib/category-store";
 import { t } from "../lib/i18n";
 import { areaRow, formatKm } from "../lib/ui/format";
 import { useCoarseLocation } from "../lib/ui/use-coarse-location";
@@ -13,8 +14,16 @@ import { colors, radius, space } from "../theme";
 /**
  * Nueva zona guardada (casa, trabajo, familia…): tipo, nombre privado opcional, radio y punto. El punto sale de
  * la ubicación actual o de un lugar buscado; el servidor lo reduce a una celda de ~0,7 km² antes de guardarlo.
+ * Cada zona tiene su gravedad mínima y sus categorías (ADR 0154). Con `?id=` edita una existente.
  */
+const SEVERITIES = [1, 2, 3, 4, 5] as const;
+
 export default function ZoneEditScreen() {
+  const { id } = useLocalSearchParams<{ id?: string }>();
+  const [minSeverity, setMinSeverity] = useState(1);
+  const [categories, setCategories] = useState<string[]>([]);
+  const catalogVersion = useCategoryCatalogVersion();
+  const roots = useMemo(() => pickerCategories().filter((c) => !c.parent), [catalogVersion]);
   const [kind, setKind] = useState<SavedZoneKind>("HOME");
   const [name, setName] = useState("");
   const [radiusKm, setRadiusKm] = useState<number>(5);
@@ -23,6 +32,16 @@ export default function ZoneEditScreen() {
   const [areas, setAreas] = useState<AreaSearchResult[]>([]);
   const [error, setError] = useState<string | null>(null);
   const location = useCoarseLocation();
+
+  useEffect(() => {
+    if (!id) return;
+    api.zones().then((r) => {
+      const z = r.zones.find((x) => x.id === id);
+      if (!z) return;
+      setKind(z.kind); setName(z.name ?? ""); setRadiusKm(z.radiusKm); setMinSeverity(z.minSeverity); setCategories(z.categories);
+      setPoint({ ...z.center, label: t("zoneSavedPoint") });
+    }).catch((e: Error) => setError(e.message));
+  }, [id]);
 
   useEffect(() => {
     const text = q.trim();
@@ -41,13 +60,14 @@ export default function ZoneEditScreen() {
 
   // Si el permiso se concede tras pedirlo, el punto llega después: se usa en cuanto está.
   useEffect(() => {
-    if (point === null && location.granted && location.point) setPoint({ ...location.point, label: t("zoneHere") });
+    if (point === null && !id && location.granted && location.point) setPoint({ ...location.point, label: t("zoneHere") });
   }, [location.granted, location.point, point]);
 
   async function save() {
     if (!point) return;
     try {
-      await api.addZone({ kind, name: name.trim() || null, lat: point.lat, lng: point.lng, radiusKm });
+      const body = { kind, name: name.trim() || null, lat: point.lat, lng: point.lng, radiusKm, minSeverity, categories };
+      await (id ? api.updateZone(id, body) : api.addZone(body));
       router.back();
     } catch (e) {
       setError((e as Error).message);
@@ -56,6 +76,7 @@ export default function ZoneEditScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      {id ? <Stack.Screen options={{ title: t("editZone") }} /> : null}
       <View style={styles.chips}>
         {ZONE_KINDS.map((k) => (
           <Pressable key={k.kind} accessibilityRole="button" accessibilityState={{ selected: kind === k.kind }} style={[styles.chip, kind === k.kind && styles.chipOn]} onPress={() => setKind(k.kind)}>
@@ -71,6 +92,28 @@ export default function ZoneEditScreen() {
         {ZONE_RADII_KM.map((r) => (
           <Pressable key={r} accessibilityRole="button" accessibilityState={{ selected: radiusKm === r }} style={[styles.chip, radiusKm === r && styles.chipOn]} onPress={() => setRadiusKm(r)}>
             <Text style={styles.chipText}>{formatKm(r)}</Text>
+          </Pressable>
+        ))}
+      </View>
+
+      <Text style={styles.section}>{t("zoneMinSeverity")}</Text>
+      <View style={styles.chips}>
+        {SEVERITIES.map((s) => (
+          <Pressable key={s} accessibilityRole="button" accessibilityState={{ selected: minSeverity === s }} style={[styles.chip, minSeverity === s && styles.chipOn]} onPress={() => setMinSeverity(s)}>
+            <Text style={styles.chipText}>{s === 1 ? t("zoneAllSeverities") : `≥ ${s}/5`}</Text>
+          </Pressable>
+        ))}
+      </View>
+
+      <Text style={styles.section}>{t("zoneCategories")}</Text>
+      <View style={styles.chips}>
+        <Pressable accessibilityRole="button" accessibilityState={{ selected: categories.length === 0 }} style={[styles.chip, categories.length === 0 && styles.chipOn]} onPress={() => setCategories([])}>
+          <Text style={styles.chipText}>{t("zoneAllCategories")}</Text>
+        </Pressable>
+        {roots.map((c) => (
+          <Pressable key={c.code} accessibilityRole="button" accessibilityState={{ selected: categories.includes(c.code) }}
+            style={[styles.chip, categories.includes(c.code) && styles.chipOn]} onPress={() => setCategories((l) => toggleZoneCategory(l, c.code))}>
+            <Text style={styles.chipText}>{categoryLabel(c.code)}</Text>
           </Pressable>
         ))}
       </View>

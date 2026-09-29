@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
 import { Icon } from "../components/icon";
 import { ZoneMapButton } from "../components/zone-map-button";
-import { cycle, QUIET_PRESETS, quietLabel, sameQuiet, zoneKindInfo, zoneTitle, type PermissionView } from "../lib/alerts/logic";
+import { cycle, zonePrefsSummary, QUIET_PRESETS, quietLabel, sameQuiet, zoneKindInfo, zoneTitle, type PermissionView } from "../lib/alerts/logic";
 import { sendNearMe, setNearMeEnabled } from "../lib/alerts/notifications";
 import { api } from "../lib/api";
 import { enablePush, openSystemSettings, pushPermission } from "../lib/device/push";
@@ -135,7 +135,10 @@ export default function AlertSettingsScreen() {
             return (
               <View key={z.id} style={styles.row}>
                 <Icon name={k.icon} size={22} color={colors.text} />
-                <Text style={styles.label}>{zoneTitle(z, t)} · {formatKm(z.radiusKm)}</Text>
+                <Pressable accessibilityRole="button" style={styles.label} onPress={() => router.push({ pathname: "/zone-edit", params: { id: z.id } })}>
+                  <Text style={styles.labelText}>{zoneTitle(z, t)} · {formatKm(z.radiusKm)}</Text>
+                  {zonePrefsSummary(z, categoryName) ? <Text style={styles.sub}>{zonePrefsSummary(z, categoryName)}</Text> : null}
+                </Pressable>
                 <ZoneMapButton zone={z} styleUrl={offlineStyle} />
                 <Pressable accessibilityRole="button" accessibilityLabel={t("remove")} hitSlop={8} onPress={() => void removeZone(z.id)}>
                   <Icon name="close" size={20} color={colors.textMuted} />
@@ -273,6 +276,7 @@ const styles = StyleSheet.create({
   row: { flexDirection: "row", alignItems: "center", gap: space.md, backgroundColor: colors.surface, borderRadius: radius.md, padding: space.lg, marginBottom: space.sm },
   label: { flex: 1, color: colors.text, fontSize: 15 },
   labelText: { color: colors.text, fontSize: 15 },
+  sub: { color: colors.textMuted, fontSize: 13, marginTop: 2 },
   value: { color: colors.textMuted },
   action: { color: colors.accent, fontWeight: "600" },
   note: { color: colors.textMuted, fontSize: 13, marginBottom: space.md },

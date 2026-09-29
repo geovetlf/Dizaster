@@ -309,14 +309,17 @@ export class AlertService {
       const near = await tx.query<{ profile_id: string; match: "SAVED_ZONE" | "NEAR_ME" }>(
         `WITH area AS (SELECT CASE WHEN $5::text IS NULL THEN NULL ELSE ST_SetSRID(ST_GeomFromGeoJSON($5), 4326)::geography END AS g)
          SELECT DISTINCT profile_id, 'SAVED_ZONE' AS match FROM alert.zones, area
-          WHERE ST_DWithin(center, ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography, radius_m)
-             OR (area.g IS NOT NULL AND ST_DWithin(center, area.g, radius_m))
+          WHERE (ST_DWithin(center, ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography, radius_m)
+                 OR (area.g IS NOT NULL AND ST_DWithin(center, area.g, radius_m)))
+            -- Preferencias de la zona (ADR 0154): gravedad mínima y categorías (vacío = todas).
+            AND min_severity <= $6
+            AND (cardinality(categories) = 0 OR EXISTS (SELECT 1 FROM unnest(categories) c WHERE $7 = c OR $7 LIKE c || '.%'))
          UNION
          SELECT profile_id, 'NEAR_ME' FROM alert.last_locations, area
           WHERE seen_at > now() - make_interval(hours => $3)
             AND (ST_DWithin(center, ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography, $4)
                  OR (area.g IS NOT NULL AND ST_DWithin(center, area.g, 0)))`,
-        [snap.point.lng, snap.point.lat, LAST_LOCATION_TTL_HOURS, NEAR_ME_RADIUS_M, areaJson],
+        [snap.point.lng, snap.point.lat, LAST_LOCATION_TTL_HOURS, NEAR_ME_RADIUS_M, areaJson, snap.severity, snap.categoryCode],
       );
       const users = await this.social.userIdsForProfiles(tx, [...subs.rows, ...near.rows].map((r) => r.profile_id));
       for (const r of subs.rows) { const u = users.get(r.profile_id); if (u) add(r.profile_id, u, "CATEGORY"); }
@@ -532,12 +535,14 @@ export class AlertService {
   // ───────────── Zonas guardadas y ubicación aproximada (D-16) ─────────────
 
   async zones(q: Queryable, profileId: string): Promise<SavedZone[]> {
-    const { rows } = await q.query<{ id: string; kind: SavedZoneKind; name: string | null; lat: number; lng: number; radius_m: number }>(
-      `SELECT id, kind, name, ST_Y(center::geometry) AS lat, ST_X(center::geometry) AS lng, radius_m
+    const { rows } = await q.query<{ id: string; kind: SavedZoneKind; name: string | null; lat: number; lng: number; radius_m: number; min_severity: number; categories: string[] }>(
+      `SELECT id, kind, name, ST_Y(center::geometry) AS lat, ST_X(center::geometry) AS lng, radius_m, min_severity, categories
          FROM alert.zones WHERE profile_id = $1 ORDER BY created_at, id`,
       [profileId],
     );
-    return rows.map((r) => ({ id: r.id, kind: r.kind, name: r.name, center: { lat: r.lat, lng: r.lng }, radiusKm: r.radius_m / 1000 }));
+    return rows.map((r) => ({
+      id: r.id, kind: r.kind, name: r.name, center: { lat: r.lat, lng: r.lng }, radiusKm: r.radius_m / 1000, minSeverity: r.min_severity, categories: r.categories,
+    }));
   }
 
   /** Crea (sin id) o reemplaza una zona. El punto se reduce al centro de su celda H3 r8 antes de guardarlo. */
@@ -545,24 +550,29 @@ export class AlertService {
     const z = parse(SavedZoneInput, raw);
     const c = h3Center(h3({ lat: z.lat, lng: z.lng }, H3_RES.SENSITIVE));
     const name = z.name ? z.name : null;
+    const unknown = z.categories.find((code) => !this.ref.category(code));
+    if (unknown) throw new DomainError("VALIDATION", `Categoría desconocida: ${unknown}`, 400);
+    const categories = [...new Set(z.categories)].sort();
+    const prefs = { minSeverity: z.minSeverity, categories };
     if (zoneId) {
       const { rowCount } = await q.query(
-        `UPDATE alert.zones SET kind = $3, name = $4, center = ST_SetSRID(ST_MakePoint($5, $6), 4326)::geography, radius_m = $7, updated_at = now()
+        `UPDATE alert.zones SET kind = $3, name = $4, center = ST_SetSRID(ST_MakePoint($5, $6), 4326)::geography, radius_m = $7,
+                min_severity = $8, categories = $9, updated_at = now()
           WHERE id = $1 AND profile_id = $2`,
-        [zoneId, profileId, z.kind, name, c.lng, c.lat, z.radiusKm * 1000],
+        [zoneId, profileId, z.kind, name, c.lng, c.lat, z.radiusKm * 1000, z.minSeverity, categories],
       );
       if (!rowCount) throw new DomainError("NOT_FOUND", "Zona no encontrada", 404);
-      return { id: zoneId, kind: z.kind, name, center: c, radiusKm: z.radiusKm };
+      return { id: zoneId, kind: z.kind, name, center: c, radiusKm: z.radiusKm, ...prefs };
     }
     const id = newId();
     const ins = await q.query(
-      `INSERT INTO alert.zones (id, profile_id, kind, name, center, radius_m)
-       SELECT $1, $2, $3, $4, ST_SetSRID(ST_MakePoint($5, $6), 4326)::geography, $7
+      `INSERT INTO alert.zones (id, profile_id, kind, name, center, radius_m, min_severity, categories)
+       SELECT $1, $2, $3, $4, ST_SetSRID(ST_MakePoint($5, $6), 4326)::geography, $7, $9, $10
         WHERE (SELECT count(*) FROM alert.zones WHERE profile_id = $2) < $8`,
-      [id, profileId, z.kind, name, c.lng, c.lat, z.radiusKm * 1000, MAX_SAVED_ZONES],
+      [id, profileId, z.kind, name, c.lng, c.lat, z.radiusKm * 1000, MAX_SAVED_ZONES, z.minSeverity, categories],
     );
     if (!ins.rowCount) throw new DomainError("LIMIT_REACHED", `Máximo ${MAX_SAVED_ZONES} zonas`, 409);
-    return { id, kind: z.kind, name, center: c, radiusKm: z.radiusKm };
+    return { id, kind: z.kind, name, center: c, radiusKm: z.radiusKm, ...prefs };
   }
 
   async deleteZone(q: Queryable, profileId: string, zoneId: string): Promise<void> {
@@ -682,7 +692,7 @@ export class AlertService {
     const preferences = await q.query(`SELECT * FROM alert.preferences WHERE profile_id = $1`, [profileId]);
     const subscriptions = await q.query(`SELECT id, category_code, area_id, min_severity, created_at FROM alert.subscriptions WHERE profile_id = $1`, [profileId]);
     const zones = await q.query(
-      `SELECT id, kind, name, ST_Y(center::geometry) AS lat, ST_X(center::geometry) AS lng, radius_m, created_at FROM alert.zones WHERE profile_id = $1`, [profileId],
+      `SELECT id, kind, name, ST_Y(center::geometry) AS lat, ST_X(center::geometry) AS lng, radius_m, min_severity, categories, created_at FROM alert.zones WHERE profile_id = $1`, [profileId],
     );
     const lastLocation = await q.query(
       `SELECT ST_Y(center::geometry) AS lat, ST_X(center::geometry) AS lng, seen_at FROM alert.last_locations WHERE profile_id = $1`, [profileId],
