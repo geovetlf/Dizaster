@@ -17,7 +17,8 @@
     "cost:report": "node dist/cost-report-cli.js",
     "quality:report": "node dist/quality-report-cli.js",
     "grant-role": "node dist/grant-role-cli.js",
-    "source-status": "node dist/source-status-cli.js"
+    "source-status": "node dist/source-status-cli.js",
+    "reprocess-source": "node dist/reprocess-source-cli.js"
   },
   "dependencies": {
     "@dizaster/contracts": "workspace:*",

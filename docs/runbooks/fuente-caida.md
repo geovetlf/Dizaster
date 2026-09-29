@@ -30,3 +30,16 @@ SELECT s.key, r.status, r.http_status, r.started_at, r.error
 ## Cambiar qué tipos de la fuente se aceptan
 Es dato: `config.categoryMap` o `eventMap` en `data/source-registry/sources.json` (ADR 0122). El servicio valida el
 registro al arrancar y se niega a arrancar con un mapeo inválido.
+
+## Datos mal interpretados ya ingeridos
+
+Tras corregir el adapter o el mapa de categorías de la fuente (`data/source-registry/sources.json`), re-procesar el
+crudo guardado en lugar de esperar a que la fuente vuelva a publicar (ADR 0133):
+
+```sh
+pnpm reprocess-source <clave> [desde AAAA-MM-DD] [hasta AAAA-MM-DD]
+```
+
+Solo cambia lo que cambió; queda como corrida `REPROCESS` en `ingestion.runs`. El crudo existe solo dentro de la
+retención (`SOURCE_RAW_RETENTION_DAYS`).
+

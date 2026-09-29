@@ -51,7 +51,9 @@ export const copernicusEmsAdapter: FeedAdapter = {
       const where = location(it);
       if (!code || !category || !where) continue;
       const published = parseDate(it["pubDate"]);
-      const occurred = parseDate(it["eventTime"]) ?? parseDate(it["eventDate"]) ?? published ?? new Date();
+      // Sin ninguna fecha se descarta: "ahora" haría que el ítem cambie en cada lectura (ADR 0133).
+      const occurred = parseDate(it["eventTime"]) ?? parseDate(it["eventDate"]) ?? published;
+      if (!occurred) continue;
       items.push({
         externalId: code,
         categoryCode: category,

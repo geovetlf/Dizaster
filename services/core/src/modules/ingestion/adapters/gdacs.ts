@@ -39,7 +39,9 @@ export const gdacsAdapter: FeedAdapter = {
       const point = it["Point"] as { lat?: number; long?: number } | undefined;
       if (!category || eventId === undefined || typeof point?.lat !== "number" || typeof point?.long !== "number") continue;
       const alert = String(it["alertlevel"] ?? "").toLowerCase();
-      const from = parseDate(it["fromdate"]) ?? parseDate(it["pubDate"]) ?? new Date();
+      // Sin ninguna fecha no se puede ubicar en el tiempo; inventar "ahora" cambiaría el ítem en cada lectura (ADR 0133).
+      const from = parseDate(it["fromdate"]) ?? parseDate(it["pubDate"]);
+      if (!from) continue;
       const published = parseDate(it["pubDate"]) ?? from;
       items.push({
         externalId: `${type}-${eventId}`,

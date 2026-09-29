@@ -1,5 +1,5 @@
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
-import { gzipSync } from "node:zlib";
+import { gunzipSync, gzipSync } from "node:zlib";
 import { publish } from "../../platform/outbox.js";
 import type { Clock } from "../../platform/clock.js";
 import type { Db } from "../../platform/db.js";
@@ -262,6 +262,60 @@ export class IngestionScheduler {
       const error = redactSecrets(String(err instanceof Error ? err.message : err), this.secrets).slice(0, 2000);
       await this.db.query(`UPDATE ingestion.runs SET finished_at = now(), status = 'FAILED', error = $2 WHERE id = $1`, [runId, error]);
       return { ok: false, code: "UNPARSEABLE" };
+    }
+  }
+
+  /**
+   * Re-procesa el crudo guardado de una fuente (Blueprint §7.3, ADR 0133), p. ej. tras corregir su adapter o su mapa de
+   * categorías. Lee los crudos del rango en orden de llegada y se queda con la última versión de cada ítem, así nunca
+   * se reescribe un ítem con un documento más viejo que el último visto; después lo ingiere una vez (carril NORMAL).
+   * Lo que no cambió es un duplicado sin efecto. No vuelve a aplicar retiros. Queda como corrida `REPROCESS`.
+   */
+  async reprocess(key: string, range: { from?: Date; to?: Date } = {}): Promise<RunSummary & { documents: number }> {
+    if (!this.raw) throw new Error("El crudo de las fuentes está desactivado (SOURCE_RAW_RETENTION_DAYS=0)");
+    const s = (await this.db.query<SourceRow & { status: string }>(
+      `SELECT id, key, adapter, config, status FROM ingestion.sources WHERE key = $1`, [key])).rows[0];
+    if (!s) throw new Error(`Fuente desconocida: ${key}`);
+    if (s.status !== "ACTIVE") throw new Error(`La fuente ${key} no está activa`);
+    const adapter = FEED_ADAPTERS.get(s.adapter);
+    if (!adapter) throw new Error(`La fuente ${key} no tiene adapter`);
+    const refs = (await this.db.query<{ raw_ref: string }>(
+      `SELECT raw_ref FROM ingestion.runs
+        WHERE source_id = $1 AND raw_ref IS NOT NULL AND started_at >= coalesce($2, '-infinity'::timestamptz) AND started_at <= coalesce($3, 'infinity'::timestamptz)
+        GROUP BY raw_ref ORDER BY max(started_at)`,
+      [s.id, range.from ?? null, range.to ?? null],
+    )).rows.map((r) => r.raw_ref);
+
+    const now = this.clock.now();
+    const runId = newId();
+    await this.db.query(`INSERT INTO ingestion.runs (id, source_id, lane, started_at, status, trigger) VALUES ($1, $2, 'NORMAL', $3, 'RUNNING', 'REPROCESS')`, [runId, s.id, now]);
+    const summary: RunSummary & { documents: number } = { sourceKey: s.key, lane: "NORMAL", status: "OK", itemsSeen: 0, itemsNew: 0, itemsUrgent: 0, documents: 0 };
+    try {
+      const latest = new Map<string, { item: ReturnType<typeof adapter.parse>[number]; rawRef: string }>();
+      for (const ref of refs) {
+        let body: string;
+        try {
+          body = gunzipSync(await this.raw.storage.get(ref)).toString("utf8");
+        } catch {
+          continue; // borrado por la retención entre la consulta y la lectura
+        }
+        summary.documents++;
+        for (const item of adapter.parse(body, s.config)) latest.set(item.externalId, { item, rawRef: ref });
+      }
+      summary.itemsSeen = latest.size;
+      for (const { item, rawRef } of latest.values()) {
+        const r = await this.ingestion.ingest(s.key, item, "NORMAL", rawRef);
+        if (!r.duplicate) summary.itemsNew++;
+      }
+      await this.db.query(
+        `UPDATE ingestion.runs SET finished_at = now(), items_seen = $2, items_new = $3, items_urgent = 0, status = 'OK' WHERE id = $1`,
+        [runId, summary.itemsSeen, summary.itemsNew],
+      );
+      return summary;
+    } catch (err) {
+      const error = redactSecrets(String(err instanceof Error ? err.message : err), this.secrets).slice(0, 2000);
+      await this.db.query(`UPDATE ingestion.runs SET finished_at = now(), status = 'FAILED', error = $2 WHERE id = $1`, [runId, error]);
+      throw err;
     }
   }
 
