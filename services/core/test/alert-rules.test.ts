@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { SUPPORTED_LANGS } from "@dizaster/contracts";
 import { describe, expect, it } from "vitest";
 import { DEFAULT_PREFERENCES, alertText, decideAlerts, groupText, inQuietHours, wants } from "../src/modules/alert/index.js";
 
@@ -77,5 +79,17 @@ describe("textos", () => {
     expect(alertText("es", { ...base, place: null, kind: "RESOLVED" })).toEqual({ title: "Terminado: Inundación", body: "Confirmado oficialmente" });
     expect(groupText("es", ["a", "b", "c", "d", "e"])).toEqual({ title: "5 alertas nuevas", body: "a · b · c y 2 más" });
     expect(groupText("en", ["a", "b"])).toEqual({ title: "2 new alerts", body: "a · b" });
+    expect(alertText("pt", { ...base, category: "Inundação", kind: "NEW_EVENT" })).toEqual({ title: "Inundação em Miraflores, Lima", body: "Confirmado oficialmente · gravidade 4/5" });
+    expect(alertText("fr", { ...base, category: "Inondation", kind: "SEVERITY_UP" })).toEqual({ title: "Gravité en hausse : Inondation", body: "Miraflores, Lima · gravité 4/5" });
+    expect(groupText("fr", ["a", "b", "c", "d"])).toEqual({ title: "4 nouvelles alertes", body: "a · b · c et 1 de plus" });
+  });
+
+  it("cada categoría del catálogo tiene nombre en todos los idiomas soportados", () => {
+    const catalog = JSON.parse(readFileSync(new URL("../../../data/categories/categories.json", import.meta.url), "utf8")) as { categories: { code: string; names: Record<string, string> }[] };
+    const emergency = JSON.parse(readFileSync(new URL("../../../data/emergency-numbers/emergency-numbers.json", import.meta.url), "utf8")) as { numbers: { label: Record<string, string> }[] };
+    for (const l of SUPPORTED_LANGS) {
+      expect(catalog.categories.filter((c) => !c.names[l]?.trim()).map((c) => c.code), l).toEqual([]);
+      expect(emergency.numbers.filter((n) => !n.label[l]?.trim()).length, l).toBe(0);
+    }
   });
 });

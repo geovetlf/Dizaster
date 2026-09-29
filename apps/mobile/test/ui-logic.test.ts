@@ -32,6 +32,9 @@ describe("formato de publicaciones", () => {
     expect(timeAgo("2026-09-29T11:48:00Z", "es", now)).toBe("Hace 12 min");
     expect(timeAgo("2026-09-29T09:00:00Z", "en", now)).toBe("3 h ago");
     expect(timeAgo("2026-09-29T11:59:30Z", "es", now)).toBe("Ahora");
+    expect(timeAgo("2026-09-29T11:48:00Z", "pt", now)).toBe("Há 12 min");
+    expect(timeAgo("2026-09-27T11:00:00Z", "fr", now)).toBe("Il y a 2 j");
+    expect(distanceLabel("<2km", "fr")).toBe("à moins de 2 km");
   });
 
   it("distancia por tramos, nunca exacta", () => {

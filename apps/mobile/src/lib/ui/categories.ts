@@ -1,4 +1,4 @@
-import type { CategoryCatalog } from "@dizaster/contracts";
+import { SUPPORTED_LANGS, type CategoryCatalog, type Lang } from "@dizaster/contracts";
 
 /** Nombre de icono de MaterialCommunityIcons (@expo/vector-icons, igual en Android e iOS). */
 export type IconName =
@@ -8,7 +8,7 @@ export type IconName =
 export interface CategoryChip {
   /** null = todas las categorías. */
   code: string | null;
-  label: { es: string; en: string };
+  label: Record<Lang, string>;
   icon: IconName;
   color: string;
 }
@@ -18,18 +18,18 @@ export interface CategoryChip {
  * los códigos que no existan se ocultan. "Más" agrupa el resto.
  */
 const CHIPS: CategoryChip[] = [
-  { code: null, label: { es: "Todos", en: "All" }, icon: "earth", color: "#FFFFFF" },
-  { code: "natural", label: { es: "Desastres", en: "Disasters" }, icon: "volcano", color: "#E5262E" },
-  { code: "health", label: { es: "Salud", en: "Health" }, icon: "medical-bag", color: "#22C55E" },
-  { code: "crime", label: { es: "Delincuencia", en: "Crime" }, icon: "shield-alert", color: "#3B82F6" },
-  { code: "accident", label: { es: "Accidentes", en: "Accidents" }, icon: "car", color: "#F97316" },
-  { code: "fire", label: { es: "Incendios", en: "Fires" }, icon: "fire", color: "#EF4444" },
-  { code: "infra", label: { es: "Infraestructura", en: "Infrastructure" }, icon: "bank", color: "#CBD5E1" },
-  { code: "prevention", label: { es: "Prevención", en: "Prevention" }, icon: "alert", color: "#FACC15" },
-  { code: "help", label: { es: "Ayuda", en: "Help" }, icon: "account-group", color: "#A855F7" },
+  { code: null, label: { es: "Todos", en: "All", pt: "Todos", fr: "Tous" }, icon: "earth", color: "#FFFFFF" },
+  { code: "natural", label: { es: "Desastres", en: "Disasters", pt: "Desastres", fr: "Catastrophes" }, icon: "volcano", color: "#E5262E" },
+  { code: "health", label: { es: "Salud", en: "Health", pt: "Saúde", fr: "Santé" }, icon: "medical-bag", color: "#22C55E" },
+  { code: "crime", label: { es: "Delincuencia", en: "Crime", pt: "Crime", fr: "Délinquance" }, icon: "shield-alert", color: "#3B82F6" },
+  { code: "accident", label: { es: "Accidentes", en: "Accidents", pt: "Acidentes", fr: "Accidents" }, icon: "car", color: "#F97316" },
+  { code: "fire", label: { es: "Incendios", en: "Fires", pt: "Incêndios", fr: "Incendies" }, icon: "fire", color: "#EF4444" },
+  { code: "infra", label: { es: "Infraestructura", en: "Infrastructure", pt: "Infraestrutura", fr: "Infrastructures" }, icon: "bank", color: "#CBD5E1" },
+  { code: "prevention", label: { es: "Prevención", en: "Prevention", pt: "Prevenção", fr: "Prévention" }, icon: "alert", color: "#FACC15" },
+  { code: "help", label: { es: "Ayuda", en: "Help", pt: "Ajuda", fr: "Entraide" }, icon: "account-group", color: "#A855F7" },
 ];
 
-const MORE: CategoryChip = { code: "__more__", label: { es: "Más", en: "More" }, icon: "dots-horizontal", color: "#FFFFFF" };
+const MORE: CategoryChip = { code: "__more__", label: { es: "Más", en: "More", pt: "Mais", fr: "Plus" }, icon: "dots-horizontal", color: "#FFFFFF" };
 const FALLBACK: Pick<CategoryChip, "icon" | "color"> = { icon: "help-circle", color: "#94A3B8" };
 const EXTRA_ICONS: Record<string, Pick<CategoryChip, "icon" | "color">> = { emergency: { icon: "alarm-light", color: "#F43F5E" } };
 
@@ -40,7 +40,7 @@ export function homeChips(catalog: CategoryCatalog): { chips: CategoryChip[]; mo
   const shown = new Set(chips.map((c) => c.code));
   const more = roots
     .filter((c) => !shown.has(c.code))
-    .map((c) => ({ code: c.code, label: { es: c.names["es"] ?? c.code, en: c.names["en"] ?? c.names["es"] ?? c.code }, ...(EXTRA_ICONS[c.code] ?? FALLBACK) }));
+    .map((c) => ({ code: c.code, label: Object.fromEntries(SUPPORTED_LANGS.map((l) => [l, c.names[l] ?? c.names["es"] ?? c.code])) as Record<Lang, string>, ...(EXTRA_ICONS[c.code] ?? FALLBACK) }));
   return { chips: more.length ? [...chips, MORE] : chips, more };
 }
 

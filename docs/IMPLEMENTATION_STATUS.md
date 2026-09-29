@@ -162,14 +162,23 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | Cupo de reportes y peso de denuncias según reputación | ✅ | `ReportService`, `ModerationService.flag` |
 | Reputación en la visibilidad del feed; textos idénticos | ⏳ | siguiente iteración |
 
+## Etapa 13 — Idiomas iniciales (hecha)
+
+| Área | Estado | Dónde |
+|---|---|---|
+| App en español, inglés, portugués y francés (claves completas exigidas por TypeScript) | ✅ | `apps/mobile/src/lib/i18n.ts`, `lib/locales/`, ADR 0024 |
+| Diálogos de permisos de iOS en los 4 idiomas | ✅ | `app.config.ts` (`locales`), `scripts/check-native.mjs` |
+| Categorías y números de emergencia en los 4 idiomas | ✅ | `data/categories`, `data/emergency-numbers` |
+| Avisos push en el idioma de cada persona | ✅ | `alert/rules.ts` |
+| Revisión nativa de portugués y francés | ⏳ | ver "Requiere acción humana" |
+
 ## Siguiente etapa (en orden)
 
-1. Idiomas portugués y francés (D-19).
-2. Media: miniaturas y hash perceptual para duplicados.
-3. Métricas de calidad del producto (duplicados, tiempo hasta verificación) y aviso push de umbrales a administración.
-4. **BLOQUEADA** — Identity real: Sign in with Apple, Google y email; App Attest / Play Integrity. Falta: cuentas de
+1. Media: miniaturas y hash perceptual para duplicados.
+2. Métricas de calidad del producto (duplicados, tiempo hasta verificación) y aviso push de umbrales a administración.
+3. **BLOQUEADA** — Identity real: Sign in with Apple, Google y email; App Attest / Play Integrity. Falta: cuentas de
    Apple Developer y Google (client IDs, Service ID, Team ID) y un proveedor de email aprobado (gasto).
-5. Social: negocios, etiquetas y menciones.
+4. Social: negocios, etiquetas y menciones.
 
 ## Requiere acción humana
 
@@ -185,5 +194,6 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | Verificar números de emergencia de Perú | Debe hacerlo una persona contra la fuente oficial | Confirmar 105, 116, 106, 115, 100 y fuentes |
 | Clave NASA FIRMS | Registro personal | Solicitar MAP_KEY gratuita cuando se active la fuente |
 | Acceso de red a las fuentes (USGS, GDACS) desde el entorno de desarrollo | La política de red de este entorno bloquea esos dominios | Opcional: permitirlos en la configuración de red del entorno para validar los adapters con datos reales |
+| Revisión de portugués y francés por hablantes nativos | Calidad de marca y tono; no bloquea el piloto en Perú | Revisar `apps/mobile/src/lib/locales/pt.ts` y `fr.ts` antes de lanzar en países de esos idiomas |
 | Revisar términos de uso de GDACS | Decisión legal | Confirmar que el uso previsto está permitido; entonces se activa |
 | Revisar la licencia MPL-2.0 de los límites de Perú (juaneladio/peru-geojson, datos INEI) | Decisión legal | Se usan solo en el servidor y se atribuyen; alternativa: límites oficiales de INEI/IGN directamente |

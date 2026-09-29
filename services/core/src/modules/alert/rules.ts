@@ -1,4 +1,4 @@
-import type { AlertKind, AlertMatch, AlertPreferences, PublicVerificationState } from "@dizaster/contracts";
+import type { AlertKind, AlertMatch, AlertPreferences, Lang, PublicVerificationState } from "@dizaster/contracts";
 
 /** Estado público de un EVENT tal como lo ve el Alert Engine. */
 export interface EventSnapshot {
@@ -113,7 +113,7 @@ export function isValidTimezone(tz: string): boolean {
   }
 }
 
-const STATE_TEXT: Record<"es" | "en", Record<PublicVerificationState, string>> = {
+const STATE_TEXT: Record<Lang, Record<PublicVerificationState, string>> = {
   es: {
     UNVERIFIED: "Sin verificar",
     COMMUNITY_CORROBORATED: "Corroborado por la comunidad",
@@ -130,6 +130,45 @@ const STATE_TEXT: Record<"es" | "en", Record<PublicVerificationState, string>> =
     DISPUTED: "Disputed",
     FALSE: "Marked as false",
   },
+  pt: {
+    UNVERIFIED: "Não verificado",
+    COMMUNITY_CORROBORATED: "Corroborado pela comunidade",
+    EXTERNALLY_CORROBORATED: "Confirmado por fontes externas",
+    OFFICIALLY_CONFIRMED: "Confirmado oficialmente",
+    DISPUTED: "Em disputa",
+    FALSE: "Marcado como falso",
+  },
+  fr: {
+    UNVERIFIED: "Non vérifié",
+    COMMUNITY_CORROBORATED: "Corroboré par la communauté",
+    EXTERNALLY_CORROBORATED: "Confirmé par des sources externes",
+    OFFICIALLY_CONFIRMED: "Confirmé officiellement",
+    DISPUTED: "Contesté",
+    FALSE: "Signalé comme faux",
+  },
+};
+
+/** Frases de los avisos por idioma. Un idioma nuevo = una entrada más (el tipo exige todas las frases). */
+const PHRASES: Record<Lang, {
+  severity: (n: number) => string; inPlace: (c: string, w: string) => string; severityUp: (c: string) => string;
+  over: (c: string) => string; newAlerts: (n: number) => string; more: (n: number) => string;
+}> = {
+  es: {
+    severity: (n) => `severidad ${n}/5`, inPlace: (c, w) => `${c} en ${w}`, severityUp: (c) => `Aumenta la gravedad: ${c}`,
+    over: (c) => `Terminado: ${c}`, newAlerts: (n) => `${n} alertas nuevas`, more: (n) => `y ${n} más`,
+  },
+  en: {
+    severity: (n) => `severity ${n}/5`, inPlace: (c, w) => `${c} in ${w}`, severityUp: (c) => `Severity up: ${c}`,
+    over: (c) => `Over: ${c}`, newAlerts: (n) => `${n} new alerts`, more: (n) => `and ${n} more`,
+  },
+  pt: {
+    severity: (n) => `gravidade ${n}/5`, inPlace: (c, w) => `${c} em ${w}`, severityUp: (c) => `Gravidade aumentou: ${c}`,
+    over: (c) => `Encerrado: ${c}`, newAlerts: (n) => `${n} novos alertas`, more: (n) => `e mais ${n}`,
+  },
+  fr: {
+    severity: (n) => `gravité ${n}/5`, inPlace: (c, w) => `${c} à ${w}`, severityUp: (c) => `Gravité en hausse : ${c}`,
+    over: (c) => `Terminé : ${c}`, newAlerts: (n) => `${n} nouvelles alertes`, more: (n) => `et ${n} de plus`,
+  },
 };
 
 /**
@@ -137,31 +176,29 @@ const STATE_TEXT: Record<"es" | "en", Record<PublicVerificationState, string>> =
  * estado y severidad. Nunca nombres de quien reportó, textos de sus posts ni coordenadas.
  */
 export function alertText(
-  lang: "es" | "en",
+  lang: Lang,
   a: { kind: AlertKind; category: string; place: string | null; state: PublicVerificationState; severity: number },
 ): { title: string; body: string } {
+  const t = PHRASES[lang];
   const where = a.place ?? "";
-  const sev = lang === "es" ? `severidad ${a.severity}/5` : `severity ${a.severity}/5`;
+  const sev = t.severity(a.severity);
   const state = STATE_TEXT[lang][a.state];
   const join = (...xs: string[]) => xs.filter(Boolean).join(" · ");
   switch (a.kind) {
     case "NEW_EVENT":
-      return { title: where ? (lang === "es" ? `${a.category} en ${where}` : `${a.category} in ${where}`) : a.category, body: join(state, sev) };
+      return { title: where ? t.inPlace(a.category, where) : a.category, body: join(state, sev) };
     case "STATE_CHANGED":
       return { title: `${state}: ${a.category}`, body: join(where, sev) };
     case "SEVERITY_UP":
-      return { title: lang === "es" ? `Aumenta la gravedad: ${a.category}` : `Severity up: ${a.category}`, body: join(where, sev) };
+      return { title: t.severityUp(a.category), body: join(where, sev) };
     case "RESOLVED":
-      return { title: lang === "es" ? `Terminado: ${a.category}` : `Over: ${a.category}`, body: where || state };
+      return { title: t.over(a.category), body: where || state };
   }
 }
 
 /** Resumen cuando hay varias alertas a la vez: un solo aviso en lugar de una ráfaga. */
-export function groupText(lang: "es" | "en", titles: string[]): { title: string; body: string } {
+export function groupText(lang: Lang, titles: string[]): { title: string; body: string } {
   const n = titles.length;
   const shown = titles.slice(0, 3).join(" · ");
-  return {
-    title: lang === "es" ? `${n} alertas nuevas` : `${n} new alerts`,
-    body: n > 3 ? `${shown} ${lang === "es" ? `y ${n - 3} más` : `and ${n - 3} more`}` : shown,
-  };
+  return { title: PHRASES[lang].newAlerts(n), body: n > 3 ? `${shown} ${PHRASES[lang].more(n - 3)}` : shown };
 }

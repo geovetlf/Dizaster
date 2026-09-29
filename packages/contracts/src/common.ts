@@ -13,6 +13,17 @@ export const CountryCode = z.string().regex(/^[A-Z]{2}$/);
 export type CountryCode = z.infer<typeof CountryCode>;
 
 /** Texto localizable: { "es": "...", "en": "..." }. */
+/** Idiomas de la interfaz y de los avisos (Blueprint D-19). Ampliable: un idioma nuevo es un catálogo más. */
+export const SUPPORTED_LANGS = ["es", "en", "pt", "fr"] as const;
+export const Lang = z.enum(SUPPORTED_LANGS);
+export type Lang = z.infer<typeof Lang>;
+
+/** Idioma soportado para una etiqueta BCP 47 ("pt-BR" → "pt"); español si no hay coincidencia. */
+export function langFromLocale(locale: string | null | undefined): Lang {
+  const base = (locale ?? "").toLowerCase().split(/[-_]/)[0];
+  return (SUPPORTED_LANGS as readonly string[]).includes(base ?? "") ? (base as Lang) : "es";
+}
+
 export const LocalizedText = z.record(z.string().min(2).max(10), z.string());
 export type LocalizedText = z.infer<typeof LocalizedText>;
 

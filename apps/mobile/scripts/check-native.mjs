@@ -27,6 +27,11 @@ try {
   expect(plist.includes("<string>dizaster</string>"), "iOS: falta el esquema dizaster://");
   expect(entitlements.includes("aps-environment"), "iOS: falta el entitlement de push (APNs)");
   expect(existsSync("ios/Dizaster/PrivacyInfo.xcprivacy"), "iOS: falta el manifiesto de privacidad");
+  // Diálogos de permisos en los idiomas iniciales (D-19).
+  for (const l of ["es", "en", "pt", "fr"]) {
+    const f = `ios/Dizaster/Supporting/${l}.lproj/InfoPlist.strings`;
+    expect(existsSync(f) && readFileSync(f, "utf8").includes("NSLocationWhenInUseUsageDescription"), `iOS: faltan los textos de permisos en ${l}`);
+  }
 
   for (const p of ["ACCESS_FINE_LOCATION", "CAMERA", "RECORD_AUDIO", "POST_NOTIFICATIONS"]) expect(granted(p), `Android: falta ${p}`);
   for (const p of ["ACCESS_BACKGROUND_LOCATION", "SYSTEM_ALERT_WINDOW", "READ_EXTERNAL_STORAGE", "WRITE_EXTERNAL_STORAGE"]) {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { SubmitReportRequest, publicVerificationState, CategoryCode } from "../src/index.js";
+import { SubmitReportRequest, publicVerificationState, CategoryCode, langFromLocale } from "../src/index.js";
 
 const base = {
   clientReportId: "01928c1e-7b1a-7cc0-8a9e-2c4f5d6e7f80",
@@ -38,5 +38,15 @@ describe("contracts", () => {
   it("valida códigos de categoría jerárquicos", () => {
     expect(CategoryCode.safeParse("fire.wildfire").success).toBe(true);
     expect(CategoryCode.safeParse("Fire Wildfire").success).toBe(false);
+  });
+});
+
+describe("idiomas", () => {
+  it("elige el idioma soportado a partir del locale del teléfono", () => {
+    expect(langFromLocale("pt-BR")).toBe("pt");
+    expect(langFromLocale("fr_CA")).toBe("fr");
+    expect(langFromLocale("en-US")).toBe("en");
+    expect(langFromLocale("de-DE")).toBe("es");
+    expect(langFromLocale(null)).toBe("es");
   });
 });

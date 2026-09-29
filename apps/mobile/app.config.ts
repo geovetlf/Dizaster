@@ -20,6 +20,40 @@ const CAMERA_TEXT = "Dizaster usa la cámara para tomar fotos o videos del incid
 const PHOTOS_TEXT = "Dizaster accede a las fotos y videos que elijas para adjuntarlos a un reporte.";
 const MIC_TEXT = "Dizaster usa el micrófono para grabar el audio de los videos que adjuntas a un reporte.";
 
+/**
+ * Textos de los diálogos de permisos del sistema por idioma (D-19). iOS los toma de InfoPlist.strings;
+ * el español queda también como valor por defecto en infoPlist.
+ */
+const PERMISSION_TEXTS: Record<"es" | "en" | "pt" | "fr", { location: string; camera: string; photos: string; mic: string }> = {
+  es: { location: LOCATION_TEXT, camera: CAMERA_TEXT, photos: PHOTOS_TEXT, mic: MIC_TEXT },
+  en: {
+    location: "Dizaster uses your location while you use the app: when you report, to check that you are there, and if you turn it on, to show and alert you about what happens nearby. Your exact location is never published.",
+    camera: "Dizaster uses the camera to take photos or videos of the incident you report.",
+    photos: "Dizaster accesses the photos and videos you choose to attach to a report.",
+    mic: "Dizaster uses the microphone to record the audio of videos you attach to a report.",
+  },
+  pt: {
+    location: "O Dizaster usa sua localização enquanto você usa o app: ao reportar, para confirmar que você está no local, e se você ativar, para mostrar e avisar o que acontece perto. Sua localização exata nunca é publicada.",
+    camera: "O Dizaster usa a câmera para tirar fotos ou gravar vídeos do incidente que você reporta.",
+    photos: "O Dizaster acessa as fotos e os vídeos que você escolher para anexar a um reporte.",
+    mic: "O Dizaster usa o microfone para gravar o áudio dos vídeos que você anexa a um reporte.",
+  },
+  fr: {
+    location: "Dizaster utilise votre position pendant que vous utilisez l'app : lors d'un signalement, pour vérifier que vous êtes sur place, et si vous l'activez, pour vous montrer et vous alerter de ce qui se passe près de vous. Votre position exacte n'est jamais publiée.",
+    camera: "Dizaster utilise l'appareil photo pour prendre des photos ou des vidéos de l'incident que vous signalez.",
+    photos: "Dizaster accède aux photos et vidéos que vous choisissez de joindre à un signalement.",
+    mic: "Dizaster utilise le micro pour enregistrer le son des vidéos que vous joignez à un signalement.",
+  },
+};
+const iosPermissionStrings = (x: (typeof PERMISSION_TEXTS)["es"]) => ({
+  ios: {
+    NSLocationWhenInUseUsageDescription: x.location,
+    NSCameraUsageDescription: x.camera,
+    NSPhotoLibraryUsageDescription: x.photos,
+    NSMicrophoneUsageDescription: x.mic,
+  },
+});
+
 const config: ExpoConfig = {
   name: "Dizaster",
   slug: "dizaster",
@@ -29,6 +63,7 @@ const config: ExpoConfig = {
   icon: "./assets/icon.png",
   userInterfaceStyle: "automatic",
   platforms: ["ios", "android"],
+  locales: Object.fromEntries(Object.entries(PERMISSION_TEXTS).map(([l, x]) => [l, iosPermissionStrings(x)])),
   ios: {
     supportsTablet: false,
     // Identificador provisional hasta aprobar marca y dominio (D-21).
@@ -42,6 +77,8 @@ const config: ExpoConfig = {
       NSCameraUsageDescription: CAMERA_TEXT,
       NSPhotoLibraryUsageDescription: PHOTOS_TEXT,
       NSMicrophoneUsageDescription: MIC_TEXT,
+      // Los diálogos del sistema siguen el idioma del teléfono aunque la app no tenga otros recursos nativos.
+      CFBundleAllowMixedLocalizations: true,
       // Solo cifrado estándar del sistema (HTTPS): evita la pregunta de exportación en cada envío a App Store.
       ITSAppUsesNonExemptEncryption: false,
     },

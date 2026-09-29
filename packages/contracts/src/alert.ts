@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { Lang } from "./common.js";
 
 /**
  * Por qué le llega una alerta a esta persona. SAVED_ZONE: una de sus zonas guardadas. NEAR_ME: cerca de la
@@ -36,7 +37,7 @@ export const AlertPreferences = z.object({
   /** Horas de silencio en minutos desde medianoche (hora local de `timezone`). Una confirmación oficial grave las ignora. */
   quietHours: z.object({ start: minutes, end: minutes }).nullable(),
   timezone: z.string().min(1).max(64),
-  lang: z.enum(["es", "en"]),
+  lang: Lang,
 });
 export type AlertPreferences = z.infer<typeof AlertPreferences>;
 export const UpdateAlertPreferences = AlertPreferences.partial();

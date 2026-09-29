@@ -8,7 +8,9 @@
    "number": "105",
    "label": {
     "es": "Policía Nacional del Perú",
-    "en": "National Police"
+    "en": "National Police",
+    "pt": "Polícia Nacional do Peru",
+    "fr": "Police nationale du Pérou"
    },
    "source": "Pendiente de contrastar con fuente oficial peruana (gob.pe)",
    "verification": "NEEDS_VERIFICATION",
@@ -21,7 +23,9 @@
    "number": "116",
    "label": {
     "es": "Bomberos",
-    "en": "Fire brigade"
+    "en": "Fire brigade",
+    "pt": "Bombeiros",
+    "fr": "Pompiers"
    },
    "source": "Pendiente de contrastar con fuente oficial peruana (gob.pe)",
    "verification": "NEEDS_VERIFICATION",
@@ -34,7 +38,9 @@
    "number": "106",
    "label": {
     "es": "SAMU (ambulancias)",
-    "en": "SAMU ambulance"
+    "en": "SAMU ambulance",
+    "pt": "SAMU (ambulâncias)",
+    "fr": "SAMU (ambulances)"
    },
    "source": "Pendiente de contrastar con fuente oficial peruana (gob.pe)",
    "verification": "NEEDS_VERIFICATION",
@@ -47,7 +53,9 @@
    "number": "115",
    "label": {
     "es": "Defensa Civil",
-    "en": "Civil defense"
+    "en": "Civil defense",
+    "pt": "Defesa Civil",
+    "fr": "Défense civile"
    },
    "source": "Pendiente de contrastar con fuente oficial peruana (gob.pe)",
    "verification": "NEEDS_VERIFICATION",
@@ -60,7 +68,9 @@
    "number": "100",
    "label": {
     "es": "Línea 100 (violencia familiar y sexual)",
-    "en": "Line 100 (family and sexual violence)"
+    "en": "Line 100 (family and sexual violence)",
+    "pt": "Linha 100 (violência familiar e sexual)",
+    "fr": "Ligne 100 (violences familiales et sexuelles)"
    },
    "source": "Pendiente de contrastar con fuente oficial peruana (gob.pe)",
    "verification": "NEEDS_VERIFICATION",
@@ -73,7 +83,9 @@
    "number": "112",
    "label": {
     "es": "Emergencias",
-    "en": "Emergency"
+    "en": "Emergency",
+    "pt": "Emergências",
+    "fr": "Urgences"
    },
    "source": "Pendiente de contrastar con fuente oficial del país",
    "verification": "NEEDS_VERIFICATION",
@@ -86,7 +98,9 @@
    "number": "112",
    "label": {
     "es": "Emergencias",
-    "en": "Emergency"
+    "en": "Emergency",
+    "pt": "Emergências",
+    "fr": "Urgences"
    },
    "source": "Pendiente de contrastar con fuente oficial del país",
    "verification": "NEEDS_VERIFICATION",
@@ -99,7 +113,9 @@
    "number": "112",
    "label": {
     "es": "Emergencias",
-    "en": "Emergency"
+    "en": "Emergency",
+    "pt": "Emergências",
+    "fr": "Urgences"
    },
    "source": "Pendiente de contrastar con fuente oficial del país",
    "verification": "NEEDS_VERIFICATION",
@@ -112,7 +128,9 @@
    "number": "112",
    "label": {
     "es": "Emergencias",
-    "en": "Emergency"
+    "en": "Emergency",
+    "pt": "Emergências",
+    "fr": "Urgences"
    },
    "source": "Pendiente de contrastar con fuente oficial del país",
    "verification": "NEEDS_VERIFICATION",
@@ -125,7 +143,9 @@
    "number": "112",
    "label": {
     "es": "Emergencias",
-    "en": "Emergency"
+    "en": "Emergency",
+    "pt": "Emergências",
+    "fr": "Urgences"
    },
    "source": "Pendiente de contrastar con fuente oficial del país",
    "verification": "NEEDS_VERIFICATION",
@@ -138,7 +158,9 @@
    "number": "112",
    "label": {
     "es": "Emergencias",
-    "en": "Emergency"
+    "en": "Emergency",
+    "pt": "Emergências",
+    "fr": "Urgences"
    },
    "source": "Pendiente de contrastar con fuente oficial del país",
    "verification": "NEEDS_VERIFICATION",
@@ -151,7 +173,9 @@
    "number": "112",
    "label": {
     "es": "Emergencias",
-    "en": "Emergency"
+    "en": "Emergency",
+    "pt": "Emergências",
+    "fr": "Urgences"
    },
    "source": "Pendiente de contrastar con fuente oficial del país",
    "verification": "NEEDS_VERIFICATION",
@@ -164,7 +188,9 @@
    "number": "112",
    "label": {
     "es": "Emergencias",
-    "en": "Emergency"
+    "en": "Emergency",
+    "pt": "Emergências",
+    "fr": "Urgences"
    },
    "source": "Pendiente de contrastar con fuente oficial del país",
    "verification": "NEEDS_VERIFICATION",
@@ -177,7 +203,9 @@
    "number": "112",
    "label": {
     "es": "Emergencias",
-    "en": "Emergency"
+    "en": "Emergency",
+    "pt": "Emergências",
+    "fr": "Urgences"
    },
    "source": "Pendiente de contrastar con fuente oficial del país",
    "verification": "NEEDS_VERIFICATION",
@@ -190,7 +218,9 @@
    "number": "112",
    "label": {
     "es": "Emergencias",
-    "en": "Emergency"
+    "en": "Emergency",
+    "pt": "Emergências",
+    "fr": "Urgences"
    },
    "source": "Pendiente de contrastar con fuente oficial del país",
    "verification": "NEEDS_VERIFICATION",
@@ -203,7 +233,9 @@
    "number": "112",
    "label": {
     "es": "Emergencias",
-    "en": "Emergency"
+    "en": "Emergency",
+    "pt": "Emergências",
+    "fr": "Urgences"
    },
    "source": "Pendiente de contrastar con fuente oficial del país",
    "verification": "NEEDS_VERIFICATION",
@@ -216,7 +248,9 @@
    "number": "112",
    "label": {
     "es": "Emergencias",
-    "en": "Emergency"
+    "en": "Emergency",
+    "pt": "Emergências",
+    "fr": "Urgences"
    },
    "source": "Pendiente de contrastar con fuente oficial del país",
    "verification": "NEEDS_VERIFICATION",
@@ -229,7 +263,9 @@
    "number": "112",
    "label": {
     "es": "Emergencias",
-    "en": "Emergency"
+    "en": "Emergency",
+    "pt": "Emergências",
+    "fr": "Urgences"
    },
    "source": "Pendiente de contrastar con fuente oficial del país",
    "verification": "NEEDS_VERIFICATION",
@@ -242,7 +278,9 @@
    "number": "112",
    "label": {
     "es": "Emergencias",
-    "en": "Emergency"
+    "en": "Emergency",
+    "pt": "Emergências",
+    "fr": "Urgences"
    },
    "source": "Pendiente de contrastar con fuente oficial del país",
    "verification": "NEEDS_VERIFICATION",
@@ -255,7 +293,9 @@
    "number": "112",
    "label": {
     "es": "Emergencias",
-    "en": "Emergency"
+    "en": "Emergency",
+    "pt": "Emergências",
+    "fr": "Urgences"
    },
    "source": "Pendiente de contrastar con fuente oficial del país",
    "verification": "NEEDS_VERIFICATION",
@@ -268,7 +308,9 @@
    "number": "911",
    "label": {
     "es": "Emergencias",
-    "en": "Emergency"
+    "en": "Emergency",
+    "pt": "Emergências",
+    "fr": "Urgences"
    },
    "source": "Pendiente de contrastar con fuente oficial del país",
    "verification": "NEEDS_VERIFICATION",
@@ -281,7 +323,9 @@
    "number": "911",
    "label": {
     "es": "Emergencias",
-    "en": "Emergency"
+    "en": "Emergency",
+    "pt": "Emergências",
+    "fr": "Urgences"
    },
    "source": "Pendiente de contrastar con fuente oficial del país",
    "verification": "NEEDS_VERIFICATION",
@@ -294,7 +338,9 @@
    "number": "911",
    "label": {
     "es": "Emergencias",
-    "en": "Emergency"
+    "en": "Emergency",
+    "pt": "Emergências",
+    "fr": "Urgences"
    },
    "source": "Pendiente de contrastar con fuente oficial del país",
    "verification": "NEEDS_VERIFICATION",
@@ -307,7 +353,9 @@
    "number": "999",
    "label": {
     "es": "Emergencias",
-    "en": "Emergency"
+    "en": "Emergency",
+    "pt": "Emergências",
+    "fr": "Urgences"
    },
    "source": "Pendiente de contrastar con fuente oficial del país",
    "verification": "NEEDS_VERIFICATION",
@@ -320,7 +368,9 @@
    "number": "112",
    "label": {
     "es": "Emergencias",
-    "en": "Emergency"
+    "en": "Emergency",
+    "pt": "Emergências",
+    "fr": "Urgences"
    },
    "source": "Pendiente de contrastar con fuente oficial del país",
    "verification": "NEEDS_VERIFICATION",
@@ -333,7 +383,9 @@
    "number": "000",
    "label": {
     "es": "Emergencias",
-    "en": "Emergency"
+    "en": "Emergency",
+    "pt": "Emergências",
+    "fr": "Urgences"
    },
    "source": "Pendiente de contrastar con fuente oficial del país",
    "verification": "NEEDS_VERIFICATION",
@@ -346,7 +398,9 @@
    "number": "111",
    "label": {
     "es": "Emergencias",
-    "en": "Emergency"
+    "en": "Emergency",
+    "pt": "Emergências",
+    "fr": "Urgences"
    },
    "source": "Pendiente de contrastar con fuente oficial del país",
    "verification": "NEEDS_VERIFICATION",
@@ -359,7 +413,9 @@
    "number": "110",
    "label": {
     "es": "Policía",
-    "en": "Police"
+    "en": "Police",
+    "pt": "Polícia",
+    "fr": "Police"
    },
    "source": "Pendiente de contrastar con fuente oficial del país",
    "verification": "NEEDS_VERIFICATION",
@@ -372,7 +428,9 @@
    "number": "119",
    "label": {
     "es": "Bomberos y ambulancia",
-    "en": "Fire and ambulance"
+    "en": "Fire and ambulance",
+    "pt": "Bombeiros e ambulância",
+    "fr": "Pompiers et ambulance"
    },
    "source": "Pendiente de contrastar con fuente oficial del país",
    "verification": "NEEDS_VERIFICATION",
@@ -385,7 +443,9 @@
    "number": "131",
    "label": {
     "es": "SAMU",
-    "en": "Ambulance"
+    "en": "Ambulance",
+    "pt": "SAMU",
+    "fr": "SAMU"
    },
    "source": "Pendiente de contrastar con fuente oficial del país",
    "verification": "NEEDS_VERIFICATION",
@@ -398,7 +458,9 @@
    "number": "132",
    "label": {
     "es": "Bomberos",
-    "en": "Fire"
+    "en": "Fire",
+    "pt": "Bombeiros",
+    "fr": "Pompiers"
    },
    "source": "Pendiente de contrastar con fuente oficial del país",
    "verification": "NEEDS_VERIFICATION",
@@ -411,7 +473,9 @@
    "number": "133",
    "label": {
     "es": "Carabineros",
-    "en": "Police"
+    "en": "Police",
+    "pt": "Carabineros",
+    "fr": "Carabineros (police)"
    },
    "source": "Pendiente de contrastar con fuente oficial del país",
    "verification": "NEEDS_VERIFICATION",
@@ -424,7 +488,9 @@
    "number": "123",
    "label": {
     "es": "Línea de emergencias",
-    "en": "Emergency line"
+    "en": "Emergency line",
+    "pt": "Linha de emergência",
+    "fr": "Ligne d'urgence"
    },
    "source": "Pendiente de contrastar con fuente oficial del país",
    "verification": "NEEDS_VERIFICATION",
@@ -437,7 +503,9 @@
    "number": "911",
    "label": {
     "es": "Emergencias",
-    "en": "Emergency"
+    "en": "Emergency",
+    "pt": "Emergências",
+    "fr": "Urgences"
    },
    "source": "Pendiente de contrastar con fuente oficial del país",
    "verification": "NEEDS_VERIFICATION",
@@ -450,7 +518,9 @@
    "number": "107",
    "label": {
     "es": "SAME",
-    "en": "Ambulance"
+    "en": "Ambulance",
+    "pt": "SAME",
+    "fr": "SAME"
    },
    "source": "Pendiente de contrastar con fuente oficial del país",
    "verification": "NEEDS_VERIFICATION",
@@ -463,7 +533,9 @@
    "number": "100",
    "label": {
     "es": "Bomberos",
-    "en": "Fire"
+    "en": "Fire",
+    "pt": "Bombeiros",
+    "fr": "Pompiers"
    },
    "source": "Pendiente de contrastar con fuente oficial del país",
    "verification": "NEEDS_VERIFICATION",
@@ -476,7 +548,9 @@
    "number": "911",
    "label": {
     "es": "ECU 911",
-    "en": "ECU 911"
+    "en": "ECU 911",
+    "pt": "ECU 911",
+    "fr": "ECU 911"
    },
    "source": "Pendiente de contrastar con fuente oficial del país",
    "verification": "NEEDS_VERIFICATION",
@@ -489,7 +563,9 @@
    "number": "110",
    "label": {
     "es": "Policía",
-    "en": "Police"
+    "en": "Police",
+    "pt": "Polícia",
+    "fr": "Police"
    },
    "source": "Pendiente de contrastar con fuente oficial del país",
    "verification": "NEEDS_VERIFICATION",
@@ -502,7 +578,9 @@
    "number": "119",
    "label": {
     "es": "Bomberos",
-    "en": "Fire"
+    "en": "Fire",
+    "pt": "Bombeiros",
+    "fr": "Pompiers"
    },
    "source": "Pendiente de contrastar con fuente oficial del país",
    "verification": "NEEDS_VERIFICATION",
@@ -515,7 +593,9 @@
    "number": "118",
    "label": {
     "es": "Ambulancia",
-    "en": "Ambulance"
+    "en": "Ambulance",
+    "pt": "Ambulância",
+    "fr": "Ambulance"
    },
    "source": "Pendiente de contrastar con fuente oficial del país",
    "verification": "NEEDS_VERIFICATION",
@@ -528,7 +608,9 @@
    "number": "190",
    "label": {
     "es": "Polícia Militar",
-    "en": "Military police"
+    "en": "Military police",
+    "pt": "Polícia Militar",
+    "fr": "Police militaire"
    },
    "source": "Pendiente de contrastar con fuente oficial del país",
    "verification": "NEEDS_VERIFICATION",
@@ -541,7 +623,9 @@
    "number": "192",
    "label": {
     "es": "SAMU",
-    "en": "Ambulance"
+    "en": "Ambulance",
+    "pt": "SAMU",
+    "fr": "SAMU"
    },
    "source": "Pendiente de contrastar con fuente oficial del país",
    "verification": "NEEDS_VERIFICATION",
@@ -554,7 +638,9 @@
    "number": "193",
    "label": {
     "es": "Bombeiros",
-    "en": "Fire"
+    "en": "Fire",
+    "pt": "Bombeiros",
+    "fr": "Pompiers"
    },
    "source": "Pendiente de contrastar con fuente oficial del país",
    "verification": "NEEDS_VERIFICATION",

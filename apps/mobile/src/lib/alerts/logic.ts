@@ -1,4 +1,4 @@
-import type { NotificationStatus } from "@dizaster/contracts";
+import type { Lang, NotificationStatus } from "@dizaster/contracts";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -50,10 +50,10 @@ export function cycle<T>(options: readonly T[], current: T, eq: (a: T, b: T) => 
 
 /** Qué hay que corregir en el servidor para que los avisos respeten la hora y el idioma del teléfono. */
 export function devicePrefsPatch(
-  prefs: { timezone: string; lang: "es" | "en" },
-  device: { timezone: string | null | undefined; lang: "es" | "en" },
-): { timezone?: string; lang?: "es" | "en" } | null {
-  const patch: { timezone?: string; lang?: "es" | "en" } = {};
+  prefs: { timezone: string; lang: Lang },
+  device: { timezone: string | null | undefined; lang: Lang },
+): { timezone?: string; lang?: Lang } | null {
+  const patch: { timezone?: string; lang?: Lang } = {};
   if (device.timezone && device.timezone !== prefs.timezone) patch.timezone = device.timezone;
   if (device.lang !== prefs.lang) patch.lang = device.lang;
   return Object.keys(patch).length ? patch : null;

@@ -1,8 +1,13 @@
+import { langFromLocale, type Lang } from "@dizaster/contracts";
+import { fr } from "./locales/fr";
+import { pt } from "./locales/pt";
+
 /**
- * Textos de la interfaz. Primer corte con español e inglés; los catálogos completos (ICU MessageFormat)
- * y más idiomas llegan con la capa Global/Locale.
+ * Textos de la interfaz en los idiomas iniciales (Blueprint D-19): español, inglés, portugués y francés.
+ * El español es la referencia; cada otro catálogo es `Record<MessageKey, string>`, así que TypeScript no deja
+ * compilar si falta una clave. Un idioma nuevo = un archivo en `locales/` y una entrada aquí.
  */
-const catalogs = {
+const base = {
   es: {
     report: "Reportar",
     emergency: "Emergencia",
@@ -198,6 +203,7 @@ const catalogs = {
     zoneUseHere: "Usar mi ubicación actual",
     zonePrivacy: "Guardamos un punto aproximado (~500 m), no tu dirección exacta. Nadie más ve tus zonas.",
     saveZone: "Guardar zona",
+    costMonth: "mes",
   },
   en: {
     report: "Report",
@@ -394,20 +400,22 @@ const catalogs = {
     zoneUseHere: "Use my current location",
     zonePrivacy: "We store an approximate point (~500 m), not your exact address. Nobody else sees your areas.",
     saveZone: "Save area",
+    costMonth: "month",
   },
 } as const;
 
-export type MessageKey = keyof (typeof catalogs)["es"];
+export type MessageKey = keyof (typeof base)["es"];
+const catalogs: Record<Lang, Record<MessageKey, string>> = { es: base.es, en: base.en, pt, fr };
 export const locale: string = Intl.DateTimeFormat().resolvedOptions().locale ?? "es";
-export const lang: keyof typeof catalogs = locale.startsWith("en") ? "en" : "es";
+export const lang: Lang = langFromLocale(locale);
 export const t = (key: MessageKey): string => catalogs[lang][key];
 
-export const VERIFICATION_LABEL: Record<string, { es: string; en: string; color: string }> = {
-  UNVERIFIED: { es: "Sin verificar", en: "Unverified", color: "#8a94a6" },
-  COMMUNITY_CORROBORATED: { es: "Corroborado por la comunidad", en: "Community corroborated", color: "#2f80ed" },
-  EXTERNALLY_CORROBORATED: { es: "Corroborado por fuentes externas", en: "Externally corroborated", color: "#9b51e0" },
-  OFFICIALLY_CONFIRMED: { es: "Confirmado oficialmente", en: "Officially confirmed", color: "#27ae60" },
-  DISPUTED: { es: "En disputa", en: "Disputed", color: "#f2994a" },
-  FALSE: { es: "Falso", en: "False", color: "#eb5757" },
+export const VERIFICATION_LABEL: Record<string, Record<Lang, string> & { color: string }> = {
+  UNVERIFIED: { es: "Sin verificar", en: "Unverified", pt: "Não verificado", fr: "Non vérifié", color: "#8a94a6" },
+  COMMUNITY_CORROBORATED: { es: "Corroborado por la comunidad", en: "Community corroborated", pt: "Corroborado pela comunidade", fr: "Corroboré par la communauté", color: "#2f80ed" },
+  EXTERNALLY_CORROBORATED: { es: "Corroborado por fuentes externas", en: "Externally corroborated", pt: "Corroborado por fontes externas", fr: "Corroboré par des sources externes", color: "#9b51e0" },
+  OFFICIALLY_CONFIRMED: { es: "Confirmado oficialmente", en: "Officially confirmed", pt: "Confirmado oficialmente", fr: "Confirmé officiellement", color: "#27ae60" },
+  DISPUTED: { es: "En disputa", en: "Disputed", pt: "Em disputa", fr: "Contesté", color: "#f2994a" },
+  FALSE: { es: "Falso", en: "False", pt: "Falso", fr: "Faux", color: "#eb5757" },
 };
 export const verificationLabel = (state: string) => VERIFICATION_LABEL[state]?.[lang] ?? state;

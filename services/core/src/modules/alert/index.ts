@@ -3,6 +3,7 @@ import {
   ApproximateLocationRequest,
   CategorySubscriptionInput,
   MAX_SAVED_ZONES,
+  SUPPORTED_LANGS,
   SavedZoneInput,
   type SavedZone,
   type SavedZoneKind,
@@ -10,6 +11,7 @@ import {
   UpdateAlertPreferences,
   type AlertKind,
   type AlertMatch,
+  type Lang,
   type CategorySubscription,
   type NotificationStatus,
   type NotificationView,
@@ -60,7 +62,7 @@ interface Recipient { profileId: string; userId: string; match: AlertMatch; pref
 interface PrefRow {
   profile_id: string; enabled: boolean; followed_events: boolean; followed_places: boolean; saved_zones: boolean; near_me: boolean;
   categories: boolean; status_changes: boolean;
-  min_severity: number; max_per_hour: number; quiet_start: number | null; quiet_end: number | null; timezone: string; lang: "es" | "en";
+  min_severity: number; max_per_hour: number; quiet_start: number | null; quiet_end: number | null; timezone: string; lang: Lang;
 }
 
 const toPrefs = (r: PrefRow | undefined): AlertPreferences =>
@@ -150,12 +152,12 @@ export class AlertService {
       created++;
       const recipients = await this.recipients(tx, snap, d);
       if (recipients.length === 0) continue;
-      const text = (lang: "es" | "en") =>
+      const text = (lang: Lang) =>
         alertText(lang, {
           kind: d.kind, category: category?.names[lang] ?? category?.names["es"] ?? snap.categoryCode, place: snap.place?.label ?? null,
           state: snap.publicState, severity: snap.severity,
         });
-      const texts = { es: text("es"), en: text("en") };
+      const texts = Object.fromEntries(SUPPORTED_LANGS.map((l) => [l, text(l)])) as Record<Lang, ReturnType<typeof text>>;
       await tx.query(
         `INSERT INTO alert.notifications (id, alert_id, profile_id, user_id, match, title, body)
          SELECT id, $1, p, u, m, t, b FROM unnest($2::uuid[], $3::uuid[], $4::uuid[], $5::text[], $6::text[], $7::text[]) AS x(id, p, u, m, t, b)

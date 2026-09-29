@@ -75,7 +75,7 @@ export default function AdminCostScreen() {
           {d.budgets.map((b) => (
             <View key={b.key} style={styles.row}>
               <View style={[styles.dot, { backgroundColor: TONE[budgetTone(b.percent)] }]} />
-              <Text style={styles.rowLabel}>{b.key} · {b.period === "DAILY" ? "24 h" : lang === "es" ? "mes" : "month"}</Text>
+              <Text style={styles.rowLabel}>{b.key} · {b.period === "DAILY" ? "24 h" : t("costMonth")}</Text>
               <Text style={styles.amount}>{usd(b.spentUsd)} / {usd(b.limitUsd)}</Text>
             </View>
           ))}

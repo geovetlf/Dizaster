@@ -1,10 +1,12 @@
-import type { CostDashboard } from "@dizaster/contracts";
+import type { CostDashboard, Lang } from "@dizaster/contracts";
 
 /** US$ con los decimales que importan: céntimos normalmente, más precisión para importes minúsculos. */
-export function formatUsd(n: number | null, lang: "es" | "en"): string | null {
+const NUMBER_LOCALE: Record<Lang, string> = { es: "es-PE", en: "en-US", pt: "pt-BR", fr: "fr-FR" };
+
+export function formatUsd(n: number | null, lang: Lang): string | null {
   if (n === null) return null;
   const digits = n !== 0 && Math.abs(n) < 0.01 ? 4 : 2;
-  return `US$ ${n.toLocaleString(lang === "es" ? "es-PE" : "en-US", { minimumFractionDigits: digits, maximumFractionDigits: digits })}`;
+  return `US$ ${n.toLocaleString(NUMBER_LOCALE[lang], { minimumFractionDigits: digits, maximumFractionDigits: digits })}`;
 }
 
 export function formatBytes(n: number): string {

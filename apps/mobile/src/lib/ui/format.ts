@@ -1,13 +1,18 @@
-import type { AreaSearchResult, BBox, FeedPost, MediaView } from "@dizaster/contracts";
+import type { AreaSearchResult, BBox, FeedPost, Lang, MediaView } from "@dizaster/contracts";
 
-type Lang = "es" | "en";
+const WORDS: Record<Lang, { now: string; ago: (x: string) => string; over: (km: string) => string; within: (km: string) => string }> = {
+  es: { now: "Ahora", ago: (x) => `Hace ${x}`, over: (km) => `a más de ${km} km`, within: (km) => `a menos de ${km} km` },
+  en: { now: "Now", ago: (x) => `${x} ago`, over: (km) => `over ${km} km away`, within: (km) => `within ${km} km` },
+  pt: { now: "Agora", ago: (x) => `Há ${x}`, over: (km) => `a mais de ${km} km`, within: (km) => `a menos de ${km} km` },
+  fr: { now: "À l'instant", ago: (x) => `Il y a ${x}`, over: (km) => `à plus de ${km} km`, within: (km) => `à moins de ${km} km` },
+};
 
 /** "Hace 12 min", "Hace 3 h", "Hace 2 d". */
 export function timeAgo(iso: string, lang: Lang, now = new Date()): string {
   const s = Math.max(0, Math.round((now.getTime() - new Date(iso).getTime()) / 1000));
-  if (s < 60) return lang === "es" ? "Ahora" : "Now";
-  const [n, unit] = s < 3600 ? [Math.floor(s / 60), "min"] : s < 86_400 ? [Math.floor(s / 3600), "h"] : [Math.floor(s / 86_400), "d"];
-  return lang === "es" ? `Hace ${n} ${unit}` : `${n} ${unit} ago`;
+  if (s < 60) return WORDS[lang].now;
+  const [n, unit] = s < 3600 ? [Math.floor(s / 60), "min"] : s < 86_400 ? [Math.floor(s / 3600), "h"] : [Math.floor(s / 86_400), lang === "fr" ? "j" : "d"];
+  return WORDS[lang].ago(`${n} ${unit}`);
 }
 
 /** "a menos de 2 km" a partir del tramo que da el servidor ("<2km"). */
@@ -15,8 +20,7 @@ export function distanceLabel(bucket: string | null, lang: Lang): string | null 
   if (!bucket) return null;
   const m = /^([<>])(\d+)km$/.exec(bucket);
   if (!m) return null;
-  if (m[1] === ">") return lang === "es" ? `a más de ${m[2]} km` : `over ${m[2]} km away`;
-  return lang === "es" ? `a menos de ${m[2]} km` : `within ${m[2]} km`;
+  return m[1] === ">" ? WORDS[lang].over(m[2]!) : WORDS[lang].within(m[2]!);
 }
 
 /**
