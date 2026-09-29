@@ -19,7 +19,7 @@ import { LocalDiskStorage, MediaService, S3Storage, type StorageProvider } from 
 import { QualityService } from "./modules/quality/index.js";
 import { ReferenceData } from "./modules/reference/index.js";
 import { ReportService } from "./modules/report/index.js";
-import { PostComposer, SocialService } from "./modules/social/index.js";
+import { BusinessService, PostComposer, SocialService } from "./modules/social/index.js";
 import { VerificationService } from "./modules/verification/index.js";
 
 /** Raíz de composición: el único lugar que conoce todas las implementaciones concretas. */
@@ -46,6 +46,7 @@ export interface Container {
   trust: TrustService;
   quality: QualityService;
   composer: PostComposer;
+  business: BusinessService;
   meter: Meter;
 }
 
@@ -77,7 +78,8 @@ export function buildContainer(env: AppEnv, overrides: { db?: Db; clock?: Clock;
     attestation: overrides.attestation ?? new DevAttestationVerifier(),
     limits: { reportsPerHour: env.REPORTS_PER_HOUR_LIMIT, presenceRetentionDays: env.PRESENCE_RETENTION_DAYS },
   });
-  const feed = new FeedService(social, events, media, ref, geo);
+  const business = new BusinessService(db);
+  const feed = new FeedService(social, events, media, ref, geo, business);
   const dispatcher = new OutboxDispatcher(db);
   events.registerHandlers(dispatcher);
   verification.registerHandlers(dispatcher);
@@ -100,9 +102,9 @@ export function buildContainer(env: AppEnv, overrides: { db?: Db; clock?: Clock;
     const admins = await identity.usersWithRole(db, "admin");
     await alerts.notifyAdmins(admins, (lang) => budgetAlertText(lang, e.payload), "dizaster://admin-cost", `budget:${e.payload.key}`);
   });
-  const composer = new PostComposer(db, social, media, events);
+  const composer = new PostComposer(db, social, media, events, business);
   const quality = new QualityService(db, clock, { cost, events, verification, alerts, ingestion, moderation });
-  return { env, db, clock, ref, geo, social, identity, events, ingestion, ingestionScheduler, verification, media, storage, reports, feed, alerts, dispatcher, cost, moderation, trust, quality, composer, meter };
+  return { env, db, clock, ref, geo, social, identity, events, ingestion, ingestionScheduler, verification, media, storage, reports, feed, alerts, dispatcher, cost, moderation, trust, quality, composer, business, meter };
 }
 
 /** APNs y FCM directos. Si falta la credencial de una plataforma, sus avisos quedan solo en el historial. */

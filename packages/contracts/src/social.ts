@@ -18,9 +18,12 @@ export const FeedQuery = z.object({
 });
 export type FeedQuery = z.infer<typeof FeedQuery>;
 
-/** Autor visible. Si el post es seudónimo no hay nombre ni handle: solo la etiqueta. */
+/**
+ * Autor visible. Si el post es seudónimo no hay nombre ni handle: solo la etiqueta. Si lo publicó un negocio,
+ * `business` trae su estado de verificación (y el handle es el del negocio, nunca el de quien lo administra).
+ */
 export type PostAuthor =
-  | { pseudonymous: false; handle: string; displayName: string }
+  | { pseudonymous: false; handle: string; displayName: string; business?: { verification: "UNVERIFIED" | "VERIFIED" | "INSTITUTIONAL_OFFICIAL" } }
   | { pseudonymous: true };
 
 export interface FeedPost {
@@ -63,7 +66,7 @@ export interface CommentView {
 }
 
 /** Qué se puede seguir en V1 (en la URL): personas, eventos, lugares del índice geográfico y etiquetas. */
-export const FollowTarget = z.enum(["profile", "event", "place", "tag"]);
+export const FollowTarget = z.enum(["profile", "event", "place", "tag", "business"]);
 export type FollowTarget = z.infer<typeof FollowTarget>;
 
 /** Perfil público. Nunca incluye los posts seudónimos de la persona ni cuenta con ellos. */
@@ -97,6 +100,7 @@ export interface MyFollows {
   events: { id: string }[];
   places: { id: string; name: string; label: string }[];
   tags: { tag: string; display: string }[];
+  businesses: { handle: string; name: string }[];
 }
 
 export const ProfilePostsQuery = z.object({

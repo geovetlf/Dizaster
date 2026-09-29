@@ -41,6 +41,8 @@ const ALLOWED: Record<FlagTargetType, ModerationActionType[]> = {
   POST: ["HIDE", "REMOVE", "RESTORE", "LIMIT", "WARN_USER", "SUSPEND_USER", "UNSUSPEND_USER", "DISMISS"],
   COMMENT: ["HIDE", "REMOVE", "RESTORE", "WARN_USER", "SUSPEND_USER", "UNSUSPEND_USER", "DISMISS"],
   PROFILE: ["WARN_USER", "SUSPEND_USER", "UNSUSPEND_USER", "DISMISS"],
+  // Retirar un negocio lo oculta con todos sus posts; las acciones sobre la cuenta afectan a quien lo administra.
+  BUSINESS: ["REMOVE", "RESTORE", "WARN_USER", "SUSPEND_USER", "UNSUSPEND_USER", "DISMISS"],
   EVENT: ["MARK_DISPUTED", "DISMISS"],
 };
 /** Acciones que cierran el caso (las demás, como avisar, lo dejan abierto). */
@@ -231,6 +233,9 @@ export class ModerationService {
       if (p.targetType === "POST") {
         const state = ({ HIDE: "HIDDEN", REMOVE: "REMOVED", RESTORE: "VISIBLE", LIMIT: "LIMITED" } as const)[p.action as "HIDE"];
         if (state) await this.social.setPostModeration(tx, p.targetId, state);
+      } else if (p.targetType === "BUSINESS") {
+        const state = ({ REMOVE: "REMOVED", RESTORE: "VISIBLE" } as const)[p.action as "REMOVE"];
+        if (state) await this.social.setBusinessModeration(tx, p.targetId, state);
       } else if (p.targetType === "COMMENT") {
         const state = ({ HIDE: "HIDDEN", REMOVE: "REMOVED", RESTORE: "VISIBLE" } as const)[p.action as "HIDE"];
         if (state) await this.social.setCommentModeration(tx, p.targetId, state);
@@ -330,6 +335,7 @@ export class ModerationService {
 
   private async resolveTarget(q: Queryable, type: FlagTargetType, raw: string): Promise<string> {
     if (type === "PROFILE") return this.social.profileIdByHandle(q, raw);
+    if (type === "BUSINESS") return this.social.businessIdForModeration(q, raw);
     const id = parse(z.uuid(), raw);
     if (type === "EVENT") {
       await this.events.getEvent(q, id);

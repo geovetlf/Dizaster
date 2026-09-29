@@ -203,11 +203,25 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | App: redactar, `#` y `@` tocables, pantalla de etiqueta, etiquetas en búsqueda, iOS y Android | ✅ | `app/compose.tsx`, `app/tag/[tag].tsx`, `components/rich-text.tsx` |
 | Aviso push por mención | ⏳ | decisión de producto (hoy solo se avisa de EVENTs) |
 
+## Etapa 17 — Perfiles de negocio (hecha)
+
+| Área | Estado | Dónde |
+|---|---|---|
+| Crear, editar y borrar negocios (máx. 3 por persona), handle único y reservado | ✅ | `social/business.ts`, `/v1/businesses`, ADR 0028 |
+| Publicar como negocio (nunca seudónimo; nunca reportes, D-04) | ✅ | `PostComposer`, `asBusiness` |
+| Seguir negocios, búsqueda y página con sus posts | ✅ | `/v1/follows/business/:handle`, `/v1/businesses?q=` |
+| Verificación manual y gratuita por administración, sello en la app | ✅ | `PUT /v1/admin/businesses/:handle/verification` |
+| Moderación de negocios (retirar, restaurar, sanciones a quien lo administra) | ✅ | `ModerationService`, objetivo `BUSINESS` |
+| App: mis negocios, formulario, página de negocio, "Publicar como", búsqueda, iOS y Android | ✅ | `app/my-businesses.tsx`, `app/business-edit.tsx`, `app/b/[handle].tsx` |
+| Mencionar/bloquear negocios, varios administradores | ⏳ | siguiente iteración |
+
 ## Siguiente etapa (en orden)
 
 1. **BLOQUEADA** — Identity real: Sign in with Apple, Google y email; App Attest / Play Integrity. Falta: cuentas de
    Apple Developer y Google (client IDs, Service ID, Team ID) y un proveedor de email aprobado (gasto).
-2. Social: perfiles de negocio (sin verificación de pago; D-04: no crean reportes ciudadanos).
+2. Pantalla de sesiones y dispositivos (cerrar sesión en otros dispositivos).
+3. Póster de video y `sim_media` en la deduplicación de EVENTs.
+4. Reputación en la visibilidad del feed y detección de textos idénticos.
 
 ## Requiere acción humana
 

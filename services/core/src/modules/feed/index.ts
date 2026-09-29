@@ -23,12 +23,12 @@ import type { EventService } from "../event/index.js";
 import type { GeoService } from "../geo/index.js";
 import type { MediaService } from "../media/index.js";
 import type { ReferenceData } from "../reference/index.js";
-import type { FeedFilter, FeedRow, FollowType, SocialService } from "../social/index.js";
+import type { BusinessService, FeedFilter, FeedRow, FollowType, SocialService } from "../social/index.js";
 
 /** Radio de "cerca de ti" (sobre ubicaciones públicas ya generalizadas). */
 export const NEARBY_RADIUS_M = 25_000;
 
-const FOLLOW_TYPE: Record<FollowTarget, FollowType> = { profile: "PROFILE", event: "EVENT", place: "PLACE", tag: "TAG" };
+const FOLLOW_TYPE: Record<FollowTarget, FollowType> = { profile: "PROFILE", event: "EVENT", place: "PLACE", tag: "TAG", business: "BUSINESS" };
 
 /**
  * Feed: compone posts (social), estado de verificación (event), lugar (event/geo) y media saneada (media) sin que
@@ -42,6 +42,7 @@ export class FeedService {
     private readonly media: MediaService,
     private readonly ref: ReferenceData,
     private readonly geo: GeoService,
+    private readonly business: BusinessService,
   ) {}
 
   registerHandlers(dispatcher: OutboxDispatcher): void {
@@ -84,6 +85,13 @@ export class FeedService {
     });
   }
 
+  /** Página de un negocio: sus posts, por recientes. */
+  async businessPosts(q: Queryable, handle: string, rawQuery: unknown, viewerProfileId: string | null): Promise<FeedResponse> {
+    const f = parse(ProfilePostsQuery, rawQuery);
+    const authorBusinessId = await this.business.idByHandle(q, handle);
+    return this.page(q, { tab: "for_you", authorBusinessId, ...(f.cursor ? { cursor: decodeCursor(f.cursor) } : {}), limit: f.limit, viewerProfileId });
+  }
+
   /** Posts públicos con una etiqueta, por recientes. */
   async tagPosts(q: Queryable, rawTag: string, rawQuery: unknown, viewerProfileId: string | null): Promise<FeedResponse> {
     const tag = normalizeTag(parse(TagParam, { tag: rawTag }).tag);
@@ -119,7 +127,8 @@ export class FeedService {
     const target = parse(FollowTarget, rawTarget);
     let targetId = rawId;
     if (!follow && target === "tag") targetId = normalizeTag(rawId);
-    if (follow || target === "profile") {
+    if (target === "business") targetId = follow ? await this.business.idByHandle(q, rawId) : await this.social.businessIdForModeration(q, rawId);
+    else if (follow || target === "profile") {
       if (target === "profile") targetId = await this.social.profileIdByHandle(q, rawId);
       else if (target === "event") await this.events.getEvent(q, parse(FollowTargetId.event, rawId));
       else if (target === "tag") targetId = normalizeTag(parse(TagParam, { tag: rawId }).tag);
@@ -137,6 +146,7 @@ export class FeedService {
       events: rows.flatMap((r) => (r.type === "EVENT" ? [{ id: r.targetId }] : [])),
       places,
       tags: rows.flatMap((r) => (r.type === "TAG" ? [{ tag: r.targetId, display: r.displayName ?? r.targetId }] : [])),
+      businesses: [...(await this.business.namesByIds(q, rows.filter((r) => r.type === "BUSINESS").map((r) => r.targetId))).values()],
     };
   }
 

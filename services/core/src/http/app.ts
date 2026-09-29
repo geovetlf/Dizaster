@@ -352,13 +352,51 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
   app.post("/v1/posts", async (req, reply) => {
     const session = requireSession(req);
     reply.status(201);
-    return c.composer.create(session.profileId, req.body);
+    return c.composer.create(session, req.body);
   });
 
   app.delete("/v1/posts/:id", async (req, reply) => {
     const session = requireSession(req);
     await c.composer.delete(session.profileId, parse(IdParam, req.params).id);
     return reply.status(204).send();
+  });
+
+  // ───────────── Negocios (ADR 0028) ─────────────
+  const viewer = (req: FastifyRequest) => (req.session ? { userId: req.session.userId, profileId: req.session.profileId } : null);
+  app.post("/v1/businesses", async (req, reply) => {
+    const session = requireSession(req);
+    reply.status(201);
+    return c.business.create(session, req.body);
+  });
+  app.get("/v1/businesses", async (req, reply) => {
+    reply.header("cache-control", "no-store");
+    return { businesses: await c.business.search(req.query, viewer(req)) };
+  });
+  app.get("/v1/me/businesses", async (req, reply) => {
+    const session = requireSession(req);
+    reply.header("cache-control", "no-store");
+    return { businesses: await c.business.mine(session) };
+  });
+  app.get("/v1/businesses/:handle", async (req, reply) => {
+    reply.header("cache-control", "no-store");
+    return c.business.view(c.db, parse(HandleParam, req.params).handle, viewer(req));
+  });
+  app.put("/v1/businesses/:handle", async (req) => {
+    const session = requireSession(req);
+    return c.business.update(session, parse(HandleParam, req.params).handle, req.body);
+  });
+  app.delete("/v1/businesses/:handle", async (req, reply) => {
+    const session = requireSession(req);
+    await c.business.delete(session, parse(HandleParam, req.params).handle);
+    return reply.status(204).send();
+  });
+  app.get("/v1/businesses/:handle/posts", async (req, reply) => {
+    reply.header("cache-control", "no-store");
+    return c.feed.businessPosts(c.db, parse(HandleParam, req.params).handle, req.query, req.session?.profileId ?? null);
+  });
+  app.put("/v1/admin/businesses/:handle/verification", async (req) => {
+    requireAdmin(req);
+    return c.business.setVerification(parse(HandleParam, req.params).handle, req.body);
   });
 
   app.get("/v1/tags", async (req, reply) => {

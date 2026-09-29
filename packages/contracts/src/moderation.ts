@@ -4,7 +4,7 @@ import { z } from "zod";
  * Moderation Layer (Blueprint §5.21, §13.3): denuncias de usuarios, cola priorizada, acciones auditables,
  * apelaciones y bloqueo entre personas (exigido por las tiendas para contenido generado por usuarios).
  */
-export const FlagTargetType = z.enum(["POST", "COMMENT", "EVENT", "PROFILE"]);
+export const FlagTargetType = z.enum(["POST", "COMMENT", "EVENT", "PROFILE", "BUSINESS"]);
 export type FlagTargetType = z.infer<typeof FlagTargetType>;
 
 /** Motivos: los de riesgo para personas pesan más en la prioridad de la cola. */

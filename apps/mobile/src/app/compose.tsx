@@ -1,6 +1,6 @@
-import { POST_TEXT_MAX, extractMentions, extractTags } from "@dizaster/contracts";
+import { POST_TEXT_MAX, extractMentions, extractTags, type BusinessView } from "@dizaster/contracts";
 import { router, useLocalSearchParams } from "expo-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
 import { MediaAttachments } from "../components/media-attachments";
 import { api } from "../lib/api";
@@ -16,12 +16,16 @@ import { colors, radius, space } from "../theme";
  * menciona, sin sumar al pin ni a la verificación. No usa la ubicación. Igual en Android e iOS.
  */
 export default function ComposeScreen() {
-  const params = useLocalSearchParams<{ eventId?: string; text?: string }>();
+  const params = useLocalSearchParams<{ eventId?: string; text?: string; asBusiness?: string }>();
   const [text, setText] = useState(params.text ?? "");
   const [media, setMedia] = useState<LocalMedia[]>([]);
   const [pseudonymous, setPseudonymous] = useState(false);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
+  // "Publicar como": yo o uno de mis negocios. Un negocio nunca publica de forma seudónima.
+  const [businesses, setBusinesses] = useState<BusinessView[]>([]);
+  const [asBusiness, setAsBusiness] = useState<string | null>(params.asBusiness ?? null);
+  useEffect(() => { api.myBusinesses().then((r) => setBusinesses(r.businesses)).catch(() => undefined); }, []);
 
   const tags = extractTags(text);
   const mentions = extractMentions(text);
@@ -38,7 +42,7 @@ export default function ComposeScreen() {
         if (!r.ok) throw new Error(r.error);
         mediaIds.push(r.mediaId);
       }
-      await api.createPost({ text: text.trim(), mediaIds, anonymityMode: pseudonymous ? "PSEUDONYMOUS" : "PUBLIC", ...(params.eventId ? { eventId: params.eventId } : {}) });
+      await api.createPost({ text: text.trim(), mediaIds, anonymityMode: pseudonymous && !asBusiness ? "PSEUDONYMOUS" : "PUBLIC", ...(asBusiness ? { asBusiness } : {}), ...(params.eventId ? { eventId: params.eventId } : {}) });
       for (const m of media) discardLocal(m);
       router.back();
     } catch (e) {
@@ -67,10 +71,22 @@ export default function ComposeScreen() {
         <Text style={styles.note}>{[...tags.map((x) => `#${x.display}`), ...mentions.map((m) => `@${m}`)].join("  ")}</Text>
       ) : null}
       <MediaAttachments items={media} onChange={setMedia} />
-      <View style={styles.switchRow}>
-        <Text style={styles.rowText}>{t("pseudonymous")}</Text>
-        <Switch value={pseudonymous} onValueChange={setPseudonymous} />
-      </View>
+      {businesses.length > 0 ? (
+        <View style={styles.chips}>
+          <Text style={styles.note}>{t("postAs")}</Text>
+          {[null, ...businesses.map((b) => b.handle)].map((h) => (
+            <Pressable key={h ?? "me"} accessibilityRole="button" accessibilityState={{ selected: asBusiness === h }} style={[styles.chip, asBusiness === h && styles.chipOn]} onPress={() => setAsBusiness(h)}>
+              <Text style={styles.rowText}>{h ? businesses.find((b) => b.handle === h)!.name : t("postAsMe")}</Text>
+            </Pressable>
+          ))}
+        </View>
+      ) : null}
+      {asBusiness ? null : (
+        <View style={styles.switchRow}>
+          <Text style={styles.rowText}>{t("pseudonymous")}</Text>
+          <Switch value={pseudonymous} onValueChange={setPseudonymous} />
+        </View>
+      )}
       <Text style={styles.note}>{t("composeNote")}</Text>
       <Pressable accessibilityRole="button" disabled={busy || problem !== null} style={[styles.send, (busy || problem !== null) && styles.disabled]} onPress={() => void publish()}>
         <Text style={styles.sendText}>{busy ? t("sending") : t("publish")}</Text>
@@ -86,6 +102,9 @@ const styles = StyleSheet.create({
   input: { minHeight: 140, color: colors.text, backgroundColor: colors.surface, borderRadius: radius.md, padding: space.md, fontSize: 16, textAlignVertical: "top" },
   counter: { color: colors.textMuted, fontSize: 12, alignSelf: "flex-end" },
   note: { color: colors.textMuted, fontSize: 13 },
+  chips: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: space.sm },
+  chip: { paddingHorizontal: space.md, paddingVertical: space.sm, borderRadius: radius.pill, backgroundColor: colors.surface },
+  chipOn: { backgroundColor: colors.accentSoft, borderWidth: 1, borderColor: colors.accent },
   switchRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: space.sm },
   rowText: { color: colors.text, fontSize: 15 },
   send: { backgroundColor: colors.accent, borderRadius: radius.pill, paddingVertical: space.md, alignItems: "center", marginTop: space.md },

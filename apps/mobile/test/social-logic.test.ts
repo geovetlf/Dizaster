@@ -1,6 +1,8 @@
 import type { ContextualLocation } from "@dizaster/contracts";
 import { describe, expect, it } from "vitest";
 import { EMPTY_FOLLOWS, isFollowing, withFollow } from "../src/lib/social/follow-state";
+import { BUSINESS_CATEGORIES, SUPPORTED_LANGS } from "@dizaster/contracts";
+import { BUSINESS_CATEGORY_LABEL, telUri, verificationIcon } from "../src/lib/social/business";
 import { composeProblem } from "../src/lib/social/compose";
 import { followablePlace } from "../src/lib/social/place";
 
@@ -50,5 +52,23 @@ describe("etiquetas y publicar", () => {
     expect(composeProblem("x".repeat(2001), [])).toBe("composeTooLong");
     expect(composeProblem("ok", [{ kind: "VIDEO_RECORDED" }, { kind: "VIDEO_RECORDED" }])).toBe("composeOneVideo");
     expect(composeProblem("ok #lima", [{ kind: "IMAGE" }, { kind: "VIDEO_RECORDED" }])).toBeNull();
+  });
+});
+
+describe("negocios", () => {
+  it("cada rubro tiene nombre en todos los idiomas y el sello solo aparece si está verificado", () => {
+    for (const c of BUSINESS_CATEGORIES) for (const l of SUPPORTED_LANGS) expect(BUSINESS_CATEGORY_LABEL[c][l]?.trim(), `${c}/${l}`).toBeTruthy();
+    expect(verificationIcon("UNVERIFIED")).toBeNull();
+    expect(verificationIcon(undefined)).toBeNull();
+    expect(verificationIcon("VERIFIED")).toBe("check-decagram");
+    expect(verificationIcon("INSTITUTIONAL_OFFICIAL")).toBe("bank");
+    expect(telUri("+51 (1) 555-0100")).toBe("tel:+5115550100");
+  });
+
+  it("sigue negocios por handle sin distinguir mayúsculas", () => {
+    const my = withFollow(EMPTY_FOLLOWS, "business", "Farmacia_Sol", true, "Farmacia Sol");
+    expect(my.businesses).toEqual([{ handle: "farmacia_sol", name: "Farmacia Sol" }]);
+    expect(isFollowing(my, "business", "FARMACIA_SOL")).toBe(true);
+    expect(withFollow(my, "business", "farmacia_sol", false).businesses).toEqual([]);
   });
 });

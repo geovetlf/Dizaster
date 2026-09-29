@@ -6,6 +6,7 @@ import { api } from "../lib/api";
 import { LINK_DOMAIN } from "../lib/config";
 import { canBlock } from "../lib/moderation/logic";
 import { openContentMenu, openOwnPostMenu } from "../lib/moderation/menu";
+import { verificationIcon } from "../lib/social/business";
 import { useMe } from "../lib/social/me";
 import { lang, t } from "../lib/i18n";
 import { categoryStyle } from "../lib/ui/categories";
@@ -23,6 +24,7 @@ export function PostCard({ post, categoryName }: { post: FeedPost; categoryName:
   const style = categoryStyle(post.categoryCode);
   const name = post.author.pseudonymous ? t("citizenReporter") : post.author.displayName;
   const where = postWhere(post, lang);
+  const badge = post.author.pseudonymous ? null : verificationIcon(post.author.business?.verification);
 
   async function toggleLike() {
     const next = !liked;
@@ -54,14 +56,17 @@ export function PostCard({ post, categoryName }: { post: FeedPost; categoryName:
         <Pressable
           accessibilityRole={post.author.pseudonymous ? "text" : "link"}
           disabled={post.author.pseudonymous}
-          onPress={() => { if (!post.author.pseudonymous) router.push(`/u/${post.author.handle}`); }}
+          onPress={() => { if (!post.author.pseudonymous) router.push(post.author.business ? `/b/${post.author.handle}` : `/u/${post.author.handle}`); }}
           style={styles.author}
         >
           <View style={[styles.avatar, post.author.pseudonymous && styles.avatarAnon]}>
             {post.author.pseudonymous ? <Icon name="shield-account" size={22} color={colors.textMuted} /> : <Text style={styles.avatarText}>{initials(name)}</Text>}
           </View>
           <View style={styles.headText}>
-            <Text style={styles.name} numberOfLines={1}>{name}</Text>
+            <View style={styles.nameRow}>
+              <Text style={styles.name} numberOfLines={1}>{name}</Text>
+              {badge ? <Icon name={badge} size={16} color={colors.link} /> : null}
+            </View>
             <Text style={styles.meta} numberOfLines={1}>{where}</Text>
           </View>
         </Pressable>
@@ -149,7 +154,8 @@ const styles = StyleSheet.create({
   avatarText: { color: colors.text, fontWeight: "700" },
   headText: { flex: 1 },
   author: { flex: 1, flexDirection: "row", alignItems: "center", gap: space.md },
-  name: { color: colors.text, fontSize: 16, fontWeight: "700" },
+  name: { color: colors.text, fontSize: 16, fontWeight: "700", flexShrink: 1 },
+  nameRow: { flexDirection: "row", alignItems: "center", gap: 4 },
   meta: { color: colors.textMuted, fontSize: 13, marginTop: 2 },
   badge: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 10, paddingVertical: 5, borderRadius: radius.sm, maxWidth: 150 },
   badgeText: { color: colors.white, fontSize: 12, fontWeight: "700" },

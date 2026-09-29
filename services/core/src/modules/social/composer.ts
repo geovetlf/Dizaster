@@ -4,6 +4,7 @@ import { DomainError, notFound } from "../../platform/errors.js";
 import { publish } from "../../platform/outbox.js";
 import type { EventService } from "../event/index.js";
 import type { MediaService } from "../media/index.js";
+import type { BusinessService } from "./business.js";
 import type { SocialService } from "./index.js";
 
 /** Publicaciones sin reporte por persona y hora (anti-spam barato; los reportes tienen su propio cupo). */
@@ -20,18 +21,25 @@ export class PostComposer {
     private readonly social: SocialService,
     private readonly media: MediaService,
     private readonly events: EventService,
+    private readonly business: BusinessService,
   ) {}
 
-  async create(profileId: string, raw: unknown): Promise<{ postId: string; eventId: string | null; tags: string[]; mentions: string[] }> {
+  async create(session: { userId: string; profileId: string }, raw: unknown): Promise<{ postId: string; eventId: string | null; tags: string[]; mentions: string[] }> {
+    const { profileId } = session;
     const parsed = CreatePostRequest.safeParse(raw);
     if (!parsed.success) throw new DomainError("VALIDATION", parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; "));
     const req = parsed.data;
     const recent = await this.db.query<{ n: number }>(
-      `SELECT count(*)::int AS n FROM social.posts WHERE author_id = $1 AND kind = 'STANDARD' AND created_at > now() - interval '1 hour'`,
-      [profileId],
+      `SELECT count(*)::int AS n FROM social.posts p
+        WHERE p.kind = 'STANDARD' AND p.created_at > now() - interval '1 hour'
+          AND (p.author_id = $1 OR p.author_id IN (SELECT id FROM social.business_profiles WHERE owner_user_id = $2))`,
+      [profileId, session.userId],
     );
     if (recent.rows[0]!.n >= POSTS_PER_HOUR) throw new DomainError("RATE_LIMITED", "Demasiadas publicaciones en la última hora", 429);
 
+    // Publicar como negocio: solo quien lo administra, nunca de forma seudónima. El cupo por hora es de la persona.
+    const businessId = req.asBusiness ? await this.business.ownedId(this.db, session.userId, req.asBusiness, { toPublish: true }) : null;
+    if (businessId && req.anonymityMode === "PSEUDONYMOUS") throw new DomainError("VALIDATION", "Un negocio no publica de forma seudónima");
     const media = await this.media.assertAttachable(this.db, profileId, req.mediaIds);
     if (media.filter((m) => m.kind === "VIDEO_RECORDED").length > 1) throw new DomainError("VALIDATION", "Solo un video por publicación");
 
@@ -52,6 +60,7 @@ export class PostComposer {
         authorVisibility: req.anonymityMode,
         categoryCode: event?.categoryCode ?? null,
         publicPoint: null,
+        businessId,
       });
       await this.social.attachMedia(tx, postId, media);
       for (const mediaId of await this.media.reuseSuspected(tx, media.map((m) => m.id))) await publish(tx, "MediaReuseDetected", { mediaId });

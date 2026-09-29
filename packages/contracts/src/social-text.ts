@@ -83,6 +83,8 @@ export const CreatePostRequest = z.object({
   /** EVENT que el post menciona. No alimenta pin ni verificación: solo lo enlaza. */
   eventId: z.uuid().optional(),
   anonymityMode: z.enum(["PUBLIC", "PSEUDONYMOUS"]).default("PUBLIC"),
+  /** Publicar como uno de mis negocios (handle). Un negocio nunca publica de forma seudónima. */
+  asBusiness: z.string().trim().toLowerCase().max(30).optional(),
 });
 export type CreatePostRequest = z.infer<typeof CreatePostRequest>;
 

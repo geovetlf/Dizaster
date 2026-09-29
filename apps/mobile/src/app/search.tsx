@@ -1,10 +1,11 @@
-import type { AreaSearchResult, CategoryCatalog, ProfileSearchResult, TagView } from "@dizaster/contracts";
+import type { AreaSearchResult, BusinessView, CategoryCatalog, ProfileSearchResult, TagView } from "@dizaster/contracts";
 import { router } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import { Pressable, SectionList, StyleSheet, Text, TextInput, View } from "react-native";
 import { Icon } from "../components/icon";
 import { api } from "../lib/api";
 import { lang, t } from "../lib/i18n";
+import { BUSINESS_CATEGORY_LABEL } from "../lib/social/business";
 import { categoryStyle } from "../lib/ui/categories";
 import { areaRow, bboxParam, initials } from "../lib/ui/format";
 import { useCoarseLocation } from "../lib/ui/use-coarse-location";
@@ -19,6 +20,7 @@ type Row =
   | { type: "area"; area: AreaSearchResult }
   | { type: "person"; person: ProfileSearchResult }
   | { type: "tag"; tag: TagView }
+  | { type: "business"; business: BusinessView }
   | { type: "category"; code: string; name: string };
 
 /**
@@ -30,6 +32,7 @@ export default function SearchScreen() {
   const [areas, setAreas] = useState<AreaSearchResult[]>([]);
   const [people, setPeople] = useState<ProfileSearchResult[]>([]);
   const [tags, setTags] = useState<TagView[]>([]);
+  const [businesses, setBusinesses] = useState<BusinessView[]>([]);
   const location = useCoarseLocation();
   const near = location.point;
 
@@ -40,13 +43,14 @@ export default function SearchScreen() {
 
   useEffect(() => {
     const text = q.trim();
-    if (text.length < 2) { setAreas([]); setPeople([]); setTags([]); return; }
+    if (text.length < 2) { setAreas([]); setPeople([]); setTags([]); setBusinesses([]); return; }
     let live = true;
     // Espera a que el usuario deje de escribir: menos peticiones, menos coste.
     const timer = setTimeout(() => {
       api.areas(text, near).then((r) => { if (live) setAreas(r.areas); }).catch(() => { if (live) setAreas([]); });
       api.searchProfiles(text).then((r) => { if (live) setPeople(r.profiles); }).catch(() => { if (live) setPeople([]); });
       api.searchTags(text).then((r) => { if (live) setTags(r.tags); }).catch(() => { if (live) setTags([]); });
+      api.searchBusinesses(text).then((r) => { if (live) setBusinesses(r.businesses); }).catch(() => { if (live) setBusinesses([]); });
     }, 300);
     return () => { live = false; clearTimeout(timer); };
   }, [q, near]);
@@ -54,6 +58,7 @@ export default function SearchScreen() {
   const sections = [
     ...(areas.length ? [{ title: t("searchPlaces"), data: areas.map((area): Row => ({ type: "area", area })) }] : []),
     ...(people.length ? [{ title: t("searchPeople"), data: people.map((person): Row => ({ type: "person", person })) }] : []),
+    ...(businesses.length ? [{ title: t("searchBusinesses"), data: businesses.map((business): Row => ({ type: "business", business })) }] : []),
     ...(tags.length ? [{ title: t("searchTags"), data: tags.map((tag): Row => ({ type: "tag", tag })) }] : []),
     {
       title: t("searchCategories"),
@@ -70,7 +75,7 @@ export default function SearchScreen() {
       <SectionList
         sections={sections}
         keyboardShouldPersistTaps="handled"
-        keyExtractor={(r) => (r.type === "area" ? r.area.id : r.type === "person" ? `@${r.person.handle}` : r.type === "tag" ? `#${r.tag.tag}` : r.code)}
+        keyExtractor={(r) => (r.type === "area" ? r.area.id : r.type === "person" ? `@${r.person.handle}` : r.type === "tag" ? `#${r.tag.tag}` : r.type === "business" ? `b:${r.business.handle}` : r.code)}
         renderSectionHeader={({ section }) => <Text style={styles.note}>{section.title}</Text>}
         renderItem={({ item }) => {
           if (item.type === "area") {
@@ -96,6 +101,17 @@ export default function SearchScreen() {
                 <View style={styles.rowBody}>
                   <Text style={styles.rowText}>{item.person.displayName}</Text>
                   <Text style={styles.rowSub}>@{item.person.handle} · {item.person.followerCount} {t("followers")}</Text>
+                </View>
+              </Pressable>
+            );
+          }
+          if (item.type === "business") {
+            return (
+              <Pressable accessibilityRole="link" style={styles.row} onPress={() => router.push(`/b/${item.business.handle}`)}>
+                <Icon name="storefront-outline" size={22} color={colors.textMuted} />
+                <View style={styles.rowBody}>
+                  <Text style={styles.rowText}>{item.business.name}</Text>
+                  <Text style={styles.rowSub}>@{item.business.handle} · {BUSINESS_CATEGORY_LABEL[item.business.category][lang]}</Text>
                 </View>
               </Pressable>
             );

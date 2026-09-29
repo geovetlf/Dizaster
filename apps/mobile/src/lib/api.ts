@@ -1,4 +1,4 @@
-import type { SavedZone, SavedZoneInput, AppealView, CaseDetail, CaseSummary, CreateFlagRequest, ModerationActionType, ModerationNotice, CostDashboard, KillSwitchView, QualityReport, CreatePostRequest, TagView, AlertPreferences, CategorySubscription, CategorySubscriptionInput, NotificationsResponse, AppConfig, AreaSearchResult, FollowTarget, MyFollows, ProfileSearchResult, ProfileView, CommentView, CreateUploadRequest, FeedResponse, FeedTab, CreateUploadResponse, DevicePlatform, MediaView, RegisterPushTokenRequest, EventMapResponse, EventSummary, NearbyEventsResponse, SubmitReportRequest, SubmitReportResponse, TimelineEntryView } from "@dizaster/contracts";
+import type { SavedZone, SavedZoneInput, AppealView, CaseDetail, CaseSummary, CreateFlagRequest, ModerationActionType, ModerationNotice, CostDashboard, KillSwitchView, QualityReport, CreatePostRequest, TagView, BusinessView, CreateBusinessRequest, UpdateBusinessRequest, AlertPreferences, CategorySubscription, CategorySubscriptionInput, NotificationsResponse, AppConfig, AreaSearchResult, FollowTarget, MyFollows, ProfileSearchResult, ProfileView, CommentView, CreateUploadRequest, FeedResponse, FeedTab, CreateUploadResponse, DevicePlatform, MediaView, RegisterPushTokenRequest, EventMapResponse, EventSummary, NearbyEventsResponse, SubmitReportRequest, SubmitReportResponse, TimelineEntryView } from "@dizaster/contracts";
 import { canRetryWithRefresh, singleFlight } from "./auth/refresh";
 import { API_URL } from "./config";
 import type { Sender } from "./report/queue";
@@ -139,6 +139,15 @@ export const api = {
   tagPosts: (tag: string, cursor: string | null) =>
     request<FeedResponse>(`/v1/tags/${encodeURIComponent(tag)}/posts${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`),
   searchTags: (q: string) => request<{ tags: TagView[] }>(`/v1/tags?${new URLSearchParams({ q })}`),
+  createBusiness: (body: CreateBusinessRequest) => request<BusinessView>("/v1/businesses", { method: "POST", body: JSON.stringify(body) }),
+  updateBusiness: (handle: string, body: UpdateBusinessRequest) =>
+    request<BusinessView>(`/v1/businesses/${encodeURIComponent(handle)}`, { method: "PUT", body: JSON.stringify(body) }),
+  deleteBusiness: (handle: string) => request<void>(`/v1/businesses/${encodeURIComponent(handle)}`, { method: "DELETE" }),
+  business: (handle: string) => request<BusinessView>(`/v1/businesses/${encodeURIComponent(handle)}`),
+  businessPosts: (handle: string, cursor: string | null) =>
+    request<FeedResponse>(`/v1/businesses/${encodeURIComponent(handle)}/posts${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`),
+  myBusinesses: () => request<{ businesses: BusinessView[] }>("/v1/me/businesses"),
+  searchBusinesses: (q: string) => request<{ businesses: BusinessView[] }>(`/v1/businesses?${new URLSearchParams({ q })}`),
   submitReport: (body: SubmitReportRequest) => request<SubmitReportResponse>("/v1/reports", { method: "POST", body: JSON.stringify(body) }),
 };
 

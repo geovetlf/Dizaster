@@ -19,6 +19,8 @@ export interface CreatePostInput {
   categoryCode?: string | null;
   /** Debe llegar YA generalizada; social nunca recibe la ubicación precisa. */
   publicPoint: GeoPoint | null;
+  /** Publica un negocio (ya comprobado que la persona lo administra). Nunca seudónimo. */
+  businessId?: string | null;
 }
 
 export interface FeedRow {
@@ -53,9 +55,11 @@ export interface FeedFilter {
   authorProfileId?: string;
   /** Etiqueta en forma canónica. */
   tag?: string;
+  /** Posts de un negocio (su página). */
+  authorBusinessId?: string;
 }
 
-export type FollowType = "PROFILE" | "EVENT" | "PLACE" | "TAG";
+export type FollowType = "PROFILE" | "EVENT" | "PLACE" | "TAG" | "BUSINESS";
 const MAX_FOLLOWS = 2000;
 /** "Para ti" ordena lo reciente: fuera de esta ventana, el contenido se encuentra por lugar, evento o perfil. */
 export const FOR_YOU_WINDOW_DAYS = 30;
@@ -82,13 +86,16 @@ function rankSql(nearSql: string | null): string {
     + (coalesce(s.severity, 1) - 1) * ${B.perSeverityStep}
     + ${distance}
     + CASE WHEN p.author_visibility = 'PUBLIC' AND EXISTS (
-        SELECT 1 FROM social.follows fa WHERE fa.follower_profile_id = $2 AND fa.target_type = 'PROFILE' AND fa.target_id = p.author_id::text)
+        SELECT 1 FROM social.follows fa WHERE fa.follower_profile_id = $2 AND fa.target_type = p.author_type AND fa.target_id = p.author_id::text)
       THEN ${B.followedAuthor} ELSE 0 END`;
 }
 
 export class SocialService {
   registerHandlers(dispatcher: OutboxDispatcher): void {
-    dispatcher.on("AccountDeleted", "social.anonymize-account", (e, tx) => this.anonymizeProfile(tx, e.payload.profileId));
+    dispatcher.on("AccountDeleted", "social.anonymize-account", async (e, tx) => {
+      await this.anonymizeProfile(tx, e.payload.profileId);
+      await this.deleteBusinessesOf(tx, e.payload.userId);
+    });
   }
 
   /**
@@ -114,6 +121,20 @@ export class SocialService {
     await q.query(`DELETE FROM social.blocks WHERE blocker_profile_id = $1 OR blocked_profile_id = $1`, [profileId]);
   }
 
+  /** Borrado de cuenta: sus negocios desaparecen con sus posts (la tabla conserva el handle para que nadie lo suplante). */
+  async deleteBusinessesOf(q: Queryable, userId: string): Promise<void> {
+    const { rows } = await q.query<{ id: string }>(
+      `UPDATE social.business_profiles SET deleted_at = coalesce(deleted_at, now()), description = NULL, address_public = NULL,
+              contact_phone = NULL, contact_url = NULL, updated_at = now()
+        WHERE owner_user_id = $1 RETURNING id`,
+      [userId],
+    );
+    const ids = rows.map((r) => r.id);
+    if (ids.length === 0) return;
+    await q.query(`UPDATE social.posts SET text = NULL, deleted_at = coalesce(deleted_at, now()), updated_at = now() WHERE author_type = 'BUSINESS' AND author_id = ANY($1)`, [ids]);
+    await q.query(`DELETE FROM social.follows WHERE target_type = 'BUSINESS' AND target_id = ANY($1::text[])`, [ids]);
+  }
+
   async createProfile(tx: Queryable, input: { userId: string; handleHint: string }): Promise<{ id: string; handle: string }> {
     const id = newId();
     const base = input.handleHint.toLowerCase().replace(/[^a-z0-9_]/g, "").slice(0, 20) || "usuario";
@@ -134,10 +155,10 @@ export class SocialService {
     const id = newId();
     await tx.query(
       `INSERT INTO social.posts (id, author_type, author_id, kind, author_visibility, text, category_code, public_point)
-       VALUES ($1, 'PROFILE', $2, $3, $4, $5, $8,
+       VALUES ($1, $9, $2, $3, $4, $5, $8,
                CASE WHEN $6::float8 IS NULL THEN NULL ELSE ST_SetSRID(ST_MakePoint($6, $7), 4326)::geography END)`,
-      [id, input.authorProfileId, input.kind, input.authorVisibility, input.text, input.publicPoint?.lng ?? null, input.publicPoint?.lat ?? null,
-        input.categoryCode ?? null],
+      [id, input.businessId ?? input.authorProfileId, input.kind, input.businessId ? "PUBLIC" : input.authorVisibility, input.text,
+        input.publicPoint?.lng ?? null, input.publicPoint?.lat ?? null, input.categoryCode ?? null, input.businessId ? "BUSINESS" : "PROFILE"],
     );
     return id;
   }
@@ -173,9 +194,11 @@ export class SocialService {
       id: string; kind: string; text: string | null; author_visibility: string; handle: string; created_at: Date;
       lat: number | null; lng: number | null;
     }>(
-      `SELECT p.id, p.kind, p.text, p.author_visibility, pr.handle, p.created_at,
+      `SELECT p.id, p.kind, p.text, p.author_visibility, coalesce(pr.handle, bp.handle) AS handle, p.created_at,
               ST_Y(p.public_point::geometry) AS lat, ST_X(p.public_point::geometry) AS lng
-         FROM social.posts p JOIN social.profiles pr ON pr.id = p.author_id
+         FROM social.posts p
+           LEFT JOIN social.profiles pr ON p.author_type = 'PROFILE' AND pr.id = p.author_id
+           LEFT JOIN social.business_profiles bp ON p.author_type = 'BUSINESS' AND bp.id = p.author_id
         WHERE p.id = $1 AND p.deleted_at IS NULL AND p.moderation_state IN ('VISIBLE','LIMITED')`,
       [postId],
     );
@@ -206,13 +229,16 @@ export class SocialService {
     // Bloqueos: se ocultan los posts con nombre del bloqueado. Los seudónimos se mantienen: pueden ser avisos de
     // seguridad y ocultarlos no aporta nada (el bloqueador no sabe quién los escribió).
     if (f.viewerProfileId) {
-      where.push(`NOT (p.author_visibility = 'PUBLIC' AND EXISTS (SELECT 1 FROM social.blocks b WHERE b.blocker_profile_id = $2 AND b.blocked_profile_id = p.author_id))`);
+      where.push(`NOT (p.author_type = 'PROFILE' AND p.author_visibility = 'PUBLIC' AND EXISTS (SELECT 1 FROM social.blocks b WHERE b.blocker_profile_id = $2 AND b.blocked_profile_id = p.author_id))`);
     }
     const nearSql = f.near ? `ST_SetSRID(ST_MakePoint($${params.push(f.near.lng)}, $${params.push(f.near.lat)}), 4326)::geography` : null;
     if (f.category) {
       where.push(`(p.category_code = $${params.push(f.category)} OR p.category_code LIKE $${params.push(`${f.category}.%`)})`);
     }
-    if (f.authorProfileId) where.push(`p.author_id = $${params.push(f.authorProfileId)}::uuid AND p.author_visibility = 'PUBLIC'`);
+    if (f.authorProfileId) where.push(`p.author_type = 'PROFILE' AND p.author_id = $${params.push(f.authorProfileId)}::uuid AND p.author_visibility = 'PUBLIC'`);
+    if (f.authorBusinessId) where.push(`p.author_type = 'BUSINESS' AND p.author_id = $${params.push(f.authorBusinessId)}::uuid`);
+    // Un negocio retirado o borrado deja de aparecer con todos sus posts.
+    where.push(`(p.author_type = 'PROFILE' OR (bp.deleted_at IS NULL AND bp.moderation_state = 'VISIBLE'))`);
     if (f.tag) {
       where.push(`EXISTS (SELECT 1 FROM social.post_tags pt JOIN social.tags tg ON tg.id = pt.tag_id WHERE pt.post_id = p.id AND tg.normalized = $${params.push(f.tag)})`);
     }
@@ -220,13 +246,14 @@ export class SocialService {
     if (f.tab === "videos") where.push(`EXISTS (SELECT 1 FROM social.post_media v WHERE v.post_id = p.id AND v.kind = 'VIDEO_RECORDED')`);
     if (f.tab === "following") {
       const followed = (type: string) => `(SELECT target_id FROM social.follows WHERE follower_profile_id = $2 AND target_type = '${type}')`;
-      where.push(`((p.author_visibility = 'PUBLIC' AND p.author_id::text IN ${followed("PROFILE")})
+      where.push(`((p.author_visibility = 'PUBLIC' AND p.author_type = 'PROFILE' AND p.author_id::text IN ${followed("PROFILE")})
+                   OR (p.author_type = 'BUSINESS' AND p.author_id::text IN ${followed("BUSINESS")})
                    OR le.event_id::text IN ${followed("EVENT")}
                    OR s.region_id IN ${followed("PLACE")} OR s.district_id IN ${followed("PLACE")}
                    OR EXISTS (SELECT 1 FROM social.post_tags pt JOIN social.tags tg ON tg.id = pt.tag_id
                                WHERE pt.post_id = p.id AND tg.normalized IN ${followed("TAG")}))`);
     }
-    const ranked = f.tab === "for_you" && !f.authorProfileId && !f.tag;
+    const ranked = f.tab === "for_you" && !f.authorProfileId && !f.authorBusinessId && !f.tag;
     if (ranked) where.push(`p.created_at > now() - make_interval(days => ${FOR_YOU_WINDOW_DAYS})`);
     const score = ranked ? rankSql(nearSql) : `extract(epoch FROM p.created_at) / 3600.0`;
     const cursor = f.cursor ? `WHERE (x.score, x.id) < ($${params.push(f.cursor.score)}::float8, $${params.push(f.cursor.id)}::uuid)` : "";
@@ -235,14 +262,16 @@ export class SocialService {
       id: string; kind: FeedRow["kind"]; author_visibility: string; handle: string; display_name: string; text: string | null;
       created_at: Date; category_code: string | null; event_id: string | null; distance_m: number | null; score: number;
       media: { id: string; kind: "IMAGE" | "VIDEO_RECORDED" }[] | null; like_count: number; comment_count: number; liked: boolean;
-      mentions: string[]; mine: boolean | null;
+      mentions: string[]; mine: boolean | null; business_verification: "UNVERIFIED" | "VERIFIED" | "INSTITUTIONAL_OFFICIAL" | null;
     }>(
       `WITH x AS (
-         SELECT p.id, p.author_id, p.kind, p.author_visibility, pr.handle, pr.display_name, p.text, p.created_at, p.category_code, le.event_id,
+         SELECT p.id, p.author_id, p.author_type, p.kind, p.author_visibility, coalesce(pr.handle, bp.handle) AS handle,
+                coalesce(pr.display_name, bp.name) AS display_name, bp.verification_status AS business_verification, p.text, p.created_at, p.category_code, le.event_id,
                 ${nearSql ? `ST_Distance(p.public_point, ${nearSql})` : "NULL"}::float8 AS distance_m,
                 (${score})::float8 AS score
            FROM social.posts p
-           JOIN social.profiles pr ON pr.id = p.author_id
+           LEFT JOIN social.profiles pr ON p.author_type = 'PROFILE' AND pr.id = p.author_id
+           LEFT JOIN social.business_profiles bp ON p.author_type = 'BUSINESS' AND bp.id = p.author_id
            LEFT JOIN LATERAL (SELECT l.event_id FROM social.post_event_links l WHERE l.post_id = p.id ORDER BY l.created_at LIMIT 1) le ON true
            LEFT JOIN social.event_signals s ON s.event_id = le.event_id
           WHERE ${where.join(" AND ")}
@@ -255,7 +284,9 @@ export class SocialService {
               EXISTS (SELECT 1 FROM social.reactions r WHERE r.post_id = x.id AND r.profile_id = $2) AS liked,
               (SELECT coalesce(array_agg(mp.handle ORDER BY mp.handle), '{}') FROM social.post_mentions pm
                  JOIN social.profiles mp ON mp.id = pm.profile_id WHERE pm.post_id = x.id AND mp.deleted_at IS NULL) AS mentions,
-              (x.author_id = $2) AS mine
+              CASE WHEN x.author_type = 'PROFILE' THEN x.author_id = $2
+                   ELSE EXISTS (SELECT 1 FROM social.business_profiles ob JOIN social.profiles op ON op.user_id = ob.owner_user_id
+                                 WHERE ob.id = x.author_id AND op.id = $2) END AS mine
          FROM x ${cursor}
         ORDER BY x.score DESC, x.id DESC
         LIMIT $1`,
@@ -264,7 +295,9 @@ export class SocialService {
     return rows.map((r) => ({
       id: r.id,
       kind: r.kind,
-      author: r.author_visibility === "PSEUDONYMOUS" ? { pseudonymous: true } : { pseudonymous: false, handle: r.handle, displayName: r.display_name },
+      author: r.author_visibility === "PSEUDONYMOUS"
+        ? { pseudonymous: true }
+        : { pseudonymous: false, handle: r.handle, displayName: r.display_name, ...(r.business_verification ? { business: { verification: r.business_verification } } : {}) },
       text: r.text,
       createdAt: r.created_at,
       categoryCode: r.category_code,
@@ -340,12 +373,16 @@ export class SocialService {
    * moderación o al borrar la cuenta. Devuelve la media adjunta para que el Media Engine la elimine.
    */
   async deletePost(q: Queryable, postId: string, profileId: string): Promise<{ mediaIds: string[] }> {
-    const { rows } = await q.query<{ author_id: string; kind: string; deleted: boolean }>(
-      `SELECT author_id, kind, deleted_at IS NOT NULL AS deleted FROM social.posts WHERE id = $1 FOR UPDATE`,
-      [postId],
+    const { rows } = await q.query<{ kind: string; deleted: boolean; mine: boolean }>(
+      `SELECT p.kind, p.deleted_at IS NOT NULL AS deleted,
+              CASE WHEN p.author_type = 'PROFILE' THEN p.author_id = $2
+                   ELSE EXISTS (SELECT 1 FROM social.business_profiles ob JOIN social.profiles op ON op.user_id = ob.owner_user_id
+                                 WHERE ob.id = p.author_id AND op.id = $2) END AS mine
+         FROM social.posts p WHERE p.id = $1 FOR UPDATE`,
+      [postId, profileId],
     );
     const r = rows[0];
-    if (!r || r.deleted || r.author_id !== profileId) throw notFound("Post");
+    if (!r || r.deleted || !r.mine) throw notFound("Post");
     if (r.kind === "REPORT") throw new DomainError("REPORT_POST", "Un reporte no se borra desde aquí: forma parte de la evidencia de un evento", 409);
     await q.query(`UPDATE social.posts SET text = NULL, public_point = NULL, deleted_at = now(), updated_at = now() WHERE id = $1`, [postId]);
     await q.query(`DELETE FROM social.post_tags WHERE post_id = $1`, [postId]);
@@ -423,7 +460,7 @@ export class SocialService {
       `SELECT pr.id, pr.handle, pr.display_name, pr.created_at,
               (SELECT count(*) FROM social.follows f WHERE f.target_type = 'PROFILE' AND f.target_id = pr.id::text)::int AS followers,
               (SELECT count(*) FROM social.follows f WHERE f.follower_profile_id = pr.id AND f.target_type = 'PROFILE')::int AS following,
-              (SELECT count(*) FROM social.posts p WHERE p.author_id = pr.id AND p.author_visibility = 'PUBLIC' AND p.visibility = 'PUBLIC'
+              (SELECT count(*) FROM social.posts p WHERE p.author_type = 'PROFILE' AND p.author_id = pr.id AND p.author_visibility = 'PUBLIC' AND p.visibility = 'PUBLIC'
                   AND p.deleted_at IS NULL AND p.moderation_state = 'VISIBLE')::int AS posts,
               EXISTS (SELECT 1 FROM social.follows f WHERE f.follower_profile_id = $2 AND f.target_type = 'PROFILE' AND f.target_id = pr.id::text) AS followed,
               EXISTS (SELECT 1 FROM social.blocks b WHERE b.blocker_profile_id = $2 AND b.blocked_profile_id = pr.id) AS blocked
@@ -542,9 +579,16 @@ export class SocialService {
    * Objeto denunciable con su autoría interna. `authorHandle` es null si la autoría es seudónima: la moderación
    * puede actuar sobre la cuenta sin que nadie la vea.
    */
-  async moderationTarget(q: Queryable, type: "POST" | "COMMENT" | "PROFILE", id: string): Promise<{
+  async moderationTarget(q: Queryable, type: "POST" | "COMMENT" | "PROFILE" | "BUSINESS", id: string): Promise<{
     id: string; text: string | null; authorHandle: string | null; authorUserId: string; state: string; categoryCode: string | null; reach: number; eventId: string | null;
   } | null> {
+    if (type === "BUSINESS") {
+      const { rows } = await q.query<{ id: string; handle: string; name: string; description: string | null; owner_user_id: string; moderation_state: string }>(
+        `SELECT id, handle, name, description, owner_user_id, moderation_state FROM social.business_profiles WHERE id = $1 AND deleted_at IS NULL`, [id],
+      );
+      const r = rows[0];
+      return r ? { id: r.id, text: [r.name, r.description].filter(Boolean).join(" · "), authorHandle: r.handle, authorUserId: r.owner_user_id, state: r.moderation_state, categoryCode: null, reach: 0, eventId: null } : null;
+    }
     if (type === "PROFILE") {
       const { rows } = await q.query<{ id: string; handle: string; display_name: string; user_id: string }>(
         `SELECT id, handle, display_name, user_id FROM social.profiles WHERE id = $1`, [id],
@@ -563,10 +607,13 @@ export class SocialService {
     const { rows } = await q.query<{
       id: string; text: string | null; handle: string; user_id: string; author_visibility: string; moderation_state: string; category_code: string | null; reach: number; event_id: string | null;
     }>(
-      `SELECT p.id, p.text, pr.handle, pr.user_id, p.author_visibility, p.moderation_state, p.category_code,
+      `SELECT p.id, p.text, coalesce(pr.handle, bp.handle) AS handle, coalesce(pr.user_id, bp.owner_user_id) AS user_id,
+              p.author_visibility, p.moderation_state, p.category_code,
               ((SELECT count(*) FROM social.reactions r WHERE r.post_id = p.id) + (SELECT count(*) FROM social.comments c WHERE c.post_id = p.id))::int AS reach,
               (SELECT l.event_id FROM social.post_event_links l WHERE l.post_id = p.id ORDER BY l.created_at LIMIT 1) AS event_id
-         FROM social.posts p JOIN social.profiles pr ON pr.id = p.author_id
+         FROM social.posts p
+           LEFT JOIN social.profiles pr ON p.author_type = 'PROFILE' AND pr.id = p.author_id
+           LEFT JOIN social.business_profiles bp ON p.author_type = 'BUSINESS' AND bp.id = p.author_id
         WHERE p.id = $1 AND p.deleted_at IS NULL`, [id],
     );
     const r = rows[0];
@@ -579,6 +626,17 @@ export class SocialService {
 
   async setPostModeration(q: Queryable, postId: string, state: "VISIBLE" | "LIMITED" | "HIDDEN" | "REMOVED"): Promise<void> {
     await q.query(`UPDATE social.posts SET moderation_state = $2, updated_at = now() WHERE id = $1`, [postId, state]);
+  }
+
+  /** Para moderación: el negocio por handle aunque esté retirado. */
+  async businessIdForModeration(q: Queryable, handle: string): Promise<string> {
+    const { rows } = await q.query<{ id: string }>(`SELECT id FROM social.business_profiles WHERE lower(handle) = lower($1) AND deleted_at IS NULL`, [handle]);
+    if (!rows[0]) throw notFound("Negocio");
+    return rows[0].id;
+  }
+
+  async setBusinessModeration(q: Queryable, businessId: string, state: "VISIBLE" | "REMOVED"): Promise<void> {
+    await q.query(`UPDATE social.business_profiles SET moderation_state = $2, updated_at = now() WHERE id = $1`, [businessId, state]);
   }
 
   async setCommentModeration(q: Queryable, commentId: string, state: "VISIBLE" | "HIDDEN" | "REMOVED"): Promise<void> {
@@ -595,3 +653,4 @@ export class SocialService {
 }
 
 export { POSTS_PER_HOUR, PostComposer } from "./composer.js";
+export { BusinessService } from "./business.js";
