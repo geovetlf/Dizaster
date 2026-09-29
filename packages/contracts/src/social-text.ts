@@ -88,6 +88,14 @@ export const CreatePostRequest = z.object({
 });
 export type CreatePostRequest = z.infer<typeof CreatePostRequest>;
 
+/** Compartir dentro de la app (ADR 0046): comentario opcional; sin media ni evento propios. */
+export const SharePostRequest = z.object({
+  text: z.string().trim().max(POST_TEXT_MAX).optional(),
+  anonymityMode: z.enum(["PUBLIC", "PSEUDONYMOUS"]).default("PUBLIC"),
+  asBusiness: z.string().trim().toLowerCase().max(30).optional(),
+});
+export type SharePostRequest = z.infer<typeof SharePostRequest>;
+
 export const TagParam = z.object({ tag: z.string().min(2).max(60).refine(isValidTag, "Etiqueta inválida") });
 
 export const TagSearchQuery = z.object({

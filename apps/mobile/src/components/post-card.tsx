@@ -50,11 +50,22 @@ export function PostCard({ post, categoryName }: { post: FeedPost; categoryName:
     }
   }
 
-  async function share() {
+  async function shareOutside() {
     // Se comparte el evento (o el post) con enlace a la app; sin dominio aprobado se usa el esquema propio.
     const path = post.event ? `e/${post.event.id}` : `p/${post.id}`;
     const url = LINK_DOMAIN ? `https://${LINK_DOMAIN}/${path}` : `dizaster://${post.event ? `event/${post.event.id}` : `post/${post.id}`}`;
     await Share.share({ message: [post.text, url].filter(Boolean).join("\n\n") }).catch(() => undefined);
+  }
+
+  /** Compartir en Dizaster (ADR 0046) o fuera de la app. Lo compartido se comparte desde su original. */
+  function share() {
+    const target = post.share?.post?.id ?? post.id;
+    if (post.share && !post.share.post) return void shareOutside();
+    Alert.alert(t("share"), undefined, [
+      { text: t("shareInApp"), onPress: () => router.push({ pathname: "/compose", params: { shareOf: target } }) },
+      { text: t("shareOutside"), onPress: () => void shareOutside() },
+      { text: t("cancel"), style: "cancel" },
+    ]);
   }
 
   if (hidden) return null;
@@ -94,6 +105,7 @@ export function PostCard({ post, categoryName }: { post: FeedPost; categoryName:
       </View>
 
       {post.text ? <RichText text={post.text} mentions={post.mentions} style={styles.text} /> : null}
+      {post.share ? <SharedPost post={post.share.post} categoryName={categoryName} /> : null}
       <MediaGrid media={post.media} onOpen={post.event ? () => router.push(`/event/${post.event!.id}`) : undefined} />
       {post.hiddenMediaCount > 0 ? <Text style={styles.meta}>+{post.hiddenMediaCount} {t("hiddenMedia")}</Text> : null}
 
@@ -120,9 +132,9 @@ export function PostCard({ post, categoryName }: { post: FeedPost; categoryName:
           <Icon name="comment-outline" size={22} color={colors.text} />
           <Text style={styles.count}>{post.commentCount}</Text>
         </Pressable>
-        <Pressable accessibilityRole="button" style={styles.action} onPress={() => void share()}>
+        <Pressable accessibilityRole="button" accessibilityLabel={t("share")} style={styles.action} onPress={share}>
           <Icon name="share-variant-outline" size={22} color={colors.text} />
-          <Text style={styles.count}>{t("share")}</Text>
+          <Text style={styles.count}>{post.shareCount > 0 ? post.shareCount : t("share")}</Text>
         </Pressable>
         <View style={styles.spacer} />
         <Pressable
@@ -138,6 +150,23 @@ export function PostCard({ post, categoryName }: { post: FeedPost; categoryName:
         </Pressable>
       </View>
     </View>
+  );
+}
+
+/** Original de un post compartido, en pequeño. Si ya no está disponible se dice, sin más detalle. */
+function SharedPost({ post, categoryName }: { post: FeedPost | null; categoryName: (code: string) => string }) {
+  if (!post) return <View style={styles.shared}><Text style={styles.meta}>{t("sharedUnavailable")}</Text></View>;
+  const name = post.author.pseudonymous ? t("citizenReporter") : post.author.displayName;
+  const first = post.media[0];
+  return (
+    <Pressable accessibilityRole="button" style={styles.shared}
+      onPress={() => router.push(post.event ? `/event/${post.event.id}` : `/post/${post.id}`)}>
+      <Text style={styles.sharedName} numberOfLines={1}>
+        {name}{post.categoryCode ? ` · ${categoryName(post.categoryCode)}` : ""}
+      </Text>
+      {post.text ? <Text style={styles.text} numberOfLines={4}>{post.text}</Text> : null}
+      {first ? <Tile m={first} style={styles.sharedMedia} small /> : null}
+    </Pressable>
   );
 }
 
@@ -207,6 +236,9 @@ const styles = StyleSheet.create({
   chipOn: { backgroundColor: colors.accent, borderColor: colors.accent },
   chipText: { color: colors.textMuted, fontSize: 13 },
   chipTextOn: { color: colors.white },
+  shared: { borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, borderRadius: radius.md, padding: space.md, marginBottom: space.sm },
+  sharedName: { color: colors.text, fontWeight: "700", marginBottom: 4 },
+  sharedMedia: { width: "100%", height: 120 },
   actions: { flexDirection: "row", alignItems: "center", gap: space.xl, marginTop: space.md },
   action: { flexDirection: "row", alignItems: "center", gap: 6 },
   count: { color: colors.text, fontSize: 14 },

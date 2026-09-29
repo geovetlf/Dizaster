@@ -183,6 +183,31 @@ describe("feed", () => {
     expect(after).toContain(reply.id);
   });
 
+  it("compartir dentro de la app: apunta al original, cuenta y se queda sin original si lo borran", async () => {
+    const a = await createUser(t, "share_a");
+    const b = await createUser(t, "share_b");
+    const orig = await t.app.inject({ method: "POST", url: "/v1/posts", headers: auth(a), payload: { text: "Corte de agua en todo el distrito" } });
+    const origId = orig.json().postId as string;
+    const share = await t.app.inject({ method: "POST", url: `/v1/posts/${origId}/share`, headers: auth(b), payload: { text: "Ojo vecinos" } });
+    expect(share.statusCode).toBe(201);
+    expect(share.json().sharedPostId).toBe(origId);
+    // Compartir lo compartido comparte el original.
+    const again = await t.app.inject({ method: "POST", url: `/v1/posts/${share.json().postId}/share`, headers: auth(a), payload: {} });
+    expect(again.json().sharedPostId).toBe(origId);
+
+    const posts = (await feed("tab=for_you&limit=30")).posts;
+    const s = posts.find((p) => p.id === share.json().postId)!;
+    expect(s).toMatchObject({ kind: "SHARE", text: "Ojo vecinos", share: { post: { id: origId, text: "Corte de agua en todo el distrito" } } });
+    expect(posts.find((p) => p.id === origId)!.shareCount).toBe(2);
+    expect(posts.find((p) => p.id === origId)!.share).toBeNull();
+
+    await t.app.inject({ method: "DELETE", url: `/v1/posts/${origId}`, headers: auth(a) });
+    const after = (await feed("tab=for_you&limit=30")).posts.find((p) => p.id === share.json().postId)!;
+    expect(after.share).toEqual({ post: null });
+    expect((await t.app.inject({ method: "POST", url: `/v1/posts/${origId}/share`, headers: auth(b), payload: {} })).statusCode).toBe(404);
+    expect((await t.app.inject({ method: "POST", url: `/v1/posts/${origId}/share`, payload: {} })).statusCode).toBe(401);
+  });
+
   it("los posts ocultos por moderación no aparecen ni aceptan interacción", async () => {
     const u = await createUser(t, "feed_mod");
     const r = await submit(t, u, reportBody(u, { pin: offset(LIMA, 9000), text: "ocultar" }));

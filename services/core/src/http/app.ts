@@ -410,6 +410,12 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
     return c.composer.create(session, req.body);
   });
 
+  app.post("/v1/posts/:id/share", async (req, reply) => {
+    const session = requireSession(req);
+    reply.status(201);
+    return c.composer.share(session, parse(IdParam, req.params).id, req.body ?? {});
+  });
+
   app.delete("/v1/posts/:id", async (req, reply) => {
     const session = requireSession(req);
     const { id } = parse(IdParam, req.params);

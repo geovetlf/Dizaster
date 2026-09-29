@@ -16,7 +16,9 @@ import { colors, radius, space } from "../theme";
  * menciona, sin sumar al pin ni a la verificación. No usa la ubicación. Igual en Android e iOS.
  */
 export default function ComposeScreen() {
-  const params = useLocalSearchParams<{ eventId?: string; text?: string; asBusiness?: string }>();
+  const params = useLocalSearchParams<{ eventId?: string; text?: string; asBusiness?: string; shareOf?: string }>();
+  // Compartir dentro de la app (ADR 0046): comentario opcional, sin fotos ni evento propios.
+  const sharing = !!params.shareOf;
   const [text, setText] = useState(params.text ?? "");
   const [media, setMedia] = useState<LocalMedia[]>([]);
   const [pseudonymous, setPseudonymous] = useState(false);
@@ -29,13 +31,19 @@ export default function ComposeScreen() {
 
   const tags = extractTags(text);
   const mentions = extractMentions(text);
-  const problem = composeProblem(text, media);
+  const problem = sharing ? null : composeProblem(text, media);
 
   async function publish() {
     if (problem) return setStatus(t(problem));
     setBusy(true);
     setStatus(media.length ? t("uploadingMedia") : null);
     try {
+      if (params.shareOf) {
+        const anonymityMode = pseudonymous && !asBusiness ? "PSEUDONYMOUS" : "PUBLIC";
+        await api.sharePost(params.shareOf, { ...(text.trim() ? { text: text.trim() } : {}), anonymityMode, ...(asBusiness ? { asBusiness } : {}) });
+        router.back();
+        return;
+      }
       const mediaIds: string[] = [];
       for (const m of media) {
         const r = await uploadMedia(m);
@@ -55,6 +63,7 @@ export default function ComposeScreen() {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
       {params.eventId ? <Text style={styles.note}>{t("postAboutEvent")}</Text> : null}
+      {sharing ? <Text style={styles.note}>{t("sharingNote")}</Text> : null}
       <TextInput
         style={styles.input}
         multiline
@@ -62,7 +71,7 @@ export default function ComposeScreen() {
         maxLength={POST_TEXT_MAX}
         value={text}
         onChangeText={setText}
-        placeholder={t("composePlaceholder")}
+        placeholder={sharing ? t("sharePlaceholder") : t("composePlaceholder")}
         placeholderTextColor={colors.textMuted}
         accessibilityLabel={t("newPost")}
       />
@@ -70,7 +79,7 @@ export default function ComposeScreen() {
       {tags.length || mentions.length ? (
         <Text style={styles.note}>{[...tags.map((x) => `#${x.display}`), ...mentions.map((m) => `@${m}`)].join("  ")}</Text>
       ) : null}
-      <MediaAttachments items={media} onChange={setMedia} />
+      {sharing ? null : <MediaAttachments items={media} onChange={setMedia} />}
       {businesses.length > 0 ? (
         <View style={styles.chips}>
           <Text style={styles.note}>{t("postAs")}</Text>

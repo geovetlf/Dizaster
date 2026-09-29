@@ -51,6 +51,10 @@ export interface FeedPost {
   myReactions: ReactionKind[];
   /** Handles mencionados que existen: solo esos se pintan como enlace. */
   mentions: string[];
+  /** Veces que se compartió dentro de la app (ADR 0046). */
+  shareCount: number;
+  /** Solo en posts SHARE: el original, o `post: null` si ya no está disponible (borrado u oculto). */
+  share: { post: FeedPost | null } | null;
   /** La persona que mira es quien lo escribió (puede borrarlo). Nunca revela la autoría de un post seudónimo a otros. */
   mine: boolean;
 }

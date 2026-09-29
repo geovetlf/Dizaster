@@ -147,6 +147,9 @@ export const api = {
   myFollows: () => request<MyFollows>("/v1/me/follows"),
   follow: (target: FollowTarget, id: string, on: boolean) =>
     request<{ following: boolean }>(`/v1/follows/${target}/${encodeURIComponent(id)}`, { method: on ? "PUT" : "DELETE" }),
+  /** Compartir dentro de la app (ADR 0046). */
+  sharePost: (postId: string, body: { text?: string; anonymityMode?: "PUBLIC" | "PSEUDONYMOUS"; asBusiness?: string }) =>
+    request<{ postId: string; sharedPostId: string }>(`/v1/posts/${postId}/share`, { method: "POST", body: JSON.stringify(body) }),
   createPost: (body: Partial<CreatePostRequest> & { text: string }) =>
     request<{ postId: string; eventId: string | null; tags: string[]; mentions: string[] }>("/v1/posts", { method: "POST", body: JSON.stringify(body) }),
   deletePost: (postId: string) => request<void>(`/v1/posts/${postId}`, { method: "DELETE" }),

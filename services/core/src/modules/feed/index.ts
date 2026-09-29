@@ -172,12 +172,19 @@ export class FeedService {
 
   private async page(q: Queryable, filter: FeedFilter): Promise<FeedResponse> {
     const rows = await this.social.feed(q, filter);
-    const posts = await this.compose(q, rows);
+    const posts = await this.compose(q, rows, filter.viewerProfileId);
     const last = rows[rows.length - 1];
     return { posts, nextCursor: rows.length === filter.limit && last ? encodeCursor(last.score, last.id) : null };
   }
 
-  private async compose(q: Queryable, rows: FeedRow[]): Promise<FeedPost[]> {
+  private async compose(q: Queryable, rows: FeedRow[], viewerProfileId: string | null = null, embed = true): Promise<FeedPost[]> {
+    // Originales de lo compartido: se leen con las mismas reglas (bloqueos, moderación); si no llegan, "no disponible".
+    const sharedIds = embed ? [...new Set(rows.flatMap((r) => (r.sharedPostId ? [r.sharedPostId] : [])))] : [];
+    const originals = new Map<string, FeedPost>();
+    if (sharedIds.length > 0) {
+      const inner = await this.social.feed(q, { tab: "for_you", ids: sharedIds, limit: sharedIds.length, viewerProfileId });
+      for (const p of await this.compose(q, inner, viewerProfileId, false)) originals.set(p.id, p);
+    }
     const states = await this.events.publicStates(q, rows.flatMap((r) => (r.eventId ? [r.eventId] : [])));
     const sensitivityOf = (r: FeedRow): Sensitivity =>
       (r.eventId ? states.get(r.eventId)?.sensitivity : undefined) ?? (r.categoryCode ? this.ref.category(r.categoryCode, null)?.sensitivity : undefined) ?? "NORMAL";
@@ -206,6 +213,8 @@ export class FeedService {
         likedByMe: r.likedByMe,
         reactions: r.reactions,
         myReactions: r.myReactions,
+        shareCount: r.shareCount,
+        share: r.sharedPostId ? { post: originals.get(r.sharedPostId) ?? null } : null,
         mentions: r.mentions,
         mine: r.mine,
       };

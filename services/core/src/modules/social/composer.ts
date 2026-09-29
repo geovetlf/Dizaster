@@ -1,4 +1,4 @@
-import { CreatePostRequest } from "@dizaster/contracts";
+import { CreatePostRequest, SharePostRequest } from "@dizaster/contracts";
 import { withTransaction, type Db } from "../../platform/db.js";
 import { DomainError, notFound } from "../../platform/errors.js";
 import { publish } from "../../platform/outbox.js";
@@ -29,17 +29,10 @@ export class PostComposer {
     const parsed = CreatePostRequest.safeParse(raw);
     if (!parsed.success) throw new DomainError("VALIDATION", parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; "));
     const req = parsed.data;
-    const recent = await this.db.query<{ n: number }>(
-      `SELECT count(*)::int AS n FROM social.posts p
-        WHERE p.kind = 'STANDARD' AND p.created_at > now() - interval '1 hour'
-          AND (p.author_id = $1 OR p.author_id IN (SELECT id FROM social.business_profiles WHERE owner_user_id = $2))`,
-      [profileId, session.userId],
-    );
-    if (recent.rows[0]!.n >= POSTS_PER_HOUR) throw new DomainError("RATE_LIMITED", "Demasiadas publicaciones en la última hora", 429);
+    await this.checkHourlyQuota(session);
 
     // Publicar como negocio: solo quien lo administra, nunca de forma seudónima. El cupo por hora es de la persona.
-    const businessId = req.asBusiness ? await this.business.ownedId(this.db, session.userId, req.asBusiness, { toPublish: true }) : null;
-    if (businessId && req.anonymityMode === "PSEUDONYMOUS") throw new DomainError("VALIDATION", "Un negocio no publica de forma seudónima");
+    const businessId = await this.publisher(session, req);
     const media = await this.media.assertAttachable(this.db, profileId, req.mediaIds);
     if (media.filter((m) => m.kind === "VIDEO_RECORDED").length > 1) throw new DomainError("VALIDATION", "Solo un video por publicación");
 
@@ -69,6 +62,51 @@ export class PostComposer {
       const indexed = await this.social.indexPostText(tx, postId, profileId, req.text);
       return { postId, eventId: event?.id ?? null, ...indexed };
     });
+  }
+
+  /**
+   * Compartir dentro de la app (ADR 0046): un post SHARE con comentario opcional que apunta al original. Compartir
+   * algo compartido comparte el original. No hereda media, evento ni ubicación: no alimenta pines ni verificación.
+   */
+  async share(session: { userId: string; profileId: string }, originalId: string, raw: unknown): Promise<{ postId: string; sharedPostId: string }> {
+    const parsed = SharePostRequest.safeParse(raw);
+    if (!parsed.success) throw new DomainError("VALIDATION", parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; "));
+    const req = parsed.data;
+    await this.checkHourlyQuota(session);
+    const businessId = await this.publisher(session, req);
+    const original = await this.social.shareTarget(this.db, originalId);
+    return withTransaction(this.db, async (tx) => {
+      const postId = await this.social.createPost(tx, {
+        authorProfileId: session.profileId,
+        kind: "SHARE",
+        text: req.text ? req.text : null,
+        authorVisibility: req.anonymityMode,
+        categoryCode: original.categoryCode,
+        publicPoint: null,
+        businessId,
+        sharedPostId: original.id,
+      });
+      if (req.text) await this.social.indexPostText(tx, postId, session.profileId, req.text);
+      return { postId, sharedPostId: original.id };
+    });
+  }
+
+  /** Cupo por hora de la persona (publicaciones y compartidos, incluidos los de sus negocios). */
+  private async checkHourlyQuota(session: { userId: string; profileId: string }): Promise<void> {
+    const recent = await this.db.query<{ n: number }>(
+      `SELECT count(*)::int AS n FROM social.posts p
+        WHERE p.kind IN ('STANDARD','SHARE') AND p.created_at > now() - interval '1 hour'
+          AND (p.author_id = $1 OR p.author_id IN (SELECT id FROM social.business_profiles WHERE owner_user_id = $2))`,
+      [session.profileId, session.userId],
+    );
+    if (recent.rows[0]!.n >= POSTS_PER_HOUR) throw new DomainError("RATE_LIMITED", "Demasiadas publicaciones en la última hora", 429);
+  }
+
+  /** Publicar como negocio: solo quien lo administra, nunca de forma seudónima. */
+  private async publisher(session: { userId: string }, req: { asBusiness?: string | undefined; anonymityMode: "PUBLIC" | "PSEUDONYMOUS" }): Promise<string | null> {
+    const businessId = req.asBusiness ? await this.business.ownedId(this.db, session.userId, req.asBusiness, { toPublish: true }) : null;
+    if (businessId && req.anonymityMode === "PSEUDONYMOUS") throw new DomainError("VALIDATION", "Un negocio no publica de forma seudónima");
+    return businessId;
   }
 
   async delete(profileId: string, postId: string): Promise<void> {

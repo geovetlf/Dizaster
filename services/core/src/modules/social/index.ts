@@ -20,6 +20,8 @@ export interface CreatePostInput {
   categoryCode?: string | null;
   /** Debe llegar YA generalizada; social nunca recibe la ubicación precisa. */
   publicPoint: GeoPoint | null;
+  /** Solo SHARE: el post original. */
+  sharedPostId?: string | null;
   /** Publica un negocio (ya comprobado que la persona lo administra). Nunca seudónimo. */
   businessId?: string | null;
 }
@@ -41,6 +43,8 @@ export interface FeedRow {
   likedByMe: boolean;
   reactions: ReactionCounts;
   myReactions: ReactionKind[];
+  sharedPostId: string | null;
+  shareCount: number;
   mentions: string[];
   mine: boolean;
 }
@@ -62,6 +66,8 @@ export interface FeedFilter {
   authorBusinessId?: string;
   /** Posts ligados a un evento (reportes y publicaciones sobre él). */
   eventId?: string;
+  /** Posts concretos (los originales de lo compartido), sin ventana de tiempo. */
+  ids?: string[];
 }
 
 export type FollowType = "PROFILE" | "EVENT" | "PLACE" | "TAG" | "BUSINESS";
@@ -185,11 +191,11 @@ export class SocialService {
     const base = textFingerprintBase(input.text);
     const textHash = base ? createHash("sha256").update(base).digest("hex") : null;
     await tx.query(
-      `INSERT INTO social.posts (id, author_type, author_id, kind, author_visibility, text, category_code, public_point, text_hash)
+      `INSERT INTO social.posts (id, author_type, author_id, kind, author_visibility, text, category_code, public_point, text_hash, shared_post_id)
        VALUES ($1, $9, $2, $3, $4, $5, $8,
-               CASE WHEN $6::float8 IS NULL THEN NULL ELSE ST_SetSRID(ST_MakePoint($6, $7), 4326)::geography END, $10)`,
+               CASE WHEN $6::float8 IS NULL THEN NULL ELSE ST_SetSRID(ST_MakePoint($6, $7), 4326)::geography END, $10, $11)`,
       [id, input.businessId ?? input.authorProfileId, input.kind, input.businessId ? "PUBLIC" : input.authorVisibility, input.text,
-        input.publicPoint?.lng ?? null, input.publicPoint?.lat ?? null, input.categoryCode ?? null, input.businessId ? "BUSINESS" : "PROFILE", textHash],
+        input.publicPoint?.lng ?? null, input.publicPoint?.lat ?? null, input.categoryCode ?? null, input.businessId ? "BUSINESS" : "PROFILE", textHash, input.sharedPostId ?? null],
     );
     if (textHash) await this.detectDuplicateText(tx, textHash);
     return id;
@@ -209,6 +215,18 @@ export class SocialService {
     );
     const r = rows[0];
     if (r && r.authors >= DUPLICATE_TEXT.minAuthors) await publish(tx, "DuplicateTextDetected", { postIds: r.ids });
+  }
+
+  /** Original que se puede compartir: público y visible. Si es un SHARE, su original. */
+  async shareTarget(q: Queryable, postId: string): Promise<{ id: string; categoryCode: string | null }> {
+    const { rows } = await q.query<{ id: string; category_code: string | null }>(
+      `SELECT o.id, o.category_code
+         FROM social.posts p JOIN social.posts o ON o.id = coalesce(p.shared_post_id, p.id)
+        WHERE p.id = $1 AND o.deleted_at IS NULL AND o.visibility = 'PUBLIC' AND o.moderation_state = 'VISIBLE'`,
+      [postId],
+    );
+    if (!rows[0]) throw notFound("Publicación");
+    return { id: rows[0].id, categoryCode: rows[0].category_code };
   }
 
   /** Adjunta media (ya validada por el Media Engine) a un post. Una media solo puede pertenecer a un post. */
@@ -298,6 +316,7 @@ export class SocialService {
     if (f.authorBusinessId) where.push(`p.author_type = 'BUSINESS' AND p.author_id = $${params.push(f.authorBusinessId)}::uuid`);
     // Un negocio retirado o borrado deja de aparecer con todos sus posts.
     where.push(`(p.author_type = 'PROFILE' OR (bp.deleted_at IS NULL AND bp.moderation_state = 'VISIBLE'))`);
+    if (f.ids) where.push(`p.id = ANY($${params.push(f.ids)}::uuid[])`);
     if (f.eventId) where.push(`EXISTS (SELECT 1 FROM social.post_event_links l2 WHERE l2.post_id = p.id AND l2.event_id = $${params.push(f.eventId)}::uuid)`);
     if (f.tag) {
       where.push(`EXISTS (SELECT 1 FROM social.post_tags pt JOIN social.tags tg ON tg.id = pt.tag_id WHERE pt.post_id = p.id AND tg.normalized = $${params.push(f.tag)})`);
@@ -313,7 +332,7 @@ export class SocialService {
                    OR EXISTS (SELECT 1 FROM social.post_tags pt JOIN social.tags tg ON tg.id = pt.tag_id
                                WHERE pt.post_id = p.id AND tg.normalized IN ${followed("TAG")}))`);
     }
-    const ranked = f.tab === "for_you" && !f.authorProfileId && !f.authorBusinessId && !f.tag && !f.eventId;
+    const ranked = f.tab === "for_you" && !f.authorProfileId && !f.authorBusinessId && !f.tag && !f.eventId && !f.ids;
     if (ranked) where.push(`p.created_at > now() - make_interval(days => ${FOR_YOU_WINDOW_DAYS})`);
     const score = ranked ? rankSql(nearSql) : `extract(epoch FROM p.created_at) / 3600.0`;
     const cursor = f.cursor ? `WHERE (x.score, x.id) < ($${params.push(f.cursor.score)}::float8, $${params.push(f.cursor.id)}::uuid)` : "";
@@ -321,12 +340,13 @@ export class SocialService {
     const { rows } = await q.query<{
       id: string; kind: FeedRow["kind"]; author_visibility: string; handle: string; display_name: string; text: string | null;
       created_at: Date; category_code: string | null; event_id: string | null; distance_m: number | null; score: number;
-      media: { id: string; kind: "IMAGE" | "VIDEO_RECORDED" }[] | null; reactions: ReactionCounts | null; my_reactions: ReactionKind[]; comment_count: number;
+      media: { id: string; kind: "IMAGE" | "VIDEO_RECORDED" }[] | null; reactions: ReactionCounts | null; my_reactions: ReactionKind[]; comment_count: number; shared_post_id: string | null; share_count: number;
       mentions: string[]; mine: boolean | null; business_verification: "UNVERIFIED" | "VERIFIED" | "INSTITUTIONAL_OFFICIAL" | null;
     }>(
       `WITH x AS (
          SELECT p.id, p.author_id, p.author_type, p.kind, p.author_visibility, coalesce(pr.handle, bp.handle) AS handle,
                 coalesce(pr.display_name, bp.name) AS display_name, bp.verification_status AS business_verification, p.text, p.created_at, p.category_code, le.event_id,
+                p.shared_post_id,
                 ${nearSql ? `ST_Distance(p.public_point, ${nearSql})` : "NULL"}::float8 AS distance_m,
                 (${score})::float8 AS score
            FROM social.posts p
@@ -342,6 +362,7 @@ export class SocialService {
               (SELECT json_object_agg(g.kind, g.n) FROM (SELECT r.kind, count(*)::int AS n FROM social.reactions r
                  WHERE r.post_id = x.id GROUP BY r.kind) g) AS reactions,
               (SELECT count(*) FROM social.comments c WHERE c.post_id = x.id AND c.deleted_at IS NULL AND c.moderation_state = 'VISIBLE')::int AS comment_count,
+              (SELECT count(*) FROM social.posts sp WHERE sp.shared_post_id = x.id AND sp.deleted_at IS NULL AND sp.moderation_state = 'VISIBLE')::int AS share_count,
               (SELECT coalesce(array_agg(r.kind ORDER BY r.kind), '{}') FROM social.reactions r WHERE r.post_id = x.id AND r.profile_id = $2) AS my_reactions,
               (SELECT coalesce(array_agg(mp.handle ORDER BY mp.handle), '{}') FROM social.post_mentions pm
                  JOIN social.profiles mp ON mp.id = pm.profile_id WHERE pm.post_id = x.id AND mp.deleted_at IS NULL) AS mentions,
@@ -371,6 +392,8 @@ export class SocialService {
       likedByMe: r.my_reactions.includes("LIKE"),
       reactions: r.reactions ?? {},
       myReactions: r.my_reactions,
+      sharedPostId: r.shared_post_id,
+      shareCount: r.share_count,
       mentions: r.mentions,
       mine: r.mine === true,
     }));
