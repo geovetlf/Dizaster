@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { actionsFor, canBlock, FLAG_REASONS, isSevere, presenceLines, reasonSummary, validReason } from "../src/lib/moderation/logic";
 import type { ModeratorEvidenceView, NearbyEvent } from "@dizaster/contracts";
-import { canSplit, duplicateCandidates, toggle } from "../src/lib/moderation/event-tools";
+import { canSetNegative, canSplit, duplicateCandidates, toggle } from "../src/lib/moderation/event-tools";
 
 describe("moderación (lógica de la app)", () => {
   it("acciones por tipo y confirmación de las graves", () => {
@@ -63,5 +63,19 @@ describe("presenceLines (ADR 0089)", () => {
     expect(presenceLines({ ...base, deviceFix: null, mockLocation: true, reasons: ["LOW_ACCURACY"], priorAccesses: 2 }, tr as never)).toEqual([
       "HIGH 0.87 12m GENUINE", "MOCK_LOCATION", "LOW_ACCURACY", "generalizada", "antes 2",
     ]);
+  });
+});
+
+describe("canSetNegative (ADR 0096)", () => {
+  const none = { negativeState: "NONE", level: "COMMUNITY_CORROBORATED" };
+  it("FALSE exige evidencia seleccionada y no aplica a lo confirmado oficialmente", () => {
+    expect(canSetNegative("FALSE", none, 0)).toBe(false);
+    expect(canSetNegative("FALSE", none, 1)).toBe(true);
+    expect(canSetNegative("FALSE", { ...none, level: "OFFICIALLY_CONFIRMED" }, 2)).toBe(false);
+  });
+  it("DISPUTED y NONE no piden evidencia; no se repite el estado actual", () => {
+    expect(canSetNegative("DISPUTED", none, 0)).toBe(true);
+    expect(canSetNegative("NONE", none, 0)).toBe(false);
+    expect(canSetNegative("NONE", { ...none, negativeState: "FALSE" }, 0)).toBe(true);
   });
 });

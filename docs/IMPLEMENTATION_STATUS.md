@@ -287,6 +287,7 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | Redirección de EVENT fusionado y de sus seguidores | ✅ | ADR 0093 |
 | "Mis reportes": estado, EVENT, ubicación precisa y retirar | ✅ | ADR 0094 |
 | Confirmación y desmentido por perfil institucional oficial, dentro de su ámbito | ✅ | ADR 0095 |
+| Disputa, falsedad y cola de duplicados en la app de moderación | ✅ | ADR 0096 |
 | Licencias, auditoría, SBOM, Dependabot; respaldo con prueba de restauración en CI | ✅ | ADR 0070, `scripts/supply-chain.mjs`, `scripts/db-restore-check.mjs` |
 | Idioma de la app elegible en el perfil (es/en/pt/fr o del teléfono) | ✅ | ADR 0069, `app/language.tsx` |
 | Varias cuentas en un teléfono corroboran como una (clave seudónima del teléfono) | ✅ | ADR 0068, migración 0036 |
@@ -318,13 +319,12 @@ Revisión del Blueprint del 2026-09-29 (tras ADR 0080): completada con ADR 0081�
 
 Revisión del Blueprint del 2026-09-29 (tras ADR 0092), verificada contra el código, sin bloqueos:
 
-1. Herramientas de moderación en la app: marcar DISPUTED/FALSE y revisar duplicados (§5.21, ADR 0076).
-2. "Personas bloqueadas" y "Lo que sigo" en la app (§5.3).
-3. Herramientas de administración en la app: verificación de negocios, presupuestos, registro de presencia (§13.1).
-4. Retraso de publicación configurable para categorías HIGHLY_SENSITIVE (§8.5); por defecto 0.
-5. Promoción NORMAL→URGENT por regla configurable por fuente (§9.2).
-6. Roles verificador y operador (§13.1 RBAC).
-7. Preparación para idiomas RTL (§5.15).
+1. "Personas bloqueadas" y "Lo que sigo" en la app (§5.3).
+2. Herramientas de administración en la app: verificación de negocios, presupuestos, registro de presencia (§13.1).
+3. Retraso de publicación configurable para categorías HIGHLY_SENSITIVE (§8.5); por defecto 0.
+4. Promoción NORMAL→URGENT por regla configurable por fuente (§9.2).
+5. Roles verificador y operador (§13.1 RBAC).
+6. Preparación para idiomas RTL (§5.15).
 
 
 Bloqueadas o en espera:

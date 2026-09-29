@@ -1,25 +1,27 @@
-import type { AppealView, CaseSummary } from "@dizaster/contracts";
+import type { AppealView, CaseSummary, DuplicateCandidateView } from "@dizaster/contracts";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 import { FlatList, Pressable, RefreshControl, StyleSheet, Text, TextInput, View } from "react-native";
 import { api } from "../../lib/api";
 import { lang, t } from "../../lib/i18n";
 import { reasonSummary, validReason } from "../../lib/moderation/logic";
-import { timeAgo } from "../../lib/ui/format";
+import { eventTitle, timeAgo } from "../../lib/ui/format";
 import { colors, radius, space } from "../../theme";
 
-/** Herramientas de moderación dentro de la app (V1 sin panel web): cola priorizada y apelaciones. */
+/** Herramientas de moderación dentro de la app (V1 sin panel web): cola priorizada, apelaciones y posibles duplicados (ADR 0096). */
 export default function ModerationScreen() {
-  const [tab, setTab] = useState<"queue" | "appeals">("queue");
+  const [tab, setTab] = useState<"queue" | "appeals" | "duplicates">("queue");
   const [cases, setCases] = useState<CaseSummary[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
   const [appeals, setAppeals] = useState<AppealView[]>([]);
+  const [duplicates, setDuplicates] = useState<DuplicateCandidateView[]>([]);
   const [loaded, setLoaded] = useState(false);
 
   const load = useCallback(async () => {
-    const [q, a] = await Promise.all([api.moderationQueue(), api.appeals()]).catch(() => [null, null] as const);
+    const [q, a, d] = await Promise.all([api.moderationQueue(), api.appeals(), api.duplicateQueue()]).catch(() => [null, null, null] as const);
     if (q) { setCases(q.cases); setCursor(q.nextCursor); }
     if (a) setAppeals(a.appeals);
+    if (d) setDuplicates(d.candidates);
     setLoaded(true);
   }, []);
   useFocusEffect(useCallback(() => { void load(); }, [load]));
@@ -33,9 +35,11 @@ export default function ModerationScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.tabs}>
-        {(["queue", "appeals"] as const).map((k) => (
+        {(["queue", "appeals", "duplicates"] as const).map((k) => (
           <Pressable key={k} accessibilityRole="tab" accessibilityState={{ selected: tab === k }} style={[styles.tab, tab === k && styles.tabOn]} onPress={() => setTab(k)}>
-            <Text style={styles.tabText}>{k === "queue" ? `${t("moderationQueue")} (${cases.length})` : `${t("moderationAppeals")} (${appeals.length})`}</Text>
+            <Text style={styles.tabText}>
+              {k === "queue" ? `${t("moderationQueue")} (${cases.length})` : k === "appeals" ? `${t("moderationAppeals")} (${appeals.length})` : `${t("duplicatesTab")} (${duplicates.length})`}
+            </Text>
           </Pressable>
         ))}
       </View>
@@ -57,6 +61,14 @@ export default function ModerationScreen() {
             </Pressable>
           )}
         />
+      ) : tab === "duplicates" ? (
+        <FlatList
+          data={duplicates}
+          keyExtractor={(d) => d.id}
+          refreshControl={<RefreshControl refreshing={false} onRefresh={() => void load()} tintColor={colors.textMuted} />}
+          ListEmptyComponent={loaded ? <Text style={styles.empty}>{t("noDuplicatePairs")}</Text> : null}
+          renderItem={({ item }) => <DuplicateRow candidate={item} onDone={() => setDuplicates((prev) => prev.filter((d) => d.id !== item.id))} />}
+        />
       ) : (
         <FlatList
           data={appeals}
@@ -65,6 +77,47 @@ export default function ModerationScreen() {
           renderItem={({ item }) => <AppealRow appeal={item} onDone={() => setAppeals((prev) => prev.filter((a) => a.id !== item.id))} />}
         />
       )}
+    </View>
+  );
+}
+
+/** Par de posibles duplicados (ADR 0076): unir uno en otro o descartar, siempre con motivo. */
+function DuplicateRow({ candidate, onDone }: { candidate: DuplicateCandidateView; onDone: () => void }) {
+  const [reason, setReason] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [a, b] = candidate.events;
+  async function act(action: () => Promise<unknown>) {
+    try {
+      await action();
+      onDone();
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }
+  const ok = validReason(reason);
+  return (
+    <View style={styles.row}>
+      <View style={styles.body}>
+        <Text style={styles.kind}>{t(`dupReason_${candidate.reason}`)} · {Math.round(candidate.score * 100)}% · {timeAgo(candidate.createdAt, lang)}</Text>
+        {[a, b].map((e, i) => (
+          <Pressable key={e.id} accessibilityRole="link" onPress={() => router.push(`/moderation/event/${e.id}`)}>
+            <Text style={styles.text} numberOfLines={1}>{i + 1}. {eventTitle(e, lang)} · {e.reportCount} · {timeAgo(e.firstSeenAt, lang)}</Text>
+          </Pressable>
+        ))}
+        <TextInput value={reason} onChangeText={setReason} maxLength={1000} placeholder={t("actionReason")} placeholderTextColor={colors.textMuted} style={styles.input} />
+        {error ? <Text style={styles.error}>{error}</Text> : null}
+        <View style={styles.buttons}>
+          <Pressable accessibilityRole="button" disabled={!ok} style={[styles.button, !ok && styles.disabled]} onPress={() => void act(() => api.mergeEvents(a.id, [b.id], reason.trim()))}>
+            <Text style={styles.buttonText}>{t("mergeIntoFirst")}</Text>
+          </Pressable>
+          <Pressable accessibilityRole="button" disabled={!ok} style={[styles.button, !ok && styles.disabled]} onPress={() => void act(() => api.mergeEvents(b.id, [a.id], reason.trim()))}>
+            <Text style={styles.buttonText}>{t("mergeIntoSecond")}</Text>
+          </Pressable>
+          <Pressable accessibilityRole="button" disabled={!ok} style={[styles.button, styles.primary, !ok && styles.disabled]} onPress={() => void act(() => api.dismissDuplicate(candidate.id, reason.trim()))}>
+            <Text style={styles.buttonText}>{t("dismissDuplicate")}</Text>
+          </Pressable>
+        </View>
+      </View>
     </View>
   );
 }

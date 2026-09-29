@@ -18,3 +18,18 @@ export function toggle(selected: ReadonlySet<string>, id: string): Set<string> {
   else next.add(id);
   return next;
 }
+
+/**
+ * ¿Se puede marcar el evento con este estado negativo? (ADR 0096). FALSE exige citar evidencia (las seleccionadas) y
+ * nunca aplica a un evento confirmado oficialmente: eso solo lo desmiente una fuente oficial. El servidor lo comprueba igual.
+ * NO AI REQUIRED.
+ */
+export function canSetNegative(
+  to: "NONE" | "DISPUTED" | "FALSE",
+  current: { negativeState: string; level: string },
+  selectedEvidence: number,
+): boolean {
+  if (current.negativeState === to) return false;
+  if (to === "FALSE") return selectedEvidence > 0 && current.level !== "OFFICIALLY_CONFIRMED";
+  return true;
+}

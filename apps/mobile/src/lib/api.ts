@@ -1,4 +1,4 @@
-import type { OfficialScopeView, MyReportView, MfaEnrollResponse, MfaStatus, PresenceReview, EventSourceView, EventStatus, MyProfile, UpdateProfileRequest, ReactionKind, ReactionState, DataExport, VerificationView, ModeratorEventDetail, SavedZone, SavedZoneInput, AppealView, CaseDetail, CaseSummary, CreateFlagRequest, ModerationActionType, ModerationNotice, CostDashboard, KillSwitchView, QualityReport, CreatePostRequest, TagView, BusinessView, SessionView, CreateBusinessRequest, UpdateBusinessRequest, AlertPreferences, CategorySubscription, CategorySubscriptionInput, NotificationsResponse, AppConfig, AttributionsResponse, AreaSearchResult, FollowTarget, MyFollows, ProfileSearchResult, ProfileView, CommentView, CreateUploadRequest, FeedPost, FeedResponse, FeedTab, CreateUploadResponse, DevicePlatform, MediaView, RegisterPushTokenRequest, EventMapResponse, EventDetail, EventSummary, NearbyEventsResponse, SubmitReportRequest, SubmitReportResponse, TimelineEntryView } from "@dizaster/contracts";
+import type { DuplicateCandidateView, OfficialScopeView, MyReportView, MfaEnrollResponse, MfaStatus, PresenceReview, EventSourceView, EventStatus, MyProfile, UpdateProfileRequest, ReactionKind, ReactionState, DataExport, VerificationView, ModeratorEventDetail, SavedZone, SavedZoneInput, AppealView, CaseDetail, CaseSummary, CreateFlagRequest, ModerationActionType, ModerationNotice, CostDashboard, KillSwitchView, QualityReport, CreatePostRequest, TagView, BusinessView, SessionView, CreateBusinessRequest, UpdateBusinessRequest, AlertPreferences, CategorySubscription, CategorySubscriptionInput, NotificationsResponse, AppConfig, AttributionsResponse, AreaSearchResult, FollowTarget, MyFollows, ProfileSearchResult, ProfileView, CommentView, CreateUploadRequest, FeedPost, FeedResponse, FeedTab, CreateUploadResponse, DevicePlatform, MediaView, RegisterPushTokenRequest, EventMapResponse, EventDetail, EventSummary, NearbyEventsResponse, SubmitReportRequest, SubmitReportResponse, TimelineEntryView } from "@dizaster/contracts";
 import { mergeMapTiles, tilesForView } from "@dizaster/geo-kit";
 import { canRetryWithRefresh, singleFlight } from "./auth/refresh";
 import { API_URL } from "./config";
@@ -174,6 +174,11 @@ export const api = {
     request<CaseDetail>(`/v1/moderation/cases/${id}/actions`, { method: "POST", body: JSON.stringify({ action, reason }) }),
   appeals: () => request<{ appeals: AppealView[] }>("/v1/moderation/appeals"),
   moderatorEvent: (id: string) => request<ModeratorEventDetail>(`/v1/moderation/events/${id}`),
+  setNegativeState: (id: string, to: "NONE" | "DISPUTED" | "FALSE", reason: string, evidenceRefs: string[]) =>
+    request<VerificationView>(`/v1/moderation/events/${id}/negative-state`, { method: "POST", body: JSON.stringify({ to, reason, evidenceRefs }) }),
+  duplicateQueue: () => request<{ candidates: DuplicateCandidateView[] }>("/v1/moderation/duplicates"),
+  dismissDuplicate: (id: string, reason: string) =>
+    request<void>(`/v1/moderation/duplicates/${id}/dismiss`, { method: "POST", body: JSON.stringify({ reason }) }),
   mergeEvents: (targetId: string, sourceEventIds: string[], reason: string) =>
     request<{ mergeIds: string[]; event: ModeratorEventDetail }>(`/v1/moderation/events/${targetId}/merge`, { method: "POST", body: JSON.stringify({ sourceEventIds, reason }) }),
   revertMerge: (mergeId: string, reason: string) =>

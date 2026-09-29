@@ -1,15 +1,16 @@
-import type { EventStatus, EventSummary, ModeratorEventDetail, NearbyEvent } from "@dizaster/contracts";
+import type { EventStatus, EventSummary, ModeratorEventDetail, NearbyEvent, VerificationView } from "@dizaster/contracts";
 import { router, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { api } from "../../../lib/api";
 import { lang, t, type MessageKey } from "../../../lib/i18n";
-import { canSplit, duplicateCandidates, toggle } from "../../../lib/moderation/event-tools";
+import { canSetNegative, canSplit, duplicateCandidates, toggle } from "../../../lib/moderation/event-tools";
 import { validReason } from "../../../lib/moderation/logic";
 import { eventTitle, timeAgo } from "../../../lib/ui/format";
 import { colors, radius, space } from "../../../theme";
 
 const STATUSES: EventStatus[] = ["ACTIVE", "MONITORING", "RESOLVED", "ARCHIVED"];
+const NEGATIVE = ["NONE", "DISPUTED", "FALSE"] as const;
 const TIER: Record<string, MessageKey> = { CITIZEN: "tierCitizen", EXTERNAL: "tierExternal", OFFICIAL: "tierOfficial" };
 
 /**
@@ -20,6 +21,7 @@ export default function EventToolsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [event, setEvent] = useState<EventSummary | null>(null);
   const [detail, setDetail] = useState<ModeratorEventDetail | null>(null);
+  const [verification, setVerification] = useState<VerificationView | null>(null);
   const [nearby, setNearby] = useState<NearbyEvent[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [reason, setReason] = useState("");
@@ -29,9 +31,10 @@ export default function EventToolsScreen() {
   const load = useCallback(async () => {
     if (!id) return;
     try {
-      const [ev, d] = await Promise.all([api.event(id), api.moderatorEvent(id)]);
+      const [ev, d, v] = await Promise.all([api.event(id), api.moderatorEvent(id), api.verification(id)]);
       setEvent(ev);
       setDetail(d);
+      setVerification(v);
       setSelected(new Set());
       const near = await api.nearby(ev.point.lat, ev.point.lng, ev.categoryCode);
       setNearby(duplicateCandidates(near.events, id));
@@ -92,6 +95,26 @@ export default function EventToolsScreen() {
           {detail.statusChanges.map((c) => (
             <Text key={c.at} style={styles.meta}>{timeAgo(c.at, lang)} · {t(`st_${c.from}`)} → {t(`st_${c.to}`)} · {c.reason}</Text>
           ))}
+
+          {verification ? (
+            <>
+              <Text style={styles.section}>{t("negativeSection")}</Text>
+              <Text style={styles.meta}>{t("negativeHint")}</Text>
+              <View style={styles.chips}>
+                {NEGATIVE.map((n) => {
+                  const current = verification.negativeState === n;
+                  const enabled = ok && canSetNegative(n, verification, selected.size);
+                  return (
+                    <Pressable key={n} accessibilityRole="button" accessibilityState={{ selected: current, disabled: !enabled }} disabled={!enabled}
+                      style={[styles.button, current && styles.current, !current && !enabled && styles.disabled]}
+                      onPress={() => confirm(t("confirmNegative"), () => api.setNegativeState(event.id, n, reason.trim(), n === "FALSE" ? [...selected] : []))}>
+                      <Text style={styles.buttonText}>{t(`neg_${n}`)}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </>
+          ) : null}
 
           <Text style={styles.section}>{t("possibleDuplicates")}</Text>
           {nearby.length === 0 ? <Text style={styles.meta}>{t("noDuplicates")}</Text> : null}
