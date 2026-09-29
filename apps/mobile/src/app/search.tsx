@@ -1,4 +1,4 @@
-import type { AreaSearchResult, BusinessView, CategoryCatalog, EventSummary, FeedPost, ProfileSearchResult, TagView } from "@dizaster/contracts";
+import type { AreaSearchResult, BusinessView, EventSummary, FeedPost, ProfileSearchResult, TagView } from "@dizaster/contracts";
 import { router } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import { Pressable, SectionList, StyleSheet, Text, TextInput, View } from "react-native";
@@ -12,9 +12,8 @@ import { categoryStyle } from "../lib/ui/categories";
 import { areaRow, bboxParam, timeAgo } from "../lib/ui/format";
 import { useCoarseLocation } from "../lib/ui/use-coarse-location";
 import { colors, radius, space } from "../theme";
+import { findCategory, pickerCategories, useCategoryCatalogVersion } from "../lib/category-store";
 
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const catalog = require("../reference-data/categories.json") as CategoryCatalog;
 
 const normalize = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 
@@ -42,10 +41,11 @@ export default function SearchScreen() {
   const location = useCoarseLocation();
   const near = location.point;
 
+  const catalogVersion = useCategoryCatalogVersion();
   const categories = useMemo(() => {
     const n = normalize(q.trim());
-    return catalog.categories.filter((c) => !n || Object.values(c.names).some((name) => normalize(name).includes(n)));
-  }, [q]);
+    return pickerCategories().filter((c) => !n || Object.values(c.names).some((name) => normalize(name).includes(n)));
+  }, [q, catalogVersion]);
 
   useEffect(() => {
     const text = q.trim();
@@ -92,7 +92,7 @@ export default function SearchScreen() {
         renderItem={({ item }) => {
           if (item.type === "event") {
             const s = categoryStyle(item.event.categoryCode);
-            const name = catalog.categories.find((c) => c.code === item.event.categoryCode)?.names;
+            const name = findCategory(item.event.categoryCode)?.names;
             return (
               <Pressable accessibilityRole="link" style={styles.row} onPress={() => router.push(`/event/${item.event.id}`)}>
                 <Icon name={s.icon} size={22} color={s.color} />

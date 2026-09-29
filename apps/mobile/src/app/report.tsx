@@ -1,5 +1,5 @@
 import { Camera, GeoJSONSource, Layer, Map } from "@maplibre/maplibre-react-native";
-import { detectPersonalData, type CategoryCatalog, type CategoryConfig, type GeoPoint, type NearbyEvent, type SubmitReportRequest, type SubmitReportResponse } from "@dizaster/contracts";
+import { detectPersonalData, type CategoryConfig, type GeoPoint, type NearbyEvent, type SubmitReportRequest, type SubmitReportResponse } from "@dizaster/contracts";
 import { clampToRadius } from "@dizaster/geo-kit";
 import * as Location from "expo-location";
 import { router, useLocalSearchParams } from "expo-router";
@@ -22,9 +22,8 @@ import { flushUntilSent, reportQueue } from "../lib/report/outbox";
 import { useSession } from "../lib/session";
 import { outcomeLines } from "../lib/report/outcome";
 import { colors } from "../theme";
+import { categoryIn, findCategory, reportCategories, useCategoryCatalogVersion } from "../lib/category-store";
 
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const catalog = require("../reference-data/categories.json") as CategoryCatalog;
 
 type Phase = "category" | "locating" | "compose";
 
@@ -33,10 +32,8 @@ export default function ReportScreen() {
   // "Aquí no pasa nada" desde un evento: contra-reporte presencial sobre ese evento (Blueprint §10.2).
   const params = useLocalSearchParams<{ eventId?: string; category?: string; deny?: string }>();
   const deny = params.deny === "1" && !!params.eventId;
-  const categories = useMemo(
-    () => catalog.categories.filter((c) => c.citizenReportable && !catalog.categories.some((x) => x.parent === c.code)),
-    [],
-  );
+  const catalogVersion = useCategoryCatalogVersion();
+  const categories = useMemo(() => reportCategories(), [catalogVersion]);
   const [phase, setPhase] = useState<Phase>("category");
   const [category, setCategory] = useState<CategoryConfig | null>(null);
   const [fix, setFix] = useState<Location.LocationObject | null>(null);
@@ -54,8 +51,8 @@ export default function ReportScreen() {
 
   useEffect(() => {
     if (!deny) return;
-    const c = catalog.categories.find((x) => x.code === params.category && x.citizenReportable);
-    if (!c) return;
+    const c = findCategory(params.category ?? "");
+    if (!c?.citizenReportable) return;
     setTarget(params.eventId ?? null);
     void choose(c);
     // Solo al abrir la pantalla desde el evento.
@@ -65,7 +62,8 @@ export default function ReportScreen() {
     api.config().then((c) => setStyleUrl(providerFromAppConfig(c)?.styleUrl("light") ?? null)).catch(() => setStyleUrl(null));
   }, []);
 
-  async function choose(c: CategoryConfig) {
+  async function choose(picked: CategoryConfig) {
+    let c = picked;
     setCategory(c);
     setPhase("locating");
     setStatus(t("locating"));
@@ -78,6 +76,16 @@ export default function ReportScreen() {
     const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Highest });
     recent.current.push(loc);
     const here = { lat: loc.coords.latitude, lng: loc.coords.longitude };
+    // Los ajustes que rigen son los del país donde está la persona (radio de presencia, etc.; ADR 0152).
+    const local = categoryIn(c.code, countryOf(here));
+    if (!local?.citizenReportable) {
+      setCategory(null);
+      setPhase("category");
+      setStatus(t("categoryNotHere"));
+      return;
+    }
+    c = local;
+    setCategory(c);
     setFix(loc);
     setPin(here);
     setStatus(null);
@@ -139,6 +147,7 @@ export default function ReportScreen() {
     return (
       <View style={styles.container}>
         <Text style={styles.title}>{t("chooseCategory")}</Text>
+        {status ? <Text style={styles.status}>{status}</Text> : null}
         <Pressable accessibilityRole="button" style={styles.row} onPress={() => router.replace("/compose")}>
           <Text style={styles.rowText}>{t("postWithoutReport")}</Text>
           <Text style={styles.meta}>{t("postWithoutReportHint")}</Text>

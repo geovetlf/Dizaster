@@ -5,6 +5,7 @@ export const pt: Record<MessageKey, string> = {
   report: "Reportar",
   emergency: "Emergência",
   chooseCategory: "O que está acontecendo?",
+  categoryNotHere: "Esta categoria não pode ser relatada no país onde você está. Escolha outra.",
   locating: "Obtendo sua localização…",
   locationDenied: "Sem permissão de localização não dá para criar um reporte com pin. Você pode publicar um post normal.",
   send: "Enviar reporte",

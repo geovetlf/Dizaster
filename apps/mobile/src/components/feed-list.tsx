@@ -1,15 +1,13 @@
-import type { CategoryCatalog, FeedPost, FeedResponse, FeedTab } from "@dizaster/contracts";
+import type { FeedPost, FeedResponse, FeedTab } from "@dizaster/contracts";
 import { useCallback, useEffect, useRef, useState, type ReactElement } from "react";
 import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from "react-native";
 import { api } from "../lib/api";
-import { lang, t } from "../lib/i18n";
+import { t } from "../lib/i18n";
 import { colors, radius, space } from "../theme";
 import { PostCard } from "./post-card";
+import { categoryLabel } from "../lib/category-store";
 
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const catalog = require("../reference-data/categories.json") as CategoryCatalog;
-const names = new Map(catalog.categories.map((c) => [c.code, c.names[lang] ?? c.names["es"] ?? c.code]));
-export const categoryName = (code: string) => names.get(code) ?? names.get(code.split(".")[0]!) ?? code;
+export const categoryName = categoryLabel;
 
 /** Lista paginada del feed. La usan el inicio, la pestaña de videos y los perfiles (con `fetchPage`). */
 export function FeedList(props: {

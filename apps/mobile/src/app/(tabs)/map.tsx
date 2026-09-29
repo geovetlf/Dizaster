@@ -1,5 +1,5 @@
 import { Camera, GeoJSONSource, Layer, Map, type CameraRef, type ViewStateChangeEvent } from "@maplibre/maplibre-react-native";
-import type { CategoryCatalog, EventMapResponse } from "@dizaster/contracts";
+import type { EventMapResponse } from "@dizaster/contracts";
 import { router, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View, type NativeSyntheticEvent } from "react-native";
@@ -16,10 +16,8 @@ import { readCache } from "../../lib/offline/sqlite-cache";
 import { limitAmbientCache } from "../../lib/map/offline";
 import { lang, t } from "../../lib/i18n";
 import { OFFLINE_FALLBACK_STYLE, providerFromAppConfig, type MapProvider } from "../../lib/map/provider";
+import { categoryCatalog, pickerCategories, useCategoryCatalogVersion } from "../../lib/category-store";
 
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const catalog = require("../../reference-data/categories.json") as CategoryCatalog;
-const { chips } = homeChips(catalog);
 
 /**
  * Mapa completo: el mapa base viene del proveedor configurado (estilo oscuro, como la referencia); la capa de
@@ -28,6 +26,8 @@ const { chips } = homeChips(catalog);
  */
 export default function MapScreen() {
   const location = useCoarseLocation();
+  const catalogVersion = useCategoryCatalogVersion();
+  const { chips } = useMemo(() => homeChips({ ...categoryCatalog(), categories: pickerCategories() }), [catalogVersion]);
   const [provider, setProvider] = useState<MapProvider | null>(null);
   const [data, setData] = useState<EventMapResponse | null>(null);
   const [savedAt, setSavedAt] = useState<number | null>(null);

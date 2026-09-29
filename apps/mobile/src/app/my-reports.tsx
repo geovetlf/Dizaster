@@ -1,4 +1,4 @@
-import type { CategoryCatalog, MyReportView } from "@dizaster/contracts";
+import type { MyReportView } from "@dizaster/contracts";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 import { Alert, FlatList, Pressable, StyleSheet, Text, View } from "react-native";
@@ -7,13 +7,9 @@ import { lang, t } from "../lib/i18n";
 import { canWithdraw, myReportLines } from "../lib/report/my-reports";
 import { formatInZone, timeAgo } from "../lib/ui/format";
 import { colors, radius, space } from "../theme";
+import { categoryLabel } from "../lib/category-store";
 
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const catalog = require("../reference-data/categories.json") as CategoryCatalog;
-const categoryName = (code: string) => {
-  const c = catalog.categories.find((x) => x.code === code);
-  return c?.names[lang] ?? c?.names["es"] ?? code;
-};
+const categoryName = categoryLabel;
 const fmt = (iso: string) => formatInZone(iso, lang, undefined, "datetime") ?? iso;
 
 /** Mis reportes (ADR 0094): qué pasó con cada uno, cuándo se borra la ubicación precisa, y retirarlo. */

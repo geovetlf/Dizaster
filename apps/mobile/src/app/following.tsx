@@ -1,4 +1,4 @@
-import type { CategoryCatalog, MyFollows } from "@dizaster/contracts";
+import type { MyFollows } from "@dizaster/contracts";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 import { Pressable, SectionList, StyleSheet, Text, View } from "react-native";
@@ -6,13 +6,9 @@ import { api } from "../lib/api";
 import { lang, t, type MessageKey } from "../lib/i18n";
 import { EMPTY_FOLLOWS, followSections, withFollow, type FollowRow } from "../lib/social/follow-state";
 import { colors, radius, space } from "../theme";
+import { categoryLabel } from "../lib/category-store";
 
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const catalog = require("../reference-data/categories.json") as CategoryCatalog;
-const categoryName = (code: string) => {
-  const c = catalog.categories.find((x) => x.code === code);
-  return c?.names[lang] ?? c?.names["es"] ?? code;
-};
+const categoryName = categoryLabel;
 const eventName = (e: MyFollows["events"][number]) => e.title?.[lang] ?? (e.title ? Object.values(e.title)[0] : undefined) ?? categoryName(e.categoryCode);
 const SECTION: Record<string, MessageKey> = {
   events: "followingEvents", places: "followingPlaces", tags: "followingTags", profiles: "followingPeople", businesses: "followingBusinesses",

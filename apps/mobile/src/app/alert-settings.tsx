@@ -1,7 +1,7 @@
-import { MAX_SAVED_ZONES, type AlertPreferences, type AreaSearchResult, type CategoryCatalog, type CategorySubscription, type SavedZone } from "@dizaster/contracts";
+import { MAX_SAVED_ZONES, type AlertPreferences, type AreaSearchResult, type CategorySubscription, type SavedZone } from "@dizaster/contracts";
 import * as Location from "expo-location";
 import { router, useFocusEffect } from "expo-router";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
 import { Icon } from "../components/icon";
 import { ZoneMapButton } from "../components/zone-map-button";
@@ -13,20 +13,15 @@ import { countryOf } from "../lib/geo/country";
 import { preferredCountry } from "../lib/geo/preferred-country";
 import { deleteZoneMap } from "../lib/map/offline";
 import { providerFromAppConfig } from "../lib/map/provider";
-import { lang, t, type MessageKey } from "../lib/i18n";
+import { t, type MessageKey } from "../lib/i18n";
 import { useSession } from "../lib/session";
 import { categoryStyle } from "../lib/ui/categories";
 import { areaRow, formatKm } from "../lib/ui/format";
 import { useCoarseLocation } from "../lib/ui/use-coarse-location";
 import { colors, radius, space } from "../theme";
+import { categoryLabel, pickerCategories, useCategoryCatalogVersion } from "../lib/category-store";
 
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const catalog = require("../reference-data/categories.json") as CategoryCatalog;
-const ROOTS = catalog.categories.filter((c) => !c.parent);
-const categoryName = (code: string) => {
-  const c = catalog.categories.find((x) => x.code === code);
-  return c?.names[lang] ?? c?.names["es"] ?? code;
-};
+const categoryName = categoryLabel;
 
 const SEVERITIES = [1, 2, 3, 4, 5] as const;
 const PER_HOUR = [2, 4, 6, 10, 20] as const;
@@ -165,6 +160,8 @@ export default function AlertSettingsScreen() {
 }
 
 function Subscriptions({ subs, onChange }: { subs: CategorySubscription[]; onChange: (s: CategorySubscription[]) => void }) {
+  const catalogVersion = useCategoryCatalogVersion();
+  const ROOTS = useMemo(() => pickerCategories().filter((c) => !c.parent), [catalogVersion]);
   const [category, setCategory] = useState<string | null>(null);
   const [q, setQ] = useState("");
   const [areas, setAreas] = useState<AreaSearchResult[]>([]);

@@ -3,6 +3,7 @@ import { join } from "node:path";
 import {
   CategoryCatalog,
   DEFAULT_MIN_AGE,
+  effectiveCategory,
   EmergencyDataset,
   ModerationTermList,
   type CategoryConfig,
@@ -69,12 +70,7 @@ export class ReferenceData {
 
   /** Configuración efectiva de una categoría para un país (aplica overrides regionales). */
   category(code: string, country?: string | null): CategoryConfig | undefined {
-    const base = this.byCode.get(code);
-    if (!base || !country) return base;
-    const o = this.categories.regionOverrides.find((r) => r.category === code && r.country === country);
-    if (!o) return base;
-    if (!o.enabled) return undefined;
-    return { ...base, ...o.overrides, names: { ...base.names, ...(o.names ?? {}) } };
+    return country ? effectiveCategory(this.categories, code, country) : this.byCode.get(code);
   }
 
   isLeaf(code: string): boolean {

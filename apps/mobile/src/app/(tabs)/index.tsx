@@ -1,4 +1,4 @@
-import type { CategoryCatalog, FeedTab } from "@dizaster/contracts";
+import type { FeedTab } from "@dizaster/contracts";
 import { useLocalSearchParams } from "expo-router";
 import { useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
@@ -11,10 +11,8 @@ import { t } from "../../lib/i18n";
 import { homeChips, MORE_CODE, type CategoryChip } from "../../lib/ui/categories";
 import { useCoarseLocation } from "../../lib/ui/use-coarse-location";
 import { colors, radius, space } from "../../theme";
+import { categoryCatalog, pickerCategories, useCategoryCatalogVersion } from "../../lib/category-store";
 
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const catalog = require("../../reference-data/categories.json") as CategoryCatalog;
-const { chips, more } = homeChips(catalog);
 const TABS: { tab: FeedTab; label: () => string }[] = [
   { tab: "for_you", label: () => t("forYou") },
   { tab: "nearby", label: () => t("nearbyTab") },
@@ -28,6 +26,8 @@ export default function HomeScreen() {
   const [showMore, setShowMore] = useState(false);
   const [tab, setTab] = useState<FeedTab>("for_you");
   const location = useCoarseLocation();
+  const catalogVersion = useCategoryCatalogVersion();
+  const { chips, more } = useMemo(() => homeChips({ ...categoryCatalog(), categories: pickerCategories() }), [catalogVersion]);
 
   const select = (c: CategoryChip) => {
     if (c.code === MORE_CODE) return setShowMore((v) => !v);

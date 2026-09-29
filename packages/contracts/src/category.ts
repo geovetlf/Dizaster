@@ -61,3 +61,21 @@ export const CategoryCatalog = z.object({
   regionOverrides: z.array(CategoryRegionOverride).default([]),
 });
 export type CategoryCatalog = z.infer<typeof CategoryCatalog>;
+
+/**
+ * Configuración efectiva de una categoría para un país (ADR 0152): el override regional pisa los campos que define y
+ * los nombres; `undefined` si no existe o está desactivada en ese país. Misma regla en servidor y app. NO AI REQUIRED.
+ */
+export function effectiveCategory(catalog: Pick<CategoryCatalog, "categories" | "regionOverrides">, code: string, country?: string | null): CategoryConfig | undefined {
+  const base = catalog.categories.find((c) => c.code === code);
+  if (!base || !country) return base;
+  const o = catalog.regionOverrides.find((r) => r.category === code && r.country === country);
+  if (!o) return base;
+  if (!o.enabled) return undefined;
+  return { ...base, ...o.overrides, names: { ...base.names, ...(o.names ?? {}) } };
+}
+
+/** Categorías disponibles en un país, con sus ajustes aplicados (las desactivadas no aparecen). */
+export function categoriesFor(catalog: Pick<CategoryCatalog, "categories" | "regionOverrides">, country?: string | null): CategoryConfig[] {
+  return catalog.categories.flatMap((c) => effectiveCategory(catalog, c.code, country) ?? []);
+}

@@ -3,6 +3,7 @@ import { StatusBar } from "expo-status-bar";
 import { useEffect, useState } from "react";
 import { t } from "../lib/i18n";
 import { useNotificationRouting } from "../lib/alerts/notifications";
+import { refreshCategoryCatalog } from "../lib/category-store";
 import { refreshEmergencyDataset } from "../lib/emergency-store";
 import { isAgeBlocked } from "../lib/account/age-gate";
 import { api } from "../lib/api";
@@ -14,7 +15,7 @@ const header = { headerStyle: { backgroundColor: colors.bg }, headerTintColor: c
 
 export default function RootLayout() {
   // Al abrir la app se comprueba si hay números de emergencia nuevos; así funcionan offline con la última versión.
-  useEffect(() => { void refreshEmergencyDataset(); }, []);
+  useEffect(() => { void refreshEmergencyDataset(); void refreshCategoryCatalog(); }, []);
   // Cambiar el idioma vuelve a montar la navegación para que títulos y pantallas usen el nuevo (ADR 0069).
   const [langKey, setLangKey] = useState(0);
   useEffect(() => onLanguageChange(() => setLangKey((k) => k + 1)), []);

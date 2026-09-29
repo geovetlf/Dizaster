@@ -5,6 +5,7 @@ export const fr: Record<MessageKey, string> = {
   report: "Signaler",
   emergency: "Urgence",
   chooseCategory: "Que se passe-t-il ?",
+  categoryNotHere: "Cette catégorie ne peut pas être signalée dans le pays où vous êtes. Choisissez-en une autre.",
   locating: "Localisation en cours…",
   locationDenied: "Sans autorisation de localisation, impossible de créer un signalement épinglé. Vous pouvez publier une publication normale.",
   send: "Envoyer le signalement",

@@ -24,14 +24,9 @@ import { colors, radius, space } from "../../theme";
 import { appendPage, newestFirst } from "../../lib/ui/pages";
 import { evidenceCounts } from "../../lib/events/counts";
 import { secondaryLine } from "../../lib/events/secondary";
-import type { CategoryCatalog } from "@dizaster/contracts";
+import { categoryLabel } from "../../lib/category-store";
 
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const catalog = require("../../reference-data/categories.json") as CategoryCatalog;
-const categoryName = (code: string) => {
-  const c = catalog.categories.find((x) => x.code === code);
-  return c?.names[lang] ?? c?.names["es"] ?? code;
-};
+const categoryName = categoryLabel;
 
 const TIMELINE_SHOWN = 12;
 
