@@ -210,7 +210,8 @@ export class MediaService {
       `UPDATE media.media SET state = 'READY', sanitized = $2, processed_at = $3, updated_at = now() WHERE id = $1`,
       [mediaId, result.removed, this.clock.now()],
     );
-    await publish(tx, "MediaReady", { mediaId }, { lane: "interactive" });
+    const hash = (await tx.query<{ phash: string | null }>(`SELECT phash FROM media.media WHERE id = $1`, [mediaId])).rows[0]?.phash ?? null;
+    await publish(tx, "MediaReady", { mediaId, phash: hash }, { lane: "interactive" });
   }
 
   /**
@@ -235,6 +236,15 @@ export class MediaService {
   }
 
   /** De estas media, cuáles parecen una foto reciclada (el reporte avisa a moderación al adjuntarlas). */
+  /** Hash perceptual de las fotos ya procesadas (para la deduplicación de EVENTs). */
+  async phashes(q: Queryable, mediaIds: string[]): Promise<string[]> {
+    if (mediaIds.length === 0) return [];
+    const { rows } = await q.query<{ phash: string }>(
+      `SELECT phash FROM media.media WHERE id = ANY($1) AND state = 'READY' AND phash IS NOT NULL`, [mediaIds],
+    );
+    return rows.map((r) => r.phash);
+  }
+
   async reuseSuspected(q: Queryable, mediaIds: string[]): Promise<string[]> {
     if (mediaIds.length === 0) return [];
     const { rows } = await q.query<{ id: string }>(`SELECT id FROM media.media WHERE id = ANY($1) AND reuse_suspected`, [mediaIds]);

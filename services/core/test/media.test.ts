@@ -145,6 +145,28 @@ describe("media en reportes y eventos", () => {
     expect(JSON.stringify(media)).not.toContain("originals/");
   });
 
+  it("el evento guarda la huella de fotos y palabras para deduplicar, también si la foto se procesa después", async () => {
+    const u = await createUser(t, "media_huella");
+    const id = await uploadReady(u, makeJpeg());
+    const r = await submit(t, u, { ...reportBody(u, { pin: { lat: -12.4, lng: -77.03 }, text: "Humo negro en el mercado central" }), mediaIds: [id] });
+    const phash = (await t.c.db.query<{ phash: string }>(`SELECT phash FROM media.media WHERE id = $1`, [id])).rows[0]!.phash;
+    const ev = (await t.c.db.query<{ keywords: string[]; media_hashes: string[] }>(`SELECT keywords, media_hashes FROM event.events WHERE id = $1`, [r.body.eventId])).rows[0]!;
+    expect(ev.media_hashes).toEqual([phash]);
+    expect(ev.keywords).toEqual(expect.arrayContaining(["humo", "mercado", "central"]));
+
+    // Foto subida pero sin procesar al reportar: el hash llega al evento cuando termina de procesarse.
+    const v = await createUser(t, "media_tarde");
+    const file = makeJpeg();
+    const up = (await requestUpload(v, file)).json();
+    expect((await put(up.upload, file)).statusCode).toBe(200);
+    await t.app.inject({ method: "POST", url: `/v1/media/${up.mediaId}/complete`, headers: auth(v) });
+    const late = await submit(t, v, { ...reportBody(v, { pin: { lat: -12.6, lng: -77.03 } }), mediaIds: [up.mediaId] });
+    expect((await t.c.db.query(`SELECT media_hashes FROM event.events WHERE id = $1`, [late.body.eventId])).rows[0]).toEqual({ media_hashes: [] });
+    await t.c.dispatcher.drain();
+    const after = (await t.c.db.query<{ media_hashes: string[] }>(`SELECT media_hashes FROM event.events WHERE id = $1`, [late.body.eventId])).rows[0]!;
+    expect(after.media_hashes).toHaveLength(1);
+  });
+
   it("una misma foto no puede adjuntarse a dos reportes", async () => {
     const u = await createUser(t, "media_twice");
     const id = await uploadReady(u, makeJpeg());

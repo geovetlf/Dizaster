@@ -106,6 +106,7 @@ export class ReportService {
           mayCreateEvent: req.assertion === "OCCURRING" && !presence.lateOffline,
           createAsPending: presence.band === "MEDIUM",
           externalIds: [],
+          mediaHashes: (await this.d.media.phashes(tx, attachable.map((m) => m.id))).slice(0, 8),
           metadata: { assertion: req.assertion, presenceBand: presence.band, keywords: extractKeywords(req.text) },
         });
         if (resolution.kind === "INVALID_TARGET") throw new DomainError("INVALID_TARGET", resolution.reason, 422);

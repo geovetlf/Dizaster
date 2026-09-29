@@ -5,6 +5,10 @@ import {
   clampToRadius,
   computePresence,
   decideDedup,
+  DEDUP_RULES,
+  hammingHex,
+  matchScore,
+  mediaSimilarity,
   distanceMeters,
   extractKeywords,
   generalize,
@@ -150,6 +154,22 @@ describe("deduplicación", () => {
     const a = { id: "a", categoryCode: "accident.traffic", point: LIMA, lastActivityAt: t0 };
     const b = { id: "b", categoryCode: "accident.traffic", point: { lat: LIMA.lat + 0.0001, lng: LIMA.lng }, lastActivityAt: t0 };
     expect(decideDedup(input, [a, b]).kind).toBe("AMBIGUOUS");
+  });
+
+  it("la misma foto acerca un caso dudoso; fotos distintas lo alejan (sim_media)", () => {
+    const H = "f0f0f0f0f0f0f0f0";
+    const near = "f0f0f0f0f0f0f0f1"; // 1 bit
+    const other = "0f0f0f0f0f0f0f0f"; // 64 bits
+    expect(hammingHex(H, near)).toBe(1);
+    expect(mediaSimilarity([H], [near])).toBe(1);
+    expect(mediaSimilarity([H], [other])).toBe(0);
+    expect(mediaSimilarity([], [H])).toBe(0.5);
+    // A 300 m y 60 min: sin fotos queda en la franja ambigua; con la misma foto, igual pero con más puntuación.
+    const ev = { id: "e", categoryCode: "accident.traffic", point: { lat: LIMA.lat + 0.0027, lng: LIMA.lng }, lastActivityAt: new Date(t0.getTime() - 60 * 60000) };
+    const base = matchScore(input, ev);
+    expect(matchScore({ ...input, mediaHashes: [H] }, { ...ev, mediaHashes: [near] })).toBeCloseTo(base + 0.05, 3);
+    expect(matchScore({ ...input, mediaHashes: [H] }, { ...ev, mediaHashes: [other] })).toBeCloseTo(base - 0.05, 3);
+    expect(DEDUP_RULES.version).toBe("dedup-2");
   });
 
   it("extrae palabras clave sin tildes ni palabras vacías", () => {

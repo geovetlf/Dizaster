@@ -4,7 +4,7 @@ import { distanceMeters } from "./distance.js";
 /** Reglas de deduplicación versionadas (Blueprint §8.4). */
 export interface DedupRuleSet {
   version: string;
-  weights: { distance: number; time: number; category: number; text: number };
+  weights: { distance: number; time: number; category: number; text: number; media?: number };
   autoAttach: number;
   ambiguous: number;
 }
@@ -16,12 +16,28 @@ export const DEDUP_RULES_V1: DedupRuleSet = {
   ambiguous: 0.55,
 };
 
+/**
+ * dedup-2 (ADR 0030): suma la similitud de fotos (hash perceptual) que el Blueprint §8.4 prevé como `sim_media`
+ * y reparte su peso entre los demás términos. Sin fotos en alguno de los lados el término es neutro (0,5).
+ */
+export const DEDUP_RULES_V2: DedupRuleSet = {
+  version: "dedup-2",
+  weights: { distance: 0.4, time: 0.22, category: 0.18, text: 0.1, media: 0.1 },
+  autoAttach: 0.8,
+  ambiguous: 0.55,
+};
+
+/** Reglas vigentes. */
+export const DEDUP_RULES = DEDUP_RULES_V2;
+
 export interface DedupCandidateEvent {
   id: string;
   categoryCode: string;
   point: GeoPoint;
   lastActivityAt: Date;
   keywords?: string[];
+  /** Hash perceptual (64 bits en hex) de las fotos ya asociadas al evento. */
+  mediaHashes?: string[];
 }
 
 export interface DedupInput {
@@ -33,6 +49,7 @@ export interface DedupInput {
   dedupWindowMinutes: number;
   /** Códigos compatibles para fusionar (además de la misma categoría). */
   compatibleWith: readonly string[];
+  mediaHashes?: string[];
 }
 
 export type DedupDecision =
@@ -58,7 +75,30 @@ export function keywordSimilarity(a: readonly string[] = [], b: readonly string[
   return inter / (sa.size + sb.size - inter);
 }
 
-export function matchScore(input: DedupInput, event: DedupCandidateEvent, rules: DedupRuleSet = DEDUP_RULES_V1): number {
+/** Distancia de Hamming entre dos hashes hex de 64 bits (16 caracteres). */
+export function hammingHex(a: string, b: string): number {
+  let d = 0;
+  for (let i = 0; i < 16; i += 4) {
+    let x = parseInt(a.slice(i, i + 4), 16) ^ parseInt(b.slice(i, i + 4), 16);
+    while (x) { d += x & 1; x >>>= 1; }
+  }
+  return d;
+}
+
+/**
+ * Similitud de fotos: el par más parecido decide. ≤ 6 bits = misma escena (1); ≥ 24 bits = nada que ver (0);
+ * lineal entre medias. Sin fotos en algún lado: neutro (0,5), como el texto.
+ */
+export function mediaSimilarity(a: readonly string[] = [], b: readonly string[] = []): number {
+  if (a.length === 0 || b.length === 0) return 0.5;
+  let best = 64;
+  for (const x of a) for (const y of b) best = Math.min(best, hammingHex(x, y));
+  if (best <= 6) return 1;
+  if (best >= 24) return 0;
+  return Math.round((1 - (best - 6) / 18) * 1000) / 1000;
+}
+
+export function matchScore(input: DedupInput, event: DedupCandidateEvent, rules: DedupRuleSet = DEDUP_RULES): number {
   const compat = categoryCompatibility(input.categoryCode, event.categoryCode, input.compatibleWith);
   if (compat === 0) return 0;
   const d = distanceMeters(input.point, event.point);
@@ -68,14 +108,15 @@ export function matchScore(input: DedupInput, event: DedupCandidateEvent, rules:
   const fDist = Math.exp(-2 * (d / input.dedupRadiusM) ** 2);
   const fTime = Math.exp(-2 * (dtMin / input.dedupWindowMinutes) ** 2);
   const w = rules.weights;
-  const score = w.distance * fDist + w.time * fTime + w.category * compat + w.text * keywordSimilarity(input.keywords, event.keywords);
+  const score = w.distance * fDist + w.time * fTime + w.category * compat + w.text * keywordSimilarity(input.keywords, event.keywords)
+    + (w.media ?? 0) * mediaSimilarity(input.mediaHashes, event.mediaHashes);
   return Math.round(score * 1000) / 1000;
 }
 
 export function decideDedup(
   input: DedupInput,
   candidates: readonly DedupCandidateEvent[],
-  rules: DedupRuleSet = DEDUP_RULES_V1,
+  rules: DedupRuleSet = DEDUP_RULES,
 ): DedupDecision {
   const scored = candidates
     .map((e) => ({ eventId: e.id, score: matchScore(input, e, rules) }))

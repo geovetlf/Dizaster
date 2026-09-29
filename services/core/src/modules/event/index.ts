@@ -15,7 +15,7 @@ import type {
 } from "@dizaster/contracts";
 import { publicVerificationState } from "@dizaster/contracts";
 import {
-  DEDUP_RULES_V1,
+  DEDUP_RULES,
   H3_RES,
   clusterResolutionForZoom,
   decideDedup,
@@ -107,6 +107,15 @@ export class EventService {
   ) {}
 
   registerHandlers(dispatcher: OutboxDispatcher): void {
+    // Una foto que termina de procesarse después del reporte suma su hash a los eventos donde se publicó.
+    dispatcher.on("MediaReady", "event.media-fingerprint", async (e, tx) => {
+      if (!e.payload.phash) return;
+      const { rows } = await tx.query<{ event_id: string }>(
+        `SELECT DISTINCT event_id FROM event.timeline WHERE type = 'MEDIA_ADDED' AND payload->'mediaIds' @> to_jsonb($1::text)`,
+        [e.payload.mediaId],
+      );
+      for (const r of rows) await this.addFingerprint(tx, r.event_id, [], [e.payload.phash]);
+    });
     // El nivel de verificación lo decide otro módulo; aquí solo se refleja (copia denormalizada + timeline).
     dispatcher.on("VerificationChanged", "event.mirror-verification", async (e, tx) => {
       await tx.query(`UPDATE event.events SET verification_level = $2, negative_state = $3, updated_at = now() WHERE id = $1`, [
@@ -154,6 +163,7 @@ export class EventService {
         point: c.point,
         observedAt: new Date(c.observedAt),
         keywords: (c.metadata["keywords"] as string[] | undefined) ?? [],
+        mediaHashes: c.mediaHashes ?? [],
         dedupRadiusM: category.dedupRadiusM,
         dedupWindowMinutes: category.dedupWindowMinutes,
         compatibleWith: category.compatibleWith,
@@ -199,8 +209,8 @@ export class EventService {
 
   private async findCandidates(tx: Queryable, c: EventCandidate, category: CategoryConfig): Promise<DedupCandidateEvent[]> {
     const root = c.categoryCode.split(".")[0]!;
-    const { rows } = await tx.query<{ id: string; category_code: string; lat: number; lng: number; last_activity_at: Date }>(
-      `SELECT id, category_code, ST_Y(geom::geometry) AS lat, ST_X(geom::geometry) AS lng, last_activity_at
+    const { rows } = await tx.query<{ id: string; category_code: string; lat: number; lng: number; last_activity_at: Date; keywords: string[]; media_hashes: string[] }>(
+      `SELECT id, category_code, ST_Y(geom::geometry) AS lat, ST_X(geom::geometry) AS lng, last_activity_at, keywords, media_hashes
          FROM event.events
         WHERE status IN ('ACTIVE','MONITORING') AND merged_into_id IS NULL AND negative_state <> 'FALSE'
           AND (category_code = ANY($1) OR category_code LIKE $2)
@@ -212,7 +222,10 @@ export class EventService {
         category.dedupRadiusM, c.observedAt, category.dedupWindowMinutes,
       ],
     );
-    return rows.map((r) => ({ id: r.id, categoryCode: r.category_code, point: { lat: r.lat, lng: r.lng }, lastActivityAt: r.last_activity_at }));
+    return rows.map((r) => ({
+      id: r.id, categoryCode: r.category_code, point: { lat: r.lat, lng: r.lng }, lastActivityAt: r.last_activity_at,
+      keywords: r.keywords, mediaHashes: r.media_hashes,
+    }));
   }
 
   private async create(tx: Queryable, c: EventCandidate, category: CategoryConfig, country: string | null): Promise<ResolutionResult> {
@@ -256,6 +269,7 @@ export class EventService {
       ],
     );
     await this.recomputeAggregates(tx, eventId, c);
+    await this.addFingerprint(tx, eventId, (c.metadata["keywords"] as string[] | undefined) ?? [], c.mediaHashes ?? []);
     const timelineType =
       c.trustTier === "OFFICIAL" ? "OFFICIAL_UPDATE" : c.trustTier === "EXTERNAL" ? "SOURCE_ADDED" : assertion === "NOT_OCCURRING" ? "COUNTER_REPORT_ADDED" : "REPORT_ADDED";
     if (confidence !== "NEW_EVENT" || c.trustTier !== "CITIZEN") {
@@ -269,6 +283,21 @@ export class EventService {
       { lane: c.trustTier === "OFFICIAL" ? "urgent" : "interactive" },
     );
     return { kind: "ATTACHED", eventId, evidenceId, confidence, score };
+  }
+
+  /**
+   * Huella para deduplicar (ADR 0030): palabras clave y hashes de fotos de lo que ya se sabe del evento, acotados
+   * (50 y 20) para que el costo no crezca con el tamaño del evento.
+   */
+  private async addFingerprint(tx: Queryable, eventId: string, keywords: string[], hashes: string[]): Promise<void> {
+    if (keywords.length === 0 && hashes.length === 0) return;
+    await tx.query(
+      `UPDATE event.events SET
+         keywords = (SELECT coalesce(array_agg(k), '{}') FROM (SELECT DISTINCT unnest(keywords || $2::text[]) AS k LIMIT 50) x),
+         media_hashes = (SELECT coalesce(array_agg(h), '{}') FROM (SELECT DISTINCT unnest(media_hashes || $3::text[]) AS h LIMIT 20) y)
+       WHERE id = $1`,
+      [eventId, keywords, hashes],
+    );
   }
 
   /** Geometría y contadores agregados. Una fuente oficial prevalece; si no, mediana ponderada (robusta a pines atípicos). */
@@ -515,7 +544,7 @@ export class EventService {
     return rows.length > 0;
   }
 
-  readonly dedupRuleVersion = DEDUP_RULES_V1.version;
+  readonly dedupRuleVersion = DEDUP_RULES.version;
 
   // ───────────── Calidad (ADR 0026) ─────────────
 

@@ -17,7 +17,7 @@ export interface DomainEventMap {
   AlertTriggered: { alertId: string; eventId: string; kind: string };
   ExternalItemIngested: { externalItemId: string; sourceId: string; lane: "NORMAL" | "URGENT" };
   MediaUploaded: { mediaId: string };
-  MediaReady: { mediaId: string };
+  MediaReady: { mediaId: string; phash?: string | null };
   MediaRejected: { mediaId: string; reason: string };
   /** La persona borró su cuenta: cada módulo elimina o anonimiza lo suyo (ADR 0021). */
   AccountDeleted: { userId: string; profileId: string };

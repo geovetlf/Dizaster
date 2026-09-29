@@ -223,12 +223,20 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | Dispositivo sin sesiones deja de recibir avisos | ✅ | `identity.devices.push_token` |
 | App: "Sesiones y dispositivos", iOS y Android | ✅ | `apps/mobile/src/app/sessions.tsx` |
 
+## Etapa 19 — Deduplicación con texto y fotos (hecha)
+
+| Área | Estado | Dónde |
+|---|---|---|
+| Huella del EVENT: palabras clave y hashes de fotos, acotados | ✅ | `event.events.keywords/media_hashes`, ADR 0030 |
+| Reglas `dedup-2` con `sim_media` y `sim_texto` reales | ✅ | `packages/geo-kit/src/dedup.ts` |
+| Fotos procesadas después del reporte suman su hash al evento | ✅ | `MediaReady.phash`, `event.media-fingerprint` |
+
 ## Siguiente etapa (en orden)
 
 1. **BLOQUEADA** — Identity real: Sign in with Apple, Google y email; App Attest / Play Integrity. Falta: cuentas de
    Apple Developer y Google (client IDs, Service ID, Team ID) y un proveedor de email aprobado (gasto).
-2. Póster de video y `sim_media` en la deduplicación de EVENTs.
-3. Reputación en la visibilidad del feed y detección de textos idénticos.
+2. Reputación en la visibilidad del feed y detección de textos idénticos (spam coordinado).
+3. Póster de video (miniatura generada en el dispositivo; el servidor no tiene ffmpeg y no se añade).
 
 ## Requiere acción humana
 

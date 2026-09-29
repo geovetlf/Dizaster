@@ -132,6 +132,7 @@ export class IngestionService {
         mayCreateEvent: item.assertion === "OCCURRING",
         createAsPending: false,
         externalIds: [item.externalId],
+        mediaHashes: [],
         metadata: { assertion: item.assertion, sourceKey },
       });
       const eventId = resolution.kind === "CREATED" || resolution.kind === "ATTACHED" ? resolution.eventId : null;

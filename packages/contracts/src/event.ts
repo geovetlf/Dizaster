@@ -57,6 +57,8 @@ export const EventCandidate = z.object({
   /** Si true, el evento creado queda PENDING_CORROBORATION. */
   createAsPending: z.boolean().default(false),
   externalIds: z.array(z.string()).default([]),
+  /** Hash perceptual de las fotos ya procesadas del reporte (sim_media en la deduplicación, ADR 0030). */
+  mediaHashes: z.array(z.string().regex(/^[0-9a-f]{16}$/)).max(8).default([]),
   metadata: z.record(z.string(), z.unknown()).default({}),
 });
 export type EventCandidate = z.infer<typeof EventCandidate>;
