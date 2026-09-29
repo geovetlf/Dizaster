@@ -1247,6 +1247,7 @@ El propietario aprobó el Blueprint y las decisiones de la sección 16 con estas
 6. **Estados:** se mantienen UNVERIFIED, COMMUNITY_CORROBORATED, EXTERNALLY_CORROBORATED y OFFICIALLY_CONFIRMED, y se añaden **DISPUTED** y **FALSE** con trazabilidad, reglas y controles contra abuso (sustituye la propuesta de banderas OFFICIALLY_DENIED y RETRACTED de D-07).
 7. **Sharing:** V1 solo app; arquitectura de deep links / universal links / app links; una página técnica mínima solo si es estrictamente necesaria y sin constituir una web de Dizaster (sustituye la recomendación de D-12 de crear una página de vista previa y un panel interno web).
 8. **Piloto:** Perú (D-02), con arquitectura global desde el día uno y sin nada específico de Perú en el código.
+9. **Plataformas (instrucción posterior, mismo día):** Android e iOS con paridad funcional desde el inicio, sin arquitectura Android-first; iOS se prepara y valida sin esperar dispositivo Apple. Se confirma D-01 tras evaluación técnica (`docs/adr/0013-plataformas-moviles-paridad.md`, `docs/MOBILE_PLATFORMS.md`).
 
 El propietario autorizó además la ejecución autónoma de la construcción por etapas, con parada solo ante decisiones de producto ambiguas, acciones destructivas, decisiones legales o financieras, credenciales imprescindibles o conflictos con este Blueprint.
 

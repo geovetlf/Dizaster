@@ -1,0 +1,51 @@
+# Compilación nativa en la nube con EAS Build: iOS y Android desde el mismo código, sin Mac propio.
+# Solo manual (workflow_dispatch) para no consumir cupo de builds en cada push (cost-first).
+# Requiere el secreto EXPO_TOKEN y las variables DIZASTER_EAS_PROJECT_ID / DIZASTER_EXPO_OWNER
+# (ver docs/MOBILE_PLATFORMS.md). Las credenciales de firma las gestiona EAS, nunca el repositorio.
+name: mobile-build
+
+on:
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: Plataforma
+        type: choice
+        options: [all, android, ios]
+        default: all
+      profile:
+        description: Perfil de eas.json
+        type: choice
+        options: [development, ios-simulator, preview, production]
+        default: preview
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: apps/mobile
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      DIZASTER_EAS_PROJECT_ID: ${{ vars.DIZASTER_EAS_PROJECT_ID }}
+      DIZASTER_EXPO_OWNER: ${{ vars.DIZASTER_EXPO_OWNER }}
+      DIZASTER_API_URL: ${{ vars.DIZASTER_API_URL }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+        working-directory: .
+      - name: Comprobar credenciales
+        run: |
+          test -n "$EXPO_TOKEN" || { echo "::error::Falta el secreto EXPO_TOKEN"; exit 1; }
+          test -n "$DIZASTER_EAS_PROJECT_ID" || { echo "::error::Falta la variable DIZASTER_EAS_PROJECT_ID"; exit 1; }
+      - run: pnpm run sync-data
+      - name: EAS Build
+        run: npx --yes eas-cli@latest build --platform "${{ inputs.platform }}" --profile "${{ inputs.profile }}" --non-interactive --no-wait

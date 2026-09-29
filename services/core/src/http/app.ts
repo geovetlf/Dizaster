@@ -1,6 +1,6 @@
 import Fastify, { type FastifyInstance, type FastifyRequest } from "fastify";
 import { z } from "zod";
-import { BBox, NegativeState, type AppConfig } from "@dizaster/contracts";
+import { BBox, DevicePlatform, NegativeState, RegisterPushTokenRequest, type AppConfig } from "@dizaster/contracts";
 import type { Container } from "../container.js";
 import { DomainError, forbidden } from "../platform/errors.js";
 import type { Session } from "../modules/identity/index.js";
@@ -91,12 +91,30 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
   // ───────────── Identidad (solo proveedor DEV en esta etapa) ─────────────
   if (c.env.DEV_AUTH_ENABLED) {
     app.post("/v1/auth/dev", async (req) => {
-      const b = parse(z.object({ handle: z.string().min(2).max(40), platform: z.enum(["IOS", "ANDROID"]).optional() }), req.body);
+      const b = parse(
+        z.object({ handle: z.string().min(2).max(40), platform: DevicePlatform.optional(), deviceId: z.uuid().optional() }),
+        req.body,
+      );
       const session = await c.identity.signIn("DEV", b.handle.toLowerCase(), b.handle);
-      const deviceId = b.platform ? await c.identity.registerDevice(session.userId, b.platform, "dev") : null;
+      const deviceId = b.platform ? await c.identity.registerDevice(session.userId, b.platform, "dev", b.deviceId) : null;
       return { token: await c.identity.issueToken(session), userId: session.userId, profileId: session.profileId, deviceId };
     });
   }
+
+  // ───────────── Dispositivos (push APNs / FCM) ─────────────
+  app.put("/v1/devices/:id/push-token", async (req, reply) => {
+    const session = requireSession(req);
+    const { id } = parse(z.object({ id: z.uuid() }), req.params);
+    await c.identity.setPushToken(session.userId, id, parse(RegisterPushTokenRequest, req.body));
+    return reply.status(204).send();
+  });
+
+  app.delete("/v1/devices/:id/push-token", async (req, reply) => {
+    const session = requireSession(req);
+    const { id } = parse(z.object({ id: z.uuid() }), req.params);
+    await c.identity.clearPushToken(session.userId, id);
+    return reply.status(204).send();
+  });
 
   // ───────────── Reportes ciudadanos ─────────────
   app.post("/v1/reports", async (req, reply) => {

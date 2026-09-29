@@ -1,2 +1,4 @@
 src/reference-data/
 dist-check/
+ios/
+android/

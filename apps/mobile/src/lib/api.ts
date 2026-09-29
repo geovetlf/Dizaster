@@ -1,4 +1,4 @@
-import type { AppConfig, EventMapResponse, EventSummary, NearbyEventsResponse, SubmitReportRequest, SubmitReportResponse, TimelineEntryView } from "@dizaster/contracts";
+import type { AppConfig, DevicePlatform, RegisterPushTokenRequest, EventMapResponse, EventSummary, NearbyEventsResponse, SubmitReportRequest, SubmitReportResponse, TimelineEntryView } from "@dizaster/contracts";
 import { API_URL } from "./config";
 import type { Sender } from "./report/queue";
 
@@ -17,8 +17,13 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 
 export const api = {
   config: () => request<AppConfig>("/v1/config"),
-  devSignIn: (handle: string, platform: "IOS" | "ANDROID") =>
-    request<{ token: string; deviceId: string | null }>("/v1/auth/dev", { method: "POST", body: JSON.stringify({ handle, platform }) }),
+  devSignIn: (handle: string, platform: DevicePlatform, deviceId?: string | null) =>
+    request<{ token: string; deviceId: string | null }>("/v1/auth/dev", {
+      method: "POST",
+      body: JSON.stringify({ handle, platform, ...(deviceId ? { deviceId } : {}) }),
+    }),
+  registerPushToken: (deviceId: string, body: RegisterPushTokenRequest) =>
+    request<void>(`/v1/devices/${deviceId}/push-token`, { method: "PUT", body: JSON.stringify(body) }),
   events: (bbox: [number, number, number, number], zoom: number) =>
     request<EventMapResponse>(`/v1/events?bbox=${bbox.map((n) => n.toFixed(5)).join(",")}&zoom=${Math.round(zoom)}`),
   event: (id: string) => request<EventSummary>(`/v1/events/${id}`),

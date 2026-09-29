@@ -9,13 +9,21 @@
     "@expo/metro-runtime": "^57.0.16",
     "@maplibre/maplibre-react-native": "^11.4.0",
     "expo": "~57.0.25",
+    "expo-application": "~57.0.3",
     "expo-constants": "~57.0.19",
     "expo-crypto": "~57.0.3",
+    "expo-device": "~57.0.2",
+    "expo-file-system": "~57.0.7",
+    "expo-image-manipulator": "~57.0.20",
+    "expo-image-picker": "~57.0.20",
     "expo-linking": "~57.0.11",
     "expo-location": "~57.0.20",
+    "expo-notifications": "~57.0.21",
     "expo-router": "~57.0.23",
+    "expo-secure-store": "~57.0.4",
     "expo-sqlite": "~57.0.3",
     "expo-status-bar": "~57.0.1",
+    "expo-system-ui": "~57.0.4",
     "react": "19.2.3",
     "react-native": "0.86.3",
     "react-native-safe-area-context": "~5.7.0",
@@ -39,7 +47,8 @@
     "prestart": "node scripts/sync-reference-data.mjs",
     "pretypecheck": "node scripts/sync-reference-data.mjs",
     "pretest": "node scripts/sync-reference-data.mjs",
-    "bundle:check": "node scripts/sync-reference-data.mjs && expo export --platform android --platform ios --output-dir dist-check"
+    "bundle:check": "node scripts/sync-reference-data.mjs && expo export --platform android --platform ios --output-dir dist-check",
+    "native:check": "node scripts/sync-reference-data.mjs && node scripts/check-native.mjs"
   },
   "private": true
 }

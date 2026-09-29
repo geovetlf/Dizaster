@@ -41,3 +41,7 @@ jobs:
       - name: Empaquetado móvil (JS, iOS + Android)
         working-directory: apps/mobile
         run: pnpm run bundle:check
+
+      - name: Proyectos nativos iOS + Android (paridad de permisos, push y enlaces)
+        working-directory: apps/mobile
+        run: pnpm run native:check

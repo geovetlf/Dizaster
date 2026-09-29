@@ -1,5 +1,5 @@
 import { SignJWT, jwtVerify } from "jose";
-import type { AttestationVerdict } from "@dizaster/contracts";
+import { PUSH_PROVIDER_BY_PLATFORM, type AttestationVerdict, type DevicePlatform, type RegisterPushTokenRequest } from "@dizaster/contracts";
 import type { Db, Queryable } from "../../platform/db.js";
 import { withTransaction } from "../../platform/db.js";
 import { DomainError } from "../../platform/errors.js";
@@ -81,7 +81,19 @@ export class IdentityService {
     await this.db.query(`UPDATE identity.users SET roles = array(SELECT DISTINCT unnest(roles || $2::text)) WHERE id = $1`, [userId, role]);
   }
 
-  async registerDevice(userId: string, platform: "IOS" | "ANDROID", appVersion: string | null): Promise<string> {
+  /**
+   * Registra un dispositivo o, si el cliente ya tiene uno propio de la misma plataforma, lo reutiliza.
+   * Reutilizar evita que cada arranque cree un "dispositivo nuevo" y diluya el anti-abuso por dispositivo.
+   */
+  async registerDevice(userId: string, platform: DevicePlatform, appVersion: string | null, existingId?: string): Promise<string> {
+    if (existingId) {
+      const { rows } = await this.db.query<{ id: string }>(
+        `UPDATE identity.devices SET last_seen_at = now(), app_version = COALESCE($4, app_version)
+          WHERE id = $1 AND user_id = $2 AND platform = $3 RETURNING id`,
+        [existingId, userId, platform, appVersion],
+      );
+      if (rows[0]) return rows[0].id;
+    }
     const id = newId();
     await this.db.query(`INSERT INTO identity.devices (id, user_id, platform, app_version) VALUES ($1, $2, $3, $4)`, [
       id, userId, platform, appVersion,
@@ -89,9 +101,42 @@ export class IdentityService {
     return id;
   }
 
+  /**
+   * Guarda el token push del dispositivo. El proveedor debe corresponder a la plataforma (APNs↔iOS, FCM↔Android)
+   * y un token solo puede pertenecer a un dispositivo: si reaparece en otro (reinstalación), se mueve.
+   */
+  async setPushToken(userId: string, deviceId: string, req: RegisterPushTokenRequest): Promise<void> {
+    await withTransaction(this.db, async (tx) => {
+      const device = await this.ownedDevice(tx, userId, deviceId);
+      if (!device) throw new DomainError("DEVICE_NOT_FOUND", "Dispositivo inexistente o ajeno", 404);
+      if (PUSH_PROVIDER_BY_PLATFORM[device.platform] !== req.provider) {
+        throw new DomainError("PUSH_PROVIDER_MISMATCH", `${device.platform} usa ${PUSH_PROVIDER_BY_PLATFORM[device.platform]}`);
+      }
+      await tx.query(
+        `UPDATE identity.devices SET push_token = NULL, push_provider = NULL, push_environment = NULL, push_token_updated_at = now()
+          WHERE push_provider = $1 AND push_token = $2 AND id <> $3`,
+        [req.provider, req.token, deviceId],
+      );
+      await tx.query(
+        `UPDATE identity.devices SET push_token = $2, push_provider = $3, push_environment = $4, push_token_updated_at = now(), last_seen_at = now()
+          WHERE id = $1`,
+        [deviceId, req.token, req.provider, req.provider === "APNS" ? req.environment : "production"],
+      );
+    });
+  }
+
+  async clearPushToken(userId: string, deviceId: string): Promise<void> {
+    const { rowCount } = await this.db.query(
+      `UPDATE identity.devices SET push_token = NULL, push_provider = NULL, push_environment = NULL, push_token_updated_at = now()
+        WHERE id = $1 AND user_id = $2`,
+      [deviceId, userId],
+    );
+    if (!rowCount) throw new DomainError("DEVICE_NOT_FOUND", "Dispositivo inexistente o ajeno", 404);
+  }
+
   /** Devuelve el dispositivo solo si pertenece al usuario (un usuario no puede usar dispositivos ajenos). */
-  async ownedDevice(q: Queryable, userId: string, deviceId: string): Promise<{ id: string; platform: "IOS" | "ANDROID" } | null> {
-    const { rows } = await q.query<{ id: string; platform: "IOS" | "ANDROID" }>(
+  async ownedDevice(q: Queryable, userId: string, deviceId: string): Promise<{ id: string; platform: DevicePlatform } | null> {
+    const { rows } = await q.query<{ id: string; platform: DevicePlatform }>(
       `SELECT id, platform FROM identity.devices WHERE id = $1 AND user_id = $2`,
       [deviceId, userId],
     );

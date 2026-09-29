@@ -9,3 +9,4 @@
 - Tests: Vitest; los de integración usan PostgreSQL real con PostGIS + H3.
 - Contenedores: `infra/docker/core.Dockerfile` (API y worker) y `infra/docker/db.Dockerfile` (PostGIS + H3).
 - Los paquetes internos se consumen desde su código fuente en tests/typecheck/app (`source` condition, `paths` y resolver de Metro) y desde `dist` en el backend compilado.
+- Paridad Android/iOS y evaluación del stack móvil: ver ADR 0013.
