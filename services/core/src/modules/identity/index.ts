@@ -372,4 +372,19 @@ export class IdentityService {
     const { rows } = await q.query<{ id: string }>(`SELECT id FROM identity.users WHERE $1 = ANY(roles) AND status = 'ACTIVE'`, [role]);
     return rows.map((r) => r.id);
   }
+  // ───────────── Exportación de datos personales (ADR 0038) ─────────────
+
+  /** Cuenta, dispositivos y sesiones. Sin secretos: ni hashes de token ni tokens push. */
+  async exportData(q: Queryable, userId: string): Promise<Record<string, unknown[]>> {
+    const account = await q.query(`SELECT id, status, roles, primary_locale, created_at FROM identity.users WHERE id = $1`, [userId]);
+    const logins = await q.query(`SELECT provider, verified_at, created_at FROM identity.auth_identities WHERE user_id = $1`, [userId]);
+    const devices = await q.query(
+      `SELECT id, platform, app_version, attestation_status, push_token IS NOT NULL AS push_enabled, created_at, last_seen_at
+         FROM identity.devices WHERE user_id = $1 ORDER BY created_at`, [userId],
+    );
+    const sessions = await q.query(
+      `SELECT id, device_id, created_at, expires_at, revoked_at, revoke_reason FROM identity.sessions WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1000`, [userId],
+    );
+    return { account: account.rows, logins: logins.rows, devices: devices.rows, sessions: sessions.rows };
+  }
 }

@@ -417,4 +417,19 @@ export class MediaService {
     await q.query(`UPDATE media.media SET state = 'REJECTED', rejection_reason = $2, updated_at = now() WHERE id = $1`, [mediaId, reason]);
     await publish(q, "MediaRejected", { mediaId, reason });
   }
+  // ───────────── Exportación de datos personales (ADR 0038) ─────────────
+
+  /** Mis fotos y videos: metadatos y el enlace a la copia pública saneada (el original privado no sale). */
+  async exportData(q: Queryable, profileId: string): Promise<Record<string, unknown[]>> {
+    const { rows } = await q.query<{ id: string; kind: string; state: string; mime: string; bytes: string; captured_in_app: boolean;
+      captured_at: Date | null; created_at: Date; moderation_state: string; content_warning: string | null; storage_key: string | null }>(
+      `SELECT m.id, m.kind, m.state, m.mime, m.bytes, m.captured_in_app, m.captured_at, m.created_at, m.moderation_state, m.content_warning, v.storage_key
+         FROM media.media m LEFT JOIN media.variants v ON v.media_id = m.id AND v.variant = $2
+        WHERE m.owner_profile_id = $1 ORDER BY m.created_at DESC LIMIT 5000`,
+      [profileId, PUBLIC_VARIANT],
+    );
+    return {
+      media: rows.map(({ storage_key, ...r }) => ({ ...r, url: storage_key && r.state === "READY" ? this.storage.publicUrl(storage_key) : null })),
+    };
+  }
 }

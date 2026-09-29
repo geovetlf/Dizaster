@@ -2,9 +2,10 @@ import * as Application from "expo-application";
 import * as Notifications from "expo-notifications";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text } from "react-native";
+import { Alert, Pressable, ScrollView, StyleSheet, Text } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Icon } from "../../components/icon";
+import { exportMyData } from "../../lib/account/export";
 import { api } from "../../lib/api";
 import { enablePush } from "../../lib/device/push";
 import { t } from "../../lib/i18n";
@@ -20,6 +21,7 @@ export default function ProfileScreen() {
   const [handle, setHandle] = useState<string | null>(null);
   const [roles, setRoles] = useState<string[]>([]);
   const [notices, setNotices] = useState(0);
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     if (!session.ready) return;
@@ -43,6 +45,18 @@ export default function ProfileScreen() {
     router.push("/alert-settings");
   }
 
+  async function onExport() {
+    if (exporting) return;
+    setExporting(true);
+    try {
+      if ((await exportMyData()) === "saved") Alert.alert(t("exportData"), t("exportSaved"));
+    } catch {
+      Alert.alert(t("exportData"), t("exportFailed"));
+    } finally {
+      setExporting(false);
+    }
+  }
+
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
       <ScrollView contentContainerStyle={styles.content}>
@@ -57,6 +71,7 @@ export default function ProfileScreen() {
         {roles.includes("admin") ? <Row icon="gauge" label={t("qualityTitle")} onPress={() => router.push("/admin-quality")} /> : null}
         <Row icon="storefront-outline" label={t("myBusinesses")} onPress={() => router.push("/my-businesses")} />
         <Row icon="cellphone-lock" label={t("sessionsTitle")} onPress={() => router.push("/sessions")} />
+        <Row icon="download-outline" label={t("exportData")} value={exporting ? t("exportPreparing") : undefined} onPress={() => void onExport()} />
         <Row icon="account-remove-outline" label={t("deleteAccount")} onPress={() => router.push("/delete-account")} />
         <Text style={styles.note}>{t("privacyNote")}</Text>
         <Text style={styles.version}>Dizaster {Application.nativeApplicationVersion ?? ""}</Text>
@@ -65,7 +80,7 @@ export default function ProfileScreen() {
   );
 }
 
-function Row({ icon, label, value, onPress }: { icon: "account-circle-outline" | "bell-outline" | "cloud-upload-outline" | "phone-alert" | "chart-bar" | "gauge" | "storefront-outline" | "cellphone-lock" | "gavel" | "shield-check-outline" | "account-remove-outline"; label: string; value?: string; onPress?: () => void }) {
+function Row({ icon, label, value, onPress }: { icon: "account-circle-outline" | "bell-outline" | "cloud-upload-outline" | "phone-alert" | "chart-bar" | "gauge" | "storefront-outline" | "cellphone-lock" | "gavel" | "shield-check-outline" | "account-remove-outline" | "download-outline"; label: string; value?: string; onPress?: () => void }) {
   return (
     <Pressable accessibilityRole={onPress ? "button" : "text"} disabled={!onPress} style={styles.row} onPress={onPress}>
       <Icon name={icon} size={22} color={colors.text} />

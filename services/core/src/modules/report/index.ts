@@ -253,4 +253,21 @@ export class ReportService {
     );
     return res.rowCount ?? 0;
   }
+  // ───────────── Exportación de datos personales (ADR 0038) ─────────────
+
+  /**
+   * Reportes propios con su pin y, mientras no se haya generalizado, la ubicación precisa del dispositivo: son datos
+   * de la persona. No se incluyen el desglose del puntaje ni las razones antiabuso (protegen el sistema).
+   */
+  async exportData(q: Queryable, userId: string): Promise<Record<string, unknown[]>> {
+    const { rows } = await q.query(
+      `SELECT r.id, r.post_id, r.event_id, r.category_code, r.assertion, r.status, r.anonymity_mode, r.captured_at, r.received_at,
+              r.captured_offline, r.presence_band, ST_Y(r.pin::geometry) AS pin_lat, ST_X(r.pin::geometry) AS pin_lng,
+              p.device_fix, p.generalized_at AS precise_location_removed_at
+         FROM report.reports r LEFT JOIN report.presence_evidence p ON p.report_id = r.id
+        WHERE r.author_user_id = $1 ORDER BY r.received_at DESC LIMIT 10000`,
+      [userId],
+    );
+    return { reports: rows };
+  }
 }

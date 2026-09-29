@@ -704,6 +704,38 @@ export class SocialService {
     );
     if (!rowCount) throw notFound("Post");
   }
+  // ───────────── Exportación de datos personales (ADR 0038) ─────────────
+
+  /** Perfil, publicaciones, comentarios, reacciones, seguimientos, bloqueos y negocios propios. */
+  async exportData(q: Queryable, who: { userId: string; profileId: string }): Promise<Record<string, unknown[]>> {
+    const p = who.profileId;
+    const profile = await q.query(`SELECT id, handle, display_name, home_country, locale, units, created_at FROM social.profiles WHERE id = $1`, [p]);
+    const businesses = await q.query(
+      `SELECT id, handle, name, category, country, verification_status, description, address_public, contact_phone, contact_url, moderation_state, created_at, deleted_at
+         FROM social.business_profiles WHERE owner_user_id = $1`, [who.userId],
+    );
+    const posts = await q.query(
+      `SELECT p.id, p.author_type, p.kind, p.author_visibility, p.text, p.category_code, p.moderation_state, p.created_at, p.deleted_at,
+              ST_Y(p.public_point::geometry) AS public_lat, ST_X(p.public_point::geometry) AS public_lng,
+              (SELECT coalesce(array_agg(m.media_id ORDER BY m.position), '{}') FROM social.post_media m WHERE m.post_id = p.id) AS media_ids,
+              (SELECT coalesce(array_agg(l.event_id), '{}') FROM social.post_event_links l WHERE l.post_id = p.id) AS event_ids
+         FROM social.posts p
+        WHERE (p.author_type = 'PROFILE' AND p.author_id = $1)
+           OR (p.author_type = 'BUSINESS' AND p.author_id IN (SELECT id FROM social.business_profiles WHERE owner_user_id = $2))
+        ORDER BY p.created_at DESC LIMIT 10000`,
+      [p, who.userId],
+    );
+    const comments = await q.query(`SELECT id, post_id, text, moderation_state, created_at, deleted_at FROM social.comments WHERE author_profile_id = $1 ORDER BY created_at DESC LIMIT 10000`, [p]);
+    const reactions = await q.query(`SELECT post_id, kind, created_at FROM social.reactions WHERE profile_id = $1 ORDER BY created_at DESC LIMIT 10000`, [p]);
+    const follows = await q.query(`SELECT target_type, target_id, created_at FROM social.follows WHERE follower_profile_id = $1`, [p]);
+    const blocks = await q.query(
+      `SELECT pr.handle AS blocked_handle, b.created_at FROM social.blocks b JOIN social.profiles pr ON pr.id = b.blocked_profile_id WHERE b.blocker_profile_id = $1`, [p],
+    );
+    return {
+      profile: profile.rows, businesses: businesses.rows, posts: posts.rows, comments: comments.rows,
+      reactions: reactions.rows, follows: follows.rows, blocks: blocks.rows,
+    };
+  }
 }
 
 export { POSTS_PER_HOUR, PostComposer } from "./composer.js";

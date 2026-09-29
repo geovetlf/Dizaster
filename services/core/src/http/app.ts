@@ -2,7 +2,7 @@ import Fastify, { type FastifyInstance, type FastifyRequest } from "fastify";
 import { z } from "zod";
 import {
   BBox, CreateCommentRequest, DevicePlatform, MEDIA_UPLOAD_LIMITS, MergeEventsRequest, NegativeState, RegisterPushTokenRequest, RevertMergeRequest,
-  SplitEventRequest, type AppConfig,
+  SplitEventRequest, DATA_EXPORT_FORMAT, type AppConfig, type DataExport,
 } from "@dizaster/contracts";
 import { LocalDiskStorage } from "../modules/media/index.js";
 import type { Container } from "../container.js";
@@ -257,6 +257,30 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
   });
 
   /** Roles de la sesión: la app muestra herramientas de moderación o administración solo a quien las tiene. */
+  // Exportar mis datos (ADR 0038). Consultas acotadas; como mucho una por minuto y persona en cada instancia.
+  const lastExport = new Map<string, number>();
+  app.get("/v1/me/export", async (req, reply) => {
+    const session = requireSession(req);
+    const now = Date.now();
+    if (now - (lastExport.get(session.userId) ?? 0) < 60_000) throw new DomainError("RATE_LIMITED", "Espera un minuto antes de volver a exportar", 429);
+    lastExport.set(session.userId, now);
+    const who = { userId: session.userId, profileId: session.profileId };
+    const body: DataExport = {
+      format: DATA_EXPORT_FORMAT,
+      generatedAt: new Date(now).toISOString(),
+      sections: {
+        identity: await c.identity.exportData(c.db, session.userId),
+        social: await c.social.exportData(c.db, who),
+        reports: await c.reports.exportData(c.db, session.userId),
+        alerts: await c.alerts.exportData(c.db, session.profileId),
+        moderation: await c.moderation.exportData(c.db, who),
+        media: await c.media.exportData(c.db, session.profileId),
+      },
+    };
+    reply.header("cache-control", "no-store");
+    reply.header("content-disposition", `attachment; filename="dizaster-export-${body.generatedAt.slice(0, 10)}.json"`);
+    return body;
+  });
   app.get("/v1/me/account", async (req, reply) => {
     const session = requireSession(req);
     reply.header("cache-control", "no-store");

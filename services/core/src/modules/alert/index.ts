@@ -560,6 +560,23 @@ export class AlertService {
     for (const [i, r] of results.entries()) if (r.invalidToken) await this.identity.dropPushToken(this.db, messages[i]!.provider, messages[i]!.token);
     return results.filter((r) => r.ok).length;
   }
+
+  // ───────────── Exportación de datos personales (ADR 0038) ─────────────
+
+  async exportData(q: Queryable, profileId: string): Promise<Record<string, unknown[]>> {
+    const preferences = await q.query(`SELECT * FROM alert.preferences WHERE profile_id = $1`, [profileId]);
+    const subscriptions = await q.query(`SELECT id, category_code, area_id, min_severity, created_at FROM alert.subscriptions WHERE profile_id = $1`, [profileId]);
+    const zones = await q.query(
+      `SELECT id, kind, name, ST_Y(center::geometry) AS lat, ST_X(center::geometry) AS lng, radius_m, created_at FROM alert.zones WHERE profile_id = $1`, [profileId],
+    );
+    const lastLocation = await q.query(
+      `SELECT ST_Y(center::geometry) AS lat, ST_X(center::geometry) AS lng, seen_at FROM alert.last_locations WHERE profile_id = $1`, [profileId],
+    );
+    const notifications = await q.query(
+      `SELECT id, alert_id, title, body, status, created_at, pushed_at, read_at FROM alert.notifications WHERE profile_id = $1 ORDER BY created_at DESC LIMIT 5000`, [profileId],
+    );
+    return { preferences: preferences.rows, subscriptions: subscriptions.rows, zones: zones.rows, lastLocation: lastLocation.rows, notifications: notifications.rows };
+  }
 }
 
 function parse<T extends z.ZodType>(schema: T, value: unknown): z.infer<T> {

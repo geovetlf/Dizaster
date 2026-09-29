@@ -236,6 +236,7 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | Contenido sensible: aviso "tocar para ver" y aprobación de media en categorías sensibles | ✅ | ADR 0035 |
 | "Aquí no pasa nada" (contra-reporte) y "Por qué este estado" en la pantalla del evento | ✅ | ADR 0036 |
 | Retirar un reporte propio (evidencia DETACHED, post y media borrados) | ✅ | ADR 0037 |
+| Exportar mis datos (JSON por módulo, hoja de compartir en la app) | ✅ | ADR 0038 |
 | Reglas `dedup-2` con `sim_media` y `sim_texto` reales | ✅ | `packages/geo-kit/src/dedup.ts` |
 | Fotos procesadas después del reporte suman su hash al evento | ✅ | `MediaReady.phash`, `event.media-fingerprint` |
 
@@ -243,13 +244,12 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 
 1. **BLOQUEADA** — Identity real: Sign in with Apple, Google y email; App Attest / Play Integrity. Falta: cuentas de
    Apple Developer y Google (client IDs, Service ID, Team ID) y un proveedor de email aprobado (gasto).
-2. Exportar mis datos (§13.2).
-3. Números de emergencia con actualización incremental (`?since=version`, §6.3).
-4. Tipos de reacción de contexto ("apoyo", "útil", "yo también lo vi", §7.3).
-5. Scripts y estilos de mapas offline por zona guardada (§11.3; el alojamiento requiere storage aprobado).
-6. Difuminado de rostros y matrículas (D-08; modelo abierto, trabajo grande).
-7. Fuentes peruanas IGP, INDECI y SENAMHI: **en espera de acción humana** (confirmar formato/URL y términos);
-    si publican CAP, activar es solo configuración (ADR 0033).
+2. Números de emergencia con actualización incremental (`?since=version`, §6.3).
+3. Tipos de reacción de contexto ("apoyo", "útil", "yo también lo vi", §7.3).
+4. Scripts y estilos de mapas offline por zona guardada (§11.3; el alojamiento requiere storage aprobado).
+5. Difuminado de rostros y matrículas (D-08; modelo abierto, trabajo grande).
+6. Fuentes peruanas IGP, INDECI y SENAMHI: **en espera de acción humana** (confirmar formato/URL y términos);
+   si publican CAP, activar es solo configuración (ADR 0033).
 
 ## Requiere acción humana
 

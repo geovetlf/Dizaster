@@ -418,6 +418,18 @@ export class ModerationService {
       appealsReversed: ap.rows[0]!.reversed,
     };
   }
+
+  // ───────────── Exportación de datos personales (ADR 0038) ─────────────
+
+  /** Acciones sobre mi contenido o cuenta, mis apelaciones y mis denuncias. Nunca quién me denunció. */
+  async exportData(q: Queryable, who: { userId: string; profileId: string }): Promise<Record<string, unknown[]>> {
+    const actions = await q.query(
+      `SELECT id, target_type, target_id, action, actor, reason, created_at FROM moderation.actions WHERE affected_user_id = $1 ORDER BY created_at DESC LIMIT 5000`, [who.userId],
+    );
+    const appeals = await q.query(`SELECT id, action_id, text, status, decision_reason, created_at, decided_at FROM moderation.appeals WHERE appellant_user_id = $1`, [who.userId]);
+    const flags = await q.query(`SELECT target_type, target_id, reason, note, created_at FROM moderation.flags WHERE reporter_profile_id = $1 ORDER BY created_at DESC LIMIT 5000`, [who.profileId]);
+    return { actionsOnMyContent: actions.rows, appeals: appeals.rows, flagsISent: flags.rows };
+  }
 }
 
 function actionView(r: ActionRow): ModerationActionView {
