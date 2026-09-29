@@ -279,6 +279,7 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | País preferido en el perfil | ✅ | ADR 0085 |
 | Explicación legible completa de verificación | ✅ | ADR 0086 |
 | Alertas según el área oficial afectada | ✅ | ADR 0087 |
+| Datos personales → cola de moderación | ✅ | ADR 0088 |
 | Licencias, auditoría, SBOM, Dependabot; respaldo con prueba de restauración en CI | ✅ | ADR 0070, `scripts/supply-chain.mjs`, `scripts/db-restore-check.mjs` |
 | Idioma de la app elegible en el perfil (es/en/pt/fr o del teléfono) | ✅ | ADR 0069, `app/language.tsx` |
 | Varias cuentas en un teléfono corroboran como una (clave seudónima del teléfono) | ✅ | ADR 0068, migración 0036 |
@@ -308,11 +309,10 @@ Revisión del Blueprint del 2026-09-29 (tras ADR 0070): completada con ADR 0071�
 
 Revisión del Blueprint del 2026-09-29 (tras ADR 0080), verificada contra el código, sin bloqueos:
 
-1. Detección determinista de datos personales en publicaciones → cola de moderación (§13.3, §5.12).
-2. Acceso auditado, con motivo, a la evidencia de presencia para moderación (§7.3, §13.1).
-3. MFA (TOTP) para moderación y administración (§13.1).
-4. Detección local del idioma del contenido (§5.15).
-5. Adapters del carril NORMAL (ReliefWeb, OMS, RSS de noticias), PLANNED hasta revisar términos (§9.3).
+1. Acceso auditado, con motivo, a la evidencia de presencia para moderación (§7.3, §13.1).
+2. MFA (TOTP) para moderación y administración (§13.1).
+3. Detección local del idioma del contenido (§5.15).
+4. Adapters del carril NORMAL (ReliefWeb, OMS, RSS de noticias), PLANNED hasta revisar términos (§9.3).
 
 Bloqueadas o en espera:
 

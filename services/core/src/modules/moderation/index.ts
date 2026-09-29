@@ -86,6 +86,11 @@ export class ModerationService {
     dispatcher.on("PostMediaNeedsReview", "moderation.sensitive-media", async (e, tx) => {
       await this.systemFlag(tx, "POST", e.payload.postId, "PRIVACY", "Regla: media en una categoría sensible; no se muestra hasta aprobarla (revisar rostros, matrículas e imágenes impactantes).");
     });
+    // Posibles datos personales (ADR 0088): a revisión como PRIVACY, con los tipos y nunca el dato.
+    dispatcher.on("PersonalDataDetected", "moderation.personal-data", async (e, tx) => {
+      await this.systemFlag(tx, e.payload.targetType, e.payload.targetId, "PRIVACY",
+        `Regla: el texto parece incluir datos personales (${e.payload.kinds.join(", ")}). Revisar si expone a alguien (doxxing).`);
+    });
     // Mismo texto desde varias cuentas en pocas horas (ADR 0031): cada post entra en la cola, sin ocultarse solo.
     dispatcher.on("DuplicateTextDetected", "moderation.duplicate-text", async (e, tx) => {
       for (const postId of e.payload.postIds) {

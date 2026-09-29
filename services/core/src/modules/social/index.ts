@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { extractMentions, extractTags, textFingerprintBase, type CommentView, type FeedTab, type GeoPoint, type PostAuthor, type ProfileSearchResult, type ReactionCounts, type ReactionKind, type ReactionState, type CommentReactionKind, type Units, type UpdateProfileRequest, type ProfileView, type TagView } from "@dizaster/contracts";
+import { detectPersonalData, extractMentions, extractTags, textFingerprintBase, type CommentView, type FeedTab, type GeoPoint, type PostAuthor, type ProfileSearchResult, type ReactionCounts, type ReactionKind, type ReactionState, type CommentReactionKind, type Units, type UpdateProfileRequest, type ProfileView, type TagView } from "@dizaster/contracts";
 import type { Queryable } from "../../platform/db.js";
 import { publish, type OutboxDispatcher } from "../../platform/outbox.js";
 import { DomainError, notFound } from "../../platform/errors.js";
@@ -109,6 +109,9 @@ function rankSql(nearSql: string | null): string {
 }
 
 export class SocialService {
+  /** Números públicos conocidos (dataset de emergencias), en dígitos: no cuentan como teléfono personal (ADR 0088). */
+  constructor(private readonly publicNumbers: ReadonlySet<string> = new Set()) {}
+
   registerHandlers(dispatcher: OutboxDispatcher): void {
     dispatcher.on("AccountDeleted", "social.anonymize-account", async (e, tx) => {
       await this.anonymizeProfile(tx, e.payload.profileId);
@@ -200,7 +203,20 @@ export class SocialService {
         input.publicPoint?.lng ?? null, input.publicPoint?.lat ?? null, input.categoryCode ?? null, input.businessId ? "BUSINESS" : "PROFILE", textHash, input.sharedPostId ?? null],
     );
     if (textHash) await this.detectDuplicateText(tx, textHash);
+    // Un negocio publica su propio teléfono y correo a propósito: solo se revisan documentos y tarjetas.
+    if (input.text) await this.detectPersonalData(tx, "POST", id, input.text, input.businessId ? ["ID_DOCUMENT", "PAYMENT_CARD"] : null);
     return id;
+  }
+
+  /**
+   * Datos personales en el texto (ADR 0088, doxxing §13.3): va a la cola de moderación con los TIPOS detectados,
+   * nunca con el dato. No se oculta solo: decide una persona (puede ser el teléfono de un albergue).
+   */
+  private async detectPersonalData(
+    q: Queryable, targetType: "POST" | "COMMENT", targetId: string, text: string, only: readonly string[] | null,
+  ): Promise<void> {
+    const kinds = detectPersonalData(text, this.publicNumbers).filter((k) => !only || only.includes(k));
+    if (kinds.length) await publish(q, "PersonalDataDetected", { targetType, targetId, kinds });
   }
 
   /**
@@ -715,6 +731,7 @@ export class SocialService {
     }
     const id = newId();
     await q.query(`INSERT INTO social.comments (id, post_id, author_profile_id, text, parent_comment_id) VALUES ($1, $2, $3, $4, $5)`, [id, postId, profileId, text, parent]);
+    await this.detectPersonalData(q, "COMMENT", id, text, null);
     return (await this.comments(q, postId, profileId)).find((c) => c.id === id)!;
   }
 

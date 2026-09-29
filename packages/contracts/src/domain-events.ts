@@ -40,6 +40,8 @@ export interface DomainEventMap {
   PostMediaNeedsReview: { postId: string };
   /** El mismo texto (normalizado) publicado por varias cuentas distintas en pocas horas: posible spam coordinado. */
   DuplicateTextDetected: { postIds: string[] };
+  /** Texto con posibles datos personales (ADR 0088). Solo los tipos, nunca el dato. */
+  PersonalDataDetected: { targetType: "POST" | "COMMENT"; targetId: string; kinds: string[] };
   /** La reputación de una persona entró o salió del nivel bajo (ADR 0031). Solo ordena el feed. */
   AuthorStandingChanged: { userId: string; lowTrust: boolean };
   ModerationActionTaken: {

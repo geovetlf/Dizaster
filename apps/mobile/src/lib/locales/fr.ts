@@ -308,6 +308,7 @@ export const fr: Record<MessageKey, string> = {
   why_MARKED_FALSE: "Marqué comme faux par la modération après examen des éléments.",
   why_DISPUTED: "Les personnes sur place donnent des versions contradictoires : prudence.",
   why_NOT_OFFICIAL_YET: "Pas encore confirmé officiellement.",
+  personalDataWarning: "Cela ressemble à des données personnelles (téléphone, e-mail, pièce d'identité ou carte). Ne publiez pas les données d'autrui : le texte sera examiné.",
   evidenceCounts: "Éléments : {citizen} citoyens · {external} externes · {official} officiels",
   whyThisState: "Pourquoi ce statut",
   nothingHere: "Il ne se passe rien ici",

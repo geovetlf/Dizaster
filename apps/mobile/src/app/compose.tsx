@@ -1,4 +1,4 @@
-import { POST_TEXT_MAX, extractMentions, extractTags, type BusinessView } from "@dizaster/contracts";
+import { POST_TEXT_MAX, detectPersonalData, extractMentions, extractTags, type BusinessView } from "@dizaster/contracts";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
@@ -76,6 +76,7 @@ export default function ComposeScreen() {
         accessibilityLabel={t("newPost")}
       />
       <Text style={styles.counter}>{text.length}/{POST_TEXT_MAX}</Text>
+      {detectPersonalData(text).length ? <Text style={styles.warn}>{t("personalDataWarning")}</Text> : null}
       {tags.length || mentions.length ? (
         <Text style={styles.note}>{[...tags.map((x) => `#${x.display}`), ...mentions.map((m) => `@${m}`)].join("  ")}</Text>
       ) : null}
@@ -111,6 +112,7 @@ const styles = StyleSheet.create({
   input: { minHeight: 140, color: colors.text, backgroundColor: colors.surface, borderRadius: radius.md, padding: space.md, fontSize: 16, textAlignVertical: "top" },
   counter: { color: colors.textMuted, fontSize: 12, alignSelf: "flex-end" },
   note: { color: colors.textMuted, fontSize: 13 },
+  warn: { color: colors.like, fontSize: 13 },
   chips: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: space.sm },
   chip: { paddingHorizontal: space.md, paddingVertical: space.sm, borderRadius: radius.pill, backgroundColor: colors.surface },
   chipOn: { backgroundColor: colors.accentSoft, borderWidth: 1, borderColor: colors.accent },

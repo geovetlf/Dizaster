@@ -1,5 +1,5 @@
 import { Camera, GeoJSONSource, Layer, Map } from "@maplibre/maplibre-react-native";
-import type { CategoryCatalog, CategoryConfig, GeoPoint, NearbyEvent, SubmitReportRequest, SubmitReportResponse } from "@dizaster/contracts";
+import { detectPersonalData, type CategoryCatalog, type CategoryConfig, type GeoPoint, type NearbyEvent, type SubmitReportRequest, type SubmitReportResponse } from "@dizaster/contracts";
 import { clampToRadius } from "@dizaster/geo-kit";
 import * as Location from "expo-location";
 import { router, useLocalSearchParams } from "expo-router";
@@ -218,6 +218,7 @@ export default function ReportScreen() {
 
       <MediaAttachments items={media} onChange={setMedia} suggestRedaction={category.sensitivity !== "NORMAL"} />
       <TextInput style={styles.input} multiline maxLength={2000} value={text} onChangeText={setText} placeholder="…" placeholderTextColor={colors.textMuted} />
+      {detectPersonalData(text).length ? <Text style={[styles.note, styles.warn]}>{t("personalDataWarning")}</Text> : null}
       {category.forcePseudonymous ? (
         <Text style={styles.note}>{t("pseudonymousForced")}</Text>
       ) : (
@@ -255,6 +256,7 @@ const styles = StyleSheet.create({
   input: { minHeight: 100, color: colors.text, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: 8, padding: 10, textAlignVertical: "top", marginBottom: 12 },
   switchRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 },
   note: { color: colors.textMuted, marginBottom: 12 },
+  warn: { color: colors.like },
   callFirst: { backgroundColor: colors.accentSoft, padding: 12, borderRadius: 8, marginBottom: 12 },
   callFirstText: { color: "#FF8A8A", fontWeight: "600" },
   callButton: { backgroundColor: colors.accent, padding: 12, borderRadius: 8, marginTop: 10, alignItems: "center" },

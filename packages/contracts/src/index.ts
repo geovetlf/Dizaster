@@ -18,3 +18,4 @@ export * from "./quality.js";
 export * from "./social-text.js";
 export * from "./business.js";
 export * from "./privacy.js";
+export * from "./personal-data.js";
