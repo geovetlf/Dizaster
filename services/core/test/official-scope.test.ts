@@ -50,6 +50,13 @@ describe("ámbito de una fuente oficial (D-PTWC, ADR 0060)", () => {
       await t.c.dispatcher.drain();
       const id = r.resolution && "eventId" in r.resolution ? r.resolution.eventId : "";
       expect(await level(id)).toBe("OFFICIALLY_CONFIRMED");
+      // La ficha separa oficiales de externas (ADR 0117).
+      const usgs = await t.c.ingestion.ingest("usgs-earthquakes", item("usgs-1b", "natural.earthquake", offset(LIMA, 500_200)), "URGENT");
+      await t.c.dispatcher.drain();
+      expect(usgs.resolution && "eventId" in usgs.resolution ? usgs.resolution.eventId : "").toBe(id);
+      const ev = (await t.app.inject({ url: `/v1/events/${id}` })).json() as { sourceCount: number; officialSourceCount: number };
+      expect(ev.officialSourceCount).toBe(1);
+      expect(ev.sourceCount).toBeGreaterThan(ev.officialSourceCount); // el resto son externas (USGS)
     });
 
     it("una fuente oficial fuera de su categoría solo corrobora externamente", async () => {

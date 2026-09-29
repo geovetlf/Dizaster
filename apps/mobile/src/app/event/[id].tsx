@@ -20,6 +20,7 @@ import { canStateOn } from "../../lib/social/business";
 import { openFlag } from "../../lib/moderation/menu";
 import { colors, radius, space } from "../../theme";
 import { appendPage, newestFirst } from "../../lib/ui/pages";
+import { evidenceCounts } from "../../lib/events/counts";
 
 const TIMELINE_SHOWN = 12;
 
@@ -106,7 +107,7 @@ export default function EventScreen() {
       </View>
       <Text style={[styles.badge, { backgroundColor: color }]}>{verificationLabel(event.publicVerificationState)}</Text>
       <Text style={styles.meta}>
-        {tCount(event.reportCount, "report_one", "reports")} · {tCount(event.sourceCount, "source_one", "sources")} · {eventTime(event.firstSeenAt, lang, event.place?.timezone, zoneLabels())}
+        {[...evidenceCounts(event, tCount), eventTime(event.firstSeenAt, lang, event.place?.timezone, zoneLabels())].join(" · ")}
       </Text>
       {verification ? (
         <View style={styles.why}>

@@ -82,7 +82,10 @@ export const EventSummary = z.object({
   negativeState: NegativeState,
   publicVerificationState: PublicVerificationState,
   reportCount: z.number().int(),
+  /** Fuentes no ciudadanas (externas + oficiales). */
   sourceCount: z.number().int(),
+  /** De ellas, oficiales registradas (ADR 0117). Las externas son la diferencia. */
+  officialSourceCount: z.number().int(),
   firstSeenAt: Instant,
   lastActivityAt: Instant,
 });

@@ -72,14 +72,14 @@ interface EventRow {
   id: string; category_code: string; title: Record<string, string> | null; lat: number; lng: number;
   sensitivity: EventSummary["sensitivity"]; country_code: string | null; status: EventSummary["status"];
   severity: number; verification_level: VerificationLevel; negative_state: NegativeState; report_count: number;
-  source_count: number; first_seen_at: Date; last_activity_at: Date; publication_state: string; merged_into_id: string | null;
+  source_count: number; official_source_count: number; first_seen_at: Date; last_activity_at: Date; publication_state: string; merged_into_id: string | null;
   place: ContextualLocation | null;
 }
 
 const PUBLIC_EVENT_COLUMNS = `
   e.id, e.category_code, e.title, ST_Y(e.public_geom::geometry) AS lat, ST_X(e.public_geom::geometry) AS lng,
   e.sensitivity, e.country_code, e.status, e.severity, e.verification_level, e.negative_state,
-  e.report_count, e.source_count, e.first_seen_at, e.last_activity_at, e.publication_state, e.merged_into_id, e.place`;
+  e.report_count, e.source_count, e.official_source_count, e.first_seen_at, e.last_activity_at, e.publication_state, e.merged_into_id, e.place`;
 
 function toSummary(r: EventRow): EventSummary {
   return {
@@ -97,6 +97,7 @@ function toSummary(r: EventRow): EventSummary {
     publicVerificationState: publicVerificationState(r.verification_level, r.negative_state),
     reportCount: r.report_count,
     sourceCount: r.source_count,
+    officialSourceCount: r.official_source_count ?? 0,
     firstSeenAt: r.first_seen_at.toISOString(),
     lastActivityAt: r.last_activity_at.toISOString(),
   };
@@ -346,7 +347,7 @@ export class EventService {
     )).rows[0];
     if (!ev || rows.length === 0) {
       await tx.query(
-        `UPDATE event.events SET last_activity_at = greatest(last_activity_at, $2), report_count = 0, source_count = 0, updated_at = now() WHERE id = $1`,
+        `UPDATE event.events SET last_activity_at = greatest(last_activity_at, $2), report_count = 0, source_count = 0, official_source_count = 0, updated_at = now() WHERE id = $1`,
         [eventId, c.observedAt],
       );
       return;
@@ -368,12 +369,13 @@ export class EventService {
           public_h3 = $6, h3_r7 = $7, h3_r9 = $8,
           report_count = $9, source_count = $10,
           severity = greatest(severity, $11), last_activity_at = greatest(last_activity_at, $12),
-          publication_state = $13, region_id = $14, district_id = $15, place = $16, updated_at = now()
+          publication_state = $13, region_id = $14, district_id = $15, place = $16, official_source_count = $17, updated_at = now()
         WHERE id = $1`,
       [
         eventId, point.lng, point.lat, pub.point.lng, pub.point.lat, pub.cell, this.geo.h3(point, H3_RES.ZONE), this.geo.h3(point, H3_RES.DEDUP),
         citizens.length, rows.length - citizens.length, c.severityHint ?? 1, c.observedAt, publication,
         place?.region?.id ?? null, place?.district?.id ?? null, place ? JSON.stringify(place) : null,
+        rows.filter((r) => r.trust_tier === "OFFICIAL").length,
       ],
     );
   }
