@@ -12,17 +12,14 @@ import { DomainError, notFound } from "../../platform/errors.js";
 import { newId } from "../../platform/ids.js";
 import { publish, type OutboxDispatcher } from "../../platform/outbox.js";
 import type { EvidenceForVerification, EventService } from "../event/index.js";
-import type { IdentityService } from "../identity/index.js";
+import type { TrustService } from "../trust/index.js";
 import type { IngestionService } from "../ingestion/index.js";
 import type { ReferenceData } from "../reference/index.js";
 
-export const VERIFICATION_RULES_VERSION = "verification-1";
+export const VERIFICATION_RULES_VERSION = "verification-2";
 
-/** Parámetros anti-abuso de la versión de reglas. */
+/** Parámetros anti-abuso de la versión de reglas. El peso de cada persona lo da Trust (ADR 0023). */
 const RULES = {
-  /** Cuentas con menos horas que esto cuentan la mitad (granjas de cuentas nuevas). */
-  newAccountHours: 24,
-  newAccountWeight: 0.5,
   /** DISPUTED: al menos este peso de contra-reportes independientes con presencia alta... */
   disputeMinDeniers: 2,
   /** ...y que representen al menos esta fracción del peso de quienes confirman. */
@@ -55,7 +52,7 @@ export class VerificationService {
     private readonly ref: ReferenceData,
     private readonly events: EventService,
     private readonly ingestion: IngestionService,
-    private readonly identity: IdentityService,
+    private readonly trust: TrustService,
   ) {}
 
   registerHandlers(dispatcher: OutboxDispatcher): void {
@@ -113,8 +110,8 @@ export class VerificationService {
     const officialDeny = nonCitizen.filter((e) => registered.get(e.refId)?.trustTier === "OFFICIAL" && e.assertion === "NOT_OCCURRING");
     const external = nonCitizen.filter((e) => registered.get(e.refId)?.trustTier === "EXTERNAL" && e.assertion === "OCCURRING");
 
-    const confirmWeight = await this.independentWeight(tx, data.evidence.filter((e) => e.trustTier === "CITIZEN" && e.assertion === "OCCURRING"));
-    const denyWeight = await this.independentWeight(tx, data.evidence.filter((e) => e.trustTier === "CITIZEN" && e.assertion === "NOT_OCCURRING"));
+    const confirmWeight = await this.independentWeight(tx, eventId, data.evidence.filter((e) => e.trustTier === "CITIZEN" && e.assertion === "OCCURRING"));
+    const denyWeight = await this.independentWeight(tx, eventId, data.evidence.filter((e) => e.trustTier === "CITIZEN" && e.assertion === "NOT_OCCURRING"));
 
     let computed: VerificationLevel = "UNVERIFIED";
     let ruleId = "none";
@@ -172,9 +169,10 @@ export class VerificationService {
 
   /**
    * Peso de corroboración INDEPENDIENTE: solo presencia HIGH, una vez por persona y una vez por dispositivo
-   * (dos cuentas en el mismo teléfono cuentan como una), y las cuentas nuevas pesan la mitad.
+   * (dos cuentas en el mismo teléfono cuentan como una). Cada persona pesa según su reputación (nueva 0,5,
+   * con mal historial 0,25, normal 1, de confianza 1,5) y un grupo coordinado cuenta como una sola.
    */
-  private async independentWeight(tx: Queryable, evidence: EvidenceForVerification[]): Promise<number> {
+  private async independentWeight(tx: Queryable, eventId: string, evidence: EvidenceForVerification[]): Promise<number> {
     const high = evidence.filter((e) => e.presenceBand === "HIGH" && e.contributorUserId);
     const seenUsers = new Set<string>();
     const seenDevices = new Set<string>();
@@ -186,8 +184,8 @@ export class VerificationService {
       if (e.contributorDeviceId) seenDevices.add(e.contributorDeviceId);
       counted.push(e.contributorUserId!);
     }
-    const ages = await this.identity.accountAgeHours(tx, counted);
-    return counted.reduce((sum, u) => sum + ((ages.get(u) ?? 0) < RULES.newAccountHours ? RULES.newAccountWeight : 1), 0);
+    const weights = await this.trust.contributionWeights(tx, counted, eventId);
+    return counted.reduce((sum, u) => sum + (weights.get(u) ?? 0), 0);
   }
 
   /**

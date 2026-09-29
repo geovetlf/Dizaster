@@ -12,6 +12,7 @@ import { FeedService } from "./modules/feed/index.js";
 import { AlertService, ApnsSender, FcmSender, LogPushSender, PushGateway, type FcmServiceAccount, type PushSender } from "./modules/alert/index.js";
 import { GeoService } from "./modules/geo/index.js";
 import { ModerationService } from "./modules/moderation/index.js";
+import { TrustService } from "./modules/trust/index.js";
 import { DevAttestationVerifier, IdentityService, type AttestationVerifier } from "./modules/identity/index.js";
 import { IngestionScheduler, IngestionService, NodeHttpFetcher, type HttpFetcher } from "./modules/ingestion/index.js";
 import { LocalDiskStorage, MediaService, S3Storage, type StorageProvider } from "./modules/media/index.js";
@@ -41,6 +42,7 @@ export interface Container {
   dispatcher: OutboxDispatcher;
   cost: CostService;
   moderation: ModerationService;
+  trust: TrustService;
   meter: Meter;
 }
 
@@ -56,7 +58,8 @@ export function buildContainer(env: AppEnv, overrides: { db?: Db; clock?: Clock;
   const events = new EventService(ref, geo);
   const ingestion = new IngestionService(db, events);
   const ingestionScheduler = new IngestionScheduler(db, ingestion, overrides.fetcher ?? new NodeHttpFetcher(), clock);
-  const verification = new VerificationService(db, ref, events, ingestion, identity);
+  const trust = new TrustService(db, identity, events);
+  const verification = new VerificationService(db, ref, events, ingestion, trust);
   const storage = overrides.storage ?? buildStorage(env, clock);
   const media = new MediaService(db, storage, clock, {
     uploadsPerHour: env.MEDIA_UPLOADS_PER_HOUR_LIMIT,
@@ -67,7 +70,7 @@ export function buildContainer(env: AppEnv, overrides: { db?: Db; clock?: Clock;
     throw new Error("Producción requiere un verificador real de App Attest / Play Integrity");
   }
   const reports = new ReportService({
-    db, clock, ref, geo, social, events, identity, media,
+    db, clock, ref, geo, social, events, identity, media, trust,
     attestation: overrides.attestation ?? new DevAttestationVerifier(),
     limits: { reportsPerHour: env.REPORTS_PER_HOUR_LIMIT, presenceRetentionDays: env.PRESENCE_RETENTION_DAYS },
   });
@@ -81,13 +84,14 @@ export function buildContainer(env: AppEnv, overrides: { db?: Db; clock?: Clock;
   alerts.registerHandlers(dispatcher);
   social.registerHandlers(dispatcher);
   reports.registerHandlers(dispatcher);
+  trust.registerHandlers(dispatcher);
   // Presupuestos y kill switches persistidos: las funciones de pago empiezan a 0 y apagadas (migración 0009).
   const cost = new CostService(db, identity, media, clock, dataDir);
-  const moderation = new ModerationService(db, social, identity, events, verification);
+  const moderation = new ModerationService(db, social, identity, events, verification, trust);
   dispatcher.on("BudgetThresholdReached", "cost.log-threshold", async (e) => {
     console.warn(JSON.stringify({ msg: "cost.budget.threshold", ...e.payload }));
   });
-  return { env, db, clock, ref, geo, social, identity, events, ingestion, ingestionScheduler, verification, media, storage, reports, feed, alerts, dispatcher, cost, moderation, meter };
+  return { env, db, clock, ref, geo, social, identity, events, ingestion, ingestionScheduler, verification, media, storage, reports, feed, alerts, dispatcher, cost, moderation, trust, meter };
 }
 
 /** APNs y FCM directos. Si falta la credencial de una plataforma, sus avisos quedan solo en el historial. */

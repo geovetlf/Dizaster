@@ -23,6 +23,7 @@ import { publish } from "../../platform/outbox.js";
 import type { EventService } from "../event/index.js";
 import type { IdentityService } from "../identity/index.js";
 import type { SocialService } from "../social/index.js";
+import type { TrustService } from "../trust/index.js";
 import type { VerificationService } from "../verification/index.js";
 
 /** Peso de cada motivo en la prioridad: primero lo que puede dañar a una persona. */
@@ -64,6 +65,7 @@ export class ModerationService {
     private readonly identity: IdentityService,
     private readonly events: EventService,
     private readonly verification: VerificationService,
+    private readonly trust: TrustService,
   ) {}
 
   // ───────────── Denuncias ─────────────
@@ -79,9 +81,8 @@ export class ModerationService {
         [reporter.profileId],
       );
       if (recent.rows[0]!.n >= FLAGS_PER_HOUR) throw new DomainError("RATE_LIMITED", "Demasiadas denuncias seguidas", 429);
-      // Las cuentas recién creadas pesan la mitad: frena campañas de denuncias con cuentas nuevas.
-      const age = (await this.identity.accountAgeHours(tx, [reporter.userId])).get(reporter.userId) ?? 0;
-      const weight = age >= 24 ? 1 : 0.5;
+      // Las cuentas nuevas o con mal historial pesan menos: frena campañas de denuncias (ADR 0023).
+      const weight = await this.trust.flagWeight(tx, reporter.userId);
       await tx.query(
         `INSERT INTO moderation.cases (id, target_type, target_id) VALUES ($1, $2, $3)
          ON CONFLICT (target_type, target_id) WHERE status = 'OPEN' DO NOTHING`,
@@ -222,7 +223,10 @@ export class ModerationService {
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
       [id, p.caseId, p.targetType, p.targetId, p.affectedUserId, p.action, p.actor, p.moderatorUserId, p.reason, p.reverses ?? null],
     );
-    await publish(tx, "ModerationActionTaken", { actionId: id, targetType: p.targetType, targetId: p.targetId, action: p.action, actor: p.actor });
+    await publish(tx, "ModerationActionTaken", {
+      actionId: id, targetType: p.targetType, targetId: p.targetId, action: p.action, actor: p.actor,
+      affectedUserId: p.affectedUserId, reverses: p.reverses ?? null,
+    });
   }
 
   // ───────────── Transparencia y apelaciones ─────────────

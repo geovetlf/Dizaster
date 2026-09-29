@@ -16,6 +16,7 @@ import type { AttestationVerifier, IdentityService, Session } from "../identity/
 import type { MediaService } from "../media/index.js";
 import type { ReferenceData } from "../reference/index.js";
 import type { SocialService } from "../social/index.js";
+import type { TrustService } from "../trust/index.js";
 
 export interface ReportDeps {
   db: Db;
@@ -26,6 +27,7 @@ export interface ReportDeps {
   events: EventService;
   identity: IdentityService;
   media: MediaService;
+  trust: TrustService;
   attestation: AttestationVerifier;
   limits: { reportsPerHour: number; presenceRetentionDays: number };
 }
@@ -59,7 +61,8 @@ export class ReportService {
       `SELECT count(*) AS n FROM report.reports WHERE author_user_id = $1 AND received_at > now() - interval '1 hour'`,
       [session.userId],
     );
-    if (Number(recent.rows[0]!.n) >= this.d.limits.reportsPerHour) {
+    // Cuentas nuevas o con mal historial tienen menos cupo (Blueprint §13.3).
+    if (Number(recent.rows[0]!.n) >= (await this.d.trust.reportQuota(db, session.userId, this.d.limits.reportsPerHour))) {
       throw new DomainError("RATE_LIMITED", "Demasiados reportes en la última hora", 429);
     }
 

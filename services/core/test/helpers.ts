@@ -12,7 +12,7 @@ import { migrate } from "../src/platform/migrate.js";
 import { MIGRATIONS_DIR } from "../src/platform/paths.js";
 
 export const TEST_DB_URL = process.env["TEST_DATABASE_URL"] ?? "postgres://dizaster:dizaster@localhost:5432/dizaster_test";
-const SCHEMAS = ["platform", "identity", "social", "report", "event", "verification", "ingestion", "media", "geo", "alert", "cost", "moderation"];
+const SCHEMAS = ["platform", "identity", "social", "report", "event", "verification", "ingestion", "media", "geo", "alert", "cost", "moderation", "trust"];
 
 export async function resetDatabase(): Promise<void> {
   const db = createPool(TEST_DB_URL);

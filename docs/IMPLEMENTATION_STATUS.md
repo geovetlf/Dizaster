@@ -152,15 +152,24 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | App: sección "Mis zonas", pantalla para añadir zona y envío al abrir, iOS y Android | ✅ | `app/alert-settings.tsx`, `app/zone-edit.tsx`, `lib/alerts/notifications.ts` |
 | Alertas con ubicación en segundo plano | ⏳ | después (C-17) |
 
+## Etapa 12 — Trust & Safety: reputación y anti-coordinación (hecha)
+
+| Área | Estado | Dónde |
+|---|---|---|
+| Reputación por persona (antigüedad, aciertos, reportes falsos, sanciones) en 4 niveles, nunca visible | ✅ | `services/core/src/modules/trust`, ADR 0023 |
+| Peso al corroborar por reputación ("2 HIGH + reputación alta"), reglas `verification-2` | ✅ | `VerificationService.independentWeight` |
+| Grupos de cuentas jóvenes que co-reportan juntas cuentan como una | ✅ | `TrustService.contributionWeights` |
+| Cupo de reportes y peso de denuncias según reputación | ✅ | `ReportService`, `ModerationService.flag` |
+| Reputación en la visibilidad del feed; textos idénticos | ⏳ | siguiente iteración |
+
 ## Siguiente etapa (en orden)
 
-1. Trust & Safety: reputación de cuentas y dispositivos y señales de abuso para la verificación.
-2. Idiomas portugués y francés (D-19).
-3. Media: miniaturas y hash perceptual para duplicados.
-4. Métricas de calidad del producto (duplicados, tiempo hasta verificación) y aviso push de umbrales a administración.
-5. **BLOQUEADA** — Identity real: Sign in with Apple, Google y email; App Attest / Play Integrity. Falta: cuentas de
+1. Idiomas portugués y francés (D-19).
+2. Media: miniaturas y hash perceptual para duplicados.
+3. Métricas de calidad del producto (duplicados, tiempo hasta verificación) y aviso push de umbrales a administración.
+4. **BLOQUEADA** — Identity real: Sign in with Apple, Google y email; App Attest / Play Integrity. Falta: cuentas de
    Apple Developer y Google (client IDs, Service ID, Team ID) y un proveedor de email aprobado (gasto).
-6. Social: negocios, etiquetas y menciones.
+5. Social: negocios, etiquetas y menciones.
 
 ## Requiere acción humana
 
