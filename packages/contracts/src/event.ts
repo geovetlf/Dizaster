@@ -70,6 +70,8 @@ export type EventCandidate = z.infer<typeof EventCandidate>;
 export const EventSummary = z.object({
   id: z.uuid(),
   categoryCode: CategoryCode,
+  /** Otras categorías compatibles que aportan sus reportes o fuentes (p. ej. un choque que además corta la vía). */
+  secondaryCategories: z.array(CategoryCode).default([]),
   title: LocalizedText.nullable(),
   point: GeoPoint,
   sensitivity: Sensitivity,

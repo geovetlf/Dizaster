@@ -21,6 +21,15 @@ import { openFlag } from "../../lib/moderation/menu";
 import { colors, radius, space } from "../../theme";
 import { appendPage, newestFirst } from "../../lib/ui/pages";
 import { evidenceCounts } from "../../lib/events/counts";
+import { secondaryLine } from "../../lib/events/secondary";
+import type { CategoryCatalog } from "@dizaster/contracts";
+
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const catalog = require("../../reference-data/categories.json") as CategoryCatalog;
+const categoryName = (code: string) => {
+  const c = catalog.categories.find((x) => x.code === code);
+  return c?.names[lang] ?? c?.names["es"] ?? code;
+};
 
 const TIMELINE_SHOWN = 12;
 
@@ -81,11 +90,13 @@ export default function EventScreen() {
   if (!event) return <View style={styles.container} />;
   const color = VERIFICATION_LABEL[event.publicVerificationState]?.color ?? "#8a94a6";
   const place = followablePlace(event.place);
+  const also = secondaryLine(event, categoryName, t("alsoCategories"));
   const header = (
     <View style={styles.header}>
       {savedAt ? <OfflineNote savedAt={savedAt} /> : null}
       <Text style={styles.title}>{eventTitle(event, lang)}</Text>
       {event.place ? <Text style={styles.place}>{event.place.label}</Text> : null}
+      {also ? <Text style={styles.place}>{also}</Text> : null}
       <View style={styles.follows}>
         <FollowChip label={t("followEvent")} on={follows.following("event", event.id)} onPress={() => void follows.toggle("event", event.id)} />
         {place ? (

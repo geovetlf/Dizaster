@@ -336,6 +336,7 @@ export const pt: Record<MessageKey, string> = {
   callNow: "Ligar para",
   allNumbers: "Ver todos os números de emergência",
   verifiedOnly: "Só verificados",
+  alsoCategories: "Também:",
   mapWindowAny: "Qualquer data",
   mapWindow_6h: "Últimas 6 h",
   mapWindow_24h: "Últimas 24 h",

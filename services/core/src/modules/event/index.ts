@@ -73,18 +73,20 @@ interface EventRow {
   sensitivity: EventSummary["sensitivity"]; country_code: string | null; status: EventSummary["status"];
   severity: number; verification_level: VerificationLevel; negative_state: NegativeState; report_count: number;
   source_count: number; official_source_count: number; first_seen_at: Date; last_activity_at: Date; publication_state: string; merged_into_id: string | null;
-  place: ContextualLocation | null;
+  place: ContextualLocation | null; secondary_categories: string[] | null;
 }
 
 const PUBLIC_EVENT_COLUMNS = `
   e.id, e.category_code, e.title, ST_Y(e.public_geom::geometry) AS lat, ST_X(e.public_geom::geometry) AS lng,
   e.sensitivity, e.country_code, e.status, e.severity, e.verification_level, e.negative_state,
-  e.report_count, e.source_count, e.official_source_count, e.first_seen_at, e.last_activity_at, e.publication_state, e.merged_into_id, e.place`;
+  e.report_count, e.source_count, e.official_source_count, e.first_seen_at, e.last_activity_at, e.publication_state, e.merged_into_id, e.place,
+  e.secondary_categories`;
 
 function toSummary(r: EventRow): EventSummary {
   return {
     id: r.id,
     categoryCode: r.category_code,
+    secondaryCategories: r.secondary_categories ?? [],
     title: r.title,
     point: { lat: r.lat, lng: r.lng },
     sensitivity: r.sensitivity,
@@ -290,13 +292,13 @@ export class EventService {
     await tx.query(
       `INSERT INTO event.evidence
          (id, event_id, evidence_type, ref_id, trust_tier, assertion, point, weight, presence_band,
-          contributor_user_id, contributor_device_id, match_score, match_confidence, added_by, observed_at, text_hash)
-       VALUES ($1, $2, $3, $4, $5, $6, ST_SetSRID(ST_MakePoint($7, $8), 4326)::geography, $9, $10, $11, $12, $13, $14, $15, $16, $17)`,
+          contributor_user_id, contributor_device_id, match_score, match_confidence, added_by, observed_at, text_hash, category_code)
+       VALUES ($1, $2, $3, $4, $5, $6, ST_SetSRID(ST_MakePoint($7, $8), 4326)::geography, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)`,
       [
         evidenceId, eventId, evidenceType, c.originRef.id, c.trustTier, assertion, c.point.lng, c.point.lat, c.weight,
         (c.metadata["presenceBand"] as string | undefined) ?? null, c.contributor?.userId ?? null, c.contributor?.deviceId ?? null,
         score, confidence, confidence === "USER_SELECTED" ? "USER" : "RULE", c.observedAt,
-        (c.metadata["textHash"] as string | null | undefined) ?? null,
+        (c.metadata["textHash"] as string | null | undefined) ?? null, c.categoryCode,
       ],
     );
     await this.recomputeAggregates(tx, eventId, c);
@@ -348,6 +350,16 @@ export class EventService {
 
   /** Geometría y contadores agregados. Una fuente oficial prevalece; si no, mediana ponderada (robusta a pines atípicos). */
   private async recomputeAggregates(tx: Queryable, eventId: string, c: Pick<EventCandidate, "observedAt" | "severityHint">): Promise<void> {
+    // Categorías secundarias (§7.3, ADR 0125): las de sus evidencias activas distintas de la principal. Se recalculan
+    // (no se acumulan), así fusiones, reversiones, divisiones y retiros las dejan siempre al día.
+    await tx.query(
+      `UPDATE event.events e SET secondary_categories = coalesce((
+          SELECT array_agg(DISTINCT v.category_code ORDER BY v.category_code) FROM event.evidence v
+           WHERE v.event_id = e.id AND v.status = 'ACTIVE' AND v.assertion = 'OCCURRING'
+             AND v.category_code IS NOT NULL AND v.category_code <> e.category_code), '{}')
+        WHERE e.id = $1`,
+      [eventId],
+    );
     const { rows } = await tx.query<{ lat: number; lng: number; weight: number; trust_tier: TrustTier; contributor_user_id: string | null; observed_at: Date }>(
       `SELECT ST_Y(point::geometry) AS lat, ST_X(point::geometry) AS lng, weight, trust_tier, contributor_user_id, observed_at
          FROM event.evidence WHERE event_id = $1 AND status = 'ACTIVE' AND assertion = 'OCCURRING'`,
@@ -904,7 +916,8 @@ export class EventService {
     const filters = `publication_state = 'PUBLISHED' AND negative_state <> 'FALSE' AND merged_into_id IS NULL
       AND status IN ('ACTIVE','MONITORING','RESOLVED')
       AND public_geom && ST_MakeEnvelope($1, $2, $3, $4, 4326)::geography
-      AND ($5::text[] IS NULL OR category_code = ANY($5) OR split_part(category_code, '.', 1) = ANY($5))
+      AND ($5::text[] IS NULL OR category_code = ANY($5) OR split_part(category_code, '.', 1) = ANY($5)
+           OR EXISTS (SELECT 1 FROM unnest(secondary_categories) sc WHERE sc = ANY($5) OR split_part(sc, '.', 1) = ANY($5)))
       ${input.verifiedOnly ? "AND verification_level <> 'UNVERIFIED' AND negative_state = 'NONE'" : ""}
       ${hours !== null ? `AND last_activity_at > now() - make_interval(hours => ${hours})` : ""}`;
     const params = [w, s, e, n, input.categories?.length ? input.categories : null];
@@ -955,6 +968,7 @@ export class EventService {
       const like = `%${w.replace(/[\\%_]/g, "\\$&")}%`;
       clauses.push(`(
         e.category_code = ANY(${p(codes)}) OR split_part(e.category_code, '.', 1) = ANY(${p(codes)})
+        OR e.secondary_categories && ${p(codes)}::text[]
         OR e.region_id = ANY(${p(place.areaIds)}) OR e.district_id = ANY(${p(place.areaIds)})
         OR e.country_code = ANY(${p(place.countries)})
         OR EXISTS (SELECT 1 FROM jsonb_each_text(coalesce(e.title, '{}')) t WHERE lower(t.value) LIKE ${p(like)})

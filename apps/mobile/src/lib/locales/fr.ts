@@ -336,6 +336,7 @@ export const fr: Record<MessageKey, string> = {
   callNow: "Appeler",
   allNumbers: "Voir tous les numéros d’urgence",
   verifiedOnly: "Vérifiés seulement",
+  alsoCategories: "Aussi :",
   mapWindowAny: "Toutes dates",
   mapWindow_6h: "Dernières 6 h",
   mapWindow_24h: "Dernières 24 h",
