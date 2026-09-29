@@ -342,6 +342,7 @@ export const fr: Record<MessageKey, string> = {
   why_MOCK_LOCATION: "Le téléphone utilise une position simulée. Désactivez-la dans les options développeur.",
   why_ATTESTATION_FAILED: "Nous n'avons pas pu vérifier que l'app et le téléphone sont authentiques.",
   why_IMPLAUSIBLE_MOVEMENT: "Votre position a changé trop vite pour être réelle.",
+  why_MEDIA_REJECTED: "La photo ou la vidéo prouvant votre présence n'a pas pu être traitée.",
   why_CLOCK_SKEW: "L'heure du téléphone est fausse. Activez l'heure automatique.",
   why_LATE_OFFLINE_SUBMISSION: "Envoyé longtemps après la prise (hors ligne) : cela ne prouve plus la présence.",
   rejected_INVALID_CATEGORY: "Cette catégorie n'existe pas. Choisissez-en une autre.",

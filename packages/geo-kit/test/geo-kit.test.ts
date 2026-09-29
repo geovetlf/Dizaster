@@ -5,6 +5,9 @@ import {
   destinationPoint,
   clampToRadius,
   computePresence,
+  PRESENCE_RULES_BY_VERSION,
+  scoreFromBreakdown,
+  withoutMediaBonus,
   PRESENCE_RULES_V1,
   PRESENCE_RULES_V2,
   textFingerprint,
@@ -279,6 +282,21 @@ describe("presencia: bonificación por media capturada en la app (ADR 0073)", ()
     expect(computePresence(far).band).toBe("LOW");
     const noAttest = { ...weak(), attestation: "UNAVAILABLE" as const, mediaProofs: [photo("2026-09-29T10:00:00Z")] };
     expect(computePresence(noAttest).band).not.toBe("HIGH");
+  });
+
+  it("si la foto se rechaza, se retira la bonificación con los mismos topes (ADR 0121)", () => {
+    const r = computePresence({ ...weak(), mediaProofs: [photo("2026-09-29T10:00:00Z")] });
+    const rules = PRESENCE_RULES_BY_VERSION[r.ruleVersion]!;
+    // Los factores guardados reproducen la puntuación.
+    expect(Math.round(scoreFromBreakdown(r.breakdown, rules) * 1000) / 1000).toBe(r.score);
+    const revised = withoutMediaBonus(r.breakdown, rules);
+    expect(revised.breakdown.mediaInApp).toBe(0);
+    expect(revised.band).toBe("MEDIUM");
+    expect(revised.score).toBe(computePresence(weak()).score);
+    // Sin bonificación que quitar, nada cambia; nunca sube.
+    const plain = computePresence(weak());
+    expect(withoutMediaBonus(plain.breakdown, rules).score).toBe(plain.score);
+    expect(Object.keys(PRESENCE_RULES_BY_VERSION)).toEqual(["presence-1", "presence-2", "presence-3"]);
   });
 
   it("presence-1 queda igual para auditar reportes viejos", () => {

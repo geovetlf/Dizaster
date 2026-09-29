@@ -89,7 +89,7 @@ export interface PresenceResult {
   band: PresenceBand;
   reasons: PresenceRejectionReason[];
   fixToPinM: number;
-  breakdown: Record<string, number>;
+  breakdown: PresenceBreakdown;
   ruleVersion: string;
   /** Reporte offline enviado fuera de la tolerancia: solo testimonio tardío (no crea pin). */
   lateOffline: boolean;
@@ -98,6 +98,31 @@ export interface PresenceResult {
 const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
 /** 1 hasta `good`, decae linealmente hasta 0 en `max`. */
 const ramp = (value: number, good: number, max: number) => (value <= good ? 1 : clamp01(1 - (value - good) / (max - good)));
+
+/** Factores guardados con cada reporte (auditoría): bastan para recalcular la puntuación sin la ubicación precisa. */
+export interface PresenceBreakdown {
+  distance: number; accuracy: number; freshness: number; attestation: number; mediaInApp: number; penalty: number; lateOfflineFactor?: number;
+}
+
+/**
+ * Puntuación final desde los factores y las reglas, con los mismos topes que al puntuar:
+ * - fuera del radio no llega a MEDIUM;
+ * - sin integridad de app verificada (factor < 1) no llega a HIGH;
+ * - un testimonio tardío se descuenta y tampoco llega a HIGH.
+ */
+export function scoreFromBreakdown(b: PresenceBreakdown, rules: PresenceRuleSet): number {
+  const w = rules.weights;
+  const raw = w.distance * b.distance + w.accuracy * b.accuracy + w.freshness * b.freshness + w.attestation * b.attestation + w.mediaInApp * b.mediaInApp;
+  // Fuera del radio el reporte no puede afirmar presencia, aunque el resto de señales sean perfectas.
+  let score = clamp01(b.distance === 0 ? Math.min(raw - b.penalty, rules.bands.medium - 0.01) : raw - b.penalty);
+  // Sin integridad de app verificada no se alcanza HIGH: el reporte puede sumarse a un evento, pero no crearlo solo.
+  if (b.attestation !== 1) score = Math.min(score, rules.bands.high - 0.01);
+  if (b.lateOfflineFactor !== undefined) score = Math.min(score * b.lateOfflineFactor, rules.bands.high - 0.01);
+  return score;
+}
+
+export const bandOf = (score: number, rules: PresenceRuleSet): PresenceBand =>
+  score >= rules.bands.high ? "HIGH" : score >= rules.bands.medium ? "MEDIUM" : "LOW";
 
 export function computePresence(input: PresenceInput, rules: PresenceRuleSet = PRESENCE_RULES_CURRENT): PresenceResult {
   const { signals, pin, category } = input;
@@ -142,13 +167,6 @@ export function computePresence(input: PresenceInput, rules: PresenceRuleSet = P
     reasons.push("IMPLAUSIBLE_MOVEMENT");
   }
 
-  const w = rules.weights;
-  const raw = w.distance * fDistance + w.accuracy * fAccuracy + w.freshness * fFreshness + w.attestation * fAttestation + w.mediaInApp * fMedia;
-  // Fuera del radio el reporte no puede afirmar presencia, aunque el resto de señales sean perfectas.
-  let score = clamp01(fDistance === 0 ? Math.min(raw - penalty, rules.bands.medium - 0.01) : raw - penalty);
-  // Sin integridad de app verificada no se alcanza HIGH: el reporte puede sumarse a un evento, pero no crearlo solo.
-  if (input.attestation !== "GENUINE") score = Math.min(score, rules.bands.high - 0.01);
-
   let lateOffline = false;
   if (input.capturedOffline) {
     const delayMin = (input.receivedAt.getTime() - input.capturedAt.getTime()) / 60000;
@@ -158,16 +176,18 @@ export function computePresence(input: PresenceInput, rules: PresenceRuleSet = P
     }
   }
   const discountLate = lateOffline && rules.lateOfflineFactor !== undefined;
-  const lateFactor = discountLate ? rules.lateOfflineFactor! : 1;
-  if (discountLate) score = Math.min(score * lateFactor, rules.bands.high - 0.01);
-
-  const band: PresenceBand = score >= rules.bands.high ? "HIGH" : score >= rules.bands.medium ? "MEDIUM" : "LOW";
+  const breakdown: PresenceBreakdown = {
+    distance: fDistance, accuracy: fAccuracy, freshness: fFreshness, attestation: fAttestation, mediaInApp: fMedia, penalty,
+    ...(discountLate ? { lateOfflineFactor: rules.lateOfflineFactor! } : {}),
+  };
+  const score = scoreFromBreakdown(breakdown, rules);
+  const band = bandOf(score, rules);
   return {
     score: Math.round(score * 1000) / 1000,
     band,
     reasons,
     fixToPinM: Math.round(fixToPinM),
-    breakdown: { distance: fDistance, accuracy: fAccuracy, freshness: fFreshness, attestation: fAttestation, mediaInApp: fMedia, penalty, ...(discountLate ? { lateOfflineFactor: lateFactor } : {}) },
+    breakdown,
     ruleVersion: rules.version,
     lateOffline,
   };
@@ -202,4 +222,20 @@ function hasImplausibleMovement(signals: PresenceSignals, maxSpeedMps: number): 
     if (dt <= 0 ? d > 1000 : d / dt > maxSpeedMps && d > 1000) return true;
   }
   return false;
+}
+
+/** Reglas de presencia por versión: una revisión posterior usa las mismas reglas con las que se puntuó. */
+export const PRESENCE_RULES_BY_VERSION: Readonly<Record<string, PresenceRuleSet>> = Object.fromEntries(
+  [PRESENCE_RULES_V1, PRESENCE_RULES_V2, PRESENCE_RULES_V3].map((r) => [r.version, r]),
+);
+
+/**
+ * La media que sostenía la bonificación "capturada en la app" resultó rechazada (ADR 0121): se recalcula desde los
+ * factores guardados sin esa bonificación (entera: conservador, no se reconstruye con el resto de fotos). Mismos
+ * topes que al puntuar; la puntuación solo puede bajar. NO AI REQUIRED.
+ */
+export function withoutMediaBonus(b: PresenceBreakdown, rules: PresenceRuleSet): { score: number; band: PresenceBand; breakdown: PresenceBreakdown } {
+  const breakdown = { ...b, mediaInApp: 0 };
+  const score = Math.round(Math.min(scoreFromBreakdown(b, rules), scoreFromBreakdown(breakdown, rules)) * 1000) / 1000;
+  return { score, band: bandOf(score, rules), breakdown };
 }

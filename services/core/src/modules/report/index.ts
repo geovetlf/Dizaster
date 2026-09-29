@@ -9,7 +9,7 @@ import {
   type ReportAssertion,
   type SubmitReportResponse,
 } from "@dizaster/contracts";
-import { H3_RES, computePresence, extractKeywords, generalize, h3, textFingerprint } from "@dizaster/geo-kit";
+import { H3_RES, PRESENCE_RULES_BY_VERSION, bandOf, computePresence, extractKeywords, generalize, h3, textFingerprint, withoutMediaBonus, type PresenceBreakdown } from "@dizaster/geo-kit";
 import type { Clock } from "../../platform/clock.js";
 import type { Db, Queryable } from "../../platform/db.js";
 import { withTransaction } from "../../platform/db.js";
@@ -161,12 +161,12 @@ export class ReportService {
       await tx.query(
         `INSERT INTO report.reports
            (id, client_report_id, author_user_id, author_profile_id, device_id, post_id, event_id, category_code, assertion,
-            pin, pin_h3_r9, captured_at, received_at, captured_offline, presence_score, presence_band, status, anonymity_mode, result)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9, ST_SetSRID(ST_MakePoint($10,$11),4326)::geography, $12,$13,$14,$15,$16,$17,$18,$19,$20)`,
+            pin, pin_h3_r9, captured_at, received_at, captured_offline, presence_score, presence_band, status, anonymity_mode, result, media_ids)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9, ST_SetSRID(ST_MakePoint($10,$11),4326)::geography, $12,$13,$14,$15,$16,$17,$18,$19,$20,$21)`,
         [
           reportId, req.clientReportId, session.userId, session.profileId, device?.id ?? null, postId, eventId, req.categoryCode, req.assertion,
           req.pin.lng, req.pin.lat, h3(req.pin, H3_RES.DEDUP), req.capturedAt, receivedAt, req.capturedOffline, presence.score, presence.band,
-          downgraded ? "DOWNGRADED" : "ACCEPTED", anonymity, JSON.stringify(result),
+          downgraded ? "DOWNGRADED" : "ACCEPTED", anonymity, JSON.stringify(result), attachable.map((m) => m.id),
         ],
       );
       await this.storePresenceEvidence(tx, reportId, req, presence, attestation, receivedAt);
@@ -207,6 +207,8 @@ export class ReportService {
    * y se desvincula el dispositivo. El reporte sigue contando como evidencia anónima del EVENT.
    */
   registerHandlers(dispatcher: OutboxDispatcher): void {
+    // Media rechazada al procesarse (ADR 0121): si sostenía la bonificación "capturada en la app", se retira.
+    dispatcher.on("MediaRejected", "report.media-rejected", async (e, tx) => { await this.reviseForRejectedMedia(tx, e.payload.mediaId); });
     dispatcher.on("AccountDeleted", "report.generalize-account", async (e, tx) => {
       await tx.query(
         `UPDATE report.presence_evidence SET device_fix = NULL, device_fix_enc = NULL, generalized_at = COALESCE(generalized_at, now())
@@ -319,6 +321,36 @@ export class ReportService {
       await this.d.media.purgeMedia(tx, mediaIds);
       await publish(tx, "ReportWithdrawn", { reportId, userId: session.userId, eventId });
     });
+  }
+
+  /**
+   * Revisión de presencia por media rechazada (ADR 0121). Se recalcula desde los factores guardados (con las
+   * reglas de su versión) sin la bonificación de media; el reporte, su evidencia y el evento se actualizan y la
+   * verificación se reevalúa. Solo baja: nunca sube una banda. NO AI REQUIRED.
+   */
+  async reviseForRejectedMedia(tx: Queryable, mediaId: string): Promise<number> {
+    const { rows } = await tx.query<{ id: string; presence_score: number; score_breakdown: PresenceBreakdown | null; rule_version: string; reasons: string[] }>(
+      `SELECT r.id, r.presence_score, pe.score_breakdown, pe.rule_version, pe.reasons
+         FROM report.reports r JOIN report.presence_evidence pe ON pe.report_id = r.id
+        WHERE r.media_ids @> ARRAY[$1::uuid] AND r.status <> 'WITHDRAWN' FOR UPDATE OF r`,
+      [mediaId],
+    );
+    let revised = 0;
+    for (const r of rows) {
+      const rules = PRESENCE_RULES_BY_VERSION[r.rule_version];
+      if (!rules || !r.score_breakdown || !(r.score_breakdown.mediaInApp > 0)) continue;
+      const next = withoutMediaBonus(r.score_breakdown, rules);
+      const score = Math.min(next.score, r.presence_score);
+      const band = bandOf(score, rules);
+      await tx.query(`UPDATE report.reports SET presence_score = $2, presence_band = $3 WHERE id = $1`, [r.id, score, band]);
+      await tx.query(
+        `UPDATE report.presence_evidence SET score_breakdown = $2, reasons = $3 WHERE report_id = $1`,
+        [r.id, JSON.stringify(next.breakdown), [...new Set([...r.reasons, "MEDIA_REJECTED"])]],
+      );
+      await this.d.events.revisePresence(tx, "CITIZEN_REPORT", r.id, score, band);
+      revised++;
+    }
+    return revised;
   }
 
   async generalizeExpiredPresence(now: Date = this.d.clock.now()): Promise<number> {

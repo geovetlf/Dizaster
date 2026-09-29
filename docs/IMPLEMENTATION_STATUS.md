@@ -311,6 +311,7 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | Contadores sociales al escribir (ADR 0118) | Hecho | Triggers mantienen comentarios, compartidos y reacciones por post (migración 0050). NO AI REQUIRED |
 | Foto de perfil y logo de negocio (§7.3, RF-02) | Hecho: miniatura saneada, solo media propia procesada, purga de la anterior, REMOVE_AVATAR en moderación; Avatar y AvatarPicker en la app | ADR 0119 |
 | Adaptador Copernicus EMS (§9.3) | Hecho: GeoRSS de activaciones de cartografía rápida, EMSR como id, punto o centro del polígono; EXTERNAL y PLANNED | ADR 0120 |
+| MediaRejected con consumidores (§6.2) | Hecho: presencia revisada a la baja desde el desglose guardado, evidencia y verificación, línea de tiempo y post | ADR 0121 |
 | Licencias, auditoría, SBOM, Dependabot; respaldo con prueba de restauración en CI | ✅ | ADR 0070, `scripts/supply-chain.mjs`, `scripts/db-restore-check.mjs` |
 | Idioma de la app elegible en el perfil (es/en/pt/fr o del teléfono) | ✅ | ADR 0069, `app/language.tsx` |
 | Varias cuentas en un teléfono corroboran como una (clave seudónima del teléfono) | ✅ | ADR 0068, migración 0036 |
@@ -347,6 +348,17 @@ Revisión del Blueprint del 2026-09-29 (tras ADR 0102): completada con ADR 0103�
 Revisión del Blueprint del 2026-09-29 (tras ADR 0109, mensaje de bajo costo del propietario): completada con ADR 0110–0112.
 
 Revisión del Blueprint del 2026-09-29 (tras ADR 0112): completada con ADR 0113–0120.
+
+Revisión del Blueprint del 2026-09-29 (tras ADR 0120), verificada contra el código, sin bloqueos:
+
+1. Mapeo de categorías por fuente como dato (§9.4).
+2. Filtro temporal del mapa (§6.3 `since`).
+3. Ciclo de vida del evento en el orden del feed (§6.2, §5.3).
+4. Categorías secundarias del evento (§7.3).
+5. Reglas de exclusión de publicidad (§5.16, D-14).
+6. Runbooks de operación e incidentes (§13.1, §18).
+7. Ingestión por push con firma por fuente (§9.2).
+8. Firma en el dispositivo de la evidencia offline (§8.1, §8.3, C-04).
 
 
 Bloqueadas o en espera:

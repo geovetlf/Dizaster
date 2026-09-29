@@ -119,6 +119,10 @@ export class SocialService {
   constructor(private readonly publicNumbers: ReadonlySet<string> = new Set()) {}
 
   registerHandlers(dispatcher: OutboxDispatcher): void {
+    // Media rechazada al procesarse (ADR 0121): se suelta del post para que no quede "en proceso" para siempre.
+    dispatcher.on("MediaRejected", "social.media-rejected", async (e, tx) => {
+      await tx.query(`DELETE FROM social.post_media WHERE media_id = $1`, [e.payload.mediaId]);
+    });
     dispatcher.on("AccountDeleted", "social.anonymize-account", async (e, tx) => {
       await this.anonymizeProfile(tx, e.payload.profileId);
       await this.deleteBusinessesOf(tx, e.payload.userId);

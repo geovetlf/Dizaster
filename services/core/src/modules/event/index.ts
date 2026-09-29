@@ -125,6 +125,17 @@ export class EventService {
       );
       for (const r of rows) await this.addFingerprint(tx, r.event_id, [], [e.payload.phash]);
     });
+    // Media rechazada al procesarse (ADR 0121): deja de figurar en "fotos o video añadidos" de la línea de tiempo.
+    dispatcher.on("MediaRejected", "event.media-rejected", async (e, tx) => {
+      await tx.query(
+        `UPDATE event.timeline t SET payload = t.payload || jsonb_build_object('mediaIds', k.ids, 'mediaCount', jsonb_array_length(k.ids))
+           FROM (SELECT tl.id, coalesce((SELECT jsonb_agg(x) FROM jsonb_array_elements(tl.payload->'mediaIds') x WHERE x <> to_jsonb($1::text)), '[]'::jsonb) AS ids
+                   FROM event.timeline tl WHERE tl.type = 'MEDIA_ADDED' AND tl.payload->'mediaIds' @> to_jsonb($1::text)) k
+          WHERE t.id = k.id`,
+        [e.payload.mediaId],
+      );
+      await tx.query(`DELETE FROM event.timeline WHERE type = 'MEDIA_ADDED' AND payload->'mediaIds' = '[]'::jsonb`);
+    });
     // El nivel de verificación lo decide otro módulo; aquí solo se refleja (copia denormalizada + timeline).
     dispatcher.on("VerificationChanged", "event.mirror-verification", async (e, tx) => {
       await tx.query(`UPDATE event.events SET verification_level = $2, negative_state = $3, updated_at = now() WHERE id = $1`, [
@@ -400,6 +411,22 @@ export class EventService {
     );
     await this.addTimeline(tx, r.event_id, "REPORT_WITHDRAWN", {});
     await publish(tx, "EventEvidenceAdded", { eventId: r.event_id, evidenceId: r.id, evidenceType: "WITHDRAWN" });
+    return r.event_id;
+  }
+
+  /**
+   * La presencia de un reporte se revisó a la baja (media rechazada, ADR 0121): su evidencia activa cambia de peso
+   * y banda, se recalculan agregados y la verificación se reevalúa como con cualquier cambio de evidencia.
+   */
+  async revisePresence(tx: Queryable, evidenceType: "CITIZEN_REPORT", refId: string, weight: number, band: string): Promise<string | null> {
+    const { rows } = await tx.query<{ id: string; event_id: string }>(
+      `UPDATE event.evidence SET weight = $3, presence_band = $4 WHERE evidence_type = $1 AND ref_id = $2 AND status = 'ACTIVE' RETURNING id, event_id`,
+      [evidenceType, refId, weight, band],
+    );
+    const r = rows[0];
+    if (!r) return null;
+    await this.recomputeAggregates(tx, r.event_id, { observedAt: new Date(0).toISOString() });
+    await publish(tx, "EventEvidenceAdded", { eventId: r.event_id, evidenceId: r.id, evidenceType: "PRESENCE_REVISED" });
     return r.event_id;
   }
 

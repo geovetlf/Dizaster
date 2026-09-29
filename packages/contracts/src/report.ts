@@ -44,6 +44,8 @@ export const PresenceRejectionReason = z.enum([
   "IMPLAUSIBLE_MOVEMENT",
   "CLOCK_SKEW",
   "LATE_OFFLINE_SUBMISSION",
+  // La foto o el video que probaba la captura en la app fue rechazado al procesarse (ADR 0121).
+  "MEDIA_REJECTED",
 ]);
 export type PresenceRejectionReason = z.infer<typeof PresenceRejectionReason>;
 
