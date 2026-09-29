@@ -67,6 +67,8 @@ export default function ProfileScreen() {
         <Row icon="bell-outline" label={t("alerts")} value={alerts ? t("alertsOn") : t("alertsOff")} onPress={() => (alerts ? router.push("/alert-settings") : void turnOnAlerts())} />
         <Row icon="cloud-upload-outline" label={t("pendingReports")} value={String(pending)} />
         <Row icon="clipboard-text-clock-outline" label={t("myReports")} onPress={() => router.push("/my-reports")} />
+        <Row icon="star-outline" label={t("followingTitle")} onPress={() => router.push("/following")} />
+        <Row icon="account-cancel-outline" label={t("blockedTitle")} onPress={() => router.push("/blocked")} />
         <Row icon="phone-alert" label={t("emergencyTitle")} onPress={() => router.push("/emergency")} />
         {notices > 0 ? <Row icon="gavel" label={t("myModeration")} value={String(notices)} onPress={() => router.push("/my-moderation")} /> : null}
         {roles.includes("moderator") || roles.includes("admin") ? <Row icon="shield-check-outline" label={t("moderation")} onPress={() => router.push("/moderation")} /> : null}

@@ -1,6 +1,6 @@
 import type { ContextualLocation } from "@dizaster/contracts";
 import { describe, expect, it } from "vitest";
-import { EMPTY_FOLLOWS, isFollowing, withFollow } from "../src/lib/social/follow-state";
+import { EMPTY_FOLLOWS, followSections, isFollowing, withFollow } from "../src/lib/social/follow-state";
 import { BUSINESS_CATEGORIES, SUPPORTED_LANGS } from "@dizaster/contracts";
 import { BUSINESS_CATEGORY_LABEL, telUri, verificationIcon } from "../src/lib/social/business";
 import { composeProblem } from "../src/lib/social/compose";
@@ -95,5 +95,23 @@ describe("hilos de comentarios (ADR 0045)", () => {
     });
     const out = threadComments([c("1", null), c("2", null), c("1a", "1"), c("2a", "2"), c("1b", "1"), c("xa", "borrado")]);
     expect(out.map((x) => `${x.reply ? "  " : ""}${x.comment.id}`)).toEqual(["1", "  1a", "  1b", "2", "  2a", "xa"]);
+  });
+});
+
+describe("followSections (ADR 0097)", () => {
+  const names = { event: (e: { title: Record<string, string> | null; categoryCode: string }) => e.title?.["es"] ?? e.categoryCode, status: (s: string) => s.toLowerCase() };
+  it("solo secciones con algo, en orden fijo, con etiquetas legibles", () => {
+    const my = {
+      ...EMPTY_FOLLOWS,
+      tags: [{ tag: "lluvias", display: "Lluvias" }],
+      events: [{ id: "e1", title: null, categoryCode: "fire.structure", status: "ACTIVE" }],
+      places: [{ id: "PE:15", name: "Lima", label: "Lima" }, { id: "PE:150122", name: "Miraflores", label: "Miraflores, Lima" }],
+    };
+    const s = followSections(my, names);
+    expect(s.map((x) => x.key)).toEqual(["events", "places", "tags"]);
+    expect(s[0]!.rows[0]).toEqual({ target: "event", id: "e1", label: "fire.structure", sub: "active" });
+    expect(s[1]!.rows.map((r) => r.sub)).toEqual([null, "Miraflores, Lima"]);
+    expect(s[2]!.rows[0]!.label).toBe("#Lluvias");
+    expect(followSections(EMPTY_FOLLOWS, names)).toEqual([]);
   });
 });

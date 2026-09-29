@@ -497,6 +497,15 @@ export class EventService {
   }
 
   /** Cola de moderación: pares abiertos cuyos dos eventos siguen sin fusionar, los más antiguos primero. */
+  /** Eventos seguidos para "Lo que sigo" (ADR 0097): sin los fusionados, cuyo destino ya se sigue (ADR 0093). */
+  async followedSummaries(q: Queryable, ids: string[]): Promise<Map<string, EventSummary>> {
+    if (ids.length === 0) return new Map();
+    const { rows } = await q.query<EventRow>(
+      `SELECT ${PUBLIC_EVENT_COLUMNS} FROM event.events e WHERE e.id = ANY($1::uuid[]) AND e.merged_into_id IS NULL`, [ids],
+    );
+    return new Map(rows.map((r) => [r.id, toSummary(r)]));
+  }
+
   async duplicateQueue(q: Queryable, limit = 50): Promise<DuplicateCandidateView[]> {
     const { rows } = await q.query<{ id: string; event_a: string; event_b: string; score: number; reason: DuplicateCandidateView["reason"]; created_at: Date }>(
       `SELECT d.id, d.event_a, d.event_b, d.score, d.reason, d.created_at FROM event.duplicate_candidates d

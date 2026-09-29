@@ -1,3 +1,4 @@
+import type { MyFollows } from "@dizaster/contracts";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createTestContext, createUser, LIMA, offset, reportBody, submit, type TestContext, type TestUser } from "./helpers.js";
 
@@ -37,6 +38,10 @@ describe("seguidores de un EVENT fusionado (ADR 0093)", () => {
     // Los avisos del destino llegan a quien seguía el duplicado.
     const followers = await t.c.social.followersOf(t.c.db, { eventId: A, placeIds: [] });
     expect(followers.map((f) => f.profileId)).toEqual(expect.arrayContaining([soloB!.profileId, ambos!.profileId, manual!.profileId]));
+
+    // "Lo que sigo" (ADR 0097) muestra solo el evento vivo, con categoría y estado.
+    const list = (await t.app.inject({ url: "/v1/me/follows", headers: auth(soloB!) })).json() as MyFollows;
+    expect(list.events).toEqual([expect.objectContaining({ id: A, categoryCode: "fire.structure", status: "ACTIVE" })]);
 
     // Seguir el destino a mano después de la fusión lo conserva aunque se revierta.
     await follow(manual!, A);

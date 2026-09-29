@@ -121,7 +121,8 @@ export interface ProfileSearchResult {
 
 export interface MyFollows {
   profiles: { handle: string; displayName: string }[];
-  events: { id: string }[];
+  /** Sin los eventos fusionados en otro (ADR 0093); título, categoría y estado para la lista (ADR 0097). */
+  events: { id: string; title: Record<string, string> | null; categoryCode: string; status: string }[];
   places: { id: string; name: string; label: string }[];
   tags: { tag: string; display: string }[];
   businesses: { handle: string; name: string }[];

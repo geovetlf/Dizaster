@@ -31,6 +31,8 @@ import type { BusinessService, FeedFilter, FeedRow, FollowType, SocialService } 
 export const NEARBY_RADIUS_M = 25_000;
 
 const FOLLOW_TYPE: Record<FollowTarget, FollowType> = { profile: "PROFILE", event: "EVENT", place: "PLACE", tag: "TAG", business: "BUSINESS" };
+/** Solo ids de evento válidos llegan a la consulta (un seguimiento viejo con id raro no rompe la lista). */
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
  * Feed: compone posts (social), estado de verificación (event), lugar (event/geo) y media saneada (media) sin que
@@ -177,7 +179,8 @@ export class FeedService {
     const places = await this.geo.areasByIds(q, rows.filter((r) => r.type === "PLACE").map((r) => r.targetId));
     return {
       profiles: rows.flatMap((r) => (r.type === "PROFILE" && r.handle ? [{ handle: r.handle, displayName: r.displayName ?? r.handle }] : [])),
-      events: rows.flatMap((r) => (r.type === "EVENT" ? [{ id: r.targetId }] : [])),
+      events: [...(await this.events.followedSummaries(q, rows.filter((r) => r.type === "EVENT" && UUID.test(r.targetId)).map((r) => r.targetId))).values()]
+        .map((e) => ({ id: e.id, title: e.title, categoryCode: e.categoryCode, status: e.status })),
       places,
       tags: rows.flatMap((r) => (r.type === "TAG" ? [{ tag: r.targetId, display: r.displayName ?? r.targetId }] : [])),
       businesses: [...(await this.business.namesByIds(q, rows.filter((r) => r.type === "BUSINESS").map((r) => r.targetId))).values()],

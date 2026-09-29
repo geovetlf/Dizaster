@@ -154,6 +154,7 @@ export const api = {
   markNotificationsRead: (ids?: string[]) =>
     request<{ unread: number }>("/v1/me/notifications/read", { method: "POST", ...(ids ? { body: JSON.stringify({ ids }) } : {}) }),
   flag: (body: CreateFlagRequest) => request<{ received: boolean }>("/v1/flags", { method: "POST", body: JSON.stringify(body) }),
+  myBlocks: () => request<{ handles: string[] }>("/v1/me/blocks"),
   block: (handle: string, on: boolean) =>
     request<{ blocked: boolean }>(`/v1/blocks/${encodeURIComponent(handle)}`, { method: on ? "PUT" : "DELETE" }),
   myModeration: () => request<{ notices: ModerationNotice[] }>("/v1/me/moderation"),
