@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      TEST_DATABASE_URL: postgres://dizaster:dizaster@localhost:5432/dizaster_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: PostgreSQL 16 + PostGIS + H3
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-16 postgresql-16-postgis-3 postgresql-16-h3
+          sudo systemctl start postgresql
+          sudo -u postgres psql -c "CREATE ROLE dizaster LOGIN SUPERUSER PASSWORD 'dizaster';"
+          sudo -u postgres psql -c "CREATE DATABASE dizaster_test OWNER dizaster;"
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm check:boundaries
+      - run: pnpm typecheck
+      - run: pnpm build
+      - run: pnpm test
+
+      - name: Empaquetado móvil (JS, iOS + Android)
+        working-directory: apps/mobile
+        run: pnpm run bundle:check

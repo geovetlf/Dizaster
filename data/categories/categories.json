@@ -1,0 +1,913 @@
+{
+ "version": "categories-2026.09.1",
+ "categories": [
+  {
+   "code": "natural",
+   "parent": null,
+   "names": {
+    "es": "Desastre natural",
+    "en": "Natural disaster"
+   },
+   "icon": "mountain",
+   "defaultSeverity": 2,
+   "presenceRadiusM": 500,
+   "dedupRadiusM": 500,
+   "dedupWindowMinutes": 120,
+   "offlineToleranceMinutes": 60,
+   "communityThreshold": 3,
+   "sensitivity": "NORMAL",
+   "citizenReportable": false,
+   "alertable": false,
+   "compatibleWith": [],
+   "forcePseudonymous": false
+  },
+  {
+   "code": "fire",
+   "parent": null,
+   "names": {
+    "es": "Incendio",
+    "en": "Fire"
+   },
+   "icon": "flame",
+   "defaultSeverity": 2,
+   "presenceRadiusM": 500,
+   "dedupRadiusM": 500,
+   "dedupWindowMinutes": 120,
+   "offlineToleranceMinutes": 60,
+   "communityThreshold": 3,
+   "sensitivity": "NORMAL",
+   "citizenReportable": false,
+   "alertable": false,
+   "compatibleWith": [],
+   "forcePseudonymous": false
+  },
+  {
+   "code": "accident",
+   "parent": null,
+   "names": {
+    "es": "Accidente",
+    "en": "Accident"
+   },
+   "icon": "car-crash",
+   "defaultSeverity": 2,
+   "presenceRadiusM": 500,
+   "dedupRadiusM": 500,
+   "dedupWindowMinutes": 120,
+   "offlineToleranceMinutes": 60,
+   "communityThreshold": 3,
+   "sensitivity": "NORMAL",
+   "citizenReportable": false,
+   "alertable": false,
+   "compatibleWith": [],
+   "forcePseudonymous": false
+  },
+  {
+   "code": "crime",
+   "parent": null,
+   "names": {
+    "es": "Delincuencia",
+    "en": "Crime"
+   },
+   "icon": "shield-alert",
+   "defaultSeverity": 2,
+   "presenceRadiusM": 500,
+   "dedupRadiusM": 500,
+   "dedupWindowMinutes": 120,
+   "offlineToleranceMinutes": 60,
+   "communityThreshold": 3,
+   "sensitivity": "NORMAL",
+   "citizenReportable": false,
+   "alertable": false,
+   "compatibleWith": [],
+   "forcePseudonymous": false
+  },
+  {
+   "code": "infra",
+   "parent": null,
+   "names": {
+    "es": "Infraestructura",
+    "en": "Infrastructure"
+   },
+   "icon": "construction",
+   "defaultSeverity": 2,
+   "presenceRadiusM": 500,
+   "dedupRadiusM": 500,
+   "dedupWindowMinutes": 120,
+   "offlineToleranceMinutes": 60,
+   "communityThreshold": 3,
+   "sensitivity": "NORMAL",
+   "citizenReportable": false,
+   "alertable": false,
+   "compatibleWith": [],
+   "forcePseudonymous": false
+  },
+  {
+   "code": "health",
+   "parent": null,
+   "names": {
+    "es": "Salud",
+    "en": "Health"
+   },
+   "icon": "heart-pulse",
+   "defaultSeverity": 2,
+   "presenceRadiusM": 500,
+   "dedupRadiusM": 500,
+   "dedupWindowMinutes": 120,
+   "offlineToleranceMinutes": 60,
+   "communityThreshold": 3,
+   "sensitivity": "NORMAL",
+   "citizenReportable": false,
+   "alertable": false,
+   "compatibleWith": [],
+   "forcePseudonymous": false
+  },
+  {
+   "code": "emergency",
+   "parent": null,
+   "names": {
+    "es": "Emergencia",
+    "en": "Emergency"
+   },
+   "icon": "siren",
+   "defaultSeverity": 2,
+   "presenceRadiusM": 500,
+   "dedupRadiusM": 500,
+   "dedupWindowMinutes": 120,
+   "offlineToleranceMinutes": 60,
+   "communityThreshold": 3,
+   "sensitivity": "NORMAL",
+   "citizenReportable": false,
+   "alertable": false,
+   "compatibleWith": [],
+   "forcePseudonymous": false
+  },
+  {
+   "code": "prevention",
+   "parent": null,
+   "names": {
+    "es": "Prevención",
+    "en": "Prevention"
+   },
+   "icon": "info",
+   "defaultSeverity": 2,
+   "presenceRadiusM": 500,
+   "dedupRadiusM": 500,
+   "dedupWindowMinutes": 120,
+   "offlineToleranceMinutes": 60,
+   "communityThreshold": 3,
+   "sensitivity": "NORMAL",
+   "citizenReportable": false,
+   "alertable": false,
+   "compatibleWith": [],
+   "forcePseudonymous": false
+  },
+  {
+   "code": "help",
+   "parent": null,
+   "names": {
+    "es": "Ayuda comunitaria",
+    "en": "Community help"
+   },
+   "icon": "hand-heart",
+   "defaultSeverity": 2,
+   "presenceRadiusM": 500,
+   "dedupRadiusM": 500,
+   "dedupWindowMinutes": 120,
+   "offlineToleranceMinutes": 60,
+   "communityThreshold": 3,
+   "sensitivity": "NORMAL",
+   "citizenReportable": false,
+   "alertable": false,
+   "compatibleWith": [],
+   "forcePseudonymous": false
+  },
+  {
+   "code": "other",
+   "parent": null,
+   "names": {
+    "es": "Otros",
+    "en": "Other"
+   },
+   "icon": "circle-dot",
+   "defaultSeverity": 2,
+   "presenceRadiusM": 500,
+   "dedupRadiusM": 500,
+   "dedupWindowMinutes": 120,
+   "offlineToleranceMinutes": 60,
+   "communityThreshold": 3,
+   "sensitivity": "NORMAL",
+   "citizenReportable": false,
+   "alertable": false,
+   "compatibleWith": [],
+   "forcePseudonymous": false
+  },
+  {
+   "code": "natural.earthquake",
+   "parent": "natural",
+   "names": {
+    "es": "Sismo",
+    "en": "Earthquake"
+   },
+   "icon": "activity",
+   "defaultSeverity": 4,
+   "presenceRadiusM": 50000,
+   "dedupRadiusM": 300000,
+   "dedupWindowMinutes": 1440,
+   "offlineToleranceMinutes": 720,
+   "communityThreshold": 5,
+   "sensitivity": "NORMAL",
+   "citizenReportable": true,
+   "alertable": true,
+   "compatibleWith": [],
+   "forcePseudonymous": false
+  },
+  {
+   "code": "natural.tsunami",
+   "parent": "natural",
+   "names": {
+    "es": "Tsunami",
+    "en": "Tsunami"
+   },
+   "icon": "waves",
+   "defaultSeverity": 5,
+   "presenceRadiusM": 20000,
+   "dedupRadiusM": 200000,
+   "dedupWindowMinutes": 1440,
+   "offlineToleranceMinutes": 360,
+   "communityThreshold": 3,
+   "sensitivity": "NORMAL",
+   "citizenReportable": true,
+   "alertable": true,
+   "compatibleWith": [],
+   "forcePseudonymous": false
+  },
+  {
+   "code": "natural.flood",
+   "parent": "natural",
+   "names": {
+    "es": "Inundación",
+    "en": "Flood"
+   },
+   "icon": "droplets",
+   "defaultSeverity": 3,
+   "presenceRadiusM": 2000,
+   "dedupRadiusM": 3000,
+   "dedupWindowMinutes": 2880,
+   "offlineToleranceMinutes": 720,
+   "communityThreshold": 3,
+   "sensitivity": "NORMAL",
+   "citizenReportable": true,
+   "alertable": true,
+   "compatibleWith": [
+    "natural.landslide",
+    "infra.road_blocked"
+   ],
+   "forcePseudonymous": false
+  },
+  {
+   "code": "natural.landslide",
+   "parent": "natural",
+   "names": {
+    "es": "Huaico / deslizamiento",
+    "en": "Landslide / mudflow"
+   },
+   "icon": "mountain-snow",
+   "defaultSeverity": 4,
+   "presenceRadiusM": 2000,
+   "dedupRadiusM": 2000,
+   "dedupWindowMinutes": 1440,
+   "offlineToleranceMinutes": 720,
+   "communityThreshold": 3,
+   "sensitivity": "NORMAL",
+   "citizenReportable": true,
+   "alertable": true,
+   "compatibleWith": [
+    "natural.flood",
+    "infra.road_blocked"
+   ],
+   "forcePseudonymous": false
+  },
+  {
+   "code": "natural.storm",
+   "parent": "natural",
+   "names": {
+    "es": "Tormenta / lluvia intensa",
+    "en": "Storm / heavy rain"
+   },
+   "icon": "cloud-lightning",
+   "defaultSeverity": 3,
+   "presenceRadiusM": 10000,
+   "dedupRadiusM": 20000,
+   "dedupWindowMinutes": 720,
+   "offlineToleranceMinutes": 360,
+   "communityThreshold": 3,
+   "sensitivity": "NORMAL",
+   "citizenReportable": true,
+   "alertable": true,
+   "compatibleWith": [],
+   "forcePseudonymous": false
+  },
+  {
+   "code": "natural.volcano",
+   "parent": "natural",
+   "names": {
+    "es": "Actividad volcánica",
+    "en": "Volcanic activity"
+   },
+   "icon": "triangle-alert",
+   "defaultSeverity": 4,
+   "presenceRadiusM": 30000,
+   "dedupRadiusM": 50000,
+   "dedupWindowMinutes": 4320,
+   "offlineToleranceMinutes": 720,
+   "communityThreshold": 3,
+   "sensitivity": "NORMAL",
+   "citizenReportable": true,
+   "alertable": true,
+   "compatibleWith": [],
+   "forcePseudonymous": false
+  },
+  {
+   "code": "natural.drought",
+   "parent": "natural",
+   "names": {
+    "es": "Sequía",
+    "en": "Drought"
+   },
+   "icon": "sun",
+   "defaultSeverity": 2,
+   "presenceRadiusM": 20000,
+   "dedupRadiusM": 50000,
+   "dedupWindowMinutes": 10080,
+   "offlineToleranceMinutes": 1440,
+   "communityThreshold": 3,
+   "sensitivity": "NORMAL",
+   "citizenReportable": true,
+   "alertable": false,
+   "compatibleWith": [],
+   "forcePseudonymous": false
+  },
+  {
+   "code": "natural.cold_wave",
+   "parent": "natural",
+   "names": {
+    "es": "Heladas / friaje",
+    "en": "Cold wave / frost"
+   },
+   "icon": "snowflake",
+   "defaultSeverity": 3,
+   "presenceRadiusM": 20000,
+   "dedupRadiusM": 50000,
+   "dedupWindowMinutes": 2880,
+   "offlineToleranceMinutes": 720,
+   "communityThreshold": 3,
+   "sensitivity": "NORMAL",
+   "citizenReportable": true,
+   "alertable": true,
+   "compatibleWith": [],
+   "forcePseudonymous": false
+  },
+  {
+   "code": "fire.wildfire",
+   "parent": "fire",
+   "names": {
+    "es": "Incendio forestal",
+    "en": "Wildfire"
+   },
+   "icon": "trees",
+   "defaultSeverity": 4,
+   "presenceRadiusM": 3000,
+   "dedupRadiusM": 5000,
+   "dedupWindowMinutes": 4320,
+   "offlineToleranceMinutes": 360,
+   "communityThreshold": 3,
+   "sensitivity": "NORMAL",
+   "citizenReportable": true,
+   "alertable": true,
+   "compatibleWith": [
+    "fire.structure"
+   ],
+   "forcePseudonymous": false
+  },
+  {
+   "code": "fire.structure",
+   "parent": "fire",
+   "names": {
+    "es": "Incendio en edificación",
+    "en": "Structure fire"
+   },
+   "icon": "building",
+   "defaultSeverity": 4,
+   "presenceRadiusM": 500,
+   "dedupRadiusM": 400,
+   "dedupWindowMinutes": 360,
+   "offlineToleranceMinutes": 60,
+   "communityThreshold": 3,
+   "sensitivity": "NORMAL",
+   "citizenReportable": true,
+   "alertable": true,
+   "compatibleWith": [
+    "fire.wildfire"
+   ],
+   "forcePseudonymous": false
+  },
+  {
+   "code": "fire.vehicle",
+   "parent": "fire",
+   "names": {
+    "es": "Incendio de vehículo",
+    "en": "Vehicle fire"
+   },
+   "icon": "car",
+   "defaultSeverity": 3,
+   "presenceRadiusM": 300,
+   "dedupRadiusM": 300,
+   "dedupWindowMinutes": 120,
+   "offlineToleranceMinutes": 60,
+   "communityThreshold": 2,
+   "sensitivity": "NORMAL",
+   "citizenReportable": true,
+   "alertable": true,
+   "compatibleWith": [
+    "accident.traffic"
+   ],
+   "forcePseudonymous": false
+  },
+  {
+   "code": "accident.traffic",
+   "parent": "accident",
+   "names": {
+    "es": "Accidente de tránsito",
+    "en": "Traffic accident"
+   },
+   "icon": "car-crash",
+   "defaultSeverity": 3,
+   "presenceRadiusM": 300,
+   "dedupRadiusM": 500,
+   "dedupWindowMinutes": 120,
+   "offlineToleranceMinutes": 60,
+   "communityThreshold": 3,
+   "sensitivity": "NORMAL",
+   "citizenReportable": true,
+   "alertable": true,
+   "compatibleWith": [
+    "infra.road_blocked",
+    "fire.vehicle"
+   ],
+   "forcePseudonymous": false
+  },
+  {
+   "code": "accident.industrial",
+   "parent": "accident",
+   "names": {
+    "es": "Accidente industrial",
+    "en": "Industrial accident"
+   },
+   "icon": "factory",
+   "defaultSeverity": 4,
+   "presenceRadiusM": 1000,
+   "dedupRadiusM": 1000,
+   "dedupWindowMinutes": 360,
+   "offlineToleranceMinutes": 60,
+   "communityThreshold": 3,
+   "sensitivity": "NORMAL",
+   "citizenReportable": true,
+   "alertable": true,
+   "compatibleWith": [
+    "emergency.hazmat"
+   ],
+   "forcePseudonymous": false
+  },
+  {
+   "code": "accident.building_collapse",
+   "parent": "accident",
+   "names": {
+    "es": "Derrumbe de estructura",
+    "en": "Structure collapse"
+   },
+   "icon": "building-2",
+   "defaultSeverity": 4,
+   "presenceRadiusM": 500,
+   "dedupRadiusM": 500,
+   "dedupWindowMinutes": 720,
+   "offlineToleranceMinutes": 120,
+   "communityThreshold": 3,
+   "sensitivity": "NORMAL",
+   "citizenReportable": true,
+   "alertable": true,
+   "compatibleWith": [],
+   "forcePseudonymous": false
+  },
+  {
+   "code": "crime.robbery",
+   "parent": "crime",
+   "names": {
+    "es": "Robo / asalto",
+    "en": "Robbery / assault"
+   },
+   "icon": "shield-alert",
+   "defaultSeverity": 3,
+   "presenceRadiusM": 300,
+   "dedupRadiusM": 500,
+   "dedupWindowMinutes": 60,
+   "offlineToleranceMinutes": 30,
+   "communityThreshold": 3,
+   "sensitivity": "SENSITIVE",
+   "citizenReportable": true,
+   "alertable": true,
+   "compatibleWith": [
+    "crime.theft"
+   ],
+   "forcePseudonymous": true
+  },
+  {
+   "code": "crime.theft",
+   "parent": "crime",
+   "names": {
+    "es": "Hurto",
+    "en": "Theft"
+   },
+   "icon": "wallet",
+   "defaultSeverity": 2,
+   "presenceRadiusM": 300,
+   "dedupRadiusM": 500,
+   "dedupWindowMinutes": 60,
+   "offlineToleranceMinutes": 30,
+   "communityThreshold": 3,
+   "sensitivity": "SENSITIVE",
+   "citizenReportable": true,
+   "alertable": false,
+   "compatibleWith": [
+    "crime.robbery"
+   ],
+   "forcePseudonymous": false
+  },
+  {
+   "code": "crime.vandalism",
+   "parent": "crime",
+   "names": {
+    "es": "Vandalismo",
+    "en": "Vandalism"
+   },
+   "icon": "spray-can",
+   "defaultSeverity": 2,
+   "presenceRadiusM": 300,
+   "dedupRadiusM": 300,
+   "dedupWindowMinutes": 240,
+   "offlineToleranceMinutes": 60,
+   "communityThreshold": 3,
+   "sensitivity": "SENSITIVE",
+   "citizenReportable": true,
+   "alertable": false,
+   "compatibleWith": [],
+   "forcePseudonymous": false
+  },
+  {
+   "code": "crime.violence",
+   "parent": "crime",
+   "names": {
+    "es": "Violencia / disturbios",
+    "en": "Violence / unrest"
+   },
+   "icon": "siren",
+   "defaultSeverity": 4,
+   "presenceRadiusM": 500,
+   "dedupRadiusM": 800,
+   "dedupWindowMinutes": 120,
+   "offlineToleranceMinutes": 30,
+   "communityThreshold": 3,
+   "sensitivity": "HIGHLY_SENSITIVE",
+   "citizenReportable": true,
+   "alertable": true,
+   "compatibleWith": [],
+   "forcePseudonymous": true
+  },
+  {
+   "code": "infra.power_outage",
+   "parent": "infra",
+   "names": {
+    "es": "Corte de electricidad",
+    "en": "Power outage"
+   },
+   "icon": "zap-off",
+   "defaultSeverity": 2,
+   "presenceRadiusM": 1000,
+   "dedupRadiusM": 3000,
+   "dedupWindowMinutes": 720,
+   "offlineToleranceMinutes": 120,
+   "communityThreshold": 3,
+   "sensitivity": "NORMAL",
+   "citizenReportable": true,
+   "alertable": false,
+   "compatibleWith": [],
+   "forcePseudonymous": false
+  },
+  {
+   "code": "infra.water_outage",
+   "parent": "infra",
+   "names": {
+    "es": "Corte de agua",
+    "en": "Water outage"
+   },
+   "icon": "droplet-off",
+   "defaultSeverity": 2,
+   "presenceRadiusM": 1000,
+   "dedupRadiusM": 3000,
+   "dedupWindowMinutes": 1440,
+   "offlineToleranceMinutes": 120,
+   "communityThreshold": 3,
+   "sensitivity": "NORMAL",
+   "citizenReportable": true,
+   "alertable": false,
+   "compatibleWith": [],
+   "forcePseudonymous": false
+  },
+  {
+   "code": "infra.road_blocked",
+   "parent": "infra",
+   "names": {
+    "es": "Vía bloqueada",
+    "en": "Road blocked"
+   },
+   "icon": "construction",
+   "defaultSeverity": 2,
+   "presenceRadiusM": 500,
+   "dedupRadiusM": 800,
+   "dedupWindowMinutes": 360,
+   "offlineToleranceMinutes": 60,
+   "communityThreshold": 3,
+   "sensitivity": "NORMAL",
+   "citizenReportable": true,
+   "alertable": true,
+   "compatibleWith": [
+    "accident.traffic",
+    "natural.landslide",
+    "natural.flood"
+   ],
+   "forcePseudonymous": false
+  },
+  {
+   "code": "infra.gas_leak",
+   "parent": "infra",
+   "names": {
+    "es": "Fuga de gas",
+    "en": "Gas leak"
+   },
+   "icon": "wind",
+   "defaultSeverity": 4,
+   "presenceRadiusM": 300,
+   "dedupRadiusM": 400,
+   "dedupWindowMinutes": 240,
+   "offlineToleranceMinutes": 30,
+   "communityThreshold": 2,
+   "sensitivity": "NORMAL",
+   "citizenReportable": true,
+   "alertable": true,
+   "compatibleWith": [
+    "emergency.hazmat"
+   ],
+   "forcePseudonymous": false
+  },
+  {
+   "code": "infra.bridge_damage",
+   "parent": "infra",
+   "names": {
+    "es": "Daño en puente o estructura vial",
+    "en": "Bridge / road damage"
+   },
+   "icon": "git-commit",
+   "defaultSeverity": 3,
+   "presenceRadiusM": 500,
+   "dedupRadiusM": 500,
+   "dedupWindowMinutes": 4320,
+   "offlineToleranceMinutes": 720,
+   "communityThreshold": 3,
+   "sensitivity": "NORMAL",
+   "citizenReportable": true,
+   "alertable": true,
+   "compatibleWith": [],
+   "forcePseudonymous": false
+  },
+  {
+   "code": "health.outbreak",
+   "parent": "health",
+   "names": {
+    "es": "Brote de enfermedad",
+    "en": "Disease outbreak"
+   },
+   "icon": "virus",
+   "defaultSeverity": 3,
+   "presenceRadiusM": 5000,
+   "dedupRadiusM": 50000,
+   "dedupWindowMinutes": 20160,
+   "offlineToleranceMinutes": 1440,
+   "communityThreshold": 5,
+   "sensitivity": "NORMAL",
+   "citizenReportable": false,
+   "alertable": true,
+   "compatibleWith": [],
+   "forcePseudonymous": false
+  },
+  {
+   "code": "health.facility_saturation",
+   "parent": "health",
+   "names": {
+    "es": "Centro de salud saturado",
+    "en": "Health facility overcrowded"
+   },
+   "icon": "hospital",
+   "defaultSeverity": 2,
+   "presenceRadiusM": 300,
+   "dedupRadiusM": 300,
+   "dedupWindowMinutes": 720,
+   "offlineToleranceMinutes": 120,
+   "communityThreshold": 3,
+   "sensitivity": "NORMAL",
+   "citizenReportable": true,
+   "alertable": false,
+   "compatibleWith": [],
+   "forcePseudonymous": false
+  },
+  {
+   "code": "health.facility_closure",
+   "parent": "health",
+   "names": {
+    "es": "Centro de salud cerrado",
+    "en": "Health facility closed"
+   },
+   "icon": "hospital",
+   "defaultSeverity": 2,
+   "presenceRadiusM": 300,
+   "dedupRadiusM": 300,
+   "dedupWindowMinutes": 1440,
+   "offlineToleranceMinutes": 120,
+   "communityThreshold": 3,
+   "sensitivity": "NORMAL",
+   "citizenReportable": true,
+   "alertable": false,
+   "compatibleWith": [],
+   "forcePseudonymous": false
+  },
+  {
+   "code": "emergency.hazmat",
+   "parent": "emergency",
+   "names": {
+    "es": "Materiales peligrosos",
+    "en": "Hazardous materials"
+   },
+   "icon": "biohazard",
+   "defaultSeverity": 5,
+   "presenceRadiusM": 1000,
+   "dedupRadiusM": 1000,
+   "dedupWindowMinutes": 360,
+   "offlineToleranceMinutes": 60,
+   "communityThreshold": 2,
+   "sensitivity": "NORMAL",
+   "citizenReportable": true,
+   "alertable": true,
+   "compatibleWith": [
+    "accident.industrial",
+    "infra.gas_leak"
+   ],
+   "forcePseudonymous": false
+  },
+  {
+   "code": "emergency.missing_person",
+   "parent": "emergency",
+   "names": {
+    "es": "Persona desaparecida",
+    "en": "Missing person"
+   },
+   "icon": "user-search",
+   "defaultSeverity": 3,
+   "presenceRadiusM": 1000,
+   "dedupRadiusM": 2000,
+   "dedupWindowMinutes": 4320,
+   "offlineToleranceMinutes": 720,
+   "communityThreshold": 3,
+   "sensitivity": "HIGHLY_SENSITIVE",
+   "citizenReportable": false,
+   "alertable": true,
+   "compatibleWith": [],
+   "forcePseudonymous": true
+  },
+  {
+   "code": "emergency.rescue",
+   "parent": "emergency",
+   "names": {
+    "es": "Rescate en curso",
+    "en": "Rescue in progress"
+   },
+   "icon": "life-buoy",
+   "defaultSeverity": 4,
+   "presenceRadiusM": 500,
+   "dedupRadiusM": 800,
+   "dedupWindowMinutes": 360,
+   "offlineToleranceMinutes": 60,
+   "communityThreshold": 2,
+   "sensitivity": "NORMAL",
+   "citizenReportable": true,
+   "alertable": true,
+   "compatibleWith": [],
+   "forcePseudonymous": false
+  },
+  {
+   "code": "prevention.hazard",
+   "parent": "prevention",
+   "names": {
+    "es": "Riesgo detectado",
+    "en": "Hazard spotted"
+   },
+   "icon": "triangle-alert",
+   "defaultSeverity": 2,
+   "presenceRadiusM": 300,
+   "dedupRadiusM": 300,
+   "dedupWindowMinutes": 10080,
+   "offlineToleranceMinutes": 1440,
+   "communityThreshold": 3,
+   "sensitivity": "NORMAL",
+   "citizenReportable": true,
+   "alertable": false,
+   "compatibleWith": [],
+   "forcePseudonymous": false
+  },
+  {
+   "code": "help.shelter",
+   "parent": "help",
+   "names": {
+    "es": "Albergue / refugio",
+    "en": "Shelter"
+   },
+   "icon": "home",
+   "defaultSeverity": 1,
+   "presenceRadiusM": 300,
+   "dedupRadiusM": 300,
+   "dedupWindowMinutes": 10080,
+   "offlineToleranceMinutes": 1440,
+   "communityThreshold": 2,
+   "sensitivity": "NORMAL",
+   "citizenReportable": true,
+   "alertable": false,
+   "compatibleWith": [],
+   "forcePseudonymous": false
+  },
+  {
+   "code": "help.supplies",
+   "parent": "help",
+   "names": {
+    "es": "Punto de ayuda / donaciones",
+    "en": "Aid / supply point"
+   },
+   "icon": "package",
+   "defaultSeverity": 1,
+   "presenceRadiusM": 300,
+   "dedupRadiusM": 300,
+   "dedupWindowMinutes": 10080,
+   "offlineToleranceMinutes": 1440,
+   "communityThreshold": 2,
+   "sensitivity": "NORMAL",
+   "citizenReportable": true,
+   "alertable": false,
+   "compatibleWith": [],
+   "forcePseudonymous": false
+  },
+  {
+   "code": "other.event",
+   "parent": "other",
+   "names": {
+    "es": "Otro acontecimiento",
+    "en": "Other event"
+   },
+   "icon": "circle-dot",
+   "defaultSeverity": 2,
+   "presenceRadiusM": 500,
+   "dedupRadiusM": 500,
+   "dedupWindowMinutes": 240,
+   "offlineToleranceMinutes": 60,
+   "communityThreshold": 3,
+   "sensitivity": "NORMAL",
+   "citizenReportable": true,
+   "alertable": false,
+   "compatibleWith": [],
+   "forcePseudonymous": false
+  }
+ ],
+ "regionOverrides": [
+  {
+   "category": "natural.landslide",
+   "country": "PE",
+   "names": {
+    "es": "Huaico",
+    "en": "Huaico (mudflow)"
+   }
+  },
+  {
+   "category": "natural.cold_wave",
+   "country": "PE",
+   "names": {
+    "es": "Heladas y friaje",
+    "en": "Frost and friaje"
+   }
+  }
+ ]
+}

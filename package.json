@@ -1,0 +1,25 @@
+{
+  "name": "dizaster",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.33.0",
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "build": "pnpm -r --filter \"./packages/*\" --filter \"./services/*\" run build",
+    "typecheck": "pnpm -r run typecheck",
+    "lint": "eslint .",
+    "test": "pnpm -r run test",
+    "check:boundaries": "node scripts/check-module-boundaries.mjs",
+    "check": "pnpm lint && pnpm check:boundaries && pnpm typecheck && pnpm build && pnpm test",
+    "db:migrate": "pnpm --filter @dizaster/core run build && pnpm --filter @dizaster/core run migrate"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.0",
+    "eslint": "^10.11.0",
+    "typescript": "~6.0.3",
+    "typescript-eslint": "^8.71.0",
+    "globals": "^16.0.0"
+  }
+}

@@ -1,0 +1,109 @@
+import type { GeoPoint } from "@dizaster/contracts";
+import { distanceMeters } from "./distance.js";
+
+/** Reglas de deduplicación versionadas (Blueprint §8.4). */
+export interface DedupRuleSet {
+  version: string;
+  weights: { distance: number; time: number; category: number; text: number };
+  autoAttach: number;
+  ambiguous: number;
+}
+
+export const DEDUP_RULES_V1: DedupRuleSet = {
+  version: "dedup-1",
+  weights: { distance: 0.45, time: 0.25, category: 0.2, text: 0.1 },
+  autoAttach: 0.8,
+  ambiguous: 0.55,
+};
+
+export interface DedupCandidateEvent {
+  id: string;
+  categoryCode: string;
+  point: GeoPoint;
+  lastActivityAt: Date;
+  keywords?: string[];
+}
+
+export interface DedupInput {
+  categoryCode: string;
+  point: GeoPoint;
+  observedAt: Date;
+  keywords?: string[];
+  dedupRadiusM: number;
+  dedupWindowMinutes: number;
+  /** Códigos compatibles para fusionar (además de la misma categoría). */
+  compatibleWith: readonly string[];
+}
+
+export type DedupDecision =
+  | { kind: "ATTACH"; eventId: string; score: number }
+  | { kind: "AMBIGUOUS"; candidates: Array<{ eventId: string; score: number }> }
+  | { kind: "NEW" };
+
+export function categoryCompatibility(a: string, b: string, compatibleWith: readonly string[]): number {
+  if (a === b) return 1;
+  if (compatibleWith.includes(b)) return 0.8;
+  const rootA = a.split(".")[0];
+  const rootB = b.split(".")[0];
+  return rootA === rootB ? 0.5 : 0;
+}
+
+/** Similitud de Jaccard entre conjuntos de palabras clave (determinista, sin IA). */
+export function keywordSimilarity(a: readonly string[] = [], b: readonly string[] = []): number {
+  if (a.length === 0 || b.length === 0) return 0.5; // neutro: sin texto no se penaliza ni se premia
+  const sa = new Set(a);
+  const sb = new Set(b);
+  let inter = 0;
+  for (const x of sa) if (sb.has(x)) inter++;
+  return inter / (sa.size + sb.size - inter);
+}
+
+export function matchScore(input: DedupInput, event: DedupCandidateEvent, rules: DedupRuleSet = DEDUP_RULES_V1): number {
+  const compat = categoryCompatibility(input.categoryCode, event.categoryCode, input.compatibleWith);
+  if (compat === 0) return 0;
+  const d = distanceMeters(input.point, event.point);
+  if (d > input.dedupRadiusM) return 0;
+  const dtMin = Math.abs(input.observedAt.getTime() - event.lastActivityAt.getTime()) / 60000;
+  if (dtMin > input.dedupWindowMinutes) return 0;
+  const fDist = Math.exp(-2 * (d / input.dedupRadiusM) ** 2);
+  const fTime = Math.exp(-2 * (dtMin / input.dedupWindowMinutes) ** 2);
+  const w = rules.weights;
+  const score = w.distance * fDist + w.time * fTime + w.category * compat + w.text * keywordSimilarity(input.keywords, event.keywords);
+  return Math.round(score * 1000) / 1000;
+}
+
+export function decideDedup(
+  input: DedupInput,
+  candidates: readonly DedupCandidateEvent[],
+  rules: DedupRuleSet = DEDUP_RULES_V1,
+): DedupDecision {
+  const scored = candidates
+    .map((e) => ({ eventId: e.id, score: matchScore(input, e, rules) }))
+    .filter((s) => s.score >= rules.ambiguous)
+    .sort((a, b) => b.score - a.score);
+  if (scored.length === 0) return { kind: "NEW" };
+  const [best, second] = scored;
+  // Adjuntar solo si el mejor es claro y no hay otro candidato casi igual de bueno.
+  if (best!.score >= rules.autoAttach && (!second || best!.score - second.score >= 0.1)) {
+    return { kind: "ATTACH", eventId: best!.eventId, score: best!.score };
+  }
+  return { kind: "AMBIGUOUS", candidates: scored.slice(0, 5) };
+}
+
+/** Palabras clave normalizadas (minúsculas, sin tildes, sin palabras vacías). */
+const STOPWORDS = new Set(
+  "el la los las un una unos unas de del y o en a al con por para que se es hay muy mas the a an of and or in on at to is are there".split(" "),
+);
+export function extractKeywords(text: string | undefined | null): string[] {
+  if (!text) return [];
+  return [
+    ...new Set(
+      text
+        .normalize("NFD")
+        .replace(/[̀-ͯ]/g, "")
+        .toLowerCase()
+        .split(/[^a-z0-9ñ]+/)
+        .filter((w) => w.length > 2 && !STOPWORDS.has(w)),
+    ),
+  ].slice(0, 30);
+}

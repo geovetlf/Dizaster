@@ -1,0 +1,39 @@
+# Entorno local mínimo (cost-first): una base de datos, una API y un worker. Nada más.
+services:
+  db:
+    build: { context: ., dockerfile: infra/docker/db.Dockerfile }
+    environment:
+      POSTGRES_USER: dizaster
+      POSTGRES_PASSWORD: dizaster
+      POSTGRES_DB: dizaster_dev
+    ports: ["5432:5432"]
+    volumes: [dbdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dizaster"]
+      interval: 5s
+      retries: 10
+
+  migrate:
+    build: { context: ., dockerfile: infra/docker/core.Dockerfile }
+    command: ["node", "dist/migrate-cli.js"]
+    environment: &coreenv
+      NODE_ENV: development
+      DATABASE_URL: postgres://dizaster:dizaster@db:5432/dizaster_dev
+      AUTH_JWT_SECRET: change-me-dev-only-32-characters-min
+      DEV_AUTH_ENABLED: "true"
+    depends_on: { db: { condition: service_healthy } }
+
+  api:
+    build: { context: ., dockerfile: infra/docker/core.Dockerfile }
+    environment: *coreenv
+    ports: ["8080:8080"]
+    depends_on: { migrate: { condition: service_completed_successfully } }
+
+  worker:
+    build: { context: ., dockerfile: infra/docker/core.Dockerfile }
+    command: ["node", "dist/worker.js"]
+    environment: *coreenv
+    depends_on: { migrate: { condition: service_completed_successfully } }
+
+volumes:
+  dbdata:

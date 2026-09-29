@@ -1,0 +1,10 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": ["TEAMID.app.dizaster.mobile"],
+        "components": [{ "/": "/e/*", "comment": "Enlaces a eventos: https://<dominio>/e/<id>" }]
+      }
+    ]
+  }
+}

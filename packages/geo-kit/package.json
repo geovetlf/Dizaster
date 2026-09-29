@@ -1,0 +1,33 @@
+{
+  "name": "@dizaster/geo-kit",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Geo Engine compartido (app y servidor): H3, distancias, generalización de privacidad, presencia física, deduplicación y país por coordenadas. Sin APIs de mapas.",
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@dizaster/contracts": "workspace:*",
+    "h3-js": "^4.5.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.4",
+    "typescript": "~6.0.3",
+    "vitest": "^5.0.2"
+  }
+}

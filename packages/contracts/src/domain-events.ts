@@ -1,0 +1,27 @@
+/**
+ * Eventos de dominio publicados vía transactional outbox.
+ * Los consumidores deben ser idempotentes. Añadir un tipo nuevo no rompe a los existentes.
+ */
+export const OUTBOX_LANES = ["urgent", "interactive", "normal", "batch"] as const;
+export type OutboxLane = (typeof OUTBOX_LANES)[number];
+
+export interface DomainEventMap {
+  ReportSubmitted: { reportId: string; eventId: string | null; presenceBand: string; assertion: string };
+  ReportDowngradedToPost: { postId: string; reasons: string[] };
+  EventCreated: { eventId: string; categoryCode: string };
+  EventEvidenceAdded: { eventId: string; evidenceId: string; evidenceType: string };
+  EventMerged: { targetEventId: string; mergedEventId: string };
+  VerificationChanged: { eventId: string; from: string; to: string; negativeState: string };
+  ExternalItemIngested: { externalItemId: string; sourceId: string; lane: "NORMAL" | "URGENT" };
+}
+export type DomainEventType = keyof DomainEventMap;
+
+export interface DomainEvent<T extends DomainEventType = DomainEventType> {
+  id: string;
+  type: T;
+  version: number;
+  payload: DomainEventMap[T];
+  occurredAt: string;
+  correlationId: string | null;
+  lane: OutboxLane;
+}

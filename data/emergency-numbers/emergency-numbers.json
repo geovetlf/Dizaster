@@ -1,0 +1,564 @@
+{
+ "version": "emergency-2026.09.1",
+ "numbers": [
+  {
+   "country": "PE",
+   "subdivision": null,
+   "service": "POLICE",
+   "number": "105",
+   "label": {
+    "es": "Policía Nacional del Perú",
+    "en": "National Police"
+   },
+   "source": "Pendiente de contrastar con fuente oficial peruana (gob.pe)",
+   "verification": "NEEDS_VERIFICATION",
+   "verifiedAt": null
+  },
+  {
+   "country": "PE",
+   "subdivision": null,
+   "service": "FIRE",
+   "number": "116",
+   "label": {
+    "es": "Bomberos",
+    "en": "Fire brigade"
+   },
+   "source": "Pendiente de contrastar con fuente oficial peruana (gob.pe)",
+   "verification": "NEEDS_VERIFICATION",
+   "verifiedAt": null
+  },
+  {
+   "country": "PE",
+   "subdivision": null,
+   "service": "AMBULANCE",
+   "number": "106",
+   "label": {
+    "es": "SAMU (ambulancias)",
+    "en": "SAMU ambulance"
+   },
+   "source": "Pendiente de contrastar con fuente oficial peruana (gob.pe)",
+   "verification": "NEEDS_VERIFICATION",
+   "verifiedAt": null
+  },
+  {
+   "country": "PE",
+   "subdivision": null,
+   "service": "CIVIL_DEFENSE",
+   "number": "115",
+   "label": {
+    "es": "Defensa Civil",
+    "en": "Civil defense"
+   },
+   "source": "Pendiente de contrastar con fuente oficial peruana (gob.pe)",
+   "verification": "NEEDS_VERIFICATION",
+   "verifiedAt": null
+  },
+  {
+   "country": "PE",
+   "subdivision": null,
+   "service": "GENDER_VIOLENCE",
+   "number": "100",
+   "label": {
+    "es": "Línea 100 (violencia familiar y sexual)",
+    "en": "Line 100 (family and sexual violence)"
+   },
+   "source": "Pendiente de contrastar con fuente oficial peruana (gob.pe)",
+   "verification": "NEEDS_VERIFICATION",
+   "verifiedAt": null
+  },
+  {
+   "country": "ES",
+   "subdivision": null,
+   "service": "GENERAL",
+   "number": "112",
+   "label": {
+    "es": "Emergencias",
+    "en": "Emergency"
+   },
+   "source": "Pendiente de contrastar con fuente oficial del país",
+   "verification": "NEEDS_VERIFICATION",
+   "verifiedAt": null
+  },
+  {
+   "country": "FR",
+   "subdivision": null,
+   "service": "GENERAL",
+   "number": "112",
+   "label": {
+    "es": "Emergencias",
+    "en": "Emergency"
+   },
+   "source": "Pendiente de contrastar con fuente oficial del país",
+   "verification": "NEEDS_VERIFICATION",
+   "verifiedAt": null
+  },
+  {
+   "country": "DE",
+   "subdivision": null,
+   "service": "GENERAL",
+   "number": "112",
+   "label": {
+    "es": "Emergencias",
+    "en": "Emergency"
+   },
+   "source": "Pendiente de contrastar con fuente oficial del país",
+   "verification": "NEEDS_VERIFICATION",
+   "verifiedAt": null
+  },
+  {
+   "country": "IT",
+   "subdivision": null,
+   "service": "GENERAL",
+   "number": "112",
+   "label": {
+    "es": "Emergencias",
+    "en": "Emergency"
+   },
+   "source": "Pendiente de contrastar con fuente oficial del país",
+   "verification": "NEEDS_VERIFICATION",
+   "verifiedAt": null
+  },
+  {
+   "country": "PT",
+   "subdivision": null,
+   "service": "GENERAL",
+   "number": "112",
+   "label": {
+    "es": "Emergencias",
+    "en": "Emergency"
+   },
+   "source": "Pendiente de contrastar con fuente oficial del país",
+   "verification": "NEEDS_VERIFICATION",
+   "verifiedAt": null
+  },
+  {
+   "country": "NL",
+   "subdivision": null,
+   "service": "GENERAL",
+   "number": "112",
+   "label": {
+    "es": "Emergencias",
+    "en": "Emergency"
+   },
+   "source": "Pendiente de contrastar con fuente oficial del país",
+   "verification": "NEEDS_VERIFICATION",
+   "verifiedAt": null
+  },
+  {
+   "country": "BE",
+   "subdivision": null,
+   "service": "GENERAL",
+   "number": "112",
+   "label": {
+    "es": "Emergencias",
+    "en": "Emergency"
+   },
+   "source": "Pendiente de contrastar con fuente oficial del país",
+   "verification": "NEEDS_VERIFICATION",
+   "verifiedAt": null
+  },
+  {
+   "country": "IE",
+   "subdivision": null,
+   "service": "GENERAL",
+   "number": "112",
+   "label": {
+    "es": "Emergencias",
+    "en": "Emergency"
+   },
+   "source": "Pendiente de contrastar con fuente oficial del país",
+   "verification": "NEEDS_VERIFICATION",
+   "verifiedAt": null
+  },
+  {
+   "country": "AT",
+   "subdivision": null,
+   "service": "GENERAL",
+   "number": "112",
+   "label": {
+    "es": "Emergencias",
+    "en": "Emergency"
+   },
+   "source": "Pendiente de contrastar con fuente oficial del país",
+   "verification": "NEEDS_VERIFICATION",
+   "verifiedAt": null
+  },
+  {
+   "country": "SE",
+   "subdivision": null,
+   "service": "GENERAL",
+   "number": "112",
+   "label": {
+    "es": "Emergencias",
+    "en": "Emergency"
+   },
+   "source": "Pendiente de contrastar con fuente oficial del país",
+   "verification": "NEEDS_VERIFICATION",
+   "verifiedAt": null
+  },
+  {
+   "country": "FI",
+   "subdivision": null,
+   "service": "GENERAL",
+   "number": "112",
+   "label": {
+    "es": "Emergencias",
+    "en": "Emergency"
+   },
+   "source": "Pendiente de contrastar con fuente oficial del país",
+   "verification": "NEEDS_VERIFICATION",
+   "verifiedAt": null
+  },
+  {
+   "country": "DK",
+   "subdivision": null,
+   "service": "GENERAL",
+   "number": "112",
+   "label": {
+    "es": "Emergencias",
+    "en": "Emergency"
+   },
+   "source": "Pendiente de contrastar con fuente oficial del país",
+   "verification": "NEEDS_VERIFICATION",
+   "verifiedAt": null
+  },
+  {
+   "country": "PL",
+   "subdivision": null,
+   "service": "GENERAL",
+   "number": "112",
+   "label": {
+    "es": "Emergencias",
+    "en": "Emergency"
+   },
+   "source": "Pendiente de contrastar con fuente oficial del país",
+   "verification": "NEEDS_VERIFICATION",
+   "verifiedAt": null
+  },
+  {
+   "country": "GR",
+   "subdivision": null,
+   "service": "GENERAL",
+   "number": "112",
+   "label": {
+    "es": "Emergencias",
+    "en": "Emergency"
+   },
+   "source": "Pendiente de contrastar con fuente oficial del país",
+   "verification": "NEEDS_VERIFICATION",
+   "verifiedAt": null
+  },
+  {
+   "country": "CZ",
+   "subdivision": null,
+   "service": "GENERAL",
+   "number": "112",
+   "label": {
+    "es": "Emergencias",
+    "en": "Emergency"
+   },
+   "source": "Pendiente de contrastar con fuente oficial del país",
+   "verification": "NEEDS_VERIFICATION",
+   "verifiedAt": null
+  },
+  {
+   "country": "US",
+   "subdivision": null,
+   "service": "GENERAL",
+   "number": "911",
+   "label": {
+    "es": "Emergencias",
+    "en": "Emergency"
+   },
+   "source": "Pendiente de contrastar con fuente oficial del país",
+   "verification": "NEEDS_VERIFICATION",
+   "verifiedAt": null
+  },
+  {
+   "country": "CA",
+   "subdivision": null,
+   "service": "GENERAL",
+   "number": "911",
+   "label": {
+    "es": "Emergencias",
+    "en": "Emergency"
+   },
+   "source": "Pendiente de contrastar con fuente oficial del país",
+   "verification": "NEEDS_VERIFICATION",
+   "verifiedAt": null
+  },
+  {
+   "country": "MX",
+   "subdivision": null,
+   "service": "GENERAL",
+   "number": "911",
+   "label": {
+    "es": "Emergencias",
+    "en": "Emergency"
+   },
+   "source": "Pendiente de contrastar con fuente oficial del país",
+   "verification": "NEEDS_VERIFICATION",
+   "verifiedAt": null
+  },
+  {
+   "country": "GB",
+   "subdivision": null,
+   "service": "GENERAL",
+   "number": "999",
+   "label": {
+    "es": "Emergencias",
+    "en": "Emergency"
+   },
+   "source": "Pendiente de contrastar con fuente oficial del país",
+   "verification": "NEEDS_VERIFICATION",
+   "verifiedAt": null
+  },
+  {
+   "country": "GB",
+   "subdivision": null,
+   "service": "GENERAL",
+   "number": "112",
+   "label": {
+    "es": "Emergencias",
+    "en": "Emergency"
+   },
+   "source": "Pendiente de contrastar con fuente oficial del país",
+   "verification": "NEEDS_VERIFICATION",
+   "verifiedAt": null
+  },
+  {
+   "country": "AU",
+   "subdivision": null,
+   "service": "GENERAL",
+   "number": "000",
+   "label": {
+    "es": "Emergencias",
+    "en": "Emergency"
+   },
+   "source": "Pendiente de contrastar con fuente oficial del país",
+   "verification": "NEEDS_VERIFICATION",
+   "verifiedAt": null
+  },
+  {
+   "country": "NZ",
+   "subdivision": null,
+   "service": "GENERAL",
+   "number": "111",
+   "label": {
+    "es": "Emergencias",
+    "en": "Emergency"
+   },
+   "source": "Pendiente de contrastar con fuente oficial del país",
+   "verification": "NEEDS_VERIFICATION",
+   "verifiedAt": null
+  },
+  {
+   "country": "JP",
+   "subdivision": null,
+   "service": "POLICE",
+   "number": "110",
+   "label": {
+    "es": "Policía",
+    "en": "Police"
+   },
+   "source": "Pendiente de contrastar con fuente oficial del país",
+   "verification": "NEEDS_VERIFICATION",
+   "verifiedAt": null
+  },
+  {
+   "country": "JP",
+   "subdivision": null,
+   "service": "FIRE",
+   "number": "119",
+   "label": {
+    "es": "Bomberos y ambulancia",
+    "en": "Fire and ambulance"
+   },
+   "source": "Pendiente de contrastar con fuente oficial del país",
+   "verification": "NEEDS_VERIFICATION",
+   "verifiedAt": null
+  },
+  {
+   "country": "CL",
+   "subdivision": null,
+   "service": "AMBULANCE",
+   "number": "131",
+   "label": {
+    "es": "SAMU",
+    "en": "Ambulance"
+   },
+   "source": "Pendiente de contrastar con fuente oficial del país",
+   "verification": "NEEDS_VERIFICATION",
+   "verifiedAt": null
+  },
+  {
+   "country": "CL",
+   "subdivision": null,
+   "service": "FIRE",
+   "number": "132",
+   "label": {
+    "es": "Bomberos",
+    "en": "Fire"
+   },
+   "source": "Pendiente de contrastar con fuente oficial del país",
+   "verification": "NEEDS_VERIFICATION",
+   "verifiedAt": null
+  },
+  {
+   "country": "CL",
+   "subdivision": null,
+   "service": "POLICE",
+   "number": "133",
+   "label": {
+    "es": "Carabineros",
+    "en": "Police"
+   },
+   "source": "Pendiente de contrastar con fuente oficial del país",
+   "verification": "NEEDS_VERIFICATION",
+   "verifiedAt": null
+  },
+  {
+   "country": "CO",
+   "subdivision": null,
+   "service": "GENERAL",
+   "number": "123",
+   "label": {
+    "es": "Línea de emergencias",
+    "en": "Emergency line"
+   },
+   "source": "Pendiente de contrastar con fuente oficial del país",
+   "verification": "NEEDS_VERIFICATION",
+   "verifiedAt": null
+  },
+  {
+   "country": "AR",
+   "subdivision": null,
+   "service": "GENERAL",
+   "number": "911",
+   "label": {
+    "es": "Emergencias",
+    "en": "Emergency"
+   },
+   "source": "Pendiente de contrastar con fuente oficial del país",
+   "verification": "NEEDS_VERIFICATION",
+   "verifiedAt": null
+  },
+  {
+   "country": "AR",
+   "subdivision": null,
+   "service": "AMBULANCE",
+   "number": "107",
+   "label": {
+    "es": "SAME",
+    "en": "Ambulance"
+   },
+   "source": "Pendiente de contrastar con fuente oficial del país",
+   "verification": "NEEDS_VERIFICATION",
+   "verifiedAt": null
+  },
+  {
+   "country": "AR",
+   "subdivision": null,
+   "service": "FIRE",
+   "number": "100",
+   "label": {
+    "es": "Bomberos",
+    "en": "Fire"
+   },
+   "source": "Pendiente de contrastar con fuente oficial del país",
+   "verification": "NEEDS_VERIFICATION",
+   "verifiedAt": null
+  },
+  {
+   "country": "EC",
+   "subdivision": null,
+   "service": "GENERAL",
+   "number": "911",
+   "label": {
+    "es": "ECU 911",
+    "en": "ECU 911"
+   },
+   "source": "Pendiente de contrastar con fuente oficial del país",
+   "verification": "NEEDS_VERIFICATION",
+   "verifiedAt": null
+  },
+  {
+   "country": "BO",
+   "subdivision": null,
+   "service": "POLICE",
+   "number": "110",
+   "label": {
+    "es": "Policía",
+    "en": "Police"
+   },
+   "source": "Pendiente de contrastar con fuente oficial del país",
+   "verification": "NEEDS_VERIFICATION",
+   "verifiedAt": null
+  },
+  {
+   "country": "BO",
+   "subdivision": null,
+   "service": "FIRE",
+   "number": "119",
+   "label": {
+    "es": "Bomberos",
+    "en": "Fire"
+   },
+   "source": "Pendiente de contrastar con fuente oficial del país",
+   "verification": "NEEDS_VERIFICATION",
+   "verifiedAt": null
+  },
+  {
+   "country": "BO",
+   "subdivision": null,
+   "service": "AMBULANCE",
+   "number": "118",
+   "label": {
+    "es": "Ambulancia",
+    "en": "Ambulance"
+   },
+   "source": "Pendiente de contrastar con fuente oficial del país",
+   "verification": "NEEDS_VERIFICATION",
+   "verifiedAt": null
+  },
+  {
+   "country": "BR",
+   "subdivision": null,
+   "service": "POLICE",
+   "number": "190",
+   "label": {
+    "es": "Polícia Militar",
+    "en": "Military police"
+   },
+   "source": "Pendiente de contrastar con fuente oficial del país",
+   "verification": "NEEDS_VERIFICATION",
+   "verifiedAt": null
+  },
+  {
+   "country": "BR",
+   "subdivision": null,
+   "service": "AMBULANCE",
+   "number": "192",
+   "label": {
+    "es": "SAMU",
+    "en": "Ambulance"
+   },
+   "source": "Pendiente de contrastar con fuente oficial del país",
+   "verification": "NEEDS_VERIFICATION",
+   "verifiedAt": null
+  },
+  {
+   "country": "BR",
+   "subdivision": null,
+   "service": "FIRE",
+   "number": "193",
+   "label": {
+    "es": "Bombeiros",
+    "en": "Fire"
+   },
+   "source": "Pendiente de contrastar con fuente oficial del país",
+   "verification": "NEEDS_VERIFICATION",
+   "verifiedAt": null
+  }
+ ]
+}
