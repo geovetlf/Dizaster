@@ -119,7 +119,11 @@ export class MediaService {
     return rows.length;
   }
 
-  async createUpload(ownerProfileId: string, body: unknown): Promise<CreateUploadResponse> {
+  /**
+   * `dailyBytes` (ADR 0072): tope de bytes subidos en 24 h por la cuenta, ya ajustado por reputación. Cuenta lo
+   * pedido que no fue rechazado, incluida esta subida.
+   */
+  async createUpload(ownerProfileId: string, body: unknown, dailyBytes: number = Number.POSITIVE_INFINITY): Promise<CreateUploadResponse> {
     const parsed = CreateUploadRequest.safeParse(body);
     if (!parsed.success) throw new DomainError("INVALID_UPLOAD", parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; "));
     const req = parsed.data;
@@ -129,6 +133,16 @@ export class MediaService {
       [ownerProfileId],
     );
     if (Number(recent.rows[0]!.n) >= this.limits.uploadsPerHour) throw new DomainError("RATE_LIMITED", "Demasiadas subidas en la última hora", 429);
+    if (Number.isFinite(dailyBytes)) {
+      const day = await this.db.query<{ b: string }>(
+        `SELECT coalesce(sum(bytes + coalesce(poster_bytes, 0)), 0) AS b FROM media.media
+          WHERE owner_profile_id = $1 AND created_at > now() - interval '24 hours' AND state NOT IN ('REJECTED', 'DELETED')`,
+        [ownerProfileId],
+      );
+      if (Number(day.rows[0]!.b) + req.sizeBytes + (req.poster?.sizeBytes ?? 0) > dailyBytes) {
+        throw new DomainError("DAILY_UPLOAD_QUOTA", "Llegaste al máximo de datos subidos en 24 horas", 429);
+      }
+    }
 
     const id = newId();
     const now = this.clock.now();

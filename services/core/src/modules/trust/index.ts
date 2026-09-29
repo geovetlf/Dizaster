@@ -162,6 +162,11 @@ export class TrustService {
   }
 
   /** Reportes por hora permitidos a esta persona. */
+  /** Bytes que la cuenta puede subir en 24 h (ADR 0072): misma escala que el cupo de reportes. */
+  async uploadBytesQuota(q: Queryable, userId: string, baseMb: number): Promise<number> {
+    return reportQuota((await this.tiers(q, [userId])).get(userId) ?? "NEW", baseMb) * 1024 * 1024;
+  }
+
   async reportQuota(q: Queryable, userId: string, base: number): Promise<number> {
     return reportQuota((await this.tiers(q, [userId])).get(userId) ?? "NEW", base);
   }

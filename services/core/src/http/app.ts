@@ -612,7 +612,8 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
   // ───────────── Media (subida directa al almacenamiento) ─────────────
   app.post("/v1/media/uploads", async (req, reply) => {
     const session = requireSession(req);
-    return reply.status(201).send(await c.media.createUpload(session.profileId, req.body));
+    const dailyBytes = await c.trust.uploadBytesQuota(c.db, session.userId, c.env.MEDIA_DAILY_UPLOAD_MB);
+    return reply.status(201).send(await c.media.createUpload(session.profileId, req.body, dailyBytes));
   });
 
   app.post("/v1/media/:id/complete", async (req) => {

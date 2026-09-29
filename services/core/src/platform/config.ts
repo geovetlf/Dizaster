@@ -38,6 +38,8 @@ const Env = z.object({
   S3_FORCE_PATH_STYLE: z.enum(["true", "false"]).default("false").transform((v) => v === "true"),
   MEDIA_PUBLIC_BASE_URL: z.string().optional(),
   MEDIA_UPLOADS_PER_HOUR_LIMIT: z.coerce.number().int().positive().default(30),
+  /** MB subidos en 24 h por cuenta con reputación normal; nueva: la mitad; baja: un cuarto (ADR 0072). */
+  MEDIA_DAILY_UPLOAD_MB: z.coerce.number().int().min(60).default(300),
   MEDIA_UPLOAD_URL_TTL_SECONDS: z.coerce.number().int().min(60).max(3600).default(900),
   MEDIA_ORIGINAL_RETENTION_DAYS: z.coerce.number().int().positive().default(30),
   // Push directo (gratis). "log" no envía nada (desarrollo); "live" usa APNs y FCM con las credenciales de abajo.
