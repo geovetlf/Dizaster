@@ -410,21 +410,54 @@ export class EventService {
    */
   async detachEvidence(tx: Queryable, evidenceType: "CITIZEN_REPORT", refId: string): Promise<string | null> {
     const { rows } = await tx.query<{ id: string; event_id: string }>(
-      `UPDATE event.evidence SET status = 'DETACHED' WHERE evidence_type = $1 AND ref_id = $2 AND status = 'ACTIVE' RETURNING id, event_id`,
+      // También una evidencia que moderación había apartado: retirada, ya no vuelve con Restaurar (ADR 0143).
+      `UPDATE event.evidence SET status = 'DETACHED' WHERE evidence_type = $1 AND ref_id = $2 AND status IN ('ACTIVE','MODERATED') RETURNING id, event_id`,
       [evidenceType, refId],
     );
     const r = rows[0];
     if (!r) return null;
     await this.recomputeAggregates(tx, r.event_id, { observedAt: new Date(0).toISOString() });
     // Un evento que se queda sin ninguna evidencia deja de mostrarse (su único reporte se retiró).
-    await tx.query(
-      `UPDATE event.events SET publication_state = 'HIDDEN', updated_at = now()
-        WHERE id = $1 AND NOT EXISTS (SELECT 1 FROM event.evidence WHERE event_id = $1 AND status = 'ACTIVE')`,
-      [r.event_id],
-    );
+    await this.hideIfEmpty(tx, r.event_id);
     await this.addTimeline(tx, r.event_id, "REPORT_WITHDRAWN", {});
     await publish(tx, "EventEvidenceAdded", { eventId: r.event_id, evidenceId: r.id, evidenceType: "WITHDRAWN" });
     return r.event_id;
+  }
+
+  /**
+   * Moderación ocultó o retiró el post de un reporte (ADR 0143): su evidencia pasa a MODERATED y deja de contar; con
+   * Restaurar vuelve a ACTIVE. Se recalculan agregados y la verificación se reevalúa como con cualquier cambio de
+   * evidencia. Un evento que se queda sin evidencia se oculta y recupera su estado de publicación si vuelve.
+   */
+  async moderateEvidence(tx: Queryable, evidenceType: "CITIZEN_REPORT", refId: string, hidden: boolean): Promise<string | null> {
+    const { rows } = await tx.query<{ id: string; event_id: string }>(
+      `UPDATE event.evidence SET status = $3 WHERE evidence_type = $1 AND ref_id = $2 AND status = $4 RETURNING id, event_id`,
+      [evidenceType, refId, hidden ? "MODERATED" : "ACTIVE", hidden ? "ACTIVE" : "MODERATED"],
+    );
+    const r = rows[0];
+    if (!r) return null;
+    await this.recomputeAggregates(tx, r.event_id, { observedAt: new Date(0).toISOString() });
+    if (hidden) {
+      await this.hideIfEmpty(tx, r.event_id);
+    } else {
+      const back = await tx.query<{ publication_state: string }>(
+        `UPDATE event.events SET publication_state = hidden_from, hidden_from = NULL, updated_at = now()
+          WHERE id = $1 AND publication_state = 'HIDDEN' AND hidden_from IS NOT NULL RETURNING publication_state`,
+        [r.event_id],
+      );
+      if (back.rows[0]?.publication_state === "PUBLISHED") await publish(tx, "EventPublished", { eventId: r.event_id });
+    }
+    await this.addTimeline(tx, r.event_id, hidden ? "REPORT_MODERATED" : "REPORT_RESTORED", {});
+    await publish(tx, "EventEvidenceAdded", { eventId: r.event_id, evidenceId: r.id, evidenceType: hidden ? "MODERATED" : "RESTORED" });
+    return r.event_id;
+  }
+
+  private async hideIfEmpty(tx: Queryable, eventId: string): Promise<void> {
+    await tx.query(
+      `UPDATE event.events SET hidden_from = publication_state, publication_state = 'HIDDEN', updated_at = now()
+        WHERE id = $1 AND publication_state <> 'HIDDEN' AND NOT EXISTS (SELECT 1 FROM event.evidence WHERE event_id = $1 AND status = 'ACTIVE')`,
+      [eventId],
+    );
   }
 
   /**

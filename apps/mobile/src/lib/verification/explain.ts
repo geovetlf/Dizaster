@@ -71,6 +71,9 @@ const TIMELINE_KEY: Partial<Record<TimelineEntryType, MessageKey>> = {
   MEDIA_ADDED: "tl_MEDIA_ADDED",
   MERGED: "tl_MERGED",
   SPLIT: "tl_SPLIT",
+  REPORT_WITHDRAWN: "tl_REPORT_WITHDRAWN",
+  REPORT_MODERATED: "tl_REPORT_MODERATED",
+  REPORT_RESTORED: "tl_REPORT_RESTORED",
 };
 
 /** Texto de una entrada de la cronología; un tipo nuevo que la app aún no conoce se muestra tal cual. */

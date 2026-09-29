@@ -235,6 +235,14 @@ export class ReportService {
   registerHandlers(dispatcher: OutboxDispatcher): void {
     // Media rechazada al procesarse (ADR 0121): si sostenía la bonificación "capturada en la app", se retira.
     dispatcher.on("MediaRejected", "report.media-rejected", async (e, tx) => { await this.reviseForRejectedMedia(tx, e.payload.mediaId); });
+    // Moderación sobre el post de un reporte (ADR 0143): ocultar o retirar deja de contarlo; restaurar lo devuelve.
+    dispatcher.on("ModerationActionTaken", "report.follow-moderation", async (e, tx) => {
+      const p = e.payload;
+      if (p.targetType !== "POST" || !["HIDE", "REMOVE", "RESTORE"].includes(p.action)) return;
+      const r = (await tx.query<{ id: string; status: string }>(`SELECT id, status FROM report.reports WHERE post_id = $1`, [p.targetId])).rows[0];
+      if (!r || r.status === "WITHDRAWN") return;
+      await this.d.events.moderateEvidence(tx, "CITIZEN_REPORT", r.id, p.action !== "RESTORE");
+    });
     dispatcher.on("AccountDeleted", "report.generalize-account", async (e, tx) => {
       await tx.query(
         `UPDATE report.presence_evidence SET device_fix = NULL, device_fix_enc = NULL, generalized_at = COALESCE(generalized_at, now())

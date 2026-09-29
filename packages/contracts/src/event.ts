@@ -30,6 +30,9 @@ export const TimelineEntryType = z.enum([
   "MERGED",
   "SPLIT",
   "REPORT_WITHDRAWN",
+  /** Moderación ocultó o retiró un reporte: deja de contar (ADR 0143). Restaurar lo devuelve. */
+  "REPORT_MODERATED",
+  "REPORT_RESTORED",
   "LIVE_STARTED",
   "LIVE_ENDED",
 ]);
