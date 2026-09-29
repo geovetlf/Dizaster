@@ -50,6 +50,17 @@ export const capAdapter: FeedAdapter = {
     return items;
   },
 
+  withdrawals(body) {
+    const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: "@", removeNSPrefix: true, parseTagValue: false, trimValues: true });
+    const out: string[] = [];
+    for (const alert of findAlerts(parser.parse(body) as Node)) {
+      if (text(alert["status"]) !== "Actual" || text(alert["msgType"]) !== "Cancel") continue;
+      const original = firstReference(text(alert["references"]));
+      if (original) out.push(original);
+    }
+    return out;
+  },
+
   isUrgent(item, rawConfig) {
     const min = SEVERITY[(rawConfig as CapConfig).urgentMinSeverity ?? "Severe"];
     return (item.severity ?? 0) >= min && URGENT_URGENCY.has(String(item.raw["urgency"] ?? ""));
@@ -120,6 +131,7 @@ function normalizeAlert(alert: Node, config: CapConfig): NormalizedItem | null {
     publishedAt: sent.toISOString(),
     title: Object.keys(title).length > 0 ? title : null,
     link: text(info["web"]) ?? null,
+    endsAt: parseDate(info["expires"])?.toISOString() ?? null,
     severity: SEVERITY[severity] ?? 2,
     assertion: "OCCURRING",
     raw: {

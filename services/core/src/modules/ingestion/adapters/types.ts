@@ -9,6 +9,8 @@ export interface FeedAdapter {
   parse(body: string, config: Record<string, unknown>): NormalizedItem[];
   /** ¿Justifica el carril URGENT? (p. ej. sismo ≥ 4,5 o alerta naranja/roja). */
   isUrgent(item: NormalizedItem, config: Record<string, unknown>): boolean;
+  /** Ids externos que la fuente retiró en este documento (p. ej. CAP `Cancel`). No son desmentidos. */
+  withdrawals?(body: string, config: Record<string, unknown>): string[];
 }
 
 export const num = (v: unknown, fallback: number): number => (typeof v === "number" && Number.isFinite(v) ? v : fallback);

@@ -22,6 +22,8 @@ export interface NormalizedItem {
   title: LocalizedText | null;
   /** Enlace público al ítem original, si la fuente lo da (se muestra en la ficha del evento). */
   link?: string | null;
+  /** Hasta cuándo vale la alerta según la fuente (CAP `expires`). Pasado eso, deja de sostener el evento. */
+  endsAt?: string | null;
   severity: number | null;
   /** NOT_OCCURRING = la fuente niega/desmiente el acontecimiento. */
   assertion: "OCCURRING" | "NOT_OCCURRING";
@@ -103,14 +105,14 @@ export class IngestionService {
 
       const itemId = existing?.id ?? newId();
       if (existing) {
-        await tx.query(`UPDATE ingestion.external_items SET content_hash = $2, normalized = $3, lane = $4, fetched_at = now() WHERE id = $1`, [
-          itemId, hash, JSON.stringify(item), lane,
+        await tx.query(`UPDATE ingestion.external_items SET content_hash = $2, normalized = $3, lane = $4, fetched_at = now(), ends_at = $5 WHERE id = $1`, [
+          itemId, hash, JSON.stringify(item), lane, item.endsAt ?? null,
         ]);
       } else {
         await tx.query(
-          `INSERT INTO ingestion.external_items (id, source_id, external_id, content_hash, lane, assertion, published_at, normalized, status)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'NEW')`,
-          [itemId, source.id, item.externalId, hash, lane, item.assertion, item.publishedAt, JSON.stringify(item)],
+          `INSERT INTO ingestion.external_items (id, source_id, external_id, content_hash, lane, assertion, published_at, normalized, status, ends_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'NEW', $9)`,
+          [itemId, source.id, item.externalId, hash, lane, item.assertion, item.publishedAt, JSON.stringify(item), item.endsAt ?? null],
         );
       }
       await publish(tx, "ExternalItemIngested", { externalItemId: itemId, sourceId: source.id, lane }, { lane: lane === "URGENT" ? "urgent" : "batch" });
@@ -155,6 +157,32 @@ export class IngestionService {
       [itemIds],
     );
     return new Map(rows.map((r) => [r.id, { trustTier: r.trust_tier, assertion: r.assertion }]));
+  }
+
+  /** La fuente retiró una alerta (CAP Cancel, ADR 0059). Idempotente; un id desconocido se ignora. */
+  async withdraw(sourceKey: string, externalId: string, at: Date): Promise<boolean> {
+    const { rowCount } = await this.db.query(
+      `UPDATE ingestion.external_items i SET withdrawn_at = $3
+         FROM ingestion.sources s
+        WHERE s.id = i.source_id AND s.key = $1 AND i.external_id = $2 AND i.withdrawn_at IS NULL`,
+      [sourceKey, externalId, at],
+    );
+    return (rowCount ?? 0) > 0;
+  }
+
+  /**
+   * Ítems vinculados a un evento cuya vigencia terminó (retirados o expirados) en la ventana dada, con el motivo.
+   * Solo los recientes: un evento viejo ya lo cerró el ciclo por inactividad.
+   */
+  async endedItems(q: Queryable, now: Date, windowDays = 7): Promise<{ id: string; reason: "WITHDRAWN" | "EXPIRED" }[]> {
+    const { rows } = await q.query<{ id: string; reason: "WITHDRAWN" | "EXPIRED" }>(
+      `SELECT id, CASE WHEN withdrawn_at IS NOT NULL THEN 'WITHDRAWN' ELSE 'EXPIRED' END AS reason
+         FROM ingestion.external_items
+        WHERE event_id IS NOT NULL AND coalesce(withdrawn_at, ends_at) <= $1
+          AND coalesce(withdrawn_at, ends_at) > $1::timestamptz - make_interval(days => $2)`,
+      [now, windowDays],
+    );
+    return rows;
   }
 
   /**

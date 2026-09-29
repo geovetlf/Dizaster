@@ -743,6 +743,32 @@ export class EventService {
     await publish(tx, "EventLifecycleChanged", { eventId, to }, { lane: "normal" });
   }
 
+  /**
+   * Fin oficial (ADR 0059): un evento cuya evidencia activa es SOLO de fuentes y todas terminaron (retiradas o
+   * expiradas) pasa a RESOLVED. Si hay un reporte ciudadano o una fuente vigente, no se toca: sigue el ciclo por
+   * inactividad. `ended` lo da ingestion (ids de ítems externos con su motivo).
+   */
+  async applySourceEnd(q: Queryable, ended: { id: string; reason: "WITHDRAWN" | "EXPIRED" }[]): Promise<number> {
+    if (ended.length === 0) return 0;
+    const reasonById = new Map(ended.map((e) => [e.id, e.reason]));
+    const { rows } = await q.query<{ id: string; status: EventStatus; refs: string[] }>(
+      `SELECT e.id, e.status, array_agg(ev.ref_id::text) AS refs
+         FROM event.events e JOIN event.evidence ev ON ev.event_id = e.id AND ev.status = 'ACTIVE'
+        WHERE e.status IN ('ACTIVE','MONITORING') AND e.merged_into_id IS NULL
+          AND e.id IN (SELECT event_id FROM event.evidence WHERE ref_id::text = ANY($1) AND status = 'ACTIVE')
+        GROUP BY e.id, e.status
+       HAVING bool_and(ev.ref_id::text = ANY($1))`,
+      [[...reasonById.keys()]],
+    );
+    for (const r of rows) {
+      const withdrawn = r.refs.some((ref) => reasonById.get(ref) === "WITHDRAWN");
+      await q.query(`UPDATE event.events SET status = 'RESOLVED', updated_at = now() WHERE id = $1`, [r.id]);
+      await this.addTimeline(q, r.id, "STATUS_CHANGED", { from: r.status, to: "RESOLVED", cause: withdrawn ? "SOURCE_WITHDRAWN" : "SOURCE_EXPIRED" });
+      await publish(q, "EventLifecycleChanged", { eventId: r.id, to: "RESOLVED" }, { lane: "normal" });
+    }
+    return rows.length;
+  }
+
   // ───────────── Interfaz para el Verification Engine ─────────────
 
   async evidenceForVerification(q: Queryable, eventId: string): Promise<{ categoryCode: string; countryCode: string | null; evidence: EvidenceForVerification[] }> {

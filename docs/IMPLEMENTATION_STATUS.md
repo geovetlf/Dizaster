@@ -218,6 +218,7 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | Motivo práctico cuando un reporte baja a publicación o se rechaza (§8.2) | ✅ | ADR 0056, `lib/report/outcome.ts` |
 | Filtros del mapa y estilo por verificación (§11.4) | ✅ | ADR 0057 |
 | Aviso a administración cuando una fuente urgente cae o vuelve (§9.2) | ✅ | ADR 0058 |
+| Cancelación/expiración de la fuente cierran eventos solo de fuentes (§5.7) | ✅ | ADR 0059 |
 | Varios administradores por negocio | ⏳ | cuando haya demanda (`BusinessMember`) |
 
 ## Etapa 18 — Sesiones y dispositivos (hecha)
@@ -262,18 +263,24 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 
 ## Siguiente etapa (en orden)
 
+Decisiones del propietario del 2026-09-29 (mensaje "Zero/minimum AI cost architecture"), primero:
+
+A. PTWC como fuente OFICIAL solo para tsunami (D-PTWC).
+B. RESOLVED → ARCHIVED a los 7 días, configurable; fuera del mapa, accesible por enlace (D-ARCHIVE).
+C. "Llamar" marca directo el número de la categoría según el registro de servicios de emergencia (D-EMERGENCY-CALL).
+D. Push por mención con horas de silencio, preferencias, bloqueos y anti-spam (D-MENTION).
+E. Auditoría de IA y APIs externas; AI CORE único, opcional y desacoplado; interfaces de conectores (traducción, SMS,
+   voz, video en vivo); modo desarrollo costo cero; tabla AI_REQUIRED/COSTO por función.
+
 Revisión del Blueprint del 2026-09-29 (tras ADR 0054), verificada contra el código:
 
-1. Ciclo de vida oficial: CAP Cancel/expiración cierran eventos solo oficiales (§5.7, §10.1).
-2. Búsqueda de eventos (RF-02, §5.3).
-3. Lectura sin conexión: últimos avisos y eventos cercanos en SQLite (§12.2).
-4. Adaptador FIRMS (VIIRS CSV → candidatos de incendio); activarlo espera la MAP_KEY (§9.3).
-5. Reputación por dispositivo: varias cuentas en un teléfono cuentan como una (§5.20, §13.3).
-6. Idioma de la app elegible en el perfil (§5.2).
-7. Cadena de suministro y respaldos: Dependabot, audit, SBOM, licencias; `pg_dump` con prueba de restauración (§13.1).
+1. Búsqueda de eventos (RF-02, §5.3).
+2. Lectura sin conexión: últimos avisos y eventos cercanos en SQLite (§12.2).
+3. Adaptador FIRMS (VIIRS CSV → candidatos de incendio); activarlo espera la MAP_KEY (§9.3).
+4. Reputación por dispositivo: varias cuentas en un teléfono cuentan como una (§5.20, §13.3).
+5. Idioma de la app elegible en el perfil (§5.2).
+6. Cadena de suministro y respaldos: Dependabot, audit, SBOM, licencias; `pg_dump` con prueba de restauración (§13.1).
 
-Requieren decisión del propietario: PTWC (tsunami) como fuente OFICIAL o EXTERNAL; días hasta archivar un evento
-RESUELTO y si sigue en el mapa; si el botón "Llamar" marca directo el número de la categoría; push por mención.
 
 Bloqueadas o en espera:
 

@@ -33,6 +33,8 @@ async function loop() {
     if (Date.now() - lastHourly > 3600_000) {
       lastHourly = Date.now();
       console.log(JSON.stringify({ msg: "events.lifecycle", ...(await c.events.applyLifecycle(c.db, c.clock.now())) }));
+      const ended = await c.events.applySourceEnd(c.db, await c.ingestion.endedItems(c.db, c.clock.now()));
+      console.log(JSON.stringify({ msg: "events.source-end", resolved: ended }));
     }
     if (Date.now() - lastMeterFlush > 60_000) {
       lastMeterFlush = Date.now();

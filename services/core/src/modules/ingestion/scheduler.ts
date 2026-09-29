@@ -138,6 +138,7 @@ export class IngestionScheduler {
           if (!r.duplicate) summary.itemsNew++;
           if (urgent) summary.itemsUrgent++;
         }
+        for (const id of adapter.withdrawals?.(res.body, s.config) ?? []) await this.ingestion.withdraw(s.key, id, now);
       } else {
         httpStatus = res.status;
         throw new Error(`HTTP ${res.status}`);
