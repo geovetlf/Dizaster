@@ -297,9 +297,7 @@ E. ✅ Auditoría de IA y APIs externas (ninguna en uso); AI CORE único, opcion
 Revisión del Blueprint del 2026-09-29 (tras ADR 0054): completada con ADR 0055–0070. Lo que sigue depende de
 decisiones o credenciales del propietario (lista de abajo); mientras tanto se continúa con mejoras sin bloqueo.
 
-Revisión del Blueprint del 2026-09-29 (tras ADR 0070), verificada contra el código, sin bloqueos:
-
-
+Revisión del Blueprint del 2026-09-29 (tras ADR 0070): completada con ADR 0071–0080.
 
 Bloqueadas o en espera:
 
@@ -309,6 +307,7 @@ Bloqueadas o en espera:
   teléfono (ML Kit), pero sin `EXPO_TOKEN` no se puede probar un módulo nativo nuevo en una development build.
 - **BLOQUEADA** — Publicar el mapa propio: `infra/maps/publish.sh --apply` cuando haya bucket; después validar en un
   teléfono la descarga offline con `pmtiles://` (ADR 0041).
+- **En espera de acción humana** — Activar EMSC (ADR 0080): confirmar que sus términos permiten el uso en la app.
 - **En espera de acción humana** — Fuentes IGP, INDECI y SENAMHI (confirmar formato/URL y términos; si publican CAP,
   activar es solo configuración, ADR 0033).
 - **Requiere al propietario** — Capa de IA (proveedor y presupuesto), enlaces de donación verificados (D-15), textos
