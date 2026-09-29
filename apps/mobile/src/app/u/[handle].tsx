@@ -5,7 +5,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { FeedList } from "../../components/feed-list";
 import { api } from "../../lib/api";
 import { t } from "../../lib/i18n";
-import { initials } from "../../lib/ui/format";
+import { Avatar } from "../../components/avatar";
 import { confirmBlock, openFlag } from "../../lib/moderation/menu";
 import { colors, radius, space } from "../../theme";
 
@@ -44,7 +44,7 @@ export default function PublicProfileScreen() {
     () =>
       profile ? (
         <View style={styles.head}>
-          <View style={styles.avatar}><Text style={styles.avatarText}>{initials(profile.displayName)}</Text></View>
+          <Avatar name={profile.displayName} url={profile.avatarUrl} size={72} />
           <Text style={styles.name}>{profile.displayName}</Text>
           <Text style={styles.handle}>@{profile.handle}</Text>
           {profile.bio ? <Text style={styles.bio}>{profile.bio}</Text> : null}
@@ -101,8 +101,6 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   error: { color: colors.textMuted, padding: space.lg, backgroundColor: colors.bg, flex: 1 },
   head: { alignItems: "center", paddingVertical: space.lg, gap: space.xs },
-  avatar: { width: 72, height: 72, borderRadius: 36, backgroundColor: colors.surfaceAlt, alignItems: "center", justifyContent: "center" },
-  avatarText: { color: colors.text, fontSize: 24, fontWeight: "700" },
   name: { color: colors.text, fontSize: 20, fontWeight: "800", marginTop: space.sm },
   handle: { color: colors.textMuted },
   stats: { flexDirection: "row", gap: space.xl, marginVertical: space.md },

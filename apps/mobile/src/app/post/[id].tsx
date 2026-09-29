@@ -3,6 +3,7 @@ import { useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import { Alert, FlatList, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { categoryName } from "../../components/feed-list";
+import { Avatar } from "../../components/avatar";
 import { Icon } from "../../components/icon";
 import { PostCard } from "../../components/post-card";
 import { api } from "../../lib/api";
@@ -105,7 +106,10 @@ export default function PostCommentsScreen() {
               )}
               style={[styles.comment, reply && styles.reply]}
             >
-              <Text style={styles.author}>{item.author.displayName} <Text style={styles.time}>· {timeAgo(item.createdAt, lang)}</Text></Text>
+              <View style={styles.authorRow}>
+                <Avatar name={item.author.displayName} url={item.author.avatarUrl} size={24} />
+                <Text style={styles.author}>{item.author.displayName} <Text style={styles.time}>· {timeAgo(item.createdAt, lang)}</Text></Text>
+              </View>
               <Text style={styles.text}>{item.text}</Text>
               <View style={styles.actions}>
                 <Pressable accessibilityRole="button" accessibilityState={{ selected: liked }} hitSlop={8} onPress={() => void toggleLike(item)} style={styles.action}>
@@ -145,7 +149,8 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   list: { padding: space.lg },
   comment: { backgroundColor: colors.surface, borderRadius: radius.md, padding: space.md, marginBottom: space.sm },
-  author: { color: colors.text, fontWeight: "700" },
+  authorRow: { flexDirection: "row", alignItems: "center", gap: space.sm },
+  author: { color: colors.text, fontWeight: "700", flexShrink: 1 },
   time: { color: colors.textMuted, fontWeight: "400" },
   text: { color: colors.text, marginTop: 4 },
   reply: { marginStart: space.xl },

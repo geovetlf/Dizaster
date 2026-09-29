@@ -25,6 +25,8 @@ export const ModerationActionType = z.enum([
   "HIDE", "REMOVE", "RESTORE", "LIMIT", "WARN_USER", "SUSPEND_USER", "UNSUSPEND_USER", "MARK_DISPUTED", "DISMISS",
   // Media de un post (ADR 0035): aprobar la que espera revisión (categorías sensibles) y marcarla como impactante.
   "APPROVE_MEDIA", "MARK_GRAPHIC",
+  // Quitar la foto de un perfil o el logo de un negocio (ADR 0119) sin tocar la cuenta ni sus posts.
+  "REMOVE_AVATAR",
 ]);
 export type ModerationActionType = z.infer<typeof ModerationActionType>;
 

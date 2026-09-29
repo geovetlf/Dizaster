@@ -2,6 +2,7 @@ import { BUSINESS_CATEGORIES, CreateBusinessRequest, UpdateBusinessRequest, type
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { AvatarPicker } from "../components/avatar-picker";
 import { api } from "../lib/api";
 import { lang, t, type MessageKey } from "../lib/i18n";
 import { BUSINESS_CATEGORY_LABEL } from "../lib/social/business";
@@ -11,16 +12,17 @@ import { colors, radius, space } from "../theme";
 export default function BusinessEditScreen() {
   const { handle } = useLocalSearchParams<{ handle?: string }>();
   const editing = !!handle;
+  const [logoUrl, setLogoUrl] = useState<string | null | undefined>(undefined);
   const [f, setF] = useState({ handle: "", name: "", category: "other" as BusinessCategory, description: "", addressPublic: "", contactPhone: "", contactUrl: "" });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!handle) return;
-    api.business(handle).then((b) => setF({
+    api.business(handle).then((b) => { setLogoUrl(b.logoUrl); setF({
       handle: b.handle, name: b.name, category: b.category, description: b.description ?? "", addressPublic: b.addressPublic ?? "",
       contactPhone: b.contactPhone ?? "", contactUrl: b.contactUrl ?? "",
-    })).catch((e: Error) => setError(e.message));
+    }); }).catch((e: Error) => setError(e.message));
   }, [handle]);
 
   const body = {
@@ -70,6 +72,10 @@ export default function BusinessEditScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      {/* El logo se pone una vez creado el negocio (ADR 0119). */}
+      {editing && logoUrl !== undefined ? (
+        <AvatarPicker name={f.name} url={logoUrl} square apply={async (id) => (await api.setBusinessLogo(handle!, id)).logoUrl} />
+      ) : null}
       {editing ? <Text style={styles.label}>@{f.handle}</Text> : field("handle", "businessHandle", { max: 30 })}
       {field("name", "businessName", { max: 80 })}
       <Text style={styles.label}>{t("businessCategory")}</Text>

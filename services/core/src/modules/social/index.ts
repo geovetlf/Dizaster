@@ -161,7 +161,7 @@ export class SocialService {
   async anonymizeProfile(q: Queryable, profileId: string): Promise<void> {
     await q.query(
       `UPDATE social.profiles SET handle = 'borrado_' || replace(id::text, '-', ''), display_name = '', bio = NULL, home_country = NULL,
-              deleted_at = COALESCE(deleted_at, now()), updated_at = now()
+              avatar_media_id = NULL, avatar_url = NULL, deleted_at = COALESCE(deleted_at, now()), updated_at = now()
         WHERE id = $1`,
       [profileId],
     );
@@ -183,7 +183,7 @@ export class SocialService {
   async deleteBusinessesOf(q: Queryable, userId: string): Promise<void> {
     const { rows } = await q.query<{ id: string }>(
       `UPDATE social.business_profiles SET deleted_at = coalesce(deleted_at, now()), description = NULL, address_public = NULL,
-              contact_phone = NULL, contact_url = NULL, updated_at = now()
+              contact_phone = NULL, contact_url = NULL, logo_media_id = NULL, logo_url = NULL, updated_at = now()
         WHERE owner_user_id = $1 RETURNING id`,
       [userId],
     );
@@ -274,6 +274,12 @@ export class SocialService {
     const mediaIds = media.map((m) => m.id);
     const taken = await tx.query(`SELECT 1 FROM social.post_media WHERE media_id = ANY($1) LIMIT 1`, [mediaIds]);
     if (taken.rowCount) throw new DomainError("MEDIA_ALREADY_ATTACHED", "La media ya está adjunta a otra publicación", 409);
+    // Una foto de perfil o un logo (ADR 0119) tiene su propio ciclo de vida: borrar el post no debe llevársela.
+    const avatar = await tx.query(
+      `SELECT 1 FROM social.profiles WHERE avatar_media_id = ANY($1) UNION ALL SELECT 1 FROM social.business_profiles WHERE logo_media_id = ANY($1)`,
+      [mediaIds],
+    );
+    if (avatar.rowCount) throw new DomainError("MEDIA_IN_USE", "Esa imagen es una foto de perfil o un logo", 409);
     await tx.query(
       `INSERT INTO social.post_media (post_id, media_id, kind, position)
        SELECT $1, m, k, i - 1 FROM unnest($2::uuid[], $3::text[]) WITH ORDINALITY AS t(m, k, i)`,
@@ -385,10 +391,12 @@ export class SocialService {
       created_at: Date; category_code: string | null; event_id: string | null; distance_m: number | null; score: number;
       media: { id: string; kind: "IMAGE" | "VIDEO_RECORDED" }[] | null; reactions: ReactionCounts | null; my_reactions: ReactionKind[]; comment_count: number; shared_post_id: string | null; share_count: number;
       mentions: string[]; business_mentions: string[]; mine: boolean | null; business_verification: "UNVERIFIED" | "VERIFIED" | "INSTITUTIONAL_OFFICIAL" | null;
+      avatar_url: string | null;
     }>(
       `WITH x AS (
          SELECT p.id, p.author_id, p.author_type, p.kind, p.author_visibility, coalesce(pr.handle, bp.handle) AS handle,
-                coalesce(pr.display_name, bp.name) AS display_name, bp.verification_status AS business_verification, p.text, p.lang, p.created_at, p.category_code, le.event_id,
+                coalesce(pr.display_name, bp.name) AS display_name, bp.verification_status AS business_verification,
+                coalesce(pr.avatar_url, bp.logo_url) AS avatar_url, p.text, p.lang, p.created_at, p.category_code, le.event_id,
                 p.shared_post_id, p.comment_count, p.share_count, p.reaction_counts,
                 ${nearSql ? `ST_Distance(p.public_point, ${nearSql})` : "NULL"}::float8 AS distance_m,
                 (${score})::float8 AS score
@@ -423,7 +431,7 @@ export class SocialService {
       kind: r.kind,
       author: r.author_visibility === "PSEUDONYMOUS"
         ? { pseudonymous: true }
-        : { pseudonymous: false, handle: r.handle, displayName: r.display_name, ...(r.business_verification ? { business: { verification: r.business_verification } } : {}) },
+        : { pseudonymous: false, handle: r.handle, displayName: r.display_name, avatarUrl: r.avatar_url, ...(r.business_verification ? { business: { verification: r.business_verification } } : {}) },
       text: r.text,
       lang: r.lang,
       createdAt: r.created_at,
@@ -628,9 +636,9 @@ export class SocialService {
   /** Perfil público: los contadores solo incluyen posts con autoría pública. */
   async profile(q: Queryable, handle: string, viewerProfileId: string | null): Promise<ProfileView & { id: string }> {
     const { rows } = await q.query<{
-      id: string; handle: string; display_name: string; bio: string | null; created_at: Date; followers: number; following: number; posts: number; followed: boolean; blocked: boolean;
+      id: string; handle: string; display_name: string; bio: string | null; avatar_url: string | null; created_at: Date; followers: number; following: number; posts: number; followed: boolean; blocked: boolean;
     }>(
-      `SELECT pr.id, pr.handle, pr.display_name, pr.bio, pr.created_at,
+      `SELECT pr.id, pr.handle, pr.display_name, pr.bio, pr.avatar_url, pr.created_at,
               (SELECT count(*) FROM social.follows f WHERE f.target_type = 'PROFILE' AND f.target_id = pr.id::text)::int AS followers,
               (SELECT count(*) FROM social.follows f WHERE f.follower_profile_id = pr.id AND f.target_type = 'PROFILE')::int AS following,
               (SELECT count(*) FROM social.posts p WHERE p.author_type = 'PROFILE' AND p.author_id = pr.id AND p.author_visibility = 'PUBLIC' AND p.visibility = 'PUBLIC'
@@ -643,9 +651,43 @@ export class SocialService {
     const r = rows[0];
     if (!r) throw notFound("Perfil");
     return {
-      id: r.id, handle: r.handle, displayName: r.display_name, bio: r.bio, createdAt: r.created_at.toISOString(),
+      id: r.id, handle: r.handle, displayName: r.display_name, bio: r.bio, avatarUrl: r.avatar_url, createdAt: r.created_at.toISOString(),
       followerCount: r.followers, followingCount: r.following, postCount: r.posts, followedByMe: r.followed, blockedByMe: r.blocked, isMe: r.id === viewerProfileId,
     };
+  }
+
+  // ───────────── Foto de perfil y logo (ADR 0119) ─────────────
+
+  /** Cambia (o quita, con null) la foto de un perfil. Devuelve la media anterior para que se pueda purgar. */
+  async setAvatar(q: Queryable, profileId: string, image: { mediaId: string; url: string } | null): Promise<string | null> {
+    const { rows } = await q.query<{ prev: string | null }>(
+      `UPDATE social.profiles pr SET avatar_media_id = $2, avatar_url = $3, updated_at = now()
+         FROM (SELECT id, avatar_media_id AS prev FROM social.profiles WHERE id = $1 FOR UPDATE) o
+        WHERE pr.id = o.id AND pr.deleted_at IS NULL RETURNING o.prev`,
+      [profileId, image?.mediaId ?? null, image?.url ?? null],
+    );
+    if (!rows[0]) throw notFound("Perfil");
+    return rows[0].prev === image?.mediaId ? null : rows[0].prev;
+  }
+
+  /** Igual para el logo de un negocio (ya comprobado que quien llama lo administra). */
+  async setBusinessLogo(q: Queryable, businessId: string, image: { mediaId: string; url: string } | null): Promise<string | null> {
+    const { rows } = await q.query<{ prev: string | null }>(
+      `UPDATE social.business_profiles b SET logo_media_id = $2, logo_url = $3, updated_at = now()
+         FROM (SELECT id, logo_media_id AS prev FROM social.business_profiles WHERE id = $1 FOR UPDATE) o
+        WHERE b.id = o.id AND b.deleted_at IS NULL RETURNING o.prev`,
+      [businessId, image?.mediaId ?? null, image?.url ?? null],
+    );
+    if (!rows[0]) throw notFound("Negocio");
+    return rows[0].prev === image?.mediaId ? null : rows[0].prev;
+  }
+
+  /** Media que ya es foto de perfil o logo de alguien (no se adjunta a posts ni se purga al cambiarla dos veces). */
+  async isAvatarMedia(q: Queryable, mediaId: string): Promise<boolean> {
+    const { rowCount } = await q.query(
+      `SELECT 1 FROM social.profiles WHERE avatar_media_id = $1 UNION ALL SELECT 1 FROM social.business_profiles WHERE logo_media_id = $1`, [mediaId],
+    );
+    return (rowCount ?? 0) > 0;
   }
 
   /** Ajustes propios del perfil (no públicos). */
@@ -671,8 +713,8 @@ export class SocialService {
   /** Busca personas por handle o nombre (prefijo de palabra). Primero coincidencias exactas y cuentas más seguidas. */
   async searchProfiles(q: Queryable, text: string, viewerProfileId: string | null, limit: number): Promise<ProfileSearchResult[]> {
     const key = text.toLowerCase().replace(/^@/, "").replace(/[\\%_]/g, "\\$&");
-    const { rows } = await q.query<{ handle: string; display_name: string; followers: number; followed: boolean }>(
-      `SELECT pr.handle, pr.display_name,
+    const { rows } = await q.query<{ handle: string; display_name: string; avatar_url: string | null; followers: number; followed: boolean }>(
+      `SELECT pr.handle, pr.display_name, pr.avatar_url,
               (SELECT count(*) FROM social.follows f WHERE f.target_type = 'PROFILE' AND f.target_id = pr.id::text)::int AS followers,
               EXISTS (SELECT 1 FROM social.follows f WHERE f.follower_profile_id = $2 AND f.target_type = 'PROFILE' AND f.target_id = pr.id::text) AS followed
          FROM social.profiles pr
@@ -682,7 +724,7 @@ export class SocialService {
         LIMIT $3`,
       [key, viewerProfileId, limit],
     );
-    return rows.map((r) => ({ handle: r.handle, displayName: r.display_name, followerCount: r.followers, followedByMe: r.followed }));
+    return rows.map((r) => ({ handle: r.handle, displayName: r.display_name, avatarUrl: r.avatar_url, followerCount: r.followers, followedByMe: r.followed }));
   }
 
   // ───────────── Señales de eventos para ordenar (proyección alimentada por el outbox) ─────────────
@@ -783,10 +825,10 @@ export class SocialService {
     const dir = page.order === "desc" ? "DESC" : "ASC";
     const cmp = page.order === "desc" ? "<" : ">";
     const { rows } = await q.query<{
-      id: string; parent_comment_id: string | null; handle: string; display_name: string; text: string; created_at: Date; mine: boolean;
+      id: string; parent_comment_id: string | null; handle: string; display_name: string; avatar_url: string | null; text: string; created_at: Date; mine: boolean;
       reactions: ReactionCounts | null; my_reactions: ReactionKind[];
     }>(
-      `SELECT c.id, c.parent_comment_id, pr.handle, pr.display_name, c.text, c.created_at, c.author_profile_id = $2 AS mine,
+      `SELECT c.id, c.parent_comment_id, pr.handle, pr.display_name, pr.avatar_url, c.text, c.created_at, c.author_profile_id = $2 AS mine,
               (SELECT json_object_agg(g.kind, g.n) FROM (SELECT r.kind, count(*)::int AS n FROM social.comment_reactions r
                  WHERE r.comment_id = c.id GROUP BY r.kind) g) AS reactions,
               (SELECT coalesce(array_agg(r.kind ORDER BY r.kind), '{}') FROM social.comment_reactions r WHERE r.comment_id = c.id AND r.profile_id = $2) AS my_reactions
@@ -799,7 +841,7 @@ export class SocialService {
       [postId, viewerProfileId, page.onlyId ?? null, page.cursor ?? null, page.limit ?? 1],
     );
     return rows.map((r) => ({
-      id: r.id, parentId: r.parent_comment_id, author: { handle: r.handle, displayName: r.display_name }, text: r.text,
+      id: r.id, parentId: r.parent_comment_id, author: { handle: r.handle, displayName: r.display_name, avatarUrl: r.avatar_url }, text: r.text,
       createdAt: r.created_at.toISOString(), mine: r.mine === true, reactions: r.reactions ?? {}, myReactions: r.my_reactions,
     }));
   }

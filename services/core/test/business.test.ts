@@ -47,7 +47,7 @@ describe("perfiles de negocio", () => {
 
     const page = (await t.app.inject({ url: "/v1/businesses/farmacia_sol/posts", headers: auth(fan) })).json() as FeedResponse;
     expect(page.posts).toHaveLength(1);
-    expect(page.posts[0]!.author).toEqual({ pseudonymous: false, handle: "farmacia_sol", displayName: "Farmacia Sol", business: { verification: "UNVERIFIED" } });
+    expect(page.posts[0]!.author).toEqual({ pseudonymous: false, handle: "farmacia_sol", displayName: "Farmacia Sol", avatarUrl: null, business: { verification: "UNVERIFIED" } });
     expect(page.posts[0]!.mine).toBe(false);
     const own = (await t.app.inject({ url: "/v1/businesses/farmacia_sol/posts", headers: auth(owner) })).json() as FeedResponse;
     expect(own.posts[0]!.mine).toBe(true);

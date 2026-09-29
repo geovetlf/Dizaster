@@ -3,12 +3,12 @@ import { Stack, router, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Linking, Pressable, StyleSheet, Text, View } from "react-native";
 import { FeedList } from "../../components/feed-list";
+import { Avatar } from "../../components/avatar";
 import { Icon } from "../../components/icon";
 import { api } from "../../lib/api";
 import { lang, t } from "../../lib/i18n";
 import { confirmBlock, openFlag } from "../../lib/moderation/menu";
 import { BUSINESS_CATEGORY_LABEL, telUri, verificationIcon } from "../../lib/social/business";
-import { initials } from "../../lib/ui/format";
 import { colors, radius, space } from "../../theme";
 
 /** Página de un negocio: datos públicos que el negocio eligió publicar y sus posts. */
@@ -47,7 +47,7 @@ export default function BusinessScreen() {
     const badge = verificationIcon(b.verification);
     return (
       <View style={styles.head}>
-        <View style={styles.avatar}><Text style={styles.avatarText}>{initials(b.name)}</Text></View>
+        <Avatar name={b.name} url={b.logoUrl} size={72} square />
         <View style={styles.nameRow}>
           <Text style={styles.name}>{b.name}</Text>
           {badge ? <Icon name={badge} size={20} color={colors.link} accessibilityLabel={t(b.verification === "INSTITUTIONAL_OFFICIAL" ? "businessInstitutional" : "businessVerified")} /> : null}
@@ -107,8 +107,6 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   error: { color: colors.textMuted, padding: space.lg, backgroundColor: colors.bg, flex: 1 },
   head: { alignItems: "center", paddingVertical: space.lg, gap: space.xs },
-  avatar: { width: 72, height: 72, borderRadius: radius.lg, backgroundColor: colors.surfaceAlt, alignItems: "center", justifyContent: "center" },
-  avatarText: { color: colors.text, fontSize: 24, fontWeight: "700" },
   nameRow: { flexDirection: "row", alignItems: "center", gap: space.xs, marginTop: space.sm },
   name: { color: colors.text, fontSize: 20, fontWeight: "800" },
   meta: { color: colors.textMuted, textAlign: "center" },

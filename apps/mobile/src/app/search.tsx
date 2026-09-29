@@ -2,13 +2,14 @@ import type { AreaSearchResult, BusinessView, CategoryCatalog, EventSummary, Fee
 import { router } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import { Pressable, SectionList, StyleSheet, Text, TextInput, View } from "react-native";
+import { Avatar } from "../components/avatar";
 import { Icon } from "../components/icon";
 import { api } from "../lib/api";
 import { lang, t, verificationLabel } from "../lib/i18n";
 import { BUSINESS_CATEGORY_LABEL } from "../lib/social/business";
 import { POST_SEARCH_MIN, postAuthorLabel, postSnippet } from "../lib/social/post-search";
 import { categoryStyle } from "../lib/ui/categories";
-import { areaRow, bboxParam, initials, timeAgo } from "../lib/ui/format";
+import { areaRow, bboxParam, timeAgo } from "../lib/ui/format";
 import { useCoarseLocation } from "../lib/ui/use-coarse-location";
 import { colors, radius, space } from "../theme";
 
@@ -121,7 +122,7 @@ export default function SearchScreen() {
           if (item.type === "person") {
             return (
               <Pressable accessibilityRole="link" style={styles.row} onPress={() => router.push(`/u/${item.person.handle}`)}>
-                <View style={styles.avatar}><Text style={styles.avatarText}>{initials(item.person.displayName)}</Text></View>
+                <Avatar name={item.person.displayName} url={item.person.avatarUrl} size={32} />
                 <View style={styles.rowBody}>
                   <Text style={styles.rowText}>{item.person.displayName}</Text>
                   <Text style={styles.rowSub}>@{item.person.handle} · {item.person.followerCount} {t("followers")}</Text>
@@ -184,6 +185,4 @@ const styles = StyleSheet.create({
   rowText: { color: colors.text, fontSize: 16 },
   rowBody: { flex: 1 },
   rowSub: { color: colors.textMuted, fontSize: 13, marginTop: 2 },
-  avatar: { width: 32, height: 32, borderRadius: 16, backgroundColor: colors.surfaceAlt, alignItems: "center", justifyContent: "center" },
-  avatarText: { color: colors.text, fontWeight: "700", fontSize: 12 },
 });

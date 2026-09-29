@@ -2,6 +2,7 @@ import type { MyProfile, Units } from "@dizaster/contracts";
 import { router } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { AvatarPicker } from "../components/avatar-picker";
 import { api } from "../lib/api";
 import { countryOptions } from "../lib/geo/country";
 import { filterCountries } from "../lib/geo/country-choice";
@@ -14,7 +15,7 @@ import { colors, radius, space } from "../theme";
 
 const BIO_MAX = 160;
 
-/** Editar mi perfil (ADR 0044, 0085): nombre visible, bio pública, unidades y país preferido. El handle no cambia. */
+/** Editar mi perfil (ADR 0044, 0085, 0119): foto, nombre visible, bio pública, unidades y país preferido. El handle no cambia. */
 export default function ProfileEditScreen() {
   const [me, setMe] = useState<MyProfile | null>(null);
   const [name, setName] = useState("");
@@ -51,6 +52,7 @@ export default function ProfileEditScreen() {
   const valid = name.trim().length > 0;
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <AvatarPicker name={me.displayName} url={me.avatarUrl} apply={async (id) => { const m = await api.setAvatar(id); forgetMe(); return m.avatarUrl; }} />
       <Text style={styles.label}>@{me.handle}</Text>
       <Text style={styles.label}>{t("displayName")}</Text>
       <TextInput value={name} onChangeText={setName} maxLength={50} style={styles.input} placeholderTextColor={colors.textMuted} />

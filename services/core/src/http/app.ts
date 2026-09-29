@@ -461,6 +461,11 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
     return c.feed.updateMe(c.db, session.profileId, req.body);
   });
 
+  app.put("/v1/me/avatar", async (req) => {
+    const session = requireSession(req);
+    return withTransaction(c.db, (tx) => c.feed.setMyAvatar(tx, session.profileId, req.body));
+  });
+
   // ───────────── Alertas: preferencias, suscripciones e historial (personales: nunca se cachean) ─────────────
   app.get("/v1/me/alert-preferences", async (req, reply) => {
     const session = requireSession(req);
@@ -613,6 +618,11 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
   app.put("/v1/businesses/:handle", async (req) => {
     const session = requireSession(req);
     return c.business.update(session, parse(HandleParam, req.params).handle, req.body);
+  });
+  app.put("/v1/businesses/:handle/logo", async (req) => {
+    const session = requireSession(req);
+    const { handle } = parse(HandleParam, req.params);
+    return withTransaction(c.db, (tx) => c.feed.setBusinessLogo(tx, session, handle, req.body));
   });
   app.delete("/v1/businesses/:handle", async (req, reply) => {
     const session = requireSession(req);

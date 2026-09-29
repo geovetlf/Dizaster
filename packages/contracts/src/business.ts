@@ -48,6 +48,8 @@ export interface BusinessView {
   contactPhone: string | null;
   contactUrl: string | null;
   verification: BusinessVerification;
+  /** Logo (miniatura saneada, ADR 0119) o null. */
+  logoUrl: string | null;
   followerCount: number;
   postCount: number;
   followedByMe: boolean;

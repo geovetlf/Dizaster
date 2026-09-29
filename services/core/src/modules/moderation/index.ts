@@ -54,15 +54,15 @@ export const APPEAL_WINDOW_DAYS = 30;
 const ALLOWED: Record<FlagTargetType, ModerationActionType[]> = {
   POST: ["HIDE", "REMOVE", "RESTORE", "LIMIT", "WARN_USER", "SUSPEND_USER", "UNSUSPEND_USER", "DISMISS", "APPROVE_MEDIA", "MARK_GRAPHIC"],
   COMMENT: ["HIDE", "REMOVE", "RESTORE", "WARN_USER", "SUSPEND_USER", "UNSUSPEND_USER", "DISMISS"],
-  PROFILE: ["WARN_USER", "SUSPEND_USER", "UNSUSPEND_USER", "DISMISS"],
+  PROFILE: ["REMOVE_AVATAR", "WARN_USER", "SUSPEND_USER", "UNSUSPEND_USER", "DISMISS"],
   // Retirar un negocio lo oculta con todos sus posts; las acciones sobre la cuenta afectan a quien lo administra.
-  BUSINESS: ["REMOVE", "RESTORE", "WARN_USER", "SUSPEND_USER", "UNSUSPEND_USER", "DISMISS"],
+  BUSINESS: ["REMOVE", "RESTORE", "REMOVE_AVATAR", "WARN_USER", "SUSPEND_USER", "UNSUSPEND_USER", "DISMISS"],
   EVENT: ["MARK_DISPUTED", "DISMISS"],
 };
 /** Acciones que cierran el caso (las demás, como avisar, lo dejan abierto). */
 const CLOSES: Partial<Record<ModerationActionType, CaseStatus>> = {
   HIDE: "RESOLVED", REMOVE: "RESOLVED", RESTORE: "RESOLVED", SUSPEND_USER: "RESOLVED", MARK_DISPUTED: "RESOLVED", DISMISS: "DISMISSED",
-  APPROVE_MEDIA: "RESOLVED",
+  APPROVE_MEDIA: "RESOLVED", REMOVE_AVATAR: "RESOLVED",
 };
 /** Acciones apelables y su inversa si la apelación prospera. */
 const INVERSE: Partial<Record<ModerationActionType, ModerationActionType>> = {
@@ -266,7 +266,13 @@ export class ModerationService {
       const t = await this.social.moderationTarget(tx, p.targetType, p.targetId);
       if (!t) throw notFound("Objeto");
       affectedUserId = t.authorUserId;
-      if (p.targetType === "POST" && (p.action === "APPROVE_MEDIA" || p.action === "MARK_GRAPHIC")) {
+      if (p.action === "REMOVE_AVATAR") {
+        // La foto o el logo se quitan y su media se purga; la cuenta y sus posts siguen igual (ADR 0119).
+        const prev = p.targetType === "BUSINESS"
+          ? await this.social.setBusinessLogo(tx, p.targetId, null)
+          : await this.social.setAvatar(tx, p.targetId, null);
+        if (prev) await this.media.purgeMedia(tx, [prev]);
+      } else if (p.targetType === "POST" && (p.action === "APPROVE_MEDIA" || p.action === "MARK_GRAPHIC")) {
         const mediaIds = await this.social.mediaOfPost(tx, p.targetId);
         if (p.action === "APPROVE_MEDIA") await this.media.approve(tx, mediaIds);
         else await this.media.markGraphic(tx, mediaIds);

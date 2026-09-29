@@ -309,6 +309,7 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | Moderación priorizada por verificación (ADR 0116) | Hecho | Peso del estado público × alcance en la prioridad del caso. NO AI REQUIRED |
 | Fuentes oficiales y externas por separado (ADR 0117) | Hecho | `officialSourceCount` (migración 0049) y cabecera "reportes · externas · oficiales". NO AI REQUIRED |
 | Contadores sociales al escribir (ADR 0118) | Hecho | Triggers mantienen comentarios, compartidos y reacciones por post (migración 0050). NO AI REQUIRED |
+| Foto de perfil y logo de negocio (§7.3, RF-02) | Hecho: miniatura saneada, solo media propia procesada, purga de la anterior, REMOVE_AVATAR en moderación; Avatar y AvatarPicker en la app | ADR 0119 |
 | Licencias, auditoría, SBOM, Dependabot; respaldo con prueba de restauración en CI | ✅ | ADR 0070, `scripts/supply-chain.mjs`, `scripts/db-restore-check.mjs` |
 | Idioma de la app elegible en el perfil (es/en/pt/fr o del teléfono) | ✅ | ADR 0069, `app/language.tsx` |
 | Varias cuentas en un teléfono corroboran como una (clave seudónima del teléfono) | ✅ | ADR 0068, migración 0036 |
@@ -346,8 +347,7 @@ Revisión del Blueprint del 2026-09-29 (tras ADR 0109, mensaje de bajo costo del
 
 Revisión del Blueprint del 2026-09-29 (tras ADR 0112), verificada contra el código, sin bloqueos:
 
-1. Foto de perfil y logo de negocio (§7.3, RF-02).
-2. Adaptador Copernicus EMS en PLANNED (§9.3).
+1. Adaptador Copernicus EMS en PLANNED (§9.3).
 
 
 Bloqueadas o en espera:

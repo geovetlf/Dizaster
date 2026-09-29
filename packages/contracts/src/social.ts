@@ -23,7 +23,7 @@ export type FeedQuery = z.infer<typeof FeedQuery>;
  * `business` trae su estado de verificación (y el handle es el del negocio, nunca el de quien lo administra).
  */
 export type PostAuthor =
-  | { pseudonymous: false; handle: string; displayName: string; business?: { verification: "UNVERIFIED" | "VERIFIED" | "INSTITUTIONAL_OFFICIAL" } }
+  | { pseudonymous: false; handle: string; displayName: string; avatarUrl?: string | null; business?: { verification: "UNVERIFIED" | "VERIFIED" | "INSTITUTIONAL_OFFICIAL" } }
   | { pseudonymous: true };
 
 export interface FeedPost {
@@ -78,7 +78,7 @@ export interface CommentView {
   id: string;
   /** Respuesta a otro comentario (un solo nivel, ADR 0045). */
   parentId: string | null;
-  author: { handle: string; displayName: string };
+  author: { handle: string; displayName: string; avatarUrl?: string | null };
   text: string;
   createdAt: string;
   /** Lo escribió quien mira: puede borrarlo. */
@@ -97,6 +97,8 @@ export interface ProfileView {
   displayName: string;
   /** Biografía pública corta (ADR 0044). */
   bio: string | null;
+  /** Foto de perfil (miniatura saneada, ADR 0119) o null: la app muestra las iniciales. */
+  avatarUrl: string | null;
   createdAt: string;
   followerCount: number;
   followingCount: number;
@@ -115,6 +117,7 @@ export const ProfileSearchQuery = z.object({
 export interface ProfileSearchResult {
   handle: string;
   displayName: string;
+  avatarUrl?: string | null;
   followerCount: number;
   followedByMe: boolean;
 }
@@ -181,3 +184,10 @@ export const UpdateProfileRequest = z
   })
   .refine((v) => Object.keys(v).length > 0, "Nada que cambiar");
 export type UpdateProfileRequest = z.infer<typeof UpdateProfileRequest>;
+
+/**
+ * Foto de perfil o logo de negocio (ADR 0119): una imagen propia ya subida y procesada (sin EXIF, re-codificada).
+ * `null` = quitarla. No puede ser media adjunta a un post: cada una tiene su propio ciclo de vida.
+ */
+export const SetAvatarRequest = z.object({ mediaId: z.uuid().nullable() });
+export type SetAvatarRequest = z.infer<typeof SetAvatarRequest>;

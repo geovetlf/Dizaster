@@ -2,6 +2,7 @@ import {
   FeedQuery,
   FollowTarget,
   PostSearchQuery,
+  SetAvatarRequest,
   ProfilePostsQuery,
   ProfileSearchQuery,
   TagParam,
@@ -11,6 +12,7 @@ import {
   type FeedPost,
   type TagView,
   type FeedResponse,
+  type BusinessView,
   type MediaView,
   type MyFollows,
   type MyProfile,
@@ -161,6 +163,42 @@ export class FeedService {
     if (patch.country && !this.geo.isCountry(patch.country)) throw new DomainError("VALIDATION", `País desconocido: ${patch.country}`, 400);
     await this.social.updateProfile(q, profileId, patch);
     return this.me(q, profileId);
+  }
+
+  /**
+   * Foto de perfil (ADR 0119). Solo una imagen propia, ya procesada (variante pública saneada: sin EXIF) y que no
+   * esté adjunta a un post. Se guarda la URL de la miniatura. La foto anterior se purga (no la usa nadie más).
+   * NO AI REQUIRED.
+   */
+  async setMyAvatar(q: Queryable, profileId: string, body: unknown): Promise<MyProfile> {
+    const { mediaId } = parse(SetAvatarRequest, body);
+    const image = mediaId ? await this.avatarImage(q, profileId, mediaId) : null;
+    await this.purgeReplaced(q, await this.social.setAvatar(q, profileId, image));
+    return this.me(q, profileId);
+  }
+
+  /** Logo de un negocio que administra quien llama (mismas reglas que la foto de perfil). NO AI REQUIRED. */
+  async setBusinessLogo(q: Queryable, owner: { userId: string; profileId: string }, handle: string, body: unknown): Promise<BusinessView> {
+    const { mediaId } = parse(SetAvatarRequest, body);
+    const businessId = await this.business.ownedId(q, owner.userId, handle);
+    const image = mediaId ? await this.avatarImage(q, owner.profileId, mediaId) : null;
+    await this.purgeReplaced(q, await this.social.setBusinessLogo(q, businessId, image));
+    return this.business.view(q, handle, owner);
+  }
+
+  private async avatarImage(q: Queryable, profileId: string, mediaId: string): Promise<{ mediaId: string; url: string }> {
+    const [m] = await this.media.assertAttachable(q, profileId, [mediaId]);
+    if (m!.kind !== "IMAGE") throw new DomainError("MEDIA_KIND_UNSUPPORTED", "La foto debe ser una imagen");
+    if ((await this.social.postsWithMedia(q, mediaId)).length > 0) throw new DomainError("MEDIA_IN_USE", "Esa imagen ya está en una publicación", 409);
+    const [view] = await this.media.publicViews(q, [mediaId], { requireApproval: false });
+    if (!view) throw new DomainError("MEDIA_NOT_READY", "La imagen aún se está procesando", 409);
+    return { mediaId, url: view.thumbUrl ?? view.url };
+  }
+
+  /** La foto sustituida se borra salvo que siga en uso (p. ej. la misma imagen como logo de un negocio propio). */
+  private async purgeReplaced(q: Queryable, prev: string | null): Promise<void> {
+    if (!prev || (await this.social.isAvatarMedia(q, prev)) || (await this.social.postsWithMedia(q, prev)).length > 0) return;
+    await this.media.purgeMedia(q, [prev]);
   }
 
   async searchProfiles(q: Queryable, rawQuery: unknown, viewerProfileId: string | null): Promise<ProfileSearchResult[]> {

@@ -107,6 +107,11 @@ export const api = {
     request<NearbyEventsResponse>(`/v1/events/nearby?lat=${lat.toFixed(6)}&lng=${lng.toFixed(6)}&category=${encodeURIComponent(category)}`),
   createUpload: (body: CreateUploadRequest) => request<CreateUploadResponse>("/v1/media/uploads", { method: "POST", body: JSON.stringify(body) }),
   completeUpload: (mediaId: string) => request<{ mediaId: string; state: string }>(`/v1/media/${mediaId}/complete`, { method: "POST" }),
+  mediaState: (mediaId: string) => request<{ mediaId: string; state: string; rejectionReason: string | null }>(`/v1/media/${mediaId}`),
+  /** Foto de perfil y logo (ADR 0119): `null` la quita. */
+  setAvatar: (mediaId: string | null) => request<MyProfile>("/v1/me/avatar", { method: "PUT", body: JSON.stringify({ mediaId }) }),
+  setBusinessLogo: (handle: string, mediaId: string | null) =>
+    request<BusinessView>(`/v1/businesses/${encodeURIComponent(handle)}/logo`, { method: "PUT", body: JSON.stringify({ mediaId }) }),
   eventMedia: (eventId: string) => request<{ media: MediaView[] }>(`/v1/events/${eventId}/media`),
   feed: (p: { tab: FeedTab; category?: string | null; near?: { lat: number; lng: number } | null; cursor?: string | null }) => {
     const q = new URLSearchParams({ tab: p.tab });

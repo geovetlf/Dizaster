@@ -13,7 +13,8 @@ import { applyReaction, CONTEXT_REACTIONS } from "../lib/social/reactions";
 import { lang, t } from "../lib/i18n";
 import { foreignLanguageName } from "../lib/language";
 import { categoryStyle } from "../lib/ui/categories";
-import { duration, imageUri, initials, mediaLayout, postWhere } from "../lib/ui/format";
+import { duration, imageUri, mediaLayout, postWhere } from "../lib/ui/format";
+import { Avatar } from "./avatar";
 import { colors, radius, space } from "../theme";
 import { Icon } from "./icon";
 import { RichText } from "./rich-text";
@@ -82,7 +83,9 @@ export function PostCard({ post, categoryName }: { post: FeedPost; categoryName:
           style={styles.author}
         >
           <View style={[styles.avatar, post.author.pseudonymous && styles.avatarAnon]}>
-            {post.author.pseudonymous ? <Icon name="shield-account" size={22} color={colors.textMuted} /> : <Text style={styles.avatarText}>{initials(name)}</Text>}
+            {post.author.pseudonymous
+              ? <Icon name="shield-account" size={22} color={colors.textMuted} />
+              : <Avatar name={name} url={post.author.avatarUrl} size={44} square={!!post.author.business} />}
           </View>
           <View style={styles.headText}>
             <View style={styles.nameRow}>
@@ -213,7 +216,6 @@ const styles = StyleSheet.create({
   head: { flexDirection: "row", alignItems: "center", gap: space.md, marginBottom: space.sm },
   avatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.surfaceAlt, alignItems: "center", justifyContent: "center" },
   avatarAnon: { borderWidth: 1, borderColor: colors.border },
-  avatarText: { color: colors.text, fontWeight: "700" },
   headText: { flex: 1 },
   author: { flex: 1, flexDirection: "row", alignItems: "center", gap: space.md },
   name: { color: colors.text, fontSize: 16, fontWeight: "700", flexShrink: 1 },
