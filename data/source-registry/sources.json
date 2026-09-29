@@ -1,5 +1,5 @@
 {
-  "version": "sources-2026.09.1",
+  "version": "sources-2026.09.2",
   "sources": [
     {
       "key": "usgs-earthquakes",
@@ -24,6 +24,39 @@
       "urgentCapable": true,
       "urgentPollSeconds": 120,
       "status": "ACTIVE"
+    },
+    {
+      "key": "ptwc-tsunami",
+      "name": "Pacific Tsunami Warning Center (NOAA/NWS)",
+      "type": "OFFICIAL",
+      "trustTier": "OFFICIAL",
+      "countryScope": [
+        "*"
+      ],
+      "categories": [
+        "natural.tsunami"
+      ],
+      "adapter": "cap-1.2",
+      "config": {
+        "url": "https://www.tsunami.gov/events/xml/PHEBCAP.xml",
+        "languages": [
+          "en"
+        ],
+        "eventMap": [
+          {
+            "match": "tsunami",
+            "category": "natural.tsunami"
+          }
+        ],
+        "urgentMinSeverity": "Moderate"
+      },
+      "license": "Dominio público (gobierno de EE. UU., NOAA/NWS)",
+      "termsUrl": "https://www.weather.gov/disclaimer",
+      "scheduleNormal": "0 */6 * * *",
+      "urgentCapable": true,
+      "urgentPollSeconds": 60,
+      "status": "PLANNED",
+      "notes": "D-PTWC (2026-09-29): oficial SOLO para natural.tsunami. Pendiente validar URL y formato CAP del feed: tsunami.gov no es accesible desde el entorno de construcción. Activar = status ACTIVE tras validar con una muestra real."
     },
     {
       "key": "gdacs",

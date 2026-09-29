@@ -149,14 +149,20 @@ export class IngestionService {
    * Para el Verification Engine: confirma que cada ítem viene de una fuente REGISTRADA y con el nivel
    * de confianza registrado (no el que diga la evidencia). Una fuente retirada deja de contar.
    */
-  async registeredItems(q: Queryable, itemIds: string[]): Promise<Map<string, { trustTier: "EXTERNAL" | "OFFICIAL"; assertion: string }>> {
+  async registeredItems(
+    q: Queryable, itemIds: string[], scope?: { categoryCode: string; countryCode: string | null },
+  ): Promise<Map<string, { trustTier: "EXTERNAL" | "OFFICIAL"; assertion: string }>> {
     if (itemIds.length === 0) return new Map();
-    const { rows } = await q.query<{ id: string; trust_tier: "EXTERNAL" | "OFFICIAL"; assertion: string }>(
-      `SELECT i.id, s.trust_tier, i.assertion FROM ingestion.external_items i JOIN ingestion.sources s ON s.id = i.source_id
+    const { rows } = await q.query<{ id: string; trust_tier: "EXTERNAL" | "OFFICIAL"; assertion: string; categories: string[]; country_scope: string[] }>(
+      `SELECT i.id, s.trust_tier, i.assertion, s.categories, s.country_scope FROM ingestion.external_items i JOIN ingestion.sources s ON s.id = i.source_id
         WHERE i.id = ANY($1) AND s.status IN ('ACTIVE','PAUSED')`,
       [itemIds],
     );
-    return new Map(rows.map((r) => [r.id, { trustTier: r.trust_tier, assertion: r.assertion }]));
+    // Una fuente oficial solo es oficial dentro de su ámbito (D-PTWC): fuera de él cuenta como externa.
+    return new Map(rows.map((r) => [r.id, {
+      trustTier: r.trust_tier === "OFFICIAL" && (!scope || inOfficialScope(r, scope.categoryCode, scope.countryCode)) ? "OFFICIAL" : "EXTERNAL",
+      assertion: r.assertion,
+    }]));
   }
 
   /** La fuente retiró una alerta (CAP Cancel, ADR 0059). Idempotente; un id desconocido se ignora. */
@@ -246,4 +252,14 @@ export function safeLink(raw: string | null | undefined): string | null {
   } catch {
     return null;
   }
+}
+
+/**
+ * ¿El evento cae en el ámbito de la fuente oficial? (D-PTWC, ADR 0060). La categoría debe estar en su lista (o ser
+ * hija de una raíz listada) y el país en su `countryScope` ("*" = global). Un evento sin país solo lo cubre una global.
+ */
+export function inOfficialScope(source: { categories: readonly string[]; country_scope: readonly string[] }, categoryCode: string, countryCode: string | null): boolean {
+  const category = source.categories.some((c) => c === categoryCode || categoryCode.startsWith(`${c}.`));
+  const country = source.country_scope.includes("*") || (countryCode !== null && source.country_scope.includes(countryCode));
+  return category && country;
 }

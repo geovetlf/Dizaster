@@ -105,7 +105,7 @@ export class VerificationService {
 
     // Evidencia externa/oficial: se valida contra el registro de fuentes, no contra lo que diga la fila.
     const nonCitizen = data.evidence.filter((e) => e.evidenceType === "EXTERNAL_ITEM" || e.evidenceType === "OFFICIAL_ITEM");
-    const registered = await this.ingestion.registeredItems(tx, nonCitizen.map((e) => e.refId));
+    const registered = await this.ingestion.registeredItems(tx, nonCitizen.map((e) => e.refId), { categoryCode: data.categoryCode, countryCode: data.countryCode });
     const officialConfirm = nonCitizen.filter((e) => registered.get(e.refId)?.trustTier === "OFFICIAL" && e.assertion === "OCCURRING");
     const officialDeny = nonCitizen.filter((e) => registered.get(e.refId)?.trustTier === "OFFICIAL" && e.assertion === "NOT_OCCURRING");
     const external = nonCitizen.filter((e) => registered.get(e.refId)?.trustTier === "EXTERNAL" && e.assertion === "OCCURRING");
@@ -232,7 +232,7 @@ export class VerificationService {
     )).rows[0];
     if (!row) throw notFound("Verificación");
     const data = await this.events.evidenceForVerification(q, eventId);
-    const registered = await this.ingestion.registeredItems(q, data.evidence.filter((e) => e.trustTier !== "CITIZEN").map((e) => e.refId));
+    const registered = await this.ingestion.registeredItems(q, data.evidence.filter((e) => e.trustTier !== "CITIZEN").map((e) => e.refId), { categoryCode: data.categoryCode, countryCode: data.countryCode });
     return {
       eventId,
       level: row.level,
