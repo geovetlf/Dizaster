@@ -105,6 +105,7 @@ export function buildContainer(env: AppEnv, overrides: { db?: Db; clock?: Clock;
   alerts.registerHandlers(dispatcher);
   social.registerHandlers(dispatcher);
   reports.registerHandlers(dispatcher);
+  ingestion.registerHandlers(dispatcher);
   trust.registerHandlers(dispatcher);
   // Presupuestos y kill switches persistidos: las funciones de pago empiezan a 0 y apagadas (migración 0009).
   const cost = new CostService(db, identity, media, clock, dataDir);

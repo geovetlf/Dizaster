@@ -4,7 +4,7 @@ import type { Db, Queryable } from "../../platform/db.js";
 import { withTransaction } from "../../platform/db.js";
 import { DomainError } from "../../platform/errors.js";
 import { newId } from "../../platform/ids.js";
-import { publish } from "../../platform/outbox.js";
+import { publish, type OutboxDispatcher } from "../../platform/outbox.js";
 import type { EventService, ResolutionResult } from "../event/index.js";
 import type { GeoService } from "../geo/index.js";
 
@@ -215,6 +215,26 @@ export class IngestionService {
    * Ítems vinculados a un evento cuya vigencia terminó (retirados o expirados) en la ventana dada, con el motivo.
    * Solo los recientes: un evento viejo ya lo cerró el ciclo por inactividad.
    */
+  /**
+   * Fusión, reversión y división de eventos (§6.2, ADR 0149): cada ítem externo apunta al evento donde está su
+   * evidencia, igual que los reportes. De esto depende, p. ej., "una declaración por institución y evento".
+   */
+  registerHandlers(dispatcher: OutboxDispatcher): void {
+    dispatcher.on("EventMerged", "ingestion.follow-merge", async (e, tx) => {
+      await tx.query(`UPDATE ingestion.external_items SET event_id = $1 WHERE event_id = $2`, [e.payload.targetEventId, e.payload.mergedEventId]);
+    });
+    dispatcher.on("EventMergeReverted", "ingestion.follow-merge-revert", async (e, tx) => {
+      await tx.query(`UPDATE ingestion.external_items SET event_id = $1 WHERE id::text = ANY($2) AND event_id = $3`, [
+        e.payload.restoredEventId, e.payload.evidenceRefIds, e.payload.targetEventId,
+      ]);
+    });
+    dispatcher.on("EventSplit", "ingestion.follow-split", async (e, tx) => {
+      await tx.query(`UPDATE ingestion.external_items SET event_id = $1 WHERE id::text = ANY($2) AND event_id = $3`, [
+        e.payload.newEventId, e.payload.evidenceRefIds, e.payload.sourceEventId,
+      ]);
+    });
+  }
+
   async endedItems(q: Queryable, now: Date, windowDays = 7): Promise<{ id: string; reason: "WITHDRAWN" | "EXPIRED"; at: Date }[]> {
     const { rows } = await q.query<{ id: string; reason: "WITHDRAWN" | "EXPIRED"; at: Date }>(
       `SELECT id, CASE WHEN withdrawn_at IS NOT NULL THEN 'WITHDRAWN' ELSE 'EXPIRED' END AS reason, coalesce(withdrawn_at, ends_at) AS at

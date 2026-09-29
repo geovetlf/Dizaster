@@ -1,5 +1,6 @@
 import type { BusinessView, EventSourceView, VerificationView } from "@dizaster/contracts";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { withTransaction } from "../src/platform/db.js";
 import { createTestContext, createUser, LIMA, reportBody, submit, type TestContext, type TestUser } from "./helpers.js";
 
 let t: TestContext;
@@ -91,5 +92,23 @@ describe("perfil institucional oficial como fuente OFICIAL (ADR 0095)", () => {
     expect((await declare(owner, "bomberos_pe", eventId)).statusCode).toBe(403);
     const b = (await t.app.inject({ url: "/v1/businesses/bomberos_pe" })).json() as BusinessView;
     expect(b.verification).toBe("INSTITUTIONAL_OFFICIAL");
+  });
+});
+
+describe("declaraciones y fusiones (ADR 0149)", () => {
+  it("tras fusionar, la institución no puede desmentir el evento que ya confirmó", async () => {
+    await setVerification("bomberos_pe", "INSTITUTIONAL_OFFICIAL");
+    await setScope("bomberos_pe", { categories: ["fire"], countries: ["PE"] });
+    const a = await fireEvent("vecino_fusion_a", { lat: -12.3, lng: -76.8 });
+    const b = await fireEvent("vecino_fusion_b", { lat: -12.4, lng: -76.7 });
+    expect(a).not.toBe(b);
+    expect((await declare(owner, "bomberos_pe", a)).statusCode).toBe(200);
+    await t.c.dispatcher.drain();
+    await withTransaction(t.c.db, (tx) => t.c.events.merge(tx, b, a, "test", "mismo incendio"));
+    await t.c.dispatcher.drain();
+    const items = await t.c.db.query<{ event_id: string }>(`SELECT i.event_id FROM ingestion.external_items i JOIN ingestion.sources s ON s.id = i.source_id WHERE s.key LIKE 'institution:%' AND i.external_id LIKE $1`, [`${a}:%`]);
+    expect(items.rows.map((r) => r.event_id)).toEqual([b]);
+    expect((await declare(owner, "bomberos_pe", b, "NOT_OCCURRING")).statusCode).toBe(409);
+    expect((await declare(owner, "bomberos_pe", b)).statusCode).toBe(200);
   });
 });
