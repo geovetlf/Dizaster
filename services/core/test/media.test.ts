@@ -190,7 +190,7 @@ describe("media en reportes y eventos", () => {
     const u = await createUser(t, "media_presence");
     const cam = await uploadReady(u, makeJpeg(), { capturedAt: new Date().toISOString() });
     const r = await submit(t, u, { ...reportBody(u, { pin: { lat: -12.9, lng: -77.03 } }), mediaIds: [cam] });
-    expect(await breakdown(r.body.reportId)).toMatchObject({ rule_version: "presence-2", score_breakdown: { mediaInApp: 1 } });
+    expect(await breakdown(r.body.reportId)).toMatchObject({ rule_version: "presence-3", score_breakdown: { mediaInApp: 1 } });
 
     const g = await createUser(t, "media_gallery");
     const gallery = await uploadReady(g, makeJpeg({ exif: false }), { capturedAt: new Date().toISOString(), capturedInApp: false });

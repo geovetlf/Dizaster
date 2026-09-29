@@ -27,6 +27,12 @@ export interface PresenceRuleSet {
   mediaMaxS: number;
   maxPlausibleSpeedMps: number;
   bands: { high: number; medium: number };
+  /**
+   * Testimonio tardío (§8.3, ADR 0108): un reporte offline enviado fuera de la tolerancia multiplica su puntuación
+   * por este factor y no pasa de MEDIUM, así nunca cuenta como corroboración independiente. Sin valor (reglas
+   * anteriores a presence-3), no se descuenta.
+   */
+  lateOfflineFactor?: number;
 }
 
 export const PRESENCE_RULES_V1: PresenceRuleSet = {
@@ -51,7 +57,14 @@ export const PRESENCE_RULES_V2: PresenceRuleSet = {
   weights: { ...PRESENCE_RULES_V1.weights, mediaInApp: 0.1 },
 };
 
-export const PRESENCE_RULES_CURRENT = PRESENCE_RULES_V2;
+/** presence-3 (ADR 0108): igual que presence-2 más el descuento del testimonio tardío (§8.3). */
+export const PRESENCE_RULES_V3: PresenceRuleSet = {
+  ...PRESENCE_RULES_V2,
+  version: "presence-3",
+  lateOfflineFactor: 0.5,
+};
+
+export const PRESENCE_RULES_CURRENT = PRESENCE_RULES_V3;
 
 export interface PresenceInput {
   pin: GeoPoint;
@@ -144,6 +157,9 @@ export function computePresence(input: PresenceInput, rules: PresenceRuleSet = P
       reasons.push("LATE_OFFLINE_SUBMISSION");
     }
   }
+  const discountLate = lateOffline && rules.lateOfflineFactor !== undefined;
+  const lateFactor = discountLate ? rules.lateOfflineFactor! : 1;
+  if (discountLate) score = Math.min(score * lateFactor, rules.bands.high - 0.01);
 
   const band: PresenceBand = score >= rules.bands.high ? "HIGH" : score >= rules.bands.medium ? "MEDIUM" : "LOW";
   return {
@@ -151,7 +167,7 @@ export function computePresence(input: PresenceInput, rules: PresenceRuleSet = P
     band,
     reasons,
     fixToPinM: Math.round(fixToPinM),
-    breakdown: { distance: fDistance, accuracy: fAccuracy, freshness: fFreshness, attestation: fAttestation, mediaInApp: fMedia, penalty },
+    breakdown: { distance: fDistance, accuracy: fAccuracy, freshness: fFreshness, attestation: fAttestation, mediaInApp: fMedia, penalty, ...(discountLate ? { lateOfflineFactor: lateFactor } : {}) },
     ruleVersion: rules.version,
     lateOffline,
   };

@@ -299,6 +299,7 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | Errores del servidor traducidos por código (ADR 0105) | Hecho | `serverErrorMessage`: español usa el mensaje del servidor; otros idiomas traducen el código. NO AI REQUIRED |
 | Paginación por cursor de timeline y comentarios (ADR 0106) | Hecho | `ChronoPageQuery` (cursor = id, clave `(at, id)`), compatible sin parámetros; "Ver anteriores" y scroll infinito. NO AI REQUIRED |
 | Búsqueda de publicaciones por texto (ADR 0107) | Hecho | `GET /v1/search/posts` con reglas del feed, trigram (migración 0045), sección en Buscar. NO AI REQUIRED |
+| Testimonio tardío con menor peso (ADR 0108) | Hecho | presence-3: factor 0,5 y tope bajo HIGH para reportes offline fuera de tolerancia. NO AI REQUIRED |
 | Licencias, auditoría, SBOM, Dependabot; respaldo con prueba de restauración en CI | ✅ | ADR 0070, `scripts/supply-chain.mjs`, `scripts/db-restore-check.mjs` |
 | Idioma de la app elegible en el perfil (es/en/pt/fr o del teléfono) | ✅ | ADR 0069, `app/language.tsx` |
 | Varias cuentas en un teléfono corroboran como una (clave seudónima del teléfono) | ✅ | ADR 0068, migración 0036 |
@@ -332,7 +333,6 @@ Revisión del Blueprint del 2026-09-29 (tras ADR 0092): completada con ADR 0093�
 
 Revisión del Blueprint del 2026-09-29 (tras ADR 0102), verificada contra el código, sin bloqueos:
 
-1. El testimonio tardío pesa menos (§8.3).
 
 
 Bloqueadas o en espera:

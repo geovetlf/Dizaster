@@ -6,6 +6,7 @@ import {
   clampToRadius,
   computePresence,
   PRESENCE_RULES_V1,
+  PRESENCE_RULES_V2,
   textFingerprint,
   tileBounds,
   tilesForView,
@@ -122,6 +123,23 @@ describe("presencia física", () => {
     const r = computePresence(i);
     expect(r.lateOffline).toBe(true);
     expect(r.reasons).toContain("LATE_OFFLINE_SUBMISSION");
+  });
+
+  it("el testimonio tardío pesa la mitad y no llega a HIGH; las reglas antiguas no lo descuentan (ADR 0108)", () => {
+    const onTime = base();
+    onTime.capturedOffline = true;
+    onTime.receivedAt = new Date(onTime.capturedAt.getTime() + 10 * 60_000);
+    const ok = computePresence(onTime);
+    expect(ok.lateOffline).toBe(false);
+    expect(ok.band).toBe("HIGH");
+    expect(ok.breakdown["lateOfflineFactor"]).toBeUndefined();
+
+    const late = { ...onTime, receivedAt: new Date("2026-09-29T12:00:00Z") };
+    const r = computePresence(late);
+    expect(r.score).toBeCloseTo(Math.min(ok.score * 0.5, 0.749), 3);
+    expect(r.band).not.toBe("HIGH");
+    expect(r.breakdown["lateOfflineFactor"]).toBe(0.5);
+    expect(computePresence(late, PRESENCE_RULES_V2).score).toBe(ok.score);
   });
 });
 
@@ -247,7 +265,7 @@ describe("presencia: bonificación por media capturada en la app (ADR 0073)", ()
     const r = computePresence({ ...weak(), mediaProofs: [photo("2026-09-29T10:00:00Z")] });
     expect(r.breakdown["mediaInApp"]).toBe(1);
     expect(r.band).toBe("HIGH");
-    expect(r.ruleVersion).toBe("presence-2");
+    expect(r.ruleVersion).toBe("presence-3");
   });
 
   it("una foto vieja o con horas incoherentes no suma", () => {
