@@ -20,7 +20,7 @@ import type {
   TrustTier,
   VerificationLevel,
 } from "@dizaster/contracts";
-import { AreaGeometry, ChronoPageQuery, SetPublishDelayRequest, type PublishDelayView, EventSearchQuery, VERIFICATION_LEVEL_RANK, publicVerificationState } from "@dizaster/contracts";
+import { AreaGeometry, ChronoPageQuery, GalleryPageQuery, SetPublishDelayRequest, type PublishDelayView, EventSearchQuery, VERIFICATION_LEVEL_RANK, publicVerificationState } from "@dizaster/contracts";
 import {
   DEDUP_RULES,
   H3_RES,
@@ -1045,6 +1045,32 @@ export class EventService {
       [eventId],
     );
     return rows.map(publicEntry);
+  }
+
+  /**
+   * Media de la galería por páginas (ADR 0203). Deja fuera la de reportes ocultos o retirados por moderación y la de
+   * reportes retirados por su autor: su evidencia ya no cuenta, así que sus fotos tampoco se muestran. Restaurar las devuelve.
+   */
+  async galleryPage(q: Queryable, eventId: string, raw: unknown): Promise<{ mediaIds: string[]; nextCursor: string | null }> {
+    const r = GalleryPageQuery.safeParse(raw ?? {});
+    if (!r.success) throw new DomainError("VALIDATION", r.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; "));
+    const p = r.data;
+    if (p.cursor) {
+      const c = await q.query(`SELECT 1 FROM event.timeline WHERE id = $1 AND event_id = $2 AND type = 'MEDIA_ADDED'`, [p.cursor, eventId]);
+      if (!c.rowCount) throw new DomainError("VALIDATION", "Cursor inválido");
+    }
+    const { rows } = await q.query<{ id: string; payload: Record<string, unknown> }>(
+      `SELECT t.id, t.payload FROM event.timeline t
+        WHERE t.event_id = $1 AND t.type = 'MEDIA_ADDED' AND t.visibility = 'PUBLIC'
+          AND ($2::uuid IS NULL OR (t.at, t.id) > (SELECT c.at, c.id FROM event.timeline c WHERE c.id = $2::uuid))
+          AND NOT EXISTS (SELECT 1 FROM event.evidence e
+                           WHERE e.evidence_type = 'CITIZEN_REPORT' AND e.ref_id::text = t.payload->>'reportId'
+                             AND e.status IN ('MODERATED','DETACHED'))
+        ORDER BY t.at, t.id LIMIT $3`,
+      [eventId, p.cursor ?? null, p.limit],
+    );
+    const mediaIds = rows.flatMap((row) => (Array.isArray(row.payload["mediaIds"]) ? (row.payload["mediaIds"] as string[]) : []));
+    return { mediaIds, nextCursor: rows.length === p.limit ? rows[rows.length - 1]!.id : null };
   }
 
   /**

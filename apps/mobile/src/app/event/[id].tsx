@@ -38,6 +38,7 @@ export default function EventScreen() {
   // Timeline por páginas, de lo más reciente hacia atrás (ADR 0106).
   const [timelineNext, setTimelineNext] = useState<string | null>(null);
   const [media, setMedia] = useState<MediaView[]>([]);
+  const [mediaNext, setMediaNext] = useState<string | null>(null);
   const [verification, setVerification] = useState<VerificationView | null>(null);
   const [sources, setSources] = useState<EventSourceView[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -57,7 +58,7 @@ export default function EventScreen() {
       })
       .catch((e: Error) => setError(e.message));
     // La media es secundaria: si falla, el evento se muestra igual.
-    api.eventMedia(id).then((r) => setMedia(r.media)).catch(() => setMedia([]));
+    api.eventMedia(id).then((r) => { setMedia(r.media); setMediaNext(r.nextCursor ?? null); }).catch(() => setMedia([]));
     api.verification(id).then(setVerification).catch(() => setVerification(null));
     api.eventSources(id).then((r) => setSources(r.sources)).catch(() => setSources([]));
     // Perfiles institucionales oficiales que administro (ADR 0095): pueden confirmar o desmentir en su ámbito.
@@ -148,7 +149,14 @@ export default function EventScreen() {
         </View>
       ) : null}
       {event.affectedArea ? <EventAreaMap area={event.affectedArea} point={event.point} color={categoryStyle(event.categoryCode).color} /> : null}
-      <EventMedia media={media} />
+      <EventMedia
+        media={media}
+        onMore={mediaNext ? () => {
+          const cursor = mediaNext;
+          setMediaNext(null);
+          api.eventMedia(id!, cursor).then((r) => { setMedia((m) => [...m, ...r.media]); setMediaNext(r.nextCursor ?? null); }).catch(() => setMediaNext(cursor));
+        } : null}
+      />
       <Text style={styles.section}>{t("timeline")}</Text>
       {/* Lo más reciente primero; lo anterior se pide por páginas. */}
       {newestFirst(timeline).map((item) => (

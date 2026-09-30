@@ -474,13 +474,12 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
   });
 
   // Media pública del evento: solo variantes saneadas; en categorías sensibles, solo la aprobada por moderación.
+  // Por páginas y sin la de reportes moderados (ADR 0203).
   app.get("/v1/events/:id/media", async (req) => {
     const { id } = parse(IdParam, req.params);
     const event = await c.events.getEvent(c.db, id);
-    const mediaIds = (await c.events.timeline(c.db, id))
-      .filter((t) => t.type === "MEDIA_ADDED")
-      .flatMap((t) => (Array.isArray(t.payload["mediaIds"]) ? (t.payload["mediaIds"] as string[]) : []));
-    return { media: withWarning(await c.media.publicViews(c.db, mediaIds, { requireApproval: event.sensitivity !== "NORMAL" }), event.sensitivity) };
+    const { mediaIds, nextCursor } = await c.events.galleryPage(c.db, id, req.query);
+    return { media: withWarning(await c.media.publicViews(c.db, mediaIds, { requireApproval: event.sensitivity !== "NORMAL" }), event.sensitivity), nextCursor };
   });
 
   // ───────────── Red social ─────────────

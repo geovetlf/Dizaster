@@ -138,7 +138,8 @@ export const api = {
   setAvatar: (mediaId: string | null) => request<MyProfile>("/v1/me/avatar", { method: "PUT", body: JSON.stringify({ mediaId }) }),
   setBusinessLogo: (handle: string, mediaId: string | null) =>
     request<BusinessView>(`/v1/businesses/${encodeURIComponent(handle)}/logo`, { method: "PUT", body: JSON.stringify({ mediaId }) }),
-  eventMedia: (eventId: string) => request<{ media: MediaView[] }>(`/v1/events/${eventId}/media`),
+  eventMedia: (eventId: string, cursor?: string) =>
+    request<{ media: MediaView[]; nextCursor?: string | null }>(`/v1/events/${eventId}/media${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`),
   feed: (p: { tab: FeedTab; category?: string | null; near?: { lat: number; lng: number } | null; cursor?: string | null }) => {
     const q = new URLSearchParams({ tab: p.tab });
     if (p.category) q.set("category", p.category);

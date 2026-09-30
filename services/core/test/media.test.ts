@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import sharp from "sharp";
 import { dctHash, hammingHex, NEAR_DUPLICATE_BITS, phashBands, redactionRects } from "../src/modules/media/images.js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -279,6 +279,42 @@ describe("media en reportes y eventos", () => {
     expect((await t.app.inject({ url: `/v1/events/${r.body.eventId}/media` })).json().media).toHaveLength(0);
     await t.c.db.query(`UPDATE media.media SET moderation_state = 'APPROVED' WHERE id = $1`, [id]);
     expect((await t.app.inject({ url: `/v1/events/${r.body.eventId}/media` })).json().media).toHaveLength(1);
+  });
+});
+
+describe("galería del evento (ADR 0203)", () => {
+  const gallery = async (eventId: string, qs = "") => (await t.app.inject({ url: `/v1/events/${eventId}/media${qs}` })).json() as { media: { id: string }[]; nextCursor: string | null };
+
+  it("las fotos de un reporte moderado salen de la galería y vuelven al restaurarlo", async () => {
+    // Dos reportes: con uno solo, ocultarlo oculta también el evento entero.
+    const [u, other] = [await createUser(t, "gal_mod"), await createUser(t, "gal_mod_2")];
+    const id = await uploadReady(u, makeJpeg());
+    const r = await submit(t, u, { ...reportBody(u, { pin: { lat: -12.71, lng: -77.03 } }), mediaIds: [id] });
+    const eventId = r.body.eventId!;
+    expect((await submit(t, other, reportBody(other, { pin: { lat: -12.7101, lng: -77.03 } }))).body.eventId).toBe(eventId);
+    expect((await gallery(eventId)).media.map((m) => m.id)).toEqual([id]);
+    await t.c.events.moderateEvidence(t.c.db, "CITIZEN_REPORT", r.body.reportId!, true);
+    expect((await gallery(eventId)).media).toHaveLength(0);
+    await t.c.events.moderateEvidence(t.c.db, "CITIZEN_REPORT", r.body.reportId!, false);
+    expect((await gallery(eventId)).media.map((m) => m.id)).toEqual([id]);
+  });
+
+  it("va por páginas sin repetir fotos", async () => {
+    const [a, b] = [await createUser(t, "gal_page_a"), await createUser(t, "gal_page_b")];
+    const ida = await uploadReady(a, makeJpeg());
+    const ra = await submit(t, a, { ...reportBody(a, { pin: { lat: -12.81, lng: -77.03 } }), mediaIds: [ida] });
+    const idb = await uploadReady(b, makeJpeg());
+    const rb = await submit(t, b, { ...reportBody(b, { pin: { lat: -12.8101, lng: -77.03 } }), mediaIds: [idb] });
+    expect(rb.body.eventId).toBe(ra.body.eventId);
+    const p1 = await gallery(ra.body.eventId!, "?limit=1");
+    expect(p1.media.map((m) => m.id)).toEqual([ida]);
+    expect(p1.nextCursor).toBeTruthy();
+    const p2 = await gallery(ra.body.eventId!, `?limit=1&cursor=${p1.nextCursor}`);
+    expect(p2.media.map((m) => m.id)).toEqual([idb]);
+    const p3 = await gallery(ra.body.eventId!, `?limit=1&cursor=${p2.nextCursor}`);
+    expect(p3.media).toHaveLength(0);
+    expect(p3.nextCursor).toBeNull();
+    expect((await t.app.inject({ url: `/v1/events/${ra.body.eventId}/media?cursor=${randomUUID()}` })).statusCode).toBe(400);
   });
 });
 

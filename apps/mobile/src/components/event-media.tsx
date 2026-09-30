@@ -8,7 +8,8 @@ import { duration, imageUri } from "../lib/ui/format";
 import { SensitiveCover } from "./sensitive-cover";
 
 /** Galería pública de un evento: solo variantes saneadas que el servidor ya aprobó para mostrar. */
-export function EventMedia({ media }: { media: MediaView[] }) {
+/** `onMore`: hay otra página de la galería (ADR 0203); se pide solo si la persona la quiere ver. */
+export function EventMedia({ media, onMore }: { media: MediaView[]; onMore?: (() => void) | null }) {
   if (media.length === 0) return null;
   return (
     <ScrollView horizontal style={styles.strip} contentContainerStyle={styles.content} showsHorizontalScrollIndicator={false}>
@@ -17,6 +18,11 @@ export function EventMedia({ media }: { media: MediaView[] }) {
           {m.kind === "IMAGE" ? <Photo m={m} /> : <Video m={m} />}
         </SensitiveCover>
       ))}
+      {onMore ? (
+        <Pressable accessibilityRole="button" onPress={onMore} style={[styles.item, styles.more]}>
+          <Text style={styles.moreText}>{t("morePhotos")}</Text>
+        </Pressable>
+      ) : null}
     </ScrollView>
   );
 }
@@ -73,6 +79,8 @@ const styles = StyleSheet.create({
   strip: { marginBottom: 16, flexGrow: 0 },
   content: { gap: 8 },
   item: { height: 180, borderRadius: 10, overflow: "hidden", backgroundColor: "#eee" },
+  more: { width: 120, alignItems: "center", justifyContent: "center", padding: 8 },
+  moreText: { color: "#222", fontWeight: "600", textAlign: "center" },
   video: { alignItems: "center", justifyContent: "center", backgroundColor: "#11161D" },
   play: { width: 48, height: 48, borderRadius: 24, backgroundColor: "#000000AA", alignItems: "center", justifyContent: "center" },
   playText: { color: "#FFFFFF", fontSize: 20 },

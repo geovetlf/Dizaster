@@ -130,6 +130,13 @@ export const ChronoPageQuery = z.object({
 });
 export type ChronoPageQuery = z.infer<typeof ChronoPageQuery>;
 
+/** Galería del evento por páginas (ADR 0203): cada página son entradas de media de la timeline, en orden. */
+export const GalleryPageQuery = z.object({
+  cursor: z.uuid().optional(),
+  limit: z.coerce.number().int().min(1).max(50).default(20),
+});
+export type GalleryPageQuery = z.infer<typeof GalleryPageQuery>;
+
 export const EventCluster = z.object({
   h3: z.string(),
   point: GeoPoint,

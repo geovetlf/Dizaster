@@ -160,7 +160,7 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | Peso al corroborar por reputación ("2 HIGH + reputación alta"), reglas `verification-2` | ✅ | `VerificationService.independentWeight` |
 | Grupos de cuentas jóvenes que co-reportan juntas cuentan como una | ✅ | `TrustService.contributionWeights` |
 | Cupo de reportes y peso de denuncias según reputación | ✅ | `ReportService`, `ModerationService.flag` |
-| Reputación en la visibilidad del feed; textos idénticos | ⏳ | siguiente iteración |
+| Reputación en la visibilidad del feed; textos idénticos | ✅ | ADR 0031, 0074 |
 
 ## Etapa 13 — Idiomas iniciales (hecha)
 
@@ -393,6 +393,7 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | Mapa accesible (§11.4, §5.6) | ✅ | ADR 0200: lista de los eventos de la vista en texto (gravedad, verificación, lugar) y tocar un grupo acerca el mapa |
 | Tiempos límite y descarga en picos (§5.22, §14) | ✅ | ADR 0201: timeouts de pool, consulta, bloqueo y transacción; requestTimeout; 503 OVERLOADED con Retry-After cuando la base está saturada |
 | Textos de data/ en 4 idiomas (§5.15, §7.3) | ✅ | ADR 0202: nombres regionales de Perú en pt/fr y prueba que exige es/en/pt/fr en todo texto localizado de data/ |
+| Galería sin media de reportes moderados, por páginas (§13.3, §13.1) | ✅ | ADR 0203: fuera las fotos de reportes ocultos, retirados o eliminados; cursor y "Ver más fotos" en la app |
 | Licencias, auditoría, SBOM, Dependabot; respaldo con prueba de restauración en CI | ✅ | ADR 0070, `scripts/supply-chain.mjs`, `scripts/db-restore-check.mjs` |
 | Idioma de la app elegible en el perfil (es/en/pt/fr o del teléfono) | ✅ | ADR 0069, `app/language.tsx` |
 | Varias cuentas en un teléfono corroboran como una (clave seudónima del teléfono) | ✅ | ADR 0068, migración 0036 |
@@ -447,6 +448,14 @@ Revisión del Blueprint del 2026-09-30 (tras ADR 0189): completada con ADR 0190�
 BLOQUEADO hasta el primer build de desarrollo).
 
 Revisión del Blueprint del 2026-09-30 (tras ADR 0196): completada con ADR 0197–0202 (la tabla de estado también se corrigió: 9 filas ⏳ ya estaban hechas).
+
+Revisión del Blueprint del 2026-09-30 (tras ADR 0202), verificada contra el código, sin bloqueos:
+
+1. Logs de peticiones sin coordenadas ni IP (§13.2, RNF-04): el log de Fastify guarda la URL con `lat`/`lng` y la IP del cliente.
+2. Plazo y cortocircuito para push y almacenamiento (§5.14, §12.2): APNs, FCM y S3 no tienen plazo; un proveedor colgado frena las alertas urgentes.
+3. Cuarentena de mensajes del outbox que siempre fallan (§4.2, §6.2): hoy se reintentan para siempre y dejan `/health/ready` en rojo permanente.
+4. Límite de subidas por teléfono, no solo por cuenta (§5.18, §12.2): igual que los reportes (ADR 0131).
+5. Paginación de la lista de bloqueos, con tope de bloqueos (§13.1); la galería ya va por páginas (ADR 0203).
 
 Bloqueadas o en espera:
 
