@@ -86,7 +86,7 @@ export function MediaAttachments({ items, onChange, suggestRedaction = false, ca
                 <Image source={{ uri: m.localUri }} style={styles.image} accessibilityIgnoresInvertColors />
                 {/* La miniatura va recortada: se indica cuántas zonas se difuminarán en lugar de dibujarlas. */}
                 <View style={[styles.blurBadge, (suggestRedaction || (m.redactions ?? []).length > 0) && styles.blurBadgeOn]}>
-                  <Text style={styles.removeText}>{(m.redactions ?? []).length || "◐"}</Text>
+                  <Text style={styles.removeText} maxFontSizeMultiplier={1.2}>{(m.redactions ?? []).length || "◐"}</Text>
                 </View>
               </Pressable>
             ) : (
@@ -96,11 +96,11 @@ export function MediaAttachments({ items, onChange, suggestRedaction = false, ca
               </View>
             )}
             <Pressable accessibilityRole="switch" accessibilityLabel={t("markGraphic")} accessibilityState={{ checked: !!m.graphic }}
-              style={[styles.graphic, m.graphic && styles.graphicOn]} onPress={() => setGraphic(m, !m.graphic)}>
-              <Text style={styles.removeText}>⚠</Text>
+              hitSlop={10} style={[styles.graphic, m.graphic && styles.graphicOn]} onPress={() => setGraphic(m, !m.graphic)}>
+              <Text style={styles.removeText} maxFontSizeMultiplier={1.2}>⚠</Text>
             </Pressable>
-            <Pressable accessibilityRole="button" accessibilityLabel={t("remove")} style={styles.remove} onPress={() => remove(m)}>
-              <Text style={styles.removeText}>✕</Text>
+            <Pressable accessibilityRole="button" accessibilityLabel={t("remove")} hitSlop={10} style={styles.remove} onPress={() => remove(m)}>
+              <Text style={styles.removeText} maxFontSizeMultiplier={1.2}>✕</Text>
             </Pressable>
           </View>
         ))}

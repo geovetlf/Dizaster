@@ -22,7 +22,7 @@ export function HomeHeader() {
           <Text style={styles.tagline}>{t("tagline")}</Text>
         </View>
         <Pressable accessibilityRole="button" accessibilityLabel={t("emergency")} style={[styles.iconButton, styles.sos]} onPress={() => router.push("/emergency")}>
-          <Text style={styles.sosText}>SOS</Text>
+          <Text style={styles.sosText} maxFontSizeMultiplier={1.6}>SOS</Text>
         </Pressable>
         <Pressable
           accessibilityRole="button"
@@ -31,7 +31,7 @@ export function HomeHeader() {
           onPress={() => router.push("/alerts")}
         >
           <Icon name="bell-outline" size={24} color={colors.text} />
-          {badge ? <View style={styles.badge}><Text style={styles.badgeText}>{badge}</Text></View> : null}
+          {badge ? <View style={styles.badge}><Text style={styles.badgeText} maxFontSizeMultiplier={1.4}>{badge}</Text></View> : null}
         </Pressable>
         <Pressable accessibilityRole="button" accessibilityLabel={t("profile")} style={styles.iconButton} onPress={() => router.push("/profile")}>
           <Icon name="account-circle-outline" size={26} color={colors.text} />
@@ -52,9 +52,10 @@ const styles = StyleSheet.create({
   logo: { color: colors.white, fontSize: 32, fontWeight: "900", letterSpacing: 0.5 },
   logoA: { color: colors.accentText },
   tagline: { color: colors.textMuted, fontSize: 13, marginTop: 2 },
-  iconButton: { width: 44, height: 44, borderRadius: radius.md, backgroundColor: colors.surface, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, alignItems: "center", justifyContent: "center" },
+  // Mínimo 44×44 que crece con el texto grande (ADR 0240): "SOS" nunca se corta.
+  iconButton: { minWidth: 44, minHeight: 44, paddingHorizontal: 4, borderRadius: radius.md, backgroundColor: colors.surface, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, alignItems: "center", justifyContent: "center" },
   sos: { backgroundColor: colors.accent, borderColor: colors.accent },
-  badge: { position: "absolute", top: 4, end: 4, minWidth: 18, height: 18, paddingHorizontal: 4, borderRadius: radius.pill, backgroundColor: colors.accent, alignItems: "center", justifyContent: "center" },
+  badge: { position: "absolute", top: 4, end: 4, minWidth: 18, minHeight: 18, paddingHorizontal: 4, borderRadius: radius.pill, backgroundColor: colors.accent, alignItems: "center", justifyContent: "center" },
   badgeText: { color: colors.white, fontSize: 11, fontWeight: "800" },
   sosText: { color: colors.white, fontWeight: "800", fontSize: 13 },
   search: { flexDirection: "row", alignItems: "center", gap: space.sm, marginTop: space.lg, backgroundColor: colors.surface, borderRadius: radius.pill, paddingHorizontal: space.lg, paddingVertical: 12, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
