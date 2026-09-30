@@ -121,7 +121,19 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
   });
   app.addHook("onRequest", async (req) => {
     const h = req.headers.authorization;
-    if (h?.startsWith("Bearer ")) req.session = await c.identity.verifyToken(h.slice(7));
+    if (h?.startsWith("Bearer ")) {
+      try {
+        req.session = await c.identity.verifyToken(h.slice(7));
+      } catch (e) {
+        // Un token inválido también gasta el cupo de su IP (ADR 0229): sin esto, una ráfaga de tokens falsos no tenía límite.
+        const wait = allLimiter.hit(`ip:${req.ip}`);
+        if (wait !== null) {
+          c.meter.add("http", "rate_limited", 1);
+          throw Object.assign(new DomainError("RATE_LIMITED", "Demasiadas peticiones; espera un momento", 429), { retryAfter: wait });
+        }
+        throw e;
+      }
+    }
     const ctx = currentContext();
     if (ctx && req.session) ctx.actor = `user:${req.session.userId}`;
     if (req.url.startsWith("/v1/")) {

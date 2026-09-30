@@ -419,6 +419,7 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | Feed "Siguiendo" indexable y acotado a 30 días (rendimiento) | ✅ | ADR 0226: uuid contra uuid para usar índices por autor y evento; ventana de 30 días |
 | Aviso visible "Dizaster no reemplaza a los servicios de emergencia" (C-18, §5.11) | ✅ | ADR 0227: en Emergencia (alerta accesible) y Acerca de; texto de producto reemplazable por el legal |
 | Límite por cuenta compartido entre réplicas (ADR 0228) | ✅ | `RATE_LIMIT_SHARED`, tabla UNLOGGED sin IPs |
+| Tokens inválidos gastan el cupo de la IP (ADR 0229) | ✅ | 429 tras el cupo, sin guardar IPs |
 | Licencias, auditoría, SBOM, Dependabot; respaldo con prueba de restauración en CI | ✅ | ADR 0070, `scripts/supply-chain.mjs`, `scripts/db-restore-check.mjs` |
 | Idioma de la app elegible en el perfil (es/en/pt/fr o del teléfono) | ✅ | ADR 0069, `app/language.tsx` |
 | Varias cuentas en un teléfono corroboran como una (clave seudónima del teléfono) | ✅ | ADR 0068, migración 0036 |
@@ -481,6 +482,9 @@ Revisión del Blueprint del 2026-09-30 (tras ADR 0208): completada con ADR 0209�
 Revisión del Blueprint del 2026-09-30 (tras ADR 0212): completada con ADR 0213–0220 (incluye el Language Engine y el AI ROUTER pedidos por el propietario).
 
 Revisión del Blueprint del 2026-09-30 (tras ADR 0220): completada con ADR 0221–0228 (los avisos sociales pasan a PENDING DECISION).
+
+Revisión del Blueprint del 2026-09-30 (tras ADR 0228), verificada contra el código, sin bloqueos:
+
 
 Bloqueadas o en espera:
 

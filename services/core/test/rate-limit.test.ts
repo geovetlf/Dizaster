@@ -41,3 +41,16 @@ describe("límite general de peticiones (ADR 0047)", () => {
     });
   });
 });
+
+describe("tokens inválidos (ADR 0229)", () => {
+  let t: TestContext;
+  beforeAll(async () => { t = await createTestContext({ env: { RATE_LIMIT_PER_MINUTE: "3" } }); });
+  afterAll(async () => { await t.close(); });
+
+  it("una ráfaga de tokens falsos gasta el cupo de la IP y termina en 429", async () => {
+    const bad = () => t.app.inject({ url: "/v1/config", headers: { authorization: "Bearer falso" }, remoteAddress: "10.1.1.1" });
+    for (let i = 0; i < 3; i++) expect((await bad()).statusCode).toBe(401);
+    expect((await bad()).statusCode).toBe(429);
+    expect((await t.app.inject({ url: "/v1/config", remoteAddress: "10.1.1.2" })).statusCode).toBe(200);
+  });
+});
