@@ -40,12 +40,24 @@ describe("quien fue bloqueado no puede interactuar", () => {
     const anaComment = (await inject(ana, "POST", `/v1/posts/${other}/comments`, { text: "Mucho tráfico" })).json().id as string;
     expect((await inject(beto, "POST", `/v1/posts/${other}/comments`, { text: "Respuesta", parentId: anaComment })).json()).toMatchObject({ error: "BLOCKED" });
     expect((await inject(beto, "POST", `/v1/posts/${other}/comments`, { text: "Comentario suelto" })).statusCode).toBe(201);
+    // Ni reacciona a sus comentarios (ADR 0252).
+    expect((await inject(beto, "PUT", `/v1/comments/${anaComment}/reactions/LIKE`)).json()).toMatchObject({ error: "BLOCKED" });
+    expect((await t.app.inject({ method: "DELETE", url: `/v1/comments/${anaComment}/reactions/LIKE`, headers: auth(beto) })).statusCode).toBe(200);
     expect(comment).toBeTruthy();
   });
 
   it("en un post seudónimo no se aplica: rechazar revelaría a su autor", async () => {
     const id = await post(ana, { text: "Aviso anónimo", anonymityMode: "PSEUDONYMOUS" });
     expect((await inject(beto, "POST", `/v1/posts/${id}/comments`, { text: "Ok" })).statusCode).toBe(201);
+  });
+});
+
+describe("comentarios borrados (ADR 0252)", () => {
+  it("borrar un comentario propio vacía su texto", async () => {
+    const id = await post(ana, { text: "Lluvia fuerte" });
+    const cid = (await inject(ana, "POST", `/v1/posts/${id}/comments`, { text: "Texto a borrar" })).json().id as string;
+    expect((await t.app.inject({ method: "DELETE", url: `/v1/comments/${cid}`, headers: auth(ana) })).statusCode).toBe(204);
+    expect((await t.c.db.query<{ text: string }>(`SELECT text FROM social.comments WHERE id = $1`, [cid])).rows[0]!.text).toBe("-");
   });
 });
 

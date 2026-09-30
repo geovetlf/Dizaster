@@ -1,7 +1,7 @@
 # Dominio técnico de enlaces (NO es una web de Dizaster)
 
 Dizaster V1 es solo app. Este directorio contiene **únicamente** los dos archivos que Apple y Google exigen
-para que un enlace `https://<dominio>/e/<id>` abra la app (Universal Links / App Links):
+para que un enlace `https://<dominio>/e/<id>` (evento) o `https://<dominio>/p/<id>` (post) abra la app (Universal Links / App Links):
 
 - `.well-known/apple-app-site-association` (iOS)
 - `.well-known/assetlinks.json` (Android)

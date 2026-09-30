@@ -1071,7 +1071,8 @@ export class SocialService {
   /** Borrar mi comentario (ADR 0045). Sus respuestas quedan visibles, sin el comentario al que respondían. */
   async deleteComment(q: Queryable, commentId: string, profileId: string): Promise<void> {
     const res = await q.query(
-      `UPDATE social.comments SET deleted_at = now() WHERE id = $1 AND author_profile_id = $2 AND deleted_at IS NULL`,
+      // El texto se vacía (ADR 0252): lo que la persona borra no se conserva.
+      `UPDATE social.comments SET text = '-', deleted_at = now() WHERE id = $1 AND author_profile_id = $2 AND deleted_at IS NULL`,
       [commentId, profileId],
     );
     if (res.rowCount === 0) {
@@ -1083,11 +1084,13 @@ export class SocialService {
 
   /** Reacción en un comentario visible, idempotente. */
   async setCommentReaction(q: Queryable, commentId: string, profileId: string, kind: CommentReactionKind, on: boolean): Promise<ReactionState> {
-    const c = await q.query<{ post_id: string }>(
-      `SELECT post_id FROM social.comments WHERE id = $1 AND deleted_at IS NULL AND moderation_state = 'VISIBLE'`, [commentId],
+    const c = await q.query<{ post_id: string; author_profile_id: string }>(
+      `SELECT post_id, author_profile_id FROM social.comments WHERE id = $1 AND deleted_at IS NULL AND moderation_state = 'VISIBLE'`, [commentId],
     );
     if (!c.rows[0]) throw notFound("Comentario");
     await this.assertVisible(q, c.rows[0].post_id);
+    // Quien te bloqueó no reacciona a tus comentarios (ADR 0252, como en ADR 0221). Quitar una reacción siempre se puede.
+    if (on && (await this.isBlockedBy(q, c.rows[0].author_profile_id, profileId))) throw blocked();
     if (on) {
       await q.query(`INSERT INTO social.comment_reactions (comment_id, profile_id, kind) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`, [commentId, profileId, kind]);
     } else {
