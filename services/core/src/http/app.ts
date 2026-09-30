@@ -43,8 +43,11 @@ function requireSession(req: FastifyRequest): Session {
 /** Tope del documento que una fuente puede empujar (ADR 0128). */
 const PUSH_BODY_LIMIT = 2 * 1024 * 1024;
 const SourcePushParams = z.object({ sourceKey: z.string().regex(/^[a-z0-9-]{1,64}$/) });
-/** Escrituras permitidas a una cuenta suspendida: apelar, cerrar y renovar sesiones, borrar sus posts y borrar la cuenta. */
-const WRITE_ALLOWED_WHEN_SUSPENDED = /^(POST \/v1\/me\/policies\/accept|POST \/v1\/me\/moderation\/[^/]+\/appeal|POST \/v1\/auth\/(refresh|logout)|DELETE \/v1\/me|DELETE \/v1\/posts\/[^/]+|DELETE \/v1\/me\/sessions\/[^/]+|POST \/v1\/me\/sessions\/revoke-others)$/;
+/**
+ * Escrituras permitidas a una cuenta suspendida: apelar, cerrar y renovar sesiones, borrar sus posts y comentarios,
+ * retirar sus reportes (ADR 0237) y borrar la cuenta. Quitar lo propio nunca se impide.
+ */
+const WRITE_ALLOWED_WHEN_SUSPENDED = /^(POST \/v1\/me\/policies\/accept|POST \/v1\/me\/moderation\/[^/]+\/appeal|POST \/v1\/auth\/(refresh|logout)|DELETE \/v1\/me|DELETE \/v1\/posts\/[^/]+|DELETE \/v1\/comments\/[^/]+|DELETE \/v1\/me\/reports\/[^/]+|DELETE \/v1\/me\/sessions\/[^/]+|POST \/v1\/me\/sessions\/revoke-others)$/;
 /**
  * La suspensión nunca quita la protección (ADR 0225): una cuenta suspendida (no una borrada) mantiene sus avisos de
  * seguridad (token push, preferencias, suscripciones, zonas, ubicación aproximada, seguir eventos y lugares, marcar

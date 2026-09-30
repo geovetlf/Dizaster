@@ -427,6 +427,7 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | Reportes sensibles seudónimos por defecto (ADR 0234) | ✅ | §13.2, D-05 |
 | Borrar cuenta de personal: registro de roles y último admin (ADR 0235) | ✅ | 409 `LAST_ADMIN` |
 | Apelaciones paginadas y por id (ADR 0236) | ✅ | cursor, sin tope de 50 |
+| Suspendidos quitan sus comentarios y reportes (ADR 0237) | ✅ | lista de escrituras permitidas |
 | Licencias, auditoría, SBOM, Dependabot; respaldo con prueba de restauración en CI | ✅ | ADR 0070, `scripts/supply-chain.mjs`, `scripts/db-restore-check.mjs` |
 | Idioma de la app elegible en el perfil (es/en/pt/fr o del teléfono) | ✅ | ADR 0069, `app/language.tsx` |
 | Varias cuentas en un teléfono corroboran como una (clave seudónima del teléfono) | ✅ | ADR 0068, migración 0036 |
@@ -494,8 +495,7 @@ Revisión del Blueprint del 2026-09-30 (tras ADR 0228), verificada contra el có
 
 1. Auditoría de acciones por moderador y registro de originales paginado (§5.21, §13.1).
 2. SOS, contador y botones pequeños con texto grande (accesibilidad).
-3. Cuentas suspendidas pueden borrar comentarios y retirar reportes.
-4. Cambios de administración y su registro en la misma transacción (auditoría).
+3. Cambios de administración y su registro en la misma transacción (auditoría).
 
 Bloqueadas o en espera:
 
