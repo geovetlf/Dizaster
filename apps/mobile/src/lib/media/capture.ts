@@ -66,7 +66,21 @@ export async function captureMedia(source: CaptureSource, kind: CaptureKind): Pr
   }
   const result = source === "camera" ? await ImagePicker.launchCameraAsync(options) : await ImagePicker.launchImageLibraryAsync(options);
   if (result.canceled || !result.assets[0]) return null;
-  const asset = result.assets[0];
+  return fromAsset(result.assets[0], source, kind);
+}
+
+/**
+ * Android puede matar la app mientras la cámara está abierta (poca memoria). Al volver, el resultado sigue en
+ * el sistema: se recupera y se procesa igual que una captura normal (ADR 0191). En iOS devuelve null.
+ * `source` y `kind` son los que la app guardó antes de abrir la cámara: nunca se deducen del resultado.
+ */
+export async function recoverPendingCapture(source: CaptureSource, kind: CaptureKind): Promise<LocalMedia | null> {
+  const pending = await ImagePicker.getPendingResultAsync().catch(() => null);
+  if (!pending || !("assets" in pending) || pending.canceled || !pending.assets?.[0]) return null;
+  return fromAsset(pending.assets[0], source, kind);
+}
+
+async function fromAsset(asset: ImagePicker.ImagePickerAsset, source: CaptureSource, kind: CaptureKind): Promise<LocalMedia> {
   const capturedAt = new Date().toISOString();
 
   if (kind === "IMAGE") {

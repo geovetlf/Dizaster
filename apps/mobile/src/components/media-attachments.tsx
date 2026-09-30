@@ -11,8 +11,11 @@ import { appConfig } from "../lib/config/app-config";
 export const MAX_MEDIA_PER_REPORT = 4;
 
 /** Adjuntar fotos y videos a un reporte. Mismo componente en Android e iOS. */
-export function MediaAttachments({ items, onChange, suggestRedaction = false, cameraOnly = false }: {
+export function MediaAttachments({ items, onChange, suggestRedaction = false, cameraOnly = false, onCaptureStart, onCaptureEnd }: {
   items: LocalMedia[]; onChange: (items: LocalMedia[]) => void;
+  /** Borrador (ADR 0191): se avisa antes de abrir la cámara para poder recuperar la foto si Android mata la app. */
+  onCaptureStart?: (source: CaptureSource, kind: CaptureKind) => void;
+  onCaptureEnd?: () => void;
   /** Reportes (D-10, ADR 0166): solo la cámara de la app; la galería queda para los posts. */
   cameraOnly?: boolean;
   /** Categoría sensible (p. ej. delincuencia): se invita a difuminar rostros y matrículas (D-08). */
@@ -34,6 +37,7 @@ export function MediaAttachments({ items, onChange, suggestRedaction = false, ca
     setBusy(true);
     setMessage(t("preparing"));
     setCameraDenied(false);
+    onCaptureStart?.(source, kind);
     try {
       const m = await captureMedia(source, kind);
       if (!m) return setMessage(null);
@@ -52,6 +56,7 @@ export function MediaAttachments({ items, onChange, suggestRedaction = false, ca
       setMessage((e as Error).message);
     } finally {
       setBusy(false);
+      onCaptureEnd?.();
     }
   }
 

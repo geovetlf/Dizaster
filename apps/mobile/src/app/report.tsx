@@ -28,6 +28,9 @@ import { categoryIn, findCategory, reportCategories, useCategoryCatalogVersion }
 import { askSameEvent } from "../lib/report/same-event";
 import { UpdateRequired, useUpdateRequirement } from "../components/update-required";
 import { appConfig } from "../lib/config/app-config";
+import { recoverPendingCapture, type CaptureKind, type CaptureSource } from "../lib/media/capture";
+import { draftWorthKeeping, type ReportDraft } from "../lib/report/draft";
+import { clearDraft, loadDraft, saveDraft } from "../lib/report/draft-store";
 
 
 type Phase = "category" | "locating" | "compose";
@@ -55,6 +58,10 @@ export default function ReportScreen() {
   // Por qué no hay fix (ADR 0183): sin permiso (ir a Ajustes) o sin señal a tiempo (reintentar).
   const [blocked, setBlocked] = useState<"denied" | "timeout" | null>(null);
   const recent = useRef<Location.LocationObject[]>([]);
+  // Borrador (ADR 0191): el que se ofrece retomar y el aviso de que ya se envió (no se vuelve a guardar).
+  const [draft, setDraft] = useState<ReportDraft | null>(null);
+  const sent = useRef(false);
+  const capturing = useRef<ReportDraft["pendingCapture"]>(null);
   // Versión por debajo de la mínima (ADR 0164): no se envía; emergencias sigue a mano.
   const update = useUpdateRequirement();
 
@@ -66,6 +73,57 @@ export default function ReportScreen() {
     void choose(c);
     // Solo al abrir la pantalla desde el evento.
   }, []);
+
+  useEffect(() => {
+    if (deny) return;
+    loadDraft().then((d) => { if (d && findCategory(d.categoryCode)?.citizenReportable) setDraft(d); }).catch(() => undefined);
+  }, []);
+
+  /** Lo que hay ahora en pantalla, como borrador. Sin ubicación: nunca se guarda. */
+  const currentDraft = (): ReportDraft | null =>
+    category && !deny ? { v: 1, categoryCode: category.code, text, pseudonymous, media, targetEventId: target, savedAt: Date.now(), pendingCapture: capturing.current } : null;
+
+  // Guardado automático mientras se escribe (tras una pausa breve).
+  useEffect(() => {
+    if (phase !== "compose" || sent.current) return;
+    const timer = setTimeout(() => {
+      const d = currentDraft();
+      if (!d) return;
+      void (draftWorthKeeping(d) ? saveDraft(d) : clearDraft({ discardMedia: false })).catch(() => undefined);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [phase, category, text, media, pseudonymous, target]);
+
+  function captureStart(source: CaptureSource, kind: CaptureKind) {
+    capturing.current = { source, kind };
+    const d = currentDraft();
+    if (d) void saveDraft(d).catch(() => undefined);
+  }
+
+  function captureEnd() {
+    capturing.current = null;
+  }
+
+  async function resume(d: ReportDraft) {
+    setDraft(null);
+    const c = findCategory(d.categoryCode);
+    if (!c) return;
+    setText(d.text);
+    setPseudonymous(d.pseudonymous);
+    setTarget(d.targetEventId);
+    let restored = d.media;
+    if (d.pendingCapture) {
+      const m = await recoverPendingCapture(d.pendingCapture.source, d.pendingCapture.kind).catch(() => null);
+      if (m) restored = [...restored, m];
+    }
+    setMedia(restored);
+    await choose(c);
+  }
+
+  async function discardDraft(d: ReportDraft) {
+    setDraft(null);
+    await clearDraft({ discardMedia: true, draft: d }).catch(() => undefined);
+  }
 
   useEffect(() => {
     appConfig().then((c) => setStyleUrl(providerFromAppConfig(c)?.styleUrl(APP_MAP_SCHEME) ?? null)).catch(() => setStyleUrl(null));
@@ -150,6 +208,9 @@ export default function ReportScreen() {
       // Si el almacén seguro falla, el reporte sale igual sin firma: nunca se bloquea un aviso.
       const evidence = await signingSeed().then((seed) => signEvidence(body, media.map((m) => m.sha256), seed)).catch(() => undefined);
       await reportQueue.enqueue(evidence ? { ...body, evidence } : body, now, media);
+      // Las fotos pasan a la cola: el borrador se borra sin tocarlas.
+      sent.current = true;
+      await clearDraft({ discardMedia: false }).catch(() => undefined);
       setMedia([]);
       setStatus(media.length ? t("uploadingMedia") : t("sending"));
       const mine = await flushUntilSent(body.clientReportId);
@@ -174,6 +235,21 @@ export default function ReportScreen() {
       <View style={styles.container}>
         <Text style={styles.title}>{t("chooseCategory")}</Text>
         {status ? <Text style={styles.status}>{status}</Text> : null}
+        {draft ? (
+          <View style={styles.nearby}>
+            <Text style={styles.section}>{t("draftFound")} {findCategory(draft.categoryCode)?.names[lang] ?? findCategory(draft.categoryCode)?.names["es"]}</Text>
+            {draft.text ? <Text style={styles.note} numberOfLines={2}>{draft.text}</Text> : null}
+            <Text style={styles.note}>{t("draftHint")}</Text>
+            <View style={styles.switchRow}>
+              <Pressable accessibilityRole="button" style={styles.send} onPress={() => void resume(draft)}>
+                <Text style={styles.sendText}>{t("draftResume")}</Text>
+              </Pressable>
+              <Pressable accessibilityRole="button" style={styles.row} onPress={() => void discardDraft(draft)}>
+                <Text style={styles.rowText}>{t("draftDiscard")}</Text>
+              </Pressable>
+            </View>
+          </View>
+        ) : null}
         <Pressable accessibilityRole="button" style={styles.row} onPress={() => router.replace("/compose")}>
           <Text style={styles.rowText}>{t("postWithoutReport")}</Text>
           <Text style={styles.meta}>{t("postWithoutReportHint")}</Text>
@@ -182,7 +258,7 @@ export default function ReportScreen() {
           data={categories}
           keyExtractor={(c) => c.code}
           renderItem={({ item }) => (
-            <Pressable accessibilityRole="button" style={styles.row} onPress={() => void choose(item)}>
+            <Pressable accessibilityRole="button" style={styles.row} onPress={() => { if (draft) void discardDraft(draft); void choose(item); }}>
               <Text style={styles.rowText}>{item.names[lang] ?? item.names["es"]}</Text>
             </Pressable>
           )}
@@ -271,7 +347,8 @@ export default function ReportScreen() {
         </View>
       ) : null}
 
-      <MediaAttachments items={media} onChange={setMedia} suggestRedaction={category.sensitivity !== "NORMAL"} cameraOnly />
+      <MediaAttachments items={media} onChange={setMedia} suggestRedaction={category.sensitivity !== "NORMAL"} cameraOnly
+        onCaptureStart={captureStart} onCaptureEnd={captureEnd} />
       <TextInput style={styles.input} multiline maxLength={2000} value={text} onChangeText={setText} placeholder="…" placeholderTextColor={colors.textMuted} />
       {detectPersonalData(text).length ? <Text style={[styles.note, styles.warn]}>{t("personalDataWarning")}</Text> : null}
       {category.forcePseudonymous ? (
