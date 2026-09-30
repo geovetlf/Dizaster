@@ -5,6 +5,7 @@ import { describeCategory, newestCatalog, pickableCategories, reportableCategori
 import { API_URL } from "./config";
 import { preferredCountry } from "./geo/preferred-country";
 import { lang } from "./i18n";
+import { fetchWithTimeout } from "./async/timeout";
 
 // Catálogo empaquetado: las categorías funcionan sin conexión desde la primera apertura.
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -54,7 +55,7 @@ export function useCategoryCatalogVersion(): string {
 export async function refreshCategoryCatalog(): Promise<boolean> {
   const now = current();
   try {
-    const res = await fetch(`${API_URL}/v1/reference/categories`, { headers: now.etag ? { "if-none-match": now.etag } : {} });
+    const res = await fetchWithTimeout(`${API_URL}/v1/reference/categories`, { headers: now.etag ? { "if-none-match": now.etag } : {} });
     if (res.status === 304 || !res.ok) return false;
     const next = newestCatalog(now.catalog, await res.json());
     if (next === now.catalog) return false;

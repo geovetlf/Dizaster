@@ -17,4 +17,4 @@ al instante, y nadie se enteraba. Solo se reintentaba al abrir la app o al volve
   reintentando, detenido) y las acciones Reintentar y Descartar (con confirmación; solo entonces se borran las copias).
 - Con la app abierta y algo en cola, reintento automático con espera creciente 15 s → 30 s → … → 5 min; se reinicia
   al volver a primer plano. Sin módulos nativos nuevos (Android e iOS iguales).
-- Pendiente (necesita build de desarrollo, bloqueado por EXPO_TOKEN): reintento en segundo plano con la app cerrada.
+- Reintento en segundo plano y al volver la red: ADR 0190.

@@ -2,6 +2,7 @@ import { EmergencyDataset, EmergencyNumbersResponse, compareDatasetVersions } fr
 import { File, Paths } from "expo-file-system";
 import { API_URL } from "./config";
 import { newestDataset } from "./emergency";
+import { fetchWithTimeout } from "./async/timeout";
 
 // Dataset empaquetado: los números funcionan sin conexión desde la primera apertura.
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -28,7 +29,7 @@ export async function localEmergencyDataset(): Promise<EmergencyDataset> {
 export async function refreshEmergencyDataset(): Promise<EmergencyDataset | null> {
   const current = await localEmergencyDataset();
   try {
-    const res = await fetch(`${API_URL}/v1/reference/emergency-numbers?since=${encodeURIComponent(current.version)}`);
+    const res = await fetchWithTimeout(`${API_URL}/v1/reference/emergency-numbers?since=${encodeURIComponent(current.version)}`);
     if (!res.ok) return null;
     const body = EmergencyNumbersResponse.safeParse(await res.json());
     if (!body.success || body.data.unchanged || compareDatasetVersions(body.data.version, current.version) <= 0) return null;

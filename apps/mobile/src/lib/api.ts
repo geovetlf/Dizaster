@@ -2,6 +2,7 @@ import type { AcceptPoliciesRequest, PolicyStatusResponse, ClientCrashReport, Cl
 import { mergeMapTiles, tilesForView } from "@dizaster/geo-kit";
 import { canRetryWithRefresh, singleFlight } from "./auth/refresh";
 import { appVersionHeaders } from "./app-identity";
+import { fetchWithTimeout } from "./async/timeout";
 import { API_URL } from "./config";
 import { newId } from "./ids";
 import { EtagCache } from "./http/etag-cache";
@@ -27,6 +28,9 @@ export function setSession(pair: Pick<TokenPair, "token" | "refreshToken"> | nul
   token = pair?.token ?? null;
   refreshToken = pair?.refreshToken ?? null;
 }
+
+/** Hay sesión en memoria (la tarea en segundo plano solo envía con la app viva y con sesión, ADR 0190). */
+export const hasSession = () => token !== null;
 
 /** `rotated`: guardar el refresh nuevo. `lost`: la sesión no se pudo renovar. `mfa`: moderación pide el segundo factor. */
 export function onSessionEvents(l: typeof listeners) { listeners = l; }
@@ -60,7 +64,7 @@ async function request<T>(path: string, init: RequestInit = {}, retried = false)
   const isGet = (init.method ?? "GET") === "GET";
   // Id de correlación (ADR 0172): el servidor lo propaga a sus eventos y lo devuelve; queda en el error si falla.
   const requestId = newId();
-  const res = await fetch(`${API_URL}${path}`, {
+  const res = await fetchWithTimeout(`${API_URL}${path}`, {
     ...init,
     // Sin cuerpo no se declara JSON: el servidor rechaza un cuerpo JSON vacío (p. ej. DELETE o POST .../complete).
     headers: { ...(init.body ? { "content-type": "application/json" } : {}), "x-request-id": requestId, ...appVersionHeaders, ...auth, ...(isGet ? etags.headers(path) : {}), ...(init.headers ?? {}) },

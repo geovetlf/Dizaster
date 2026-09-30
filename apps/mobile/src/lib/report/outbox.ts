@@ -1,7 +1,9 @@
+import { addNetworkStateListener, getNetworkStateAsync } from "expo-network";
 import { AppState } from "react-native";
 import { sendReport } from "../api";
 import { discardLocal } from "../media/capture";
 import { uploadMedia } from "../media/upload";
+import { cameOnline, type NetState } from "./connectivity";
 import { ReportQueue, retryDelayMs, type FlushResult, type QueuedReport } from "./queue";
 import { SqliteQueueStorage } from "./sqlite-storage";
 
@@ -47,9 +49,9 @@ export async function retryQueuedReport(clientReportId: string): Promise<FlushRe
 }
 
 /**
- * Reenvío automático (ADR 0158): al iniciar sesión, al volver a primer plano y, mientras la app está abierta y
- * queda algo en cola, con espera creciente (15 s → 5 min). Así, si la red vuelve con la app abierta, el reporte
- * sale sin que la persona haga nada. En segundo plano no corre nada (eso requiere un módulo nativo). Android e iOS.
+ * Reenvío automático (ADR 0158, ADR 0190): al iniciar sesión, al volver a primer plano, en cuanto vuelve la red y,
+ * mientras la app está abierta y queda algo en cola, con espera creciente (15 s → 5 min). En segundo plano lo
+ * retoma la tarea del sistema (`background.ts`). Android e iOS.
  */
 export function startAutoFlush(): () => void {
   let timer: ReturnType<typeof setTimeout> | null = null;
@@ -70,5 +72,13 @@ export function startAutoFlush(): () => void {
   const sub = AppState.addEventListener("change", (s) => {
     if (s === "active") { failures = 0; run(); } else clear();
   });
-  return () => { clear(); sub.remove(); };
+  // Al volver la red no se espera al siguiente reintento: sale ya.
+  let net: NetState | null = null;
+  void getNetworkStateAsync().then((s) => { net ??= s; }).catch(() => undefined);
+  const netSub = addNetworkStateListener((s) => {
+    const back = cameOnline(net, s);
+    net = s;
+    if (back) { failures = 0; run(); }
+  });
+  return () => { clear(); sub.remove(); netSub.remove(); };
 }

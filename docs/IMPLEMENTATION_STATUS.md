@@ -380,6 +380,7 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | Latido del worker y /health/ready (§5.22, §13.1) | ✅ | ADR 0187: latido por rol e instancia, /health/ready con worker y outbox (503 con códigos), healthchecks de API y worker en imagen y compose |
 | Galería del evento con miniaturas (§12.1) | ✅ | ADR 0188: miniatura en la tira y visor a pantalla completa con la variante grande solo al tocar |
 | Respaldos cifrados con clave pública y retención (§13.1) | ✅ | ADR 0189: pg_dump por tubería a age (nunca en claro), obligatorio en producción, restore-check con sha256 y descifrado, retención N últimos + semanales |
+| Cola offline que se envía sola (§8.3, C-04) | ✅ | ADR 0190: tiempo límite de 30 s, envío al volver la red (expo-network) y tarea en segundo plano (expo-background-task) sin renovar sesión desde segundo plano |
 | Licencias, auditoría, SBOM, Dependabot; respaldo con prueba de restauración en CI | ✅ | ADR 0070, `scripts/supply-chain.mjs`, `scripts/db-restore-check.mjs` |
 | Idioma de la app elegible en el perfil (es/en/pt/fr o del teléfono) | ✅ | ADR 0069, `app/language.tsx` |
 | Varias cuentas en un teléfono corroboran como una (clave seudónima del teléfono) | ✅ | ADR 0068, migración 0036 |
@@ -429,6 +430,15 @@ Revisión del Blueprint del 2026-09-30 (tras ADR 0176): completada con ADR 0177�
 
 Revisión del Blueprint del 2026-09-30 (tras ADR 0182): completada con ADR 0183–0189 (0184 aplica las decisiones del
 propietario del 2026-09-30: sin señal de red, aceptaciones mínimas tras borrar la cuenta, todo público en V1).
+
+Revisión del Blueprint del 2026-09-30 (tras ADR 0189), verificada contra el código, sin bloqueos:
+1. Borrador de reporte guardado en el teléfono (§5.4 `ReportDraft`): no perder lo empezado si la app se cierra; limpiar media huérfana.
+2. Presencia con seguimiento breve del GPS (§8.2): varias lecturas hasta ≤ 50 m y datos para la regla de velocidad imposible.
+3. Etiquetas del mapa en el idioma de la persona (§6.1 `styleUrl(theme, locale)`).
+4. Decodificación de media aislada (§13.1): proceso aparte con límites de memoria y tiempo.
+5. Ubicación simulada en iOS y proveedor real (§8.2, paridad): módulo nativo local.
+6. Video 720p también en Android (§12.1, paridad).
+7. Números de emergencia verificados contra fuentes oficiales, empezando por Perú (§5.11, C-06).
 
 Bloqueadas o en espera:
 

@@ -173,6 +173,8 @@ const config: ExpoConfig = {
     // Tokens de sesión en Keychain (iOS) y Keystore (Android).
     ["expo-secure-store", { faceIDPermission: false }],
     "expo-system-ui",
+    // Envío de la cola de reportes en segundo plano (ADR 0190): WorkManager (Android) y BGTaskScheduler (iOS).
+    "expo-background-task",
     "@maplibre/maplibre-react-native",
   ],
   experiments: { typedRoutes: false },

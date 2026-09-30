@@ -6,6 +6,7 @@ import { Platform } from "react-native";
 let mfaOpen = false;
 import { api, onSessionEvents, setSession, type TokenPair } from "./api";
 import { startupPlan } from "./auth/sign-in-flow";
+import { registerReportQueueTask } from "./report/background";
 import { ensureAlertChannel, registerPushIfPermitted, watchPushTokenRotation } from "./device/push";
 import { registerSigningKey } from "./device/signing-key";
 import { clearIdentity, loadIdentity, saveIdentity, type StoredIdentity } from "./device/secure-session";
@@ -113,6 +114,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       setState({ ready: true, deviceId, error: null });
       // Reportes guardados sin conexión: se envían en cuanto hay sesión y cada vez que la app vuelve al frente.
       stopFlush = startAutoFlush();
+      void registerReportQueueTask().catch(() => undefined);
       if (deviceId) {
         await ensureAlertChannel().catch(() => undefined);
         await registerPushIfPermitted(deviceId).catch(() => false);
