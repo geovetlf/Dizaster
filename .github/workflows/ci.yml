@@ -89,7 +89,7 @@ jobs:
         run: pnpm dzd policy --env staging
       - name: Documentación que acompaña al cambio
         run: pnpm dzd docs
-      - name: Informe del cambio (Markdown, para el comentario del PR cuando exista el repositorio)
+      - name: Informe del cambio (Markdown; el job report-comment lo publica en el PR)
         run: pnpm dzd report --out delivery-report.md
       - name: Auditoría
         if: always()
@@ -101,6 +101,37 @@ jobs:
           path: |
             delivery-audit.jsonl
             delivery-report.md
+
+  # Publica el informe de delivery como un único comentario del PR, que se actualiza en cada push (ADR 0284).
+  # No hace checkout ni ejecuta código del PR: solo lee el artefacto del job delivery. Es el único job con permiso
+  # de escritura, y solo sobre comentarios. En PRs desde forks GitHub da un token de solo lectura: se omite.
+  report-comment:
+    needs: delivery
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      pull-requests: write
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: delivery-audit
+      - name: Comentario del informe (crear o actualizar)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          marker='<!-- dzd-report -->'
+          # GitHub admite hasta 65536 caracteres por comentario.
+          body="$(printf '%s\n%s' "$marker" "$(head -c 60000 delivery-report.md)")"
+          id="$(gh api --paginate "repos/$REPO/issues/$PR/comments" \
+            --jq ".[] | select(.user.login == \"github-actions[bot]\" and (.body | startswith(\"$marker\"))) | .id" | head -n 1)"
+          if [ -n "$id" ]; then
+            gh api -X PATCH "repos/$REPO/issues/comments/$id" -f body="$body" > /dev/null
+          else
+            gh api "repos/$REPO/issues/$PR/comments" -f body="$body" > /dev/null
+          fi
 
   supply-chain:
     runs-on: ubuntu-24.04
