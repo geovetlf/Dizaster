@@ -470,8 +470,7 @@ Revisión del Blueprint del 2026-09-30 (tras ADR 0202): completada con ADR 0203�
 
 Revisión del Blueprint del 2026-09-30 (tras ADR 0208): completada con ADR 0209–0212.
 
-Revisión del Blueprint del 2026-09-30 (tras ADR 0212), verificada contra el código, sin bloqueos:
-
+Revisión del Blueprint del 2026-09-30 (tras ADR 0212): completada con ADR 0213–0220 (incluye el Language Engine y el AI ROUTER pedidos por el propietario).
 
 Bloqueadas o en espera:
 
