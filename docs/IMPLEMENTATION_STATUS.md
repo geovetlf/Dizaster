@@ -437,6 +437,7 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | Ciclo de vida con aviso vigente y en transacción (ADR 0244) | ✅ | §10.1, §6.2 |
 | Descartar reporte en cola durante un envío (ADR 0245) | ✅ | §8.3, §13.2 |
 | Correcciones de una fuente cambian su evidencia (ADR 0246) | ✅ | §9.2, §10.2 |
+| Búsqueda sin distinguir tildes ni ñ (ADR 0247) | ✅ | `platform.search_key` |
 | Licencias, auditoría, SBOM, Dependabot; respaldo con prueba de restauración en CI | ✅ | ADR 0070, `scripts/supply-chain.mjs`, `scripts/db-restore-check.mjs` |
 | Idioma de la app elegible en el perfil (es/en/pt/fr o del teléfono) | ✅ | ADR 0069, `app/language.tsx` |
 | Varias cuentas en un teléfono corroboran como una (clave seudónima del teléfono) | ✅ | ADR 0068, migración 0036 |
@@ -507,7 +508,6 @@ Revisión del Blueprint del 2026-09-30 (tras ADR 0240), verificada contra el có
 1. Retención de crudos y originales sin tope diario; purga de corridas de ingesta (§12, §13.2).
 2. Mapa sin conexión de una zona marcado como desactualizado al editarla o cambiar de idioma (§11.3).
 3. Fusionar eventos traslada el estado de alertas (§5.10).
-4. Búsqueda de eventos por título sin distinguir tildes ni ñ (§6.3).
 
 Bloqueadas o en espera:
 

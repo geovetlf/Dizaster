@@ -1217,7 +1217,7 @@ export class EventService {
         OR e.secondary_categories && ${p(codes)}::text[]
         OR e.region_id = ANY(${p(place.areaIds)}) OR e.district_id = ANY(${p(place.areaIds)}) OR e.city_id = ANY(${p(place.areaIds)})
         OR e.country_code = ANY(${p(place.countries)})
-        OR EXISTS (SELECT 1 FROM jsonb_each_text(coalesce(e.title, '{}')) t WHERE lower(t.value) LIKE ${p(like)})
+        OR EXISTS (SELECT 1 FROM jsonb_each_text(coalesce(e.title, '{}')) t WHERE platform.search_key(t.value) LIKE ${p(like)})
       )`);
     }
     const near = lat !== undefined && lng !== undefined ? { lat: Math.round(lat * 100) / 100, lng: Math.round(lng * 100) / 100 } : null;
