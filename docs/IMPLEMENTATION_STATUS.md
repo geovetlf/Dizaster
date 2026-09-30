@@ -351,6 +351,7 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | 0158 | Cola offline sin pérdidas: sin red no gasta intentos, los detenidos se conservan con Reintentar/Descartar, reintento automático con espera creciente | ✅ |
 | 0159 | Worker por roles (urgent / normal / maintenance) en bucles separados; ingesta por carril; WORKER_ROLES para escalar por separado | ✅ |
 | 0160 | Gravedad del evento desde su evidencia activa (puede bajar) + corrección auditada de moderación | ✅ |
+| 0161 | Pantalla de error global con números de emergencia locales + registro local de errores redactado | ✅ |
 | Licencias, auditoría, SBOM, Dependabot; respaldo con prueba de restauración en CI | ✅ | ADR 0070, `scripts/supply-chain.mjs`, `scripts/db-restore-check.mjs` |
 | Idioma de la app elegible en el perfil (es/en/pt/fr o del teléfono) | ✅ | ADR 0069, `app/language.tsx` |
 | Varias cuentas en un teléfono corroboran como una (clave seudónima del teléfono) | ✅ | ADR 0068, migración 0036 |
@@ -392,10 +393,9 @@ Revisión del Blueprint del 2026-09-29 (tras ADR 0148): completada con ADR 0149�
 
 Revisión del Blueprint del 2026-09-30 (tras ADR 0157), verificada contra el código, sin bloqueos:
 
-1. Pantalla de error global en la app que siempre deja llegar a emergencias (§5.22)
-2. Salud y pausa/reanudación de fuentes desde la app de administración (§5.21, §9.2)
-3. Códec de video verificado en el servidor (H.264), sin transcodificar (§5.9, §12.1)
-4. Versión mínima de la app por plataforma en /v1/config (§6.3)
+1. Salud y pausa/reanudación de fuentes desde la app de administración (§5.21, §9.2)
+2. Códec de video verificado en el servidor (H.264), sin transcodificar (§5.9, §12.1)
+3. Versión mínima de la app por plataforma en /v1/config (§6.3)
 
 Bloqueadas o en espera:
 
