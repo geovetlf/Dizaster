@@ -403,6 +403,7 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | Retención de códigos de correo y fallos de MFA (§13.2) | ✅ | ADR 0210: se borran a las 24 h en la retención diaria del worker |
 | Borrar la cuenta limpia el teléfono; cerrar sesión (§13.2, §5.1) | ✅ | ADR 0211: cola, borrador, media, errores, caché y exportaciones; "Cerrar sesión en este teléfono" con logout |
 | Enlaces rotos y contenido borrado (§5.x, D-12) | ✅ | ADR 0212: +not-found traducido, estados de carga, no disponible y reintento en evento y post |
+| Corroboración desde teléfonos distintos (§8.2, §10.2) | ✅ | ADR 0213: publicar un evento pendiente cuenta una vez por persona y por teléfono |
 | Licencias, auditoría, SBOM, Dependabot; respaldo con prueba de restauración en CI | ✅ | ADR 0070, `scripts/supply-chain.mjs`, `scripts/db-restore-check.mjs` |
 | Idioma de la app elegible en el perfil (es/en/pt/fr o del teléfono) | ✅ | ADR 0069, `app/language.tsx` |
 | Varias cuentas en un teléfono corroboran como una (clave seudónima del teléfono) | ✅ | ADR 0068, migración 0036 |
@@ -461,6 +462,13 @@ Revisión del Blueprint del 2026-09-30 (tras ADR 0196): completada con ADR 0197�
 Revisión del Blueprint del 2026-09-30 (tras ADR 0202): completada con ADR 0203–0208.
 
 Revisión del Blueprint del 2026-09-30 (tras ADR 0208): completada con ADR 0209–0212.
+
+Revisión del Blueprint del 2026-09-30 (tras ADR 0212), verificada contra el código, sin bloqueos:
+
+1. Personal suspendido sin poderes y conflicto de interés (§13.1, §13.3): un moderador suspendido conserva permisos y puede actuar sobre lo propio.
+2. Un evento en seguimiento vuelve a activo con actividad nueva (§5.7, §10.1), y la inactividad usa la ventana del país.
+3. Historial inmutable y motivo obligatorio en cambios de configuración de administración (§13.1, §13.3): verificación de negocios, ámbitos institucionales, presupuestos, kill switches, retrasos.
+4. Alcance limitado para cuentas nuevas en "Para ti" (§13.3).
 
 Bloqueadas o en espera:
 

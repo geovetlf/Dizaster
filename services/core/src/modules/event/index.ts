@@ -413,8 +413,8 @@ export class EventService {
         WHERE e.id = $1`,
       [eventId],
     );
-    const { rows } = await tx.query<{ lat: number; lng: number; weight: number; trust_tier: TrustTier; contributor_user_id: string | null; observed_at: Date }>(
-      `SELECT ST_Y(point::geometry) AS lat, ST_X(point::geometry) AS lng, weight, trust_tier, contributor_user_id, observed_at
+    const { rows } = await tx.query<{ lat: number; lng: number; weight: number; trust_tier: TrustTier; contributor_user_id: string | null; contributor_device_id: string | null; observed_at: Date }>(
+      `SELECT ST_Y(point::geometry) AS lat, ST_X(point::geometry) AS lng, weight, trust_tier, contributor_user_id, contributor_device_id, observed_at
          FROM event.evidence WHERE event_id = $1 AND status = 'ACTIVE' AND assertion = 'OCCURRING'`,
       [eventId],
     );
@@ -436,7 +436,8 @@ export class EventService {
     const pub = this.geo.generalize(point, ev.sensitivity);
     const place = await this.geo.contextFor(tx, pub.point, ev.sensitivity);
     const citizens = rows.filter((r) => r.trust_tier === "CITIZEN");
-    const distinctContributors = new Set(citizens.map((r) => r.contributor_user_id)).size;
+    // Personas en teléfonos distintos (ADR 0213): dos cuentas en el mismo teléfono no se corroboran entre sí.
+    const distinctContributors = independentContributors(citizens.map((r) => ({ userId: r.contributor_user_id, deviceId: r.contributor_device_id })));
     const hasNonCitizen = rows.some((r) => r.trust_tier !== "CITIZEN");
     const publication = nextPublication(ev.publication_state, { distinctContributors, hasNonCitizen, delayPending: ev.delay_pending });
     await tx.query(
@@ -1438,6 +1439,22 @@ export function mergeOrder<T extends { id: string; verification_level: Verificat
 /** Minutos de retraso de una categoría: solo aplica a HIGHLY_SENSITIVE (§8.5). NO AI REQUIRED. */
 export function publishDelayMinutes(category: Pick<CategoryConfig, "sensitivity" | "publishDelayMinutes">): number {
   return category.sensitivity === "HIGHLY_SENSITIVE" ? category.publishDelayMinutes ?? 0 : 0;
+}
+
+/**
+ * Contribuyentes independientes (ADR 0213, §10.2 "dispositivos distintos"): una vez por persona y una vez por
+ * teléfono (`deviceId` es el phoneId de ADR 0068). Sin teléfono conocido cuenta solo la persona. NO AI REQUIRED.
+ */
+export function independentContributors(rows: readonly { userId: string | null; deviceId: string | null }[]): number {
+  const users = new Set<string>();
+  const phones = new Set<string>();
+  for (const r of rows) {
+    if (!r.userId || users.has(r.userId)) continue;
+    if (r.deviceId && phones.has(r.deviceId)) continue;
+    users.add(r.userId);
+    if (r.deviceId) phones.add(r.deviceId);
+  }
+  return users.size;
 }
 
 /**
