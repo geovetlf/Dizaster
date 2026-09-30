@@ -626,10 +626,36 @@ export class IdentityService {
    * Retención de identidad (ADR 0210, §13.2). Los códigos de acceso por correo solo sirven 1 h (límite por hora) y
    * los fallos de MFA 15 min (bloqueo). Se borran a las 24 h. Lo llama el worker una vez al día.
    */
-  async applyRetention(q: Queryable, now: Date): Promise<{ emailChallenges: number; mfaFailures: number }> {
+  async applyRetention(q: Queryable, now: Date): Promise<{ emailChallenges: number; mfaFailures: number; sessions: number }> {
     const email = await q.query(`DELETE FROM identity.email_challenges WHERE created_at < $1::timestamptz - interval '24 hours'`, [now]);
     const mfa = await q.query(`DELETE FROM identity.mfa_failures WHERE at < $1::timestamptz - interval '24 hours'`, [now]);
-    return { emailChallenges: email.rowCount ?? 0, mfaFailures: mfa.rowCount ?? 0 };
+    return { emailChallenges: email.rowCount ?? 0, mfaFailures: mfa.rowCount ?? 0, sessions: await this.purgeExpiredSessions(q, now) };
+  }
+
+  /**
+   * Sesiones caducadas fuera (ADR 0269, §13.2): un refresh token caducado se rechaza antes de mirar si fue rotado, así
+   * que su fila ya no sirve ni para detectar reutilización. Las rotadas o revocadas que no han caducado se quedan: son
+   * las que delatan un token robado. De cada inicio de sesión que sigue abierto se conserva su primera fila, que da
+   * `startedAt` en la lista de sesiones. Por lotes, para no bloquear la tabla.
+   */
+  async purgeExpiredSessions(q: Queryable, now: Date, batch = 5000, maxBatches = 20): Promise<number> {
+    let total = 0;
+    for (let i = 0; i < maxBatches; i++) {
+      const res = await q.query(
+        `DELETE FROM identity.sessions WHERE id IN (
+           SELECT s.id FROM identity.sessions s
+            WHERE s.expires_at < $1
+              AND NOT EXISTS (
+                SELECT 1 FROM identity.sessions live
+                 WHERE live.family_id = s.family_id AND live.revoked_at IS NULL AND live.rotated_at IS NULL AND live.expires_at > $1
+                   AND s.id = (SELECT f.id FROM identity.sessions f WHERE f.family_id = s.family_id ORDER BY f.created_at, f.id LIMIT 1))
+            LIMIT $2)`,
+        [now, batch],
+      );
+      total += res.rowCount ?? 0;
+      if ((res.rowCount ?? 0) < batch) break;
+    }
+    return total;
   }
 
   // ───────────── Exportación de datos personales (ADR 0038) ─────────────

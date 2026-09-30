@@ -1002,6 +1002,9 @@ export class SocialService {
       );
       return rows[0] ? (await this.commentRows(q, postId, profileId, { onlyId: rows[0].id }))[0] ?? null : null;
     };
+    // Un comentario a la vez por persona (ADR 0268): el conteo del cupo y la inserción no se adelantan entre envíos
+    // simultáneos. `q` es una transacción (app.ts): el candado se suelta al terminar.
+    await q.query(`SELECT pg_advisory_xact_lock(hashtextextended('social.comment:' || $1, 0))`, [profileId]);
     const existing = await replay();
     if (existing) return existing;
     const recent = await q.query<{ n: number }>(
@@ -1129,6 +1132,7 @@ export class SocialService {
       await q.query(`DELETE FROM social.blocks WHERE blocker_profile_id = $1 AND blocked_profile_id = $2`, [blockerProfileId, blockedProfileId]);
       return;
     }
+    await this.lockBlocks(q, blockerProfileId);
     await this.assertBlockRoom(q, blockerProfileId, `SELECT 1 FROM social.blocks WHERE blocker_profile_id = $1 AND blocked_profile_id = $2`, blockedProfileId);
     await q.query(`INSERT INTO social.blocks (blocker_profile_id, blocked_profile_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`, [blockerProfileId, blockedProfileId]);
     await q.query(
@@ -1154,9 +1158,15 @@ export class SocialService {
       await q.query(`DELETE FROM social.business_blocks WHERE blocker_profile_id = $1 AND business_id = $2`, [blocker.profileId, biz.id]);
       return;
     }
+    await this.lockBlocks(q, blocker.profileId);
     await this.assertBlockRoom(q, blocker.profileId, `SELECT 1 FROM social.business_blocks WHERE blocker_profile_id = $1 AND business_id = $2`, biz.id);
     await q.query(`INSERT INTO social.business_blocks (blocker_profile_id, business_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`, [blocker.profileId, biz.id]);
     await q.query(`DELETE FROM social.follows WHERE follower_profile_id = $1 AND target_type = 'BUSINESS' AND target_id = $2`, [blocker.profileId, biz.id]);
+  }
+
+  /** Bloqueos de una persona en serie (ADR 0268): dos bloqueos simultáneos no superan juntos el tope. */
+  private async lockBlocks(q: Queryable, blockerProfileId: string): Promise<void> {
+    await q.query(`SELECT pg_advisory_xact_lock(hashtextextended('social.block:' || $1, 0))`, [blockerProfileId]);
   }
 
   /** Volver a bloquear lo ya bloqueado nunca falla; algo nuevo con el tope alcanzado da 409 (ADR 0208). */

@@ -456,6 +456,8 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | Delivery Control Plane `dzd` (ADR 0265) | ✅ | `tools/delivery`, `delivery/policy.json`, job `delivery` |
 | Escáneres de seguridad (ADR 0266) | ✅ | job `security`: Gitleaks, Trivy, OSV-Scanner, Semgrep |
 | IaC OpenTofu e imagen verificable (ADR 0267) | ✅ | jobs `iac` e `image`; aplicar: BLOCKED_BY_OWNER (D-18, D-23) |
+| Purga de sesiones caducadas (ADR 0269) | ✅ | `retention.identity`, migración 0103 |
+| Comentarios, bloqueos y compartidos sin carrera (ADR 0268) | ✅ | transacción + candado por persona |
 | Licencias, auditoría, SBOM, Dependabot; respaldo con prueba de restauración en CI | ✅ | ADR 0070, `scripts/supply-chain.mjs`, `scripts/db-restore-check.mjs` |
 | Idioma de la app elegible en el perfil (es/en/pt/fr o del teléfono) | ✅ | ADR 0069, `app/language.tsx` |
 | Varias cuentas en un teléfono corroboran como una (clave seudónima del teléfono) | ✅ | ADR 0068, migración 0036 |
@@ -527,10 +529,8 @@ Revisión del Blueprint del 2026-09-30 (tras ADR 0250): completada con ADR 0251�
 
 Revisión del Blueprint del 2026-09-30 (tras ADR 0256), verificada contra el código, sin bloqueos:
 
-1. Comentarios y bloqueos en transacción, sin carrera en el cupo (§4.2).
-2. Purgar sesiones rotadas y caducadas (§13.2, §7.4).
-3. La app muestra los fallos al bloquear, desbloquear, borrar o buscar (§13.3).
-4. En iOS el teclado no tapa los campos de texto (RF-01).
+1. La app muestra los fallos al bloquear, desbloquear, borrar o buscar (§13.3).
+2. En iOS el teclado no tapa los campos de texto (RF-01).
 
 Plano de entrega (Blueprint §20, ADR 0260–0265). Nivel de autonomía actual: 2 sin GitHub. Marca de bloqueo: BLOCKED_BY_OWNER.
 

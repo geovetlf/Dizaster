@@ -713,7 +713,7 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
   // Compartido fuera de la app (ADR 0155): solo se cuenta, una vez por persona.
   app.post("/v1/posts/:id/external-shares", async (req, reply) => {
     const session = requireSession(req);
-    await c.social.recordExternalShare(c.db, parse(IdParam, req.params).id, session.profileId);
+    await withTransaction(c.db, (tx) => c.social.recordExternalShare(tx, parse(IdParam, req.params).id, session.profileId));
     return reply.status(204).send();
   });
 
@@ -885,13 +885,15 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
     const session = requireSession(req);
     const { text, parentId, clientId } = parse(CreateCommentRequest, req.body);
     const limits = await c.trust.socialLimits(c.db, session.userId);
-    return reply.status(201).send(await c.social.addComment(c.db, parse(IdParam, req.params).id, session.profileId, text, parentId, limits.commentsPerMinute, clientId));
+    // En transacción (ADR 0268): cupo, inserción y detección de datos personales juntos o nada.
+    const comment = await withTransaction(c.db, (tx) => c.social.addComment(tx, parse(IdParam, req.params).id, session.profileId, text, parentId, limits.commentsPerMinute, clientId));
+    return reply.status(201).send(comment);
   });
 
   // Comentarios: borrar el propio y reaccionar (ADR 0045).
   app.delete("/v1/comments/:id", async (req, reply) => {
     const session = requireSession(req);
-    await c.social.deleteComment(c.db, parse(IdParam, req.params).id, session.profileId);
+    await withTransaction(c.db, (tx) => c.social.deleteComment(tx, parse(IdParam, req.params).id, session.profileId));
     return reply.status(204).send();
   });
   const CommentReactionParams = IdParam.extend({ kind: CommentReactionKind });
@@ -1203,12 +1205,12 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
   });
   app.put("/v1/blocks/:handle", async (req) => {
     const session = requireSession(req);
-    await c.social.setBlockByHandle(c.db, session, (req.params as { handle: string }).handle, true);
+    await withTransaction(c.db, (tx) => c.social.setBlockByHandle(tx, session, (req.params as { handle: string }).handle, true));
     return { blocked: true };
   });
   app.delete("/v1/blocks/:handle", async (req) => {
     const session = requireSession(req);
-    await c.social.setBlockByHandle(c.db, session, (req.params as { handle: string }).handle, false);
+    await withTransaction(c.db, (tx) => c.social.setBlockByHandle(tx, session, (req.params as { handle: string }).handle, false));
     return { blocked: false };
   });
   app.get("/v1/me/blocks", async (req, reply) => {
