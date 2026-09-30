@@ -431,6 +431,7 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | Cambios de administración atómicos con su registro (ADR 0238) | ✅ | presupuesto, kill switch, sello, ámbito |
 | Registro de moderación y accesos a originales paginados (ADR 0239) | ✅ | §5.21, §13.1 |
 | SOS, contador y botones pequeños con texto grande (ADR 0240) | ✅ | accesibilidad |
+| Aviso oficial vencido no suena ni abre eventos (ADR 0241) | ✅ | §5.10, ADR 0174 |
 | Licencias, auditoría, SBOM, Dependabot; respaldo con prueba de restauración en CI | ✅ | ADR 0070, `scripts/supply-chain.mjs`, `scripts/db-restore-check.mjs` |
 | Idioma de la app elegible en el perfil (es/en/pt/fr o del teléfono) | ✅ | ADR 0069, `app/language.tsx` |
 | Varias cuentas en un teléfono corroboran como una (clave seudónima del teléfono) | ✅ | ADR 0068, migración 0036 |
@@ -495,6 +496,19 @@ Revisión del Blueprint del 2026-09-30 (tras ADR 0212): completada con ADR 0213�
 Revisión del Blueprint del 2026-09-30 (tras ADR 0220): completada con ADR 0221–0228 (los avisos sociales pasan a PENDING DECISION).
 
 Revisión del Blueprint del 2026-09-30 (tras ADR 0228): completada con ADR 0229–0240 (privacidad de eventos cercanos, IA sin FALSE, auditoría, accesibilidad).
+
+Revisión del Blueprint del 2026-09-30 (tras ADR 0240), verificada contra el código, sin bloqueos:
+
+1. Coordenadas fuera de rango en USGS y GDACS se descartan sin tumbar la corrida (§9.4).
+2. Tareas diarias y horarias del worker aisladas: un fallo no salta las demás (§13.2).
+3. Descartar un reporte en cola durante un envío no lo publica ni lo resucita (§8.3).
+4. El ciclo por inactividad no resuelve eventos con alerta oficial vigente (§10.1).
+5. Actualizaciones de un ítem externo ya visto cambian su evidencia (§9.2).
+6. Cambios de ciclo de vida del worker en transacción con su outbox (§6.2).
+7. Retención de crudos y originales sin tope diario; purga de corridas de ingesta (§12, §13.2).
+8. Mapa sin conexión de una zona marcado como desactualizado al editarla o cambiar de idioma (§11.3).
+9. Fusionar eventos traslada el estado de alertas (§5.10).
+10. Búsqueda de eventos por título sin distinguir tildes ni ñ (§6.3).
 
 Bloqueadas o en espera:
 

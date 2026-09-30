@@ -1,7 +1,7 @@
 import type { NotificationsResponse } from "@dizaster/contracts";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { NormalizedItem } from "../src/modules/ingestion/index.js";
-import { actAsOfficial, createTestContext, createUser, LIMA, offset, seedGeoFixtures, type TestContext, type TestUser } from "./helpers.js";
+import { actAsOfficial, createTestContext, createUser, LIMA, offset, reportBody, seedGeoFixtures, submit, type TestContext, type TestUser } from "./helpers.js";
 
 // Campos CAP de la alerta (ADR 0174): origen, vencimiento y referencia. NO AI REQUIRED.
 let t: TestContext;
@@ -57,6 +57,39 @@ describe("campos CAP en las alertas", () => {
     const counts = await t.c.alerts.flush();
     expect(counts.EXPIRED).toBe(1);
     expect((await inbox()).notifications.find((x) => x.id === rows[0]!.id)?.delivery).toBe("EXPIRED");
+  });
+
+  it("un aviso de la fuente ya vencido no abre evento ni suena (ADR 0241)", async () => {
+    const past = new Date(Date.now() - 3_600_000).toISOString();
+    await t.app.inject({ method: "PUT", url: "/v1/me/approximate-location", headers: auth(u), payload: offset(LIMA, 900_100) });
+    const now = new Date().toISOString();
+    const r = await t.c.ingestion.ingest("ptwc-tsunami", {
+      externalId: "PTWC-OLD-1", categoryCode: "natural.tsunami", point: offset(LIMA, 900_000), uncertaintyM: 1000, occurredAt: now, publishedAt: now,
+      title: { es: "Tsunami" }, severity: 5, assertion: "OCCURRING", endsAt: past, raw: {},
+    } as NormalizedItem, "URGENT");
+    expect(r.resolution?.kind).not.toBe("CREATED");
+  });
+
+  it("si el aviso oficial ya venció al confirmar un evento existente, la alerta queda EXPIRED sin sonar (ADR 0241)", async () => {
+    const pin = offset(LIMA, 1_200_000);
+    await t.app.inject({ method: "PUT", url: "/v1/me/approximate-location", headers: auth(u), payload: offset(pin, 100) });
+    const w = await createUser(t, "testigo_vencido");
+    const rep = await submit(t, w, reportBody(w, { category: "natural.tsunami", pin }));
+    await t.c.dispatcher.drain();
+    await t.c.alerts.flush();
+    const past = new Date(Date.now() - 60_000).toISOString();
+    const now = new Date().toISOString();
+    const r = await t.c.ingestion.ingest("ptwc-tsunami", {
+      externalId: "PTWC-OLD-2", categoryCode: "natural.tsunami", point: pin, uncertaintyM: 1000, occurredAt: now, publishedAt: now,
+      title: { es: "Tsunami" }, severity: 5, assertion: "OCCURRING", endsAt: past, raw: {},
+    } as NormalizedItem, "URGENT");
+    expect((r.resolution as { eventId: string }).eventId).toBe(rep.body.eventId);
+    await t.c.dispatcher.drain();
+    const { rows } = await t.c.db.query<{ expires_at: Date }>(`SELECT expires_at FROM alert.alerts WHERE event_id = $1 AND origin = 'OFFICIAL'`, [rep.body.eventId]);
+    expect(rows.length).toBeGreaterThan(0);
+    for (const x of rows) expect(x.expires_at.getTime()).toBeLessThan(Date.now());
+    const counts = await t.c.alerts.flush();
+    expect(counts.SENT).toBe(0);
   });
 
   it("las alertas de menciones y moderación son del sistema y no vencen", async () => {

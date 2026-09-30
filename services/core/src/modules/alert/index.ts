@@ -280,7 +280,8 @@ export class AlertService {
     const official = decisions.length && snap.publicState === "OFFICIALLY_CONFIRMED" ? await this.ingestion.officialAlertSource(tx, eventId) : null;
     const origin = snap.publicState === "OFFICIALLY_CONFIRMED" ? "OFFICIAL" : "SYSTEM";
     const sourceEnd = official?.endsAt ? new Date(official.endsAt) : null;
-    const expiresAt = sourceEnd && sourceEnd > this.clock.now() ? sourceEnd : this.defaultExpiry();
+    // Un vencimiento ya pasado se respeta (ADR 0241): el aviso queda en el historial como EXPIRED y nunca suena.
+    const expiresAt = sourceEnd ?? this.defaultExpiry();
 
     let created = 0;
     for (const d of decisions) {

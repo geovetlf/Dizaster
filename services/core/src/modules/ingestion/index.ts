@@ -242,7 +242,8 @@ export class IngestionService {
         ...(item.title ? { title: item.title } : {}),
         trustTier: source.trust_tier,
         weight: 1,
-        mayCreateEvent: item.assertion === "OCCURRING" && !item.targetEventId,
+        // Un aviso que ya venció no abre un evento nuevo en el mapa (ADR 0241); si coincide con uno, sí suma evidencia.
+        mayCreateEvent: item.assertion === "OCCURRING" && !item.targetEventId && !(item.endsAt && Date.parse(item.endsAt) <= Date.now()),
         ...(item.targetEventId ? { userSelectedEventId: item.targetEventId } : {}),
         createAsPending: false,
         externalIds: [item.externalId],

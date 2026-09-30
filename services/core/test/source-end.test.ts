@@ -40,12 +40,13 @@ describe("fin oficial de un evento (ADR 0059)", () => {
 
   it("una alerta expirada no cierra el evento si hay un reporte ciudadano", async () => {
     const pin = offset(LIMA, 80_000);
-    const r = await t.c.ingestion.ingest("usgs-earthquakes", quake("end-e-1", pin, { endsAt: new Date(Date.now() - 60_000).toISOString() }), "NORMAL");
-    const id = eventOf(r);
-    await t.c.dispatcher.drain();
     const u = await createUser(t, "testigo_sismo");
     const rep = await submit(t, u, reportBody(u, { category: "natural.earthquake", pin }));
-    expect(rep.body.eventId).toBe(id);
+    await t.c.dispatcher.drain();
+    // Un aviso ya vencido no abre evento (ADR 0241), pero sí se suma al que existe.
+    const r = await t.c.ingestion.ingest("usgs-earthquakes", quake("end-e-1", pin, { endsAt: new Date(Date.now() - 60_000).toISOString() }), "NORMAL");
+    const id = eventOf(r);
+    expect(id).toBe(rep.body.eventId);
     await t.c.dispatcher.drain();
     await run();
     expect(await status(id)).toBe("ACTIVE");
