@@ -411,6 +411,7 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | Secretos fuera del repositorio; build local de Android documentada (§ seguridad, §12) | ✅ | ADR 0218: `.gitignore` de firmas y Firebase; `pnpm check:secrets` en `pnpm check`; prebuild verificado, APK BLOQUEADO (EXPO_TOKEN/SDK) |
 | Historial inmutable y motivo obligatorio en cambios de configuración (§13.1, §13.3) | ✅ | ADR 0219: `platform.config_changes` solo inserción; motivo en sellos, ámbitos, presupuestos, interruptores y retrasos; pantalla de historial |
 | Alcance limitado de cuentas nuevas en "Para ti" (§13.3) | ✅ | ADR 0220: posts de las primeras 24 h restan 3 h de ventaja; estable entre páginas; Cerca, mapa y evento sin cambios |
+| Bloqueo efectivo; posición del feed Cerca redondeada en el servidor (§13.3, §8.5) | ✅ | ADR 0221: BLOCKED al seguir, comentar, reaccionar o compartir (no en seudónimos); lat/lng a 0,01° |
 | Licencias, auditoría, SBOM, Dependabot; respaldo con prueba de restauración en CI | ✅ | ADR 0070, `scripts/supply-chain.mjs`, `scripts/db-restore-check.mjs` |
 | Idioma de la app elegible en el perfil (es/en/pt/fr o del teléfono) | ✅ | ADR 0069, `app/language.tsx` |
 | Varias cuentas en un teléfono corroboran como una (clave seudónima del teléfono) | ✅ | ADR 0068, migración 0036 |
@@ -471,6 +472,17 @@ Revisión del Blueprint del 2026-09-30 (tras ADR 0202): completada con ADR 0203�
 Revisión del Blueprint del 2026-09-30 (tras ADR 0208): completada con ADR 0209–0212.
 
 Revisión del Blueprint del 2026-09-30 (tras ADR 0212): completada con ADR 0213–0220 (incluye el Language Engine y el AI ROUTER pedidos por el propietario).
+
+Revisión del Blueprint del 2026-09-30 (tras ADR 0220), verificada contra el código, sin bloqueos:
+
+1. Mostrar al público la gravedad y el estado del evento (activo, en seguimiento, resuelto) en el evento, el mapa y la lista accesible (§7.3, §10.1).
+2. Avisar a quien reportó cuando su evento cambia de verificación o de estado (§8.1, §10.4).
+3. Hora del suceso (`occurred_start`) en el evento, no solo la de detección (§7.3).
+4. Una cuenta suspendida conserva sus avisos de seguridad: puede renovar el token push, sus zonas y preferencias (§13.3).
+5. Feed "Siguiendo" con consulta indexada y ventana de tiempo (rendimiento).
+6. Aviso visible "Dizaster no reemplaza a los servicios de emergencia" en Emergencia y Acerca de (C-18, §5.11), como texto de producto, no documento legal.
+7. Avisos sociales: comentarios en mis posts y respuestas a mis comentarios, con límites y preferencias (RF-02, §5.3).
+8. Límite de peticiones compartido entre réplicas del servidor, en PostgreSQL (seguridad).
 
 Bloqueadas o en espera:
 

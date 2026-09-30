@@ -109,6 +109,7 @@ export class PostComposer {
     await this.checkHourlyQuota(session);
     const businessId = await this.publisher(session, req);
     const original = await this.social.shareTarget(this.db, originalId);
+    await this.social.assertCanInteract(this.db, original.id, session.profileId);
     return withTransaction(this.db, async (tx) => {
       const postId = await this.social.createPost(tx, {
         authorProfileId: session.profileId,

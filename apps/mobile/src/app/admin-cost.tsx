@@ -39,7 +39,8 @@ export default function AdminCostScreen() {
   async function toggle(feature: string, killed: boolean) {
     if (!d) return;
     setD({ ...d, killSwitches: d.killSwitches.map((k) => (k.feature === feature ? { ...k, killed } : k)) });
-    await api.setKillSwitch(feature, killed, reason.trim()).catch(() => undefined);
+    // Si el servidor lo rechaza (sin permiso, sin MFA, motivo inválido) se dice, no solo se revierte al recargar.
+    await api.setKillSwitch(feature, killed, reason.trim()).catch((e: Error) => Alert.alert(feature, e.message));
     void load(days);
   }
 

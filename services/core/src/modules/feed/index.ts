@@ -88,7 +88,9 @@ export class FeedService {
 
   async feed(q: Queryable, rawQuery: unknown, viewerProfileId: string | null): Promise<FeedResponse> {
     const f = parse(FeedQuery, rawQuery);
-    const near = f.lat !== undefined && f.lng !== undefined ? { lat: f.lat, lng: f.lng } : undefined;
+    // Siempre redondeada en el servidor (~1 km, ADR 0221): con coordenadas elegidas a mano y los tramos de distancia
+    // de cada post se podría acotar el punto de cada reporte. La app ya la envía redondeada.
+    const near = f.lat !== undefined && f.lng !== undefined ? { lat: roundNear(f.lat), lng: roundNear(f.lng) } : undefined;
     return this.page(q, {
       tab: f.tab,
       ...(f.category ? { category: f.category } : {}),
@@ -315,6 +317,9 @@ const FollowTargetId = {
   /** Id del índice geográfico: espacio de nombres + código ("PE:150122", "NE1:JPN-1860"). */
   place: z.string().max(40).regex(/^[A-Z0-9]+:[A-Za-z0-9-]+$/),
 };
+
+/** Rejilla de ~1,1 km para la posición de quien lee el feed (ADR 0221). */
+export const roundNear = (x: number) => Math.round(x * 100) / 100;
 
 /** Tramos de distancia: suficientes para decidir, sin revelar posiciones exactas. */
 export function bucket(m: number): string {

@@ -389,6 +389,7 @@ export const fr: Record<MessageKey, string> = {
   errUnauthenticated: "Votre session a expiré ; reconnectez-vous",
   errValidation: "Vérifiez les données et réessayez",
   errLimitReached: "Vous avez atteint le maximum autorisé",
+  errBlocked: "Cette personne ne vous permet pas d'interagir avec son contenu.",
   errHandleTaken: "Ce nom d'utilisateur existe déjà",
   errAccountSuspended: "Votre compte est suspendu. Voyez le motif et faites appel dans Profil.",
   errAccountInactive: "Ce compte n'est pas actif",

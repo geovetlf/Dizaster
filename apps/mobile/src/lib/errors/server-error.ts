@@ -22,6 +22,7 @@ export const SERVER_ERROR_KEYS: Readonly<Record<string, MessageKey>> = {
   VALIDATION: "errValidation",
   BAD_REQUEST: "errValidation",
   LIMIT_REACHED: "errLimitReached",
+  BLOCKED: "errBlocked",
   HANDLE_TAKEN: "errHandleTaken",
   ACCOUNT_SUSPENDED: "errAccountSuspended",
   ACCOUNT_INACTIVE: "errAccountInactive",

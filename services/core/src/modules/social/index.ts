@@ -109,6 +109,8 @@ export const RANK_BOOST_HOURS = {
   lifecycle: { ACTIVE: 0, MONITORING: -2, RESOLVED: -8, ARCHIVED: -24 },
 };
 
+const blocked = () => new DomainError("BLOCKED", "Esta persona no permite que interactúes con su contenido", 403);
+
 /** Horas en que una cuenta cuenta como nueva para el alcance (igual que el nivel NEW de reputación, `TRUST.newAccountHours`). */
 export const NEW_ACCOUNT_HOURS = 24;
 
@@ -749,6 +751,7 @@ export class SocialService {
       return;
     }
     if (type === "PROFILE" && targetId === followerProfileId) throw new DomainError("VALIDATION", "No puedes seguirte a ti mismo");
+    if (type === "PROFILE" && (await this.isBlockedBy(q, targetId, followerProfileId))) throw blocked();
     const { rows } = await q.query<{ n: number }>(`SELECT count(*)::int AS n FROM social.follows WHERE follower_profile_id = $1`, [followerProfileId]);
     if (rows[0]!.n >= MAX_FOLLOWS) throw new DomainError("LIMIT_REACHED", `Puedes seguir hasta ${MAX_FOLLOWS} perfiles, eventos o lugares`, 409);
     await q.query(
@@ -933,6 +936,7 @@ export class SocialService {
    */
   async setReaction(q: Queryable, postId: string, profileId: string, kind: ReactionKind, on: boolean): Promise<ReactionState> {
     await this.assertVisible(q, postId);
+    if (on) await this.assertCanInteract(q, postId, profileId);
     if (on && kind === "SEEN_TOO") {
       const linked = await q.query(`SELECT 1 FROM social.post_event_links WHERE post_id = $1 LIMIT 1`, [postId]);
       if (linked.rowCount === 0) throw new DomainError("REACTION_NOT_APPLICABLE", "Solo se puede marcar en publicaciones sobre un evento", 422);
@@ -956,6 +960,7 @@ export class SocialService {
     q: Queryable, postId: string, profileId: string, text: string, parentId?: string, perMinute = 10, clientId?: string,
   ): Promise<CommentView> {
     await this.assertVisible(q, postId);
+    await this.assertCanInteract(q, postId, profileId);
     // Reintento con el mismo id del cliente (ADR 0178): devuelve el comentario ya creado, sin gastar cupo.
     const replay = async () => {
       if (!clientId) return null;
@@ -974,12 +979,13 @@ export class SocialService {
     let parent: string | null = null;
     if (parentId) {
       // Un solo nivel: responder a una respuesta cuelga del comentario raíz.
-      const p = await q.query<{ root: string }>(
-        `SELECT coalesce(parent_comment_id, id) AS root FROM social.comments
+      const p = await q.query<{ root: string; author: string }>(
+        `SELECT coalesce(parent_comment_id, id) AS root, author_profile_id AS author FROM social.comments
           WHERE id = $1 AND post_id = $2 AND deleted_at IS NULL AND moderation_state = 'VISIBLE'`,
         [parentId, postId],
       );
       if (!p.rows[0]) throw notFound("Comentario");
+      if (await this.isBlockedBy(q, p.rows[0].author, profileId)) throw blocked();
       parent = p.rows[0].root;
     }
     const id = newId();
@@ -1209,6 +1215,27 @@ export class SocialService {
 
   async setCommentModeration(q: Queryable, commentId: string, state: "VISIBLE" | "HIDDEN" | "REMOVED"): Promise<void> {
     await q.query(`UPDATE social.comments SET moderation_state = $2 WHERE id = $1`, [commentId, state]);
+  }
+
+  /** Si `blockerProfileId` bloqueó a `actorProfileId` (ADR 0221). */
+  async isBlockedBy(q: Queryable, blockerProfileId: string, actorProfileId: string): Promise<boolean> {
+    const { rowCount } = await q.query(
+      `SELECT 1 FROM social.blocks WHERE blocker_profile_id = $1::uuid AND blocked_profile_id = $2::uuid`, [blockerProfileId, actorProfileId],
+    );
+    return !!rowCount;
+  }
+
+  /**
+   * Quien te bloqueó no puede comentar, reaccionar ni compartir tus posts con nombre (§13.3, ADR 0221). En un post
+   * seudónimo no se aplica: rechazar revelaría quién lo escribió.
+   */
+  async assertCanInteract(q: Queryable, postId: string, actorProfileId: string): Promise<void> {
+    const { rowCount } = await q.query(
+      `SELECT 1 FROM social.posts p JOIN social.blocks b ON b.blocker_profile_id = p.author_id AND b.blocked_profile_id = $2::uuid
+        WHERE p.id = $1 AND p.author_type = 'PROFILE' AND p.author_visibility = 'PUBLIC'`,
+      [postId, actorProfileId],
+    );
+    if (rowCount) throw blocked();
   }
 
   private async assertVisible(q: Queryable, postId: string): Promise<void> {
