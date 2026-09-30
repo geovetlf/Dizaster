@@ -1,9 +1,9 @@
 import { mediaAvailability } from "@dizaster/contracts";
 import { useEffect, useState } from "react";
-import { Image, Pressable, StyleSheet, Text, View } from "react-native";
+import { Image, Linking, Pressable, StyleSheet, Text, View } from "react-native";
 import { api } from "../lib/api";
 import { t, type MessageKey } from "../lib/i18n";
-import { captureMedia, discardLocal, type CaptureKind, type CaptureSource } from "../lib/media/capture";
+import { CameraDeniedError, captureMedia, discardLocal, type CaptureKind, type CaptureSource } from "../lib/media/capture";
 import { checkLimits, type LocalMedia } from "../lib/media/local-media";
 import { colors } from "../theme";
 import { RedactEditor } from "./redact-editor";
@@ -21,6 +21,7 @@ export function MediaAttachments({ items, onChange, suggestRedaction = false, ca
   const [busy, setBusy] = useState(false);
   const [editing, setEditing] = useState<LocalMedia | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [cameraDenied, setCameraDenied] = useState(false);
   const full = items.length >= MAX_MEDIA_PER_REPORT;
   // Kill switches remotos (ADR 0082): sin red se muestran las opciones y el servidor decide al subir.
   const [avail, setAvail] = useState({ photo: true, video: true });
@@ -32,6 +33,7 @@ export function MediaAttachments({ items, onChange, suggestRedaction = false, ca
     if (full) return setMessage(t("maxMedia"));
     setBusy(true);
     setMessage(t("preparing"));
+    setCameraDenied(false);
     try {
       const m = await captureMedia(source, kind);
       if (!m) return setMessage(null);
@@ -43,6 +45,10 @@ export function MediaAttachments({ items, onChange, suggestRedaction = false, ca
       onChange([...items, m]);
       setMessage(source === "library" ? t("galleryNote") : null);
     } catch (e) {
+      if (e instanceof CameraDeniedError) {
+        setCameraDenied(true);
+        return setMessage(t("cameraDenied"));
+      }
       setMessage((e as Error).message);
     } finally {
       setBusy(false);
@@ -106,6 +112,7 @@ export function MediaAttachments({ items, onChange, suggestRedaction = false, ca
           onDone={(boxes) => { if (boxes) setRedactions(editing, boxes); setEditing(null); }} />
       ) : null}
       {message ? <Text style={styles.note}>{message}</Text> : null}
+      {cameraDenied ? <Button label={t("openSettings")} disabled={false} onPress={() => void Linking.openSettings()} /> : null}
     </View>
   );
 }

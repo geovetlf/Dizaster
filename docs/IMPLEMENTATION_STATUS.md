@@ -373,6 +373,7 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | 0180 | La reputación del teléfono (cuenta suspendida o manipulación repetida) baja el peso de su evidencia a LOW | ✅ |
 | 0181 | Pruebas de captura del medio (qué foto/video y cuánto antes del reporte) en la evidencia de presencia privada; sin ubicación por medio | ✅ |
 | 0182 | Particionado mensual preparado (rango por UUIDv7 con la PK actual), probado sobre copias; runbook para activarlo | ✅ |
+| Llamada de emergencia sin esperar al GPS (§8.1) | ✅ | ADR 0183: país por última posición/SIM/perfil/región al elegir categoría, fix con límite de 20 s y reintento, Abrir ajustes si falta permiso de ubicación o cámara |
 | Licencias, auditoría, SBOM, Dependabot; respaldo con prueba de restauración en CI | ✅ | ADR 0070, `scripts/supply-chain.mjs`, `scripts/db-restore-check.mjs` |
 | Idioma de la app elegible en el perfil (es/en/pt/fr o del teléfono) | ✅ | ADR 0069, `app/language.tsx` |
 | Varias cuentas en un teléfono corroboran como una (clave seudónima del teléfono) | ✅ | ADR 0068, migración 0036 |
@@ -419,6 +420,13 @@ Revisión del Blueprint del 2026-09-30 (tras ADR 0164): completada con ADR 0165�
 Revisión del Blueprint del 2026-09-30 (tras ADR 0171): completada con ADR 0172–0176.
 
 Revisión del Blueprint del 2026-09-30 (tras ADR 0176): completada con ADR 0177–0182.
+
+Revisión del Blueprint del 2026-09-30 (tras ADR 0182), verificada contra el código, sin bloqueos:
+1. Mapas offline de verdad (§11.3): configuración remota guardada en el teléfono y paquetes descargados con el mismo estilo que se muestra.
+2. Canales de aviso en Android como en iOS (§5.10): alertas oficiales críticas separadas de las de la comunidad, con nombres traducidos.
+3. Latido del worker y `/health/ready` (§5.22, §13.1): detectar desde fuera que el worker o el outbox se detuvieron.
+4. Galería del evento con miniaturas (§12.1): la imagen grande solo al abrirla.
+5. Backups cifrados con clave pública y con retención (§13.1).
 
 Bloqueadas o en espera:
 

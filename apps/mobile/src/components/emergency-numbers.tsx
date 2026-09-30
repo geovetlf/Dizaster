@@ -1,33 +1,12 @@
 import type { EmergencyDataset } from "@dizaster/contracts";
-import * as Cellular from "expo-cellular";
-import * as Location from "expo-location";
 import { useEffect, useState } from "react";
 import { FlatList, Linking, Pressable, StyleSheet, Text, View } from "react-native";
-import { lookupEmergency, label, regionOf, type EmergencyLookup } from "../lib/emergency";
+import { lookupEmergency, label, type EmergencyLookup } from "../lib/emergency";
 import { localEmergencyDataset, refreshEmergencyDataset } from "../lib/emergency-store";
-import { countryOf } from "../lib/geo/country";
-import { chooseCountry, type CountrySource } from "../lib/geo/country-choice";
-import { preferredCountry } from "../lib/geo/preferred-country";
+import type { CountrySource } from "../lib/geo/country-choice";
+import { detectCountry } from "../lib/geo/device-country";
 import { locale, t } from "../lib/i18n";
 import { colors } from "../theme";
-
-/** País por ubicación (calculado en el teléfono); si no hay, el preferido del perfil y luego la región del sistema. */
-async function detectCountry(): Promise<{ country: string | null; source: CountrySource | null }> {
-  let located: string | null = null;
-  try {
-    const perm = await Location.getForegroundPermissionsAsync();
-    const pos = perm.granted
-      ? ((await Location.getLastKnownPositionAsync()) ?? (await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Low })))
-      : null;
-    // La ubicación no sale del dispositivo.
-    located = pos ? countryOf({ lat: pos.coords.latitude, lng: pos.coords.longitude }) : null;
-  } catch {
-    // Sin permiso o sin señal: país preferido o región del teléfono.
-  }
-  // País de la SIM: sin permisos y sin red; en iOS devuelve null.
-  const sim = await Cellular.getIsoCountryCodeAsync().catch(() => null);
-  return chooseCountry(located, preferredCountry(), regionOf(locale), sim);
-}
 
 /** Números de emergencia, 100 % locales primero (ADR 0035). La usa la pantalla de emergencia y la pantalla de error. */
 export function EmergencyNumbers({ compact = false }: { compact?: boolean }) {

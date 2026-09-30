@@ -8,6 +8,14 @@ import {
   type LocalMedia, type LocalPoster,
 } from "./local-media";
 
+/** Sin permiso de cámara: la pantalla ofrece abrir los ajustes del sistema en vez de fallar en silencio. */
+export class CameraDeniedError extends Error {
+  constructor() {
+    super("CAMERA_DENIED");
+    this.name = "CameraDeniedError";
+  }
+}
+
 export type CaptureSource = "camera" | "library";
 export type CaptureKind = "IMAGE" | "VIDEO_RECORDED";
 
@@ -39,7 +47,7 @@ async function* readChunks(file: File): AsyncGenerator<Uint8Array> {
  * - foto: se re-codifica a JPEG con el lado mayor ≤ 1920 px. Re-codificar aplica la orientación a los píxeles
  *   y descarta Exif (incluido el GPS) ya en el dispositivo; el servidor lo vuelve a comprobar.
  * - video: máximo 60 s y calidad 720p en la captura; en iOS, H.264 también al elegir de la galería.
- * Devuelve null si el usuario cancela o no concede el permiso.
+ * Devuelve null si el usuario cancela; lanza CameraDeniedError si no hay permiso de cámara (ADR 0183).
  */
 export async function captureMedia(source: CaptureSource, kind: CaptureKind): Promise<LocalMedia | null> {
   const options: ImagePicker.ImagePickerOptions = {
@@ -54,7 +62,7 @@ export async function captureMedia(source: CaptureSource, kind: CaptureKind): Pr
   };
   if (source === "camera") {
     const perm = await ImagePicker.requestCameraPermissionsAsync();
-    if (!perm.granted) return null;
+    if (!perm.granted) throw new CameraDeniedError();
   }
   const result = source === "camera" ? await ImagePicker.launchCameraAsync(options) : await ImagePicker.launchImageLibraryAsync(options);
   if (result.canceled || !result.assets[0]) return null;

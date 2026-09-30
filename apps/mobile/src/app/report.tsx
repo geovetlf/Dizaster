@@ -10,6 +10,8 @@ import { api } from "../lib/api";
 import { callTarget, label as serviceLabel, type CallTarget } from "../lib/emergency";
 import { localEmergencyDataset } from "../lib/emergency-store";
 import { countryOf } from "../lib/geo/country";
+import { quickCountry } from "../lib/geo/device-country";
+import { FIX_TIMEOUT_MS, withTimeout } from "../lib/async/timeout";
 import { lang, locale, t, tCount, verificationLabel } from "../lib/i18n";
 import { formatInZone } from "../lib/ui/format";
 import { newId } from "../lib/ids";
@@ -49,6 +51,8 @@ export default function ReportScreen() {
   const [status, setStatus] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [call, setCall] = useState<CallTarget>({ kind: "list" });
+  // Por qué no hay fix (ADR 0183): sin permiso (ir a Ajustes) o sin señal a tiempo (reintentar).
+  const [blocked, setBlocked] = useState<"denied" | "timeout" | null>(null);
   const recent = useRef<Location.LocationObject[]>([]);
   // Versión por debajo de la mínima (ADR 0164): no se envía; emergencias sigue a mano.
   const update = useUpdateRequirement();
@@ -71,13 +75,27 @@ export default function ReportScreen() {
     setCategory(c);
     setPhase("locating");
     setStatus(t("locating"));
+    setBlocked(null);
+    // Riesgo vital (§8.1, ADR 0183): el botón de llamada sale YA, con el país de la SIM, el perfil o la región;
+    // no espera al GPS. Con el fix se afina.
+    if (!deny && c.defaultSeverity >= 4) {
+      Promise.all([localEmergencyDataset(), quickCountry()])
+        .then(([ds, where]) => setCall(callTarget(ds, c.code, where.country)))
+        .catch(() => setCall({ kind: "list" }));
+    }
     const perm = await Location.requestForegroundPermissionsAsync();
     if (!perm.granted) {
       setStatus(t("locationDenied"));
+      setBlocked("denied");
       return;
     }
-    // Ubicación del propio sistema operativo: gratis, sin API de mapas.
-    const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Highest });
+    // Ubicación del propio sistema operativo: gratis, sin API de mapas. Bajo techo puede no llegar: tiempo límite.
+    const loc = await withTimeout(Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Highest }), FIX_TIMEOUT_MS).catch(() => null);
+    if (!loc) {
+      setStatus(t("locationTimeout"));
+      setBlocked("timeout");
+      return;
+    }
     recent.current.push(loc);
     const here = { lat: loc.coords.latitude, lng: loc.coords.longitude };
     // Los ajustes que rigen son los del país donde está la persona (radio de presencia, etc.; ADR 0152).
@@ -172,11 +190,37 @@ export default function ReportScreen() {
     );
   }
 
+  const cat = category;
+  const callFirst = !deny && cat.defaultSeverity >= 4 ? (
+    <View style={styles.callFirst}>
+      <Text style={styles.callFirstText}>{t("callFirst")}</Text>
+      {call.kind === "direct" ? (
+        <Pressable accessibilityRole="button" style={styles.callButton} onPress={() => void Linking.openURL(call.tel)}>
+          <Text style={styles.callButtonText}>{t("callNow")} {serviceLabel(call.number, locale)} · {call.number.number}</Text>
+        </Pressable>
+      ) : null}
+      <Pressable accessibilityRole="button" onPress={() => router.push("/emergency")}>
+        <Text style={styles.callLink}>{call.kind === "direct" ? t("allNumbers") : t("emergencyTitle")}</Text>
+      </Pressable>
+    </View>
+  ) : null;
+
   if (phase === "locating" || !pin || !fix) {
     return (
       <View style={styles.container}>
-        <Text style={styles.title}>{category.names[lang] ?? category.names["es"]}</Text>
+        <Text style={styles.title}>{cat.names[lang] ?? cat.names["es"]}</Text>
+        {callFirst}
         <Text style={styles.status}>{status}</Text>
+        {blocked === "denied" ? (
+          <Pressable accessibilityRole="button" style={styles.row} onPress={() => void Linking.openSettings()}>
+            <Text style={styles.rowText}>{t("openSettings")}</Text>
+          </Pressable>
+        ) : null}
+        {blocked === "timeout" ? (
+          <Pressable accessibilityRole="button" style={styles.row} onPress={() => void choose(cat)}>
+            <Text style={styles.rowText}>{t("retry")}</Text>
+          </Pressable>
+        ) : null}
       </View>
     );
   }
@@ -191,19 +235,7 @@ export default function ReportScreen() {
           <Text style={styles.note}>{t("denyHint")}</Text>
         </View>
       ) : null}
-      {!deny && category.defaultSeverity >= 4 ? (
-        <View style={styles.callFirst}>
-          <Text style={styles.callFirstText}>{t("callFirst")}</Text>
-          {call.kind === "direct" ? (
-            <Pressable accessibilityRole="button" style={styles.callButton} onPress={() => void Linking.openURL(call.tel)}>
-              <Text style={styles.callButtonText}>{t("callNow")} {serviceLabel(call.number, locale)} · {call.number.number}</Text>
-            </Pressable>
-          ) : null}
-          <Pressable accessibilityRole="button" onPress={() => router.push("/emergency")}>
-            <Text style={styles.callLink}>{call.kind === "direct" ? t("allNumbers") : t("emergencyTitle")}</Text>
-          </Pressable>
-        </View>
-      ) : null}
+      {callFirst}
 
       <Text style={styles.note}>{t("adjustPin")}</Text>
       <View style={styles.mapBox}>
