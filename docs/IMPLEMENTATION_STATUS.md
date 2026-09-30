@@ -418,6 +418,7 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | Una cuenta suspendida conserva sus avisos de seguridad (§13.3) | ✅ | ADR 0225: token push, preferencias, zonas, ubicación aproximada, seguir eventos y lugares, bloquear; nada que publique; borradas no |
 | Feed "Siguiendo" indexable y acotado a 30 días (rendimiento) | ✅ | ADR 0226: uuid contra uuid para usar índices por autor y evento; ventana de 30 días |
 | Aviso visible "Dizaster no reemplaza a los servicios de emergencia" (C-18, §5.11) | ✅ | ADR 0227: en Emergencia (alerta accesible) y Acerca de; texto de producto reemplazable por el legal |
+| Límite por cuenta compartido entre réplicas (ADR 0228) | ✅ | `RATE_LIMIT_SHARED`, tabla UNLOGGED sin IPs |
 | Licencias, auditoría, SBOM, Dependabot; respaldo con prueba de restauración en CI | ✅ | ADR 0070, `scripts/supply-chain.mjs`, `scripts/db-restore-check.mjs` |
 | Idioma de la app elegible en el perfil (es/en/pt/fr o del teléfono) | ✅ | ADR 0069, `app/language.tsx` |
 | Varias cuentas en un teléfono corroboran como una (clave seudónima del teléfono) | ✅ | ADR 0068, migración 0036 |
@@ -481,8 +482,6 @@ Revisión del Blueprint del 2026-09-30 (tras ADR 0212): completada con ADR 0213�
 
 Revisión del Blueprint del 2026-09-30 (tras ADR 0220), verificada contra el código, sin bloqueos:
 
-1. Avisos sociales: comentarios en mis posts y respuestas a mis comentarios, con límites y preferencias (RF-02, §5.3).
-2. Límite de peticiones compartido entre réplicas del servidor, en PostgreSQL (seguridad).
 
 Bloqueadas o en espera:
 
@@ -495,4 +494,5 @@ Bloqueadas o en espera:
 - **PENDING DECISION** — Duración de suspensiones: hoy `SUSPEND_USER` no vence; falta decidir si hay duraciones estándar (24 h / 7 d / permanente).
 - **PENDING DECISION** — D-17 fronteras en disputa: sin implementar; falta criterio del propietario (y revisión legal antes de abrir más países).
 - **PENDING DECISION** — Uso sin cuenta (ADR 0171): hoy se puede cerrar "Entrar" y seguir en solo lectura; falta decidir si V1 lo permite o exige cuenta.
+- **PENDING DECISION** — Avisos sociales (comentarios en mis posts, respuestas a mis comentarios): el Blueprint no los pide de forma explícita y §5.3 exige evitar la fatiga de notificaciones; falta decidir si V1 los tiene, apagados o encendidos por defecto, y con qué límite diario.
 - **BLOQUEADA** — Contacto del cliente de ingesta (§9.3): el User-Agent dice "contacto pendiente"; falta el correo o URL de contacto del propietario.

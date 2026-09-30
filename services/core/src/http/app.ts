@@ -15,7 +15,7 @@ import { listConfigChanges, recordConfigChange } from "../platform/config-audit.
 import { isOverloadError, withTransaction } from "../platform/db.js";
 import { DomainError, forbidden } from "../platform/errors.js";
 import { latencyMetric } from "../platform/metrics.js";
-import { FixedWindowLimiter } from "../platform/rate-limit.js";
+import { FixedWindowLimiter, SharedAccountLimiter } from "../platform/rate-limit.js";
 import { acceptRequestId, currentContext, REQUEST_ID_HEADER, runWithContext } from "../platform/request-context.js";
 import { newId } from "../platform/ids.js";
 import { buildOpenApi } from "./openapi.js";
@@ -91,6 +91,8 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
   // Límite general (ADR 0047): por cuenta con sesión, por IP sin ella. Las escrituras tienen un cupo menor.
   const allLimiter = new FixedWindowLimiter(c.env.RATE_LIMIT_PER_MINUTE);
   const writeLimiter = new FixedWindowLimiter(c.env.RATE_LIMIT_WRITES_PER_MINUTE);
+  // Varias réplicas (ADR 0228): el cupo por cuenta se comparte en PostgreSQL; sin sesión sigue en memoria (sin IPs en la base).
+  const sharedLimiter = c.env.RATE_LIMIT_SHARED ? new SharedAccountLimiter(c.db, c.env.RATE_LIMIT_PER_MINUTE, c.env.RATE_LIMIT_WRITES_PER_MINUTE) : null;
 
   // Rutas registradas, para el contrato OpenAPI (ADR 0052). HEAD lo añade Fastify a cada GET.
   const routes: string[] = [];
@@ -125,7 +127,9 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
     if (req.url.startsWith("/v1/")) {
       const key = req.session ? `u:${req.session.userId}` : `ip:${req.ip}`;
       const write = req.method !== "GET" && req.method !== "HEAD";
-      const wait = allLimiter.hit(key) ?? (write ? writeLimiter.hit(key) : null);
+      const wait = sharedLimiter && req.session
+        ? await sharedLimiter.hit(req.session.userId, write)
+        : allLimiter.hit(key) ?? (write ? writeLimiter.hit(key) : null);
       if (wait !== null) {
         c.meter.add("http", "rate_limited", 1);
         throw Object.assign(new DomainError("RATE_LIMITED", "Demasiadas peticiones; espera un momento", 429), { retryAfter: wait });

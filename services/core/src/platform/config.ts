@@ -31,6 +31,8 @@ const Env = z.object({
   /** Límite general por persona (o por IP sin sesión), por minuto (ADR 0047). */
   RATE_LIMIT_PER_MINUTE: z.coerce.number().int().positive().default(300),
   RATE_LIMIT_WRITES_PER_MINUTE: z.coerce.number().int().positive().default(60),
+  /** Con más de una réplica de la API: contar el cupo por cuenta en PostgreSQL, compartido (ADR 0228). */
+  RATE_LIMIT_SHARED: z.enum(["true", "false"]).default("false").transform((v) => v === "true"),
   /** Detrás de un CDN o balanceador: tomar la IP de X-Forwarded-For. Solo si ese proxy la fija. */
   TRUST_PROXY: z.enum(["true", "false"]).default("false").transform((v) => v === "true"),
   // Retención de datos operativos (ADR 0165).
