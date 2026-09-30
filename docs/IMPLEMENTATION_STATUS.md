@@ -1,6 +1,6 @@
 # Estado de la implementación
 
-Actualizado: 2026-09-30 (hasta ADR 0278). Informe de preparación para producción: `docs/PRODUCTION_READINESS_REPORT.md`.
+Actualizado: 2026-09-30 (hasta ADR 0279). Informe de preparación para producción: `docs/PRODUCTION_READINESS_REPORT.md`.
 
 ## Etapa 1 — Fundación (hecha)
 
@@ -467,6 +467,7 @@ Actualizado: 2026-09-30 (hasta ADR 0278). Informe de preparación para producci�
 | Auditoría completa e informe de preparación para producción (ADR 0276) | ✅ | `docs/PRODUCTION_READINESS_REPORT.md` |
 | Firma keyless, procedencia SLSA, SLO, validación de entornos, workflow `deliver` y GitHub preparado (ADR 0277) | ✅ | activar: D-24 y D-18 |
 | OpenTofu: base de datos (Cloud SQL, VM propia o externa), bucket de media, bucket de estado y `tofu test` sin nube (ADR 0278) | ✅ | aplicar: D-23 y D-18 |
+| Procedimiento de activación por bloqueo y correo de acceso en el idioma de la app (ADR 0279) | ✅ | `docs/runbooks/activacion-bloqueos.md` |
 | Licencias, auditoría, SBOM, Dependabot; respaldo con prueba de restauración en CI | ✅ | ADR 0070, `scripts/supply-chain.mjs`, `scripts/db-restore-check.mjs` |
 | Idioma de la app elegible en el perfil (es/en/pt/fr o del teléfono) | ✅ | ADR 0069, `app/language.tsx` |
 | Varias cuentas en un teléfono corroboran como una (clave seudónima del teléfono) | ✅ | ADR 0068, migración 0036 |

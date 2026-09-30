@@ -6,7 +6,7 @@ import { createTestContext, type TestContext } from "./helpers.js";
 
 // Apple, Google y correo con código (ADR 0170). Claves y correo locales: la prueba no sale a la red.
 let t: TestContext;
-const sent: { to: string; text: string }[] = [];
+const sent: { to: string; subject: string; text: string }[] = [];
 const email: EmailSender = { id: "test", send: async (m) => { sent.push(m); } };
 type PrivKey = Awaited<ReturnType<typeof generateKeyPair>>["privateKey"];
 let applePriv: PrivKey;
@@ -47,6 +47,17 @@ describe("inicio de sesión real", () => {
     for (const bad of [await appleToken({ sub: "x" }, otherPriv), await appleToken({ sub: "x" }, applePriv, "otra.app"), "not.a.jwt.token.at.all"]) {
       expect((await t.app.inject({ method: "POST", url: "/v1/auth/apple", payload: { idToken: bad } })).statusCode).toBe(401);
     }
+  });
+
+  it("el correo con el código sale en el idioma de la app (ADR 0279); sin idioma, español", async () => {
+    for (const [lang, word] of [["en", "Your Dizaster code"], ["pt", "Seu código"], ["fr", "Votre code"], [undefined, "Tu código"]] as const) {
+      const r = await t.app.inject({ method: "POST", url: "/v1/auth/email/start", payload: { email: `idioma-${lang ?? "none"}@correo.pe`, ...(lang ? { lang } : {}) } });
+      expect(r.statusCode).toBe(204);
+      expect(sent.at(-1)!.subject).toContain(word);
+      expect(sent.at(-1)!.text).toMatch(/\d{6}/);
+    }
+    const bad = await t.app.inject({ method: "POST", url: "/v1/auth/email/start", payload: { email: "x@correo.pe", lang: "xx" } });
+    expect(bad.statusCode).toBe(400);
   });
 
   it("correo: código de 6 dígitos, 5 intentos, un solo uso, sin guardar el correo", async () => {

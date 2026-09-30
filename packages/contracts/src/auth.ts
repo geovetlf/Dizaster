@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { Lang } from "./common.js";
 import { DevicePlatform } from "./device.js";
 
 /** Inicio de sesión real: Apple, Google y correo con código (§5.1, D-11, ADR 0170). */
@@ -13,7 +14,8 @@ export const IdTokenSignInRequest = z.object({ idToken: z.string().min(20).max(8
 export type IdTokenSignInRequest = z.infer<typeof IdTokenSignInRequest>;
 
 export const EmailAddress = z.string().trim().max(254).regex(/^[^\s@]+@[^\s@]+\.[^\s@]+$/, "correo inválido");
-export const EmailStartRequest = z.object({ email: EmailAddress });
+/** `lang`: idioma del correo con el código (el de la interfaz de la app, ADR 0279); sin él, español. */
+export const EmailStartRequest = z.object({ email: EmailAddress, lang: Lang.optional() });
 export type EmailStartRequest = z.infer<typeof EmailStartRequest>;
 export const EmailCode = z.string().regex(/^\d{6}$/, "el código tiene 6 dígitos");
 export const EmailVerifyRequest = z.object({ email: EmailAddress, code: EmailCode, ...DeviceFields });

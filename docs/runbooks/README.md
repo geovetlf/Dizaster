@@ -12,6 +12,7 @@ Ninguno exige IA ni servicios de pago. Donde falta infraestructura real (proveed
 | Eventos de dominio atascados (alertas o verificación no avanzan) | [outbox-atascado.md](outbox-atascado.md) |
 | Respaldo, restauración y prueba de restauración | [respaldo-y-restauracion.md](respaldo-y-restauracion.md) |
 | Migración fallida o incompatible (rollback de base de datos) | [migracion-fallida.md](migracion-fallida.md) |
+| Activar cada bloqueo externo (GitHub, Expo, Google Cloud, base, media, correo, atestación, CSAM, push, fuentes) | [activacion-bloqueos.md](activacion-bloqueos.md) |
 | Delivery Control Plane: gates, despliegue, rollback, auditoría | [delivery-plane.md](delivery-plane.md) |
 | Rotar la clave de cifrado de columnas o el secreto de sesión | [rotacion-de-claves.md](rotacion-de-claves.md) |
 | Reutilización de tokens de sesión o cuenta comprometida | [sesiones-comprometidas.md](sesiones-comprometidas.md) |

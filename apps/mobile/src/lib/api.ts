@@ -95,7 +95,7 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ handle, platform, ...(deviceId ? { deviceId } : {}), ...(hardwareId ? { hardwareId } : {}) }),
     }),
-  emailStart: (email: string) => request<void>("/v1/auth/email/start", { method: "POST", body: JSON.stringify({ email: email.trim() }) }),
+  emailStart: (email: string) => request<void>("/v1/auth/email/start", { method: "POST", body: JSON.stringify({ email: email.trim(), lang }) }),
   emailVerify: (email: string, code: string, platform: DevicePlatform, deviceId?: string | null, hardwareId?: string | null) =>
     request<TokenPair & { deviceId: string | null }>("/v1/auth/email/verify", {
       method: "POST",

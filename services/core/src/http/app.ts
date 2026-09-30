@@ -344,7 +344,7 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
   }
   app.post("/v1/auth/email/start", async (req, reply) => {
     const b = parse(EmailStartRequest, req.body);
-    await c.externalAuth.startEmail(b.email, req.ip ?? null);
+    await c.externalAuth.startEmail(b.email, req.ip ?? null, b.lang);
     return reply.status(204).send();
   });
   app.post("/v1/auth/email/verify", async (req, reply) => {

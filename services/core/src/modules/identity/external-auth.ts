@@ -5,7 +5,16 @@ import { withTransaction, type Db } from "../../platform/db.js";
 import type { EmailSender } from "../../platform/email.js";
 import { DomainError } from "../../platform/errors.js";
 import { newId } from "../../platform/ids.js";
+import type { Lang } from "@dizaster/contracts";
 import type { IdentityProviderVerifier, IdentityService, Session } from "./index.js";
+
+/** Correo con el código en el idioma de la app (ADR 0279). Texto de sistema: nunca lleva datos de la persona. */
+const CODE_EMAIL: Record<Lang, (code: string, minutes: number) => { subject: string; text: string }> = {
+  es: (c, m) => ({ subject: `Tu código de Dizaster: ${c}`, text: `Tu código para entrar en Dizaster es ${c}. Vence en ${m} minutos. Si no lo pediste, ignora este correo.` }),
+  en: (c, m) => ({ subject: `Your Dizaster code: ${c}`, text: `Your code to sign in to Dizaster is ${c}. It expires in ${m} minutes. If you didn't request it, ignore this email.` }),
+  pt: (c, m) => ({ subject: `Seu código do Dizaster: ${c}`, text: `Seu código para entrar no Dizaster é ${c}. Ele vence em ${m} minutos. Se você não o pediu, ignore este e-mail.` }),
+  fr: (c, m) => ({ subject: `Votre code Dizaster : ${c}`, text: `Votre code pour vous connecter à Dizaster est ${c}. Il expire dans ${m} minutes. Si vous ne l'avez pas demandé, ignorez cet e-mail.` }),
+};
 
 /**
  * ID tokens de Apple y Google (OIDC, §5.1, D-11, ADR 0170). Implementación propia con `jose`: sin costo por usuario.
@@ -91,7 +100,7 @@ export class ExternalAuthService {
   }
 
   /** Envía un código de 6 dígitos. Límites por correo y por IP; siempre la misma respuesta. */
-  async startEmail(email: string, ip: string | null): Promise<void> {
+  async startEmail(email: string, ip: string | null, lang: Lang = "es"): Promise<void> {
     if (this.email.id === "none") throw new DomainError("EMAIL_NOT_CONFIGURED", "El inicio de sesión por correo aún no está disponible", 503);
     const key = this.emailKey(email);
     const ipKey = this.ipKey(ip);
@@ -115,11 +124,7 @@ export class ExternalAuthService {
         [id, key, this.codeHash(id, code), ipKey, this.clock.now(), EMAIL_CODE_TTL_MINUTES],
       );
     });
-    await this.email.send({
-      to: email.trim(),
-      subject: `Tu código de Dizaster: ${code}`,
-      text: `Tu código para entrar en Dizaster es ${code}. Vence en ${EMAIL_CODE_TTL_MINUTES} minutos. Si no lo pediste, ignora este correo.`,
-    });
+    await this.email.send({ to: email.trim(), ...CODE_EMAIL[lang](code, EMAIL_CODE_TTL_MINUTES) });
   }
 
   /** Comprueba el código (como mucho 5 intentos por código) e inicia sesión; la cuenta se crea la primera vez. */
