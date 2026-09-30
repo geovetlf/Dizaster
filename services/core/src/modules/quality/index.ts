@@ -20,7 +20,7 @@ import type { VerificationService } from "../verification/index.js";
 export const SLO_TARGETS = { apiP95Ms: 300, urgentChainP95Seconds: 120, moderationOldestOpenHours: 24 } as const;
 
 /** Alerta operativa extra (ADR 0130): un evento interno sin procesar más de 5 min indica worker caído o consumidor roto. */
-export const OPS_TARGETS = { outboxOldestPendingSeconds: 300 } as const;
+export const OPS_TARGETS = { outboxOldestPendingSeconds: 300, outboxDead: 0 } as const;
 
 export interface OpsTransition { key: OpsAlertKey; breached: boolean; observed: number; target: number; unit: string }
 
@@ -36,7 +36,7 @@ export class QualityService {
       cost: CostService; events: EventService; verification: VerificationService; alerts: AlertService;
       ingestion: IngestionService; moderation: ModerationService;
       /** Para las alertas operativas (ADR 0130); opcional para no acoplar el tablero. */
-      ops?: { identity: IdentityService; backlog: () => Promise<{ oldestPendingSeconds: number | null }> };
+      ops?: { identity: IdentityService; backlog: () => Promise<{ oldestPendingSeconds: number | null; dead?: number }> };
     },
   ) {}
 
@@ -50,7 +50,10 @@ export class QualityService {
     if (!ops) return [];
     const r = await this.report({ days: 1 });
     const observed: { key: OpsAlertKey; observed: number | null; target: number; unit: string }[] = r.slos.map((s) => ({ key: s.key, observed: s.observed, target: s.target, unit: s.unit }));
-    observed.push({ key: "outbox_oldest_pending", observed: (await ops.backlog()).oldestPendingSeconds ?? 0, target: OPS_TARGETS.outboxOldestPendingSeconds, unit: "s" });
+    const backlog = await ops.backlog();
+    observed.push({ key: "outbox_oldest_pending", observed: backlog.oldestPendingSeconds ?? 0, target: OPS_TARGETS.outboxOldestPendingSeconds, unit: "s" });
+    // Cualquier evento en cuarentena (ADR 0206) avisa: algo se perdió hasta que operación lo reprocese.
+    if (backlog.dead !== undefined) observed.push({ key: "outbox_dead", observed: backlog.dead, target: OPS_TARGETS.outboxDead, unit: "" });
 
     const prior = new Map((await this.db.query<{ key: string; breached: boolean }>(`SELECT key, breached FROM quality.ops_alert_state`)).rows.map((x) => [x.key, x.breached]));
     const transitions: OpsTransition[] = [];

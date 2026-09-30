@@ -19,7 +19,8 @@
     "grant-role": "node dist/grant-role-cli.js",
     "source-status": "node dist/source-status-cli.js",
     "reprocess-source": "node dist/reprocess-source-cli.js",
-    "transparency-report": "node dist/transparency-report-cli.js"
+    "transparency-report": "node dist/transparency-report-cli.js",
+    "outbox": "node dist/outbox-cli.js"
   },
   "dependencies": {
     "@dizaster/contracts": "workspace:*",

@@ -35,10 +35,15 @@ interface Registration {
 /** Orden de prioridad: una cola de lote nunca retrasa a la urgente. */
 const LANE_ORDER: OutboxLane[] = ["urgent", "interactive", "normal", "batch"];
 
+/** Intentos antes de la cuarentena (ADR 0206). Con espera 2^n s (máx. 1 h), 15 intentos ≈ 5 h de reintentos. */
+export const OUTBOX_MAX_ATTEMPTS = 15;
+
+export interface DeadEvent { id: string; type: string; lane: OutboxLane; occurredAt: string; deadAt: string; attempts: number; lastError: string | null }
+
 export class OutboxDispatcher {
   private readonly registrations: Registration[] = [];
 
-  constructor(private readonly db: Db) {}
+  constructor(private readonly db: Db, private readonly maxAttempts = OUTBOX_MAX_ATTEMPTS) {}
 
   on<T extends DomainEventType>(type: T, consumer: string, handler: Handler<T>): void {
     this.registrations.push({ consumer, type, handler: handler as Handler });
@@ -55,7 +60,7 @@ export class OutboxDispatcher {
         }>(
           `SELECT id, type, version, payload, lane, correlation_id, actor, occurred_at, attempts
              FROM platform.outbox
-            WHERE processed_at IS NULL AND available_at <= now() AND lane = ANY($1)
+            WHERE processed_at IS NULL AND dead_at IS NULL AND available_at <= now() AND lane = ANY($1)
             ORDER BY array_position($2::text[], lane), occurred_at
             LIMIT 1
             FOR UPDATE SKIP LOCKED`,
@@ -83,11 +88,13 @@ export class OutboxDispatcher {
         } catch (err) {
           // Reintento con espera exponencial; el error queda registrado para observabilidad.
           await tx.query("ROLLBACK TO SAVEPOINT handlers");
+          // Tras `maxAttempts` pasa a cuarentena (ADR 0206): deja de reintentarse y de contar como atasco.
           await tx.query(
             `UPDATE platform.outbox SET attempts = attempts + 1, last_error = $2,
-                    available_at = now() + make_interval(secs => least(3600, 2 ^ (attempts + 1)))
+                    available_at = now() + make_interval(secs => least(3600, 2 ^ (attempts + 1))),
+                    dead_at = CASE WHEN attempts + 1 >= $3 THEN now() END
               WHERE id = $1`,
-            [row.id, String(err instanceof Error ? err.stack ?? err.message : err).slice(0, 4000)],
+            [row.id, String(err instanceof Error ? err.stack ?? err.message : err).slice(0, 4000), this.maxAttempts],
           );
         }
         return true;
@@ -99,14 +106,42 @@ export class OutboxDispatcher {
   }
 
   /** Pendientes y antigüedad del más viejo (ADR 0130): si crece, el worker no da abasto o un consumidor falla. */
-  async backlog(): Promise<{ pending: number; oldestPendingSeconds: number | null; failing: number }> {
-    const { rows } = await this.db.query<{ pending: number; oldest: number | null; failing: number }>(
-      `SELECT count(*)::int AS pending, extract(epoch FROM now() - min(occurred_at))::float8 AS oldest,
-              count(*) FILTER (WHERE attempts > 0)::int AS failing
+  async backlog(): Promise<{ pending: number; oldestPendingSeconds: number | null; failing: number; dead: number }> {
+    const { rows } = await this.db.query<{ pending: number; oldest: number | null; failing: number; dead: number }>(
+      `SELECT count(*) FILTER (WHERE dead_at IS NULL)::int AS pending,
+              extract(epoch FROM now() - min(occurred_at) FILTER (WHERE dead_at IS NULL))::float8 AS oldest,
+              count(*) FILTER (WHERE attempts > 0 AND dead_at IS NULL)::int AS failing,
+              count(*) FILTER (WHERE dead_at IS NOT NULL)::int AS dead
          FROM platform.outbox WHERE processed_at IS NULL`,
     );
     const r = rows[0]!;
-    return { pending: r.pending, oldestPendingSeconds: r.oldest === null ? null : Math.round(r.oldest), failing: r.failing };
+    return { pending: r.pending, oldestPendingSeconds: r.oldest === null ? null : Math.round(r.oldest), failing: r.failing, dead: r.dead };
+  }
+
+  /** Eventos en cuarentena (ADR 0206), los más recientes primero. El error se recorta: puede ser largo. */
+  async dead(limit = 50): Promise<DeadEvent[]> {
+    const { rows } = await this.db.query<{ id: string; type: string; lane: OutboxLane; occurred_at: Date; dead_at: Date; attempts: number; last_error: string | null }>(
+      `SELECT id, type, lane, occurred_at, dead_at, attempts, last_error FROM platform.outbox
+        WHERE dead_at IS NOT NULL AND processed_at IS NULL ORDER BY dead_at DESC LIMIT $1`,
+      [limit],
+    );
+    return rows.map((r) => ({
+      id: r.id, type: r.type, lane: r.lane, occurredAt: r.occurred_at.toISOString(), deadAt: r.dead_at.toISOString(),
+      attempts: r.attempts, lastError: r.last_error?.split("\n")[0]?.slice(0, 300) ?? null,
+    }));
+  }
+
+  /**
+   * Reprocesar desde la cuarentena (tras corregir el consumidor): vuelve a la cola con los intentos a cero. Sin ids,
+   * todos. Los consumidores que ya lo procesaron no lo repiten (idempotencia por `outbox_consumption`).
+   */
+  async replayDead(ids?: string[]): Promise<number> {
+    const r = await this.db.query(
+      `UPDATE platform.outbox SET dead_at = NULL, attempts = 0, available_at = now()
+        WHERE dead_at IS NOT NULL AND processed_at IS NULL AND ($1::uuid[] IS NULL OR id = ANY($1))`,
+      [ids && ids.length > 0 ? ids : null],
+    );
+    return r.rowCount ?? 0;
   }
 
   /**

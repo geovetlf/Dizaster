@@ -396,6 +396,7 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | Galería sin media de reportes moderados, por páginas (§13.3, §13.1) | ✅ | ADR 0203: fuera las fotos de reportes ocultos, retirados o eliminados; cursor y "Ver más fotos" en la app |
 | Logs de peticiones sin coordenadas ni IP (§13.2, RNF-04) | ✅ | ADR 0204: solo método, ruta e id; query string como [REDACTED]; sin IP |
 | Plazos y cortocircuito en push y almacenamiento (§5.14, §12.2) | ✅ | ADR 0205: APNs/FCM 10 s, S3 120 s; APNs y FCM en paralelo; cortocircuito por proveedor con métrica |
+| Cuarentena del outbox (§4.2, §6.2, §5.22) | ✅ | ADR 0206: tras 15 intentos a cuarentena; alerta outbox_dead; pnpm outbox dead/replay |
 | Licencias, auditoría, SBOM, Dependabot; respaldo con prueba de restauración en CI | ✅ | ADR 0070, `scripts/supply-chain.mjs`, `scripts/db-restore-check.mjs` |
 | Idioma de la app elegible en el perfil (es/en/pt/fr o del teléfono) | ✅ | ADR 0069, `app/language.tsx` |
 | Varias cuentas en un teléfono corroboran como una (clave seudónima del teléfono) | ✅ | ADR 0068, migración 0036 |
@@ -453,9 +454,8 @@ Revisión del Blueprint del 2026-09-30 (tras ADR 0196): completada con ADR 0197�
 
 Revisión del Blueprint del 2026-09-30 (tras ADR 0202), verificada contra el código, sin bloqueos:
 
-1. Cuarentena de mensajes del outbox que siempre fallan (§4.2, §6.2): hoy se reintentan para siempre y dejan `/health/ready` en rojo permanente.
-2. Límite de subidas por teléfono, no solo por cuenta (§5.18, §12.2): igual que los reportes (ADR 0131).
-3. Paginación de la lista de bloqueos, con tope de bloqueos (§13.1); la galería ya va por páginas (ADR 0203).
+1. Límite de subidas por teléfono, no solo por cuenta (§5.18, §12.2): igual que los reportes (ADR 0131).
+2. Paginación de la lista de bloqueos, con tope de bloqueos (§13.1); la galería ya va por páginas (ADR 0203).
 
 Bloqueadas o en espera:
 

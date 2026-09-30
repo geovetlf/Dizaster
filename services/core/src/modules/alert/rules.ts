@@ -233,12 +233,12 @@ export function sourceAlertText(lang: Lang, s: { sourceKey: string; state: "DEGR
 }
 
 /** Alertas operativas (ADR 0130): SLO incumplido o outbox atascado, y su recuperación. */
-export type OpsAlertKey = "api_p95" | "urgent_chain_p95" | "moderation_oldest_open" | "outbox_oldest_pending";
+export type OpsAlertKey = "api_p95" | "urgent_chain_p95" | "moderation_oldest_open" | "outbox_oldest_pending" | "outbox_dead";
 const OPS_NAME: Record<Lang, Record<OpsAlertKey, string>> = {
-  es: { api_p95: "Latencia de la API (p95)", urgent_chain_p95: "Cadena urgente oficial (p95)", moderation_oldest_open: "Caso de moderación más antiguo", outbox_oldest_pending: "Eventos internos pendientes" },
-  en: { api_p95: "API latency (p95)", urgent_chain_p95: "Official urgent chain (p95)", moderation_oldest_open: "Oldest moderation case", outbox_oldest_pending: "Pending internal events" },
-  pt: { api_p95: "Latência da API (p95)", urgent_chain_p95: "Cadeia urgente oficial (p95)", moderation_oldest_open: "Caso de moderação mais antigo", outbox_oldest_pending: "Eventos internos pendentes" },
-  fr: { api_p95: "Latence de l'API (p95)", urgent_chain_p95: "Chaîne urgente officielle (p95)", moderation_oldest_open: "Plus ancien cas de modération", outbox_oldest_pending: "Événements internes en attente" },
+  es: { api_p95: "Latencia de la API (p95)", urgent_chain_p95: "Cadena urgente oficial (p95)", moderation_oldest_open: "Caso de moderación más antiguo", outbox_oldest_pending: "Eventos internos pendientes", outbox_dead: "Eventos internos en cuarentena" },
+  en: { api_p95: "API latency (p95)", urgent_chain_p95: "Official urgent chain (p95)", moderation_oldest_open: "Oldest moderation case", outbox_oldest_pending: "Pending internal events", outbox_dead: "Quarantined internal events" },
+  pt: { api_p95: "Latência da API (p95)", urgent_chain_p95: "Cadeia urgente oficial (p95)", moderation_oldest_open: "Caso de moderação mais antigo", outbox_oldest_pending: "Eventos internos pendentes", outbox_dead: "Eventos internos em quarentena" },
+  fr: { api_p95: "Latence de l'API (p95)", urgent_chain_p95: "Chaîne urgente officielle (p95)", moderation_oldest_open: "Plus ancien cas de modération", outbox_oldest_pending: "Événements internes en attente", outbox_dead: "Événements internes en quarantaine" },
 };
 const OPS_TEXT: Record<Lang, (name: string, breached: boolean, observed: string, target: string) => { title: string; body: string }> = {
   es: (n, b, o, t) => b ? { title: `Objetivo incumplido: ${n}`, body: `Medido ${o}, objetivo ${t}. Revisa el panel de calidad y los runbooks.` } : { title: `Objetivo recuperado: ${n}`, body: `Medido ${o}, objetivo ${t}.` },
@@ -247,7 +247,7 @@ const OPS_TEXT: Record<Lang, (name: string, breached: boolean, observed: string,
   fr: (n, b, o, t) => b ? { title: `Objectif manqué : ${n}`, body: `Mesuré ${o}, objectif ${t}. Consultez le tableau de qualité et les runbooks.` } : { title: `Objectif rétabli : ${n}`, body: `Mesuré ${o}, objectif ${t}.` },
 };
 export function opsAlertText(lang: Lang, a: { key: OpsAlertKey; breached: boolean; observed: number; target: number; unit: string }): { title: string; body: string } {
-  const fmt = (v: number) => `${Math.round(v)} ${a.unit}`;
+  const fmt = (v: number) => (a.unit ? `${Math.round(v)} ${a.unit}` : String(Math.round(v)));
   return OPS_TEXT[lang](OPS_NAME[lang][a.key], a.breached, fmt(a.observed), fmt(a.target));
 }
 

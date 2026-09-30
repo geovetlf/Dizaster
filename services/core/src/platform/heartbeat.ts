@@ -56,7 +56,7 @@ export class HeartbeatService {
       for (const b of beats.rows) roles[b.role] = Math.round(b.age);
       const outbox = await this.db.query<{ age: number | null }>(
         `SELECT extract(epoch FROM now() - min(available_at))::float8 AS age FROM platform.outbox
-          WHERE processed_at IS NULL AND available_at <= now()`,
+          WHERE processed_at IS NULL AND dead_at IS NULL AND available_at <= now()`,
       );
       const oldest = outbox.rows[0]!.age;
       const outboxOldestReadySeconds = oldest === null ? null : Math.round(oldest);
