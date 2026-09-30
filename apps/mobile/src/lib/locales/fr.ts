@@ -26,6 +26,8 @@ export const fr: Record<MessageKey, string> = {
   pseudonymous: "Publier sans afficher mon nom",
   pseudonymousForced: "Dans cette catégorie, votre nom n'est jamais affiché.",
   callFirst: "Si des vies sont en danger, appelez d'abord les secours.",
+  notEmergencyService: "Dizaster ne remplace pas les services d'urgence ni les autorités. En cas de danger, appelez d'abord les numéros ci-dessous.",
+  notEmergencyServiceAbout: "Dizaster n'est pas un service d'urgence : il n'envoie pas de secours et ne reçoit pas d'appels. En cas de danger, appelez les services d'urgence de votre pays.",
   privacyNote: "Votre position exacte n'est pas publiée. Elle sert uniquement à vérifier que vous êtes sur place.",
   created: "Vous avez créé un nouvel événement.",
   attached: "Votre signalement a été ajouté à un événement existant.",

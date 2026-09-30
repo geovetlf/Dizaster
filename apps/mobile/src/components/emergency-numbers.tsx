@@ -31,6 +31,8 @@ export function EmergencyNumbers({ compact = false }: { compact?: boolean }) {
   return (
     <View style={compact ? styles.compact : styles.container}>
       <Text style={styles.title}>{t("emergencyTitle")}{lookup.country ? ` · ${lookup.country}` : ""}</Text>
+      {/* C-18 (ADR 0227): Dizaster informa; no despacha ayuda. */}
+      <Text style={styles.warning} accessibilityRole="alert">{t("notEmergencyService")}</Text>
       {source === "settings" ? <Text style={styles.hint}>{t("countryFromSettings")}</Text> : null}
       {source === "sim" ? <Text style={styles.hint}>{t("countryFromSim")}</Text> : null}
       {source === "profile" ? <Text style={styles.hint}>{t("countryFromProfile")}</Text> : null}

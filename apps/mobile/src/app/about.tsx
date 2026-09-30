@@ -29,6 +29,7 @@ export default function AboutScreen() {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <Text style={styles.intro}>{t("aboutIntro")}</Text>
+      <Text style={styles.intro}>{t("notEmergencyServiceAbout")}</Text>
       {groupAttributions(list).map((g) => (
         <View key={g.kind} style={styles.group}>
           <Text style={styles.heading}>{t(TITLES[g.kind])}</Text>
