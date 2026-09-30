@@ -9,6 +9,7 @@ import { loadPolicy, validatePolicy } from "../src/policy.js";
 import { buildProvenance, contextFromEnv, verifyProvenance } from "../src/provenance.js";
 import { checkVerifyOutput, cosignVerifyArgs, identityRegexp, type SigningPolicy } from "../src/signing.js";
 import { evaluateSlo, fromK6Summary, fromSamples, percentile } from "../src/slo.js";
+import { localEnv } from "./cli-env.js";
 
 // Firma, procedencia, SLO y validación de entornos (ADR 0277). Sin nube, sin red, sin cosign.
 const root = new URL("../../../", import.meta.url).pathname;
@@ -24,7 +25,7 @@ const unconnected = (() => {
   writeFileSync(f, JSON.stringify({ ...policy, owners: [], signing: { ...policy.signing, repository: null } }));
   return f;
 })();
-const cli = (args: string[]) => spawnSync(process.execPath, [`${root}tools/delivery/dist/cli.js`, ...args], { cwd: root, encoding: "utf8" });
+const cli = (args: string[]) => spawnSync(process.execPath, [`${root}tools/delivery/dist/cli.js`, ...args], { cwd: root, encoding: "utf8", env: localEnv() });
 
 describe("firma keyless", () => {
   it("la política versionada exige firma del repositorio oficial", () => {

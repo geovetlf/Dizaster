@@ -10,6 +10,7 @@ import { loadPolicy } from "../src/policy.js";
 import { lastServing, promotable, rollbackCandidate, type ReleaseRecord } from "../src/releases.js";
 import { markdownReport } from "../src/report.js";
 import { deliveryStats } from "../src/stats.js";
+import { localEnv } from "./cli-env.js";
 
 // Despliegue, promoción, rollback, métricas e informe del Delivery Plane (ADR 0272). Sin nube ni red.
 const root = new URL("../../../", import.meta.url).pathname;
@@ -17,7 +18,7 @@ const policy = loadPolicy(`${root}delivery/policy.json`);
 const D = (n: number) => `sha256:${String(n).repeat(64).slice(0, 64)}`;
 const rel = (env: "staging" | "production", n: number, outcome: ReleaseRecord["outcome"], at: string): ReleaseRecord =>
   ({ env, service: "api", revision: { name: `api-${n}`, digest: D(n) }, outcome, previous: null, at, actor: "human" });
-const cli = (args: string[], cwd = root) => spawnSync(process.execPath, [`${root}tools/delivery/dist/cli.js`, ...args], { cwd, encoding: "utf8" });
+const cli = (args: string[], cwd = root) => spawnSync(process.execPath, [`${root}tools/delivery/dist/cli.js`, ...args], { cwd, encoding: "utf8", env: localEnv() });
 
 describe("versiones y rollback", () => {
   const h = [rel("staging", 1, "deployed", "2026-09-01"), rel("staging", 2, "deployed", "2026-09-02"), rel("staging", 3, "rolled-back", "2026-09-03")];
