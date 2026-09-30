@@ -4,6 +4,8 @@ Red social mundial geolocalizada de incidentes, desastres, prevención y alertas
 
 > Dizaster es un proyecto completamente independiente. No comparte código, repositorios, configuración ni infraestructura con ningún otro proyecto.
 
+Repositorio oficial: https://github.com/geovetlf/Dizaster
+
 - Fundación técnica: [`docs/DIZASTER_MASTER_BLUEPRINT.md`](docs/DIZASTER_MASTER_BLUEPRINT.md) (aprobado 2026-09-29)
 - Decisiones: [`docs/adr/`](docs/adr)
 - Estado de la implementación: [`docs/IMPLEMENTATION_STATUS.md`](docs/IMPLEMENTATION_STATUS.md)

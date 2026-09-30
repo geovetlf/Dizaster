@@ -17,13 +17,21 @@ const D = `sha256:${"a".repeat(64)}`;
 const OTHER = `sha256:${"b".repeat(64)}`;
 const COMMIT = "c".repeat(40);
 const signing: SigningPolicy = { ...policy.signing, repository: "dizaster-org/dizaster" };
+/** Política como antes de conectar el repositorio (D-24): sin repositorio ni propietarios. */
+const unconnected = (() => {
+  const dir = mkdtempSync(join(tmpdir(), "dzd-pol-"));
+  const f = join(dir, "policy.json");
+  writeFileSync(f, JSON.stringify({ ...policy, owners: [], signing: { ...policy.signing, repository: null } }));
+  return f;
+})();
 const cli = (args: string[]) => spawnSync(process.execPath, [`${root}tools/delivery/dist/cli.js`, ...args], { cwd: root, encoding: "utf8" });
 
 describe("firma keyless", () => {
-  it("la política versionada exige firma y aún no tiene repositorio (D-24)", () => {
+  it("la política versionada exige firma del repositorio oficial", () => {
     expect(policy.signing.required).toBe(true);
-    expect(policy.signing.repository).toBeNull();
-    expect(() => identityRegexp(policy.signing)).toThrow(/D-24/);
+    expect(policy.signing.repository).toBe("geovetlf/Dizaster");
+    expect(new RegExp(identityRegexp(policy.signing)).test("https://github.com/geovetlf/Dizaster/.github/workflows/ci.yml@refs/heads/main")).toBe(true);
+    expect(() => identityRegexp({ ...policy.signing, repository: null })).toThrow(/D-24/);
   });
   it("la firma no se puede apagar ni abrir a cualquier rama", () => {
     expect(() => validatePolicy({ ...policy, signing: { ...policy.signing, required: false } })).toThrow(/required/);
@@ -60,7 +68,7 @@ describe("firma keyless", () => {
   });
   it("staging y producción rechazan una clave local; en seco se explica el bloqueo D-24", () => {
     expect(cli(["signature", "verify", "--image", "r/p/dizaster/core", "--digest", D, "--env", "production", "--key", "k.pub"]).status).toBe(1);
-    const dry = cli(["signature", "verify", "--image", "r/p/dizaster/core", "--digest", D]);
+    const dry = cli(["signature", "verify", "--image", "r/p/dizaster/core", "--digest", D, "--policy", unconnected]);
     expect(dry.status).toBe(0);
     expect(dry.stdout).toMatch(/D-24/);
   });
@@ -68,7 +76,7 @@ describe("firma keyless", () => {
     const dir = mkdtempSync(join(tmpdir(), "dzd-"));
     const releases = join(dir, "r.jsonl");
     writeFileSync(releases, `${JSON.stringify({ env: "staging", service: "api", revision: { name: "a", digest: D }, outcome: "deployed", previous: null, at: "2026-09-30", actor: "human" })}\n`);
-    const r = cli(["promote", "--digest", D, "--releases", releases, "--project", "p", "--region", "r", "--image", "r/p/dizaster/core", "--execute", "--log", join(dir, "a.jsonl")]);
+    const r = cli(["promote", "--digest", D, "--releases", releases, "--project", "p", "--region", "r", "--image", "r/p/dizaster/core", "--execute", "--log", join(dir, "a.jsonl"), "--policy", unconnected]);
     expect(r.status).toBe(1);
     expect(r.stderr).toMatch(/Firma no verificable/);
   });
@@ -186,7 +194,7 @@ describe("quién cuenta como humano", () => {
     expect(isHuman("github:geovet", ["geovet"])).toBe(true);
     expect(isHuman("github:claude[bot]", ["geovet"])).toBe(false);
     expect(isHuman("ci", ["geovet"])).toBe(false);
-    expect(policy.owners).toEqual([]);
+    expect(policy.owners).toEqual(["geovetlf"]);
   });
   it("un bot no puede declararse propietario en la política", () => {
     expect(() => validatePolicy({ ...policy, owners: ["claude[bot]"] })).toThrow(/owners/);

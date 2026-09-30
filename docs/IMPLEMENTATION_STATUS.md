@@ -571,6 +571,6 @@ Bloqueadas o en espera:
 - **BLOCKED_BY_OWNER** — Fuentes oficiales del piloto (IGP, INDECI, SENAMHI): en investigación, sin adapter; falta validar feeds y términos de uso con el propietario. Hoy solo confirman los perfiles institucionales (ADR 0095).
 - **BLOCKED_BY_OWNER** — Revisión nativa de los textos en portugués y francés.
 - **BLOCKED_BY_OWNER** — Organizaciones para donar (ADR 0274): el directorio está vacío hasta que el propietario verifique y cargue cada una.
-- **BLOCKED_BY_OWNER** — Repositorio de GitHub de Dizaster (D-20 decidida, repositorio aún no creado): protección de `main`, entornos, firma cosign, informe en PR.
+- **Repositorio oficial**: https://github.com/geovetlf/Dizaster (creado por el propietario el 2026-09-30). Pendiente: reglas de `main` y etiquetas (`.github/rulesets/`), entornos `staging` y `production` y variables de Actions (`scripts/github-bootstrap.mjs`), con autorización del propietario.
 - **BLOCKED_BY_BILLING** — Proyectos de Google Cloud, facturación y presupuesto (D-18); base de staging (D-23); plan de GitHub (D-24). Hasta entonces `dzd deploy/promote/rollback` solo corren en seco y `infra/tofu` no se aplica.
 - **BLOQUEADA** — Contacto del cliente de ingesta (§9.3): el User-Agent dice "contacto pendiente"; falta el correo o URL de contacto del propietario.

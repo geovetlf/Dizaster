@@ -1,0 +1,13 @@
+# Propietario de Dizaster (D-24, ADR 0277). Generado desde CODEOWNERS.template.
+# Todo cambio crítico según delivery/policy.json necesita la revisión del propietario.
+*                                   @geovetlf
+/delivery/                          @geovetlf
+/tools/delivery/                    @geovetlf
+/.github/                           @geovetlf
+/infra/                             @geovetlf
+/security/                          @geovetlf
+/services/core/migrations/          @geovetlf
+/services/core/src/modules/identity/ @geovetlf
+/services/core/src/modules/verification/ @geovetlf
+/services/core/src/modules/moderation/ @geovetlf
+/data/emergency-numbers/            @geovetlf

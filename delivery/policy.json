@@ -28,11 +28,11 @@
     { "when": ["delivery/**", "infra/tofu/**"], "require": ["docs/adr/**", "docs/runbooks/**"], "message": "un cambio de política o de infraestructura se documenta en una ADR o un runbook" }
   ],
   "migrations": { "dir": "services/core/migrations", "derivedTables": ["geo.context_cache"] },
-  "owners": [],
+  "owners": ["geovetlf"],
   "signing": {
     "required": true,
     "issuer": "https://token.actions.githubusercontent.com",
-    "repository": null,
+    "repository": "geovetlf/Dizaster",
     "workflows": [".github/workflows/ci.yml"],
     "refs": ["refs/heads/main"]
   },
