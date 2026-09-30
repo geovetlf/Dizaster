@@ -216,8 +216,8 @@ export class AlertService {
     const found = new Map<string, { userId: string; match: AlertMatch }>();
     for (const f of await this.social.followersOf(tx, { eventId: snap.id, placeIds: [] })) found.set(f.profileId, { userId: f.userId, match: "FOLLOWED_EVENT" });
     const prior = await tx.query<{ profile_id: string; user_id: string }>(
-      `SELECT DISTINCT n.profile_id, n.user_id FROM alert.notifications n JOIN alert.alerts a ON a.id = n.alert_id WHERE a.event_id = $1 AND a.kind <> 'OFFICIAL_UPDATE'`,
-      [snap.id],
+      `SELECT DISTINCT n.profile_id, n.user_id FROM alert.notifications n JOIN alert.alerts a ON a.id = n.alert_id WHERE a.event_id = ANY($1) AND a.kind <> 'OFFICIAL_UPDATE'`,
+      [[snap.id, ...(await this.events.mergedIdsOf(tx, snap.id))]],
     );
     for (const r of prior.rows) if (!found.has(r.profile_id)) found.set(r.profile_id, { userId: r.user_id, match: "PREVIOUSLY_ALERTED" });
     for (const r of (await this.opts.reporters?.reportersOf(tx, snap.id)) ?? []) {
@@ -259,9 +259,17 @@ export class AlertService {
     const snap = await this.events.alertSnapshot(tx, eventId);
     if (!snap || snap.mergedIntoId) return 0;
     const category = this.ref.category(snap.categoryCode, snap.countryCode);
-    const prevRow = (await tx.query<{ public_state: string; severity: number; status: string; announced: boolean }>(
+    let prevRow = (await tx.query<{ public_state: string; severity: number; status: string; announced: boolean }>(
       `SELECT public_state, severity, status, announced FROM alert.event_state WHERE event_id = $1 FOR UPDATE`, [eventId],
     )).rows[0];
+    // Fusiones (ADR 0249): si ya se avisó de un evento absorbido, este no se vuelve a anunciar como nuevo.
+    const merged = await this.events.mergedIdsOf(tx, eventId);
+    if (merged.length && !prevRow?.announced) {
+      const heir = (await tx.query<{ public_state: string; severity: number; status: string; announced: boolean }>(
+        `SELECT public_state, severity, status, announced FROM alert.event_state WHERE event_id = ANY($1) AND announced ORDER BY updated_at DESC LIMIT 1`, [merged],
+      )).rows[0];
+      if (heir) prevRow = prevRow ? { ...prevRow, announced: true } : heir;
+    }
     const prev: SeenState | null = prevRow
       ? { publicState: prevRow.public_state, severity: prevRow.severity, status: prevRow.status, announced: prevRow.announced }
       : null;
@@ -420,10 +428,11 @@ export class AlertService {
       for (const r of near.rows) { const u = users.get(r.profile_id); if (u) add(r.profile_id, u, r.match); }
     } else {
       for (const f of await this.social.followersOf(tx, { eventId: snap.id, placeIds: [] })) add(f.profileId, f.userId, "FOLLOWED_EVENT");
-      // Quien ya recibió un aviso de este evento merece saber si se confirmó, resultó falso o terminó.
+      // Quien ya recibió un aviso de este evento (o de uno que absorbió, ADR 0249) merece saber si se confirmó,
+      // resultó falso o terminó.
       const prior = await tx.query<{ profile_id: string; user_id: string }>(
-        `SELECT DISTINCT n.profile_id, n.user_id FROM alert.notifications n JOIN alert.alerts a ON a.id = n.alert_id WHERE a.event_id = $1`,
-        [snap.id],
+        `SELECT DISTINCT n.profile_id, n.user_id FROM alert.notifications n JOIN alert.alerts a ON a.id = n.alert_id WHERE a.event_id = ANY($1)`,
+        [[snap.id, ...(await this.events.mergedIdsOf(tx, snap.id))]],
       );
       for (const r of prior.rows) add(r.profile_id, r.user_id, "PREVIOUSLY_ALERTED");
       // Quien reportó se entera de lo que pasó con su reporte (§8.1, ADR 0223).

@@ -1389,6 +1389,18 @@ export class EventService {
     return rows.length;
   }
 
+  /** Eventos absorbidos por este (fusiones encadenadas incluidas), para heredar su historial de avisos (ADR 0249). */
+  async mergedIdsOf(q: Queryable, targetId: string): Promise<string[]> {
+    const { rows } = await q.query<{ id: string }>(
+      `WITH RECURSIVE m AS (
+         SELECT id FROM event.events WHERE merged_into_id = $1
+         UNION SELECT e.id FROM event.events e JOIN m ON e.merged_into_id = m.id)
+       SELECT id FROM m LIMIT 200`,
+      [targetId],
+    );
+    return rows.map((r) => r.id);
+  }
+
   // ───────────── Interfaz para el Verification Engine ─────────────
 
   async evidenceForVerification(q: Queryable, eventId: string): Promise<{ categoryCode: string; countryCode: string | null; evidence: EvidenceForVerification[] }> {
