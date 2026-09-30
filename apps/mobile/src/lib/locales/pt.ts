@@ -663,6 +663,8 @@ export const pt: Record<MessageKey, string> = {
   redactSuggest: "◐ Nesta categoria ninguém deve ser identificado: toque em cada foto e desfoque rostos e placas.",
   offlineMap: "Mapa offline",
   offlineMapConfirm: "Baixar o mapa desta região para vê-lo sem internet. Ocupa cerca de {mb} MB. Use wi-fi se puder.",
+  offlineMapOutdated: "O mapa salvo desta zona está desatualizado (a zona ou o idioma mudou). Continua funcionando sem rede até você atualizá-lo. Atualizar ocupa cerca de {mb} MB.",
+  offlineMapOutdatedShort: "desatualizado",
   offlineMapDownload: "Baixar",
   offlineMapReady: "O mapa desta região está salvo ({mb} MB).",
   offlineMapDelete: "Apagar mapa",

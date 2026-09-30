@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { Alert, Pressable, StyleSheet, Text } from "react-native";
 import { t, tf } from "../lib/i18n";
 import { deleteZoneMap, downloadZoneMap, zoneMapStates, type ZoneMapState } from "../lib/map/offline";
-import { planZonePack } from "../lib/map/offline-plan";
+import { packFingerprint, planZonePack } from "../lib/map/offline-plan";
 import { colors } from "../theme";
 import { Icon } from "./icon";
 
@@ -11,9 +11,10 @@ import { Icon } from "./icon";
 export function ZoneMapButton({ zone, styleUrl }: { zone: SavedZone; styleUrl: string | null }) {
   const [state, setState] = useState<ZoneMapState>({ kind: "none" });
 
+  const fingerprint = styleUrl ? packFingerprint(zone, styleUrl) : null;
   useEffect(() => {
-    zoneMapStates([zone.id]).then((s) => setState(s[zone.id] ?? { kind: "none" })).catch(() => undefined);
-  }, [zone.id]);
+    zoneMapStates([zone.id], fingerprint ? { [zone.id]: fingerprint } : {}).then((s) => setState(s[zone.id] ?? { kind: "none" })).catch(() => undefined);
+  }, [zone.id, fingerprint]);
 
   if (!styleUrl) return null;
 
@@ -27,7 +28,9 @@ export function ZoneMapButton({ zone, styleUrl }: { zone: SavedZone; styleUrl: s
       return;
     }
     const plan = planZonePack(zone.center, zone.radiusKm);
-    Alert.alert(t("offlineMap"), tf("offlineMapConfirm", { mb: plan.estimatedMb }), [
+    // Desactualizado (ADR 0250): el mapa guardado sigue sirviendo hasta que se descarga el nuevo, que lo reemplaza.
+    const message = state.kind === "outdated" ? tf("offlineMapOutdated", { mb: plan.estimatedMb }) : tf("offlineMapConfirm", { mb: plan.estimatedMb });
+    Alert.alert(t("offlineMap"), message, [
       { text: t("cancel"), style: "cancel" },
       {
         text: t("offlineMapDownload"),
@@ -40,9 +43,9 @@ export function ZoneMapButton({ zone, styleUrl }: { zone: SavedZone; styleUrl: s
   }
 
   const label = state.kind === "downloading" ? `${state.percent}%` : null;
-  const icon = state.kind === "ready" ? "map-check" : state.kind === "error" ? "map-marker-alert-outline" : "download-outline";
+  const icon = state.kind === "ready" ? "map-check" : state.kind === "outdated" ? "map-clock-outline" : state.kind === "error" ? "map-marker-alert-outline" : "download-outline";
   return (
-    <Pressable accessibilityRole="button" accessibilityLabel={t("offlineMap")} hitSlop={8} onPress={() => onPress(styleUrl)} style={styles.btn}>
+    <Pressable accessibilityRole="button" accessibilityLabel={state.kind === "outdated" ? `${t("offlineMap")}: ${t("offlineMapOutdatedShort")}` : t("offlineMap")} hitSlop={8} onPress={() => onPress(styleUrl)} style={styles.btn}>
       {label ? <Text style={styles.pct}>{label}</Text> : <Icon name={icon} size={20} color={state.kind === "ready" ? colors.accent : colors.textMuted} />}
     </Pressable>
   );

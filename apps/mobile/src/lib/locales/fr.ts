@@ -663,6 +663,8 @@ export const fr: Record<MessageKey, string> = {
   redactSuggest: "◐ Personne ne doit être identifiable dans cette catégorie : touchez chaque photo et floutez visages et plaques.",
   offlineMap: "Carte hors ligne",
   offlineMapConfirm: "Télécharger la carte de cette zone pour la voir sans connexion. Environ {mb} Mo. Utilisez le wifi si possible.",
+  offlineMapOutdated: "La carte enregistrée de cette zone n'est plus à jour (la zone ou la langue a changé). Elle fonctionne hors ligne jusqu'à la mise à jour, qui prend environ {mb} Mo.",
+  offlineMapOutdatedShort: "pas à jour",
   offlineMapDownload: "Télécharger",
   offlineMapReady: "La carte de cette zone est enregistrée ({mb} Mo).",
   offlineMapDelete: "Supprimer la carte",

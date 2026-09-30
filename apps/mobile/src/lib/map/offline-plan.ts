@@ -55,3 +55,11 @@ export function planZonePack(center: { lat: number; lng: number }, radiusKm: num
   }
   return { bounds, minZoom: OFFLINE_MIN_ZOOM, maxZoom, tiles, estimatedMb: Math.max(1, Math.round((tiles * AVG_TILE_BYTES) / 1e6)) };
 }
+
+/**
+ * Huella de lo descargado (ADR 0250): estilo (cambia con el idioma, ADR 0193), centro y radio. Si la zona se edita o
+ * cambia el idioma, el mapa guardado ya no corresponde: se marca "desactualizado" para volver a descargarlo.
+ */
+export function packFingerprint(zone: { center: { lat: number; lng: number }; radiusKm: number }, styleUrl: string): string {
+  return `${styleUrl}|${zone.center.lat.toFixed(4)}|${zone.center.lng.toFixed(4)}|${zone.radiusKm}`;
+}
