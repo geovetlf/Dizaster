@@ -115,6 +115,8 @@ export const OPERATIONS: Record<string, Operation> = {
   "GET /v1/admin/transparency": { summary: "Informe de transparencia agregado (denuncias, casos, acciones, apelaciones; cifras 1–4 como \"<5\")", query: C.TransparencyQuery },
   "GET /v1/admin/sources": { summary: "Salud de las fuentes (estado, breaker, ejecuciones de 24 h)" },
   "POST /v1/admin/sources/:key/status": { summary: "Pausar o reanudar una fuente (auditado)", body: C.SetSourceStatusRequest },
+  "GET /v1/admin/staff": { summary: "Personal con roles y últimos cambios de rol" },
+  "POST /v1/admin/staff/roles": { summary: "Dar o quitar un rol de personal (auditado; nunca al último administrador)", body: C.ChangeRoleRequest },
   "GET /v1/admin/quality": { summary: "Métricas de calidad (admin)", query: C.QualityQuery },
   "PUT /v1/admin/cost/budgets/:key": { summary: "Cambiar un presupuesto (admin)", body: C.UpdateBudgetRequest },
   "GET /v1/admin/categories/:code/publish-delay": { summary: "Retraso de publicación de una categoría (admin, ADR 0109)" },

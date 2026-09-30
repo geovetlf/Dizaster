@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 /**
  * Roles y permisos (Blueprint §13.1, ADR 0101). Una sola tabla, compartida por servidor y app: el servidor decide,
  * la app solo muestra lo que el rol puede usar. Mínimo privilegio: cada rol ve solo sus herramientas.
@@ -32,3 +34,15 @@ export function isStaff(roles: readonly string[]): boolean {
 export function isStaffRole(v: string): v is StaffRole {
   return (STAFF_ROLES as readonly string[]).includes(v);
 }
+
+/** Personal y sus roles, para administración (ADR 0167). */
+export interface StaffMemberView { handle: string; roles: StaffRole[] }
+export interface RoleChangeView { handle: string | null; role: StaffRole; action: "GRANT" | "REVOKE"; reason: string; at: string }
+export interface StaffResponse { staff: StaffMemberView[]; changes: RoleChangeView[] }
+export const ChangeRoleRequest = z.object({
+  handle: z.string().trim().min(1).max(40),
+  role: z.enum(STAFF_ROLES),
+  action: z.enum(["GRANT", "REVOKE"]),
+  reason: z.string().trim().min(3).max(1000),
+});
+export type ChangeRoleRequest = z.infer<typeof ChangeRoleRequest>;

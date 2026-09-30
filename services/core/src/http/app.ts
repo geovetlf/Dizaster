@@ -5,7 +5,7 @@ import Fastify, { type FastifyInstance, type FastifyRequest } from "fastify";
 import { z } from "zod";
 import {
   BBox, CreateCommentRequest, DevicePlatform, MEDIA_UPLOAD_LIMITS, MergeEventsRequest, NegativeState, ReactionKind, CommentReactionKind, ConfirmAgeRequest, RegisterPushTokenRequest, RegisterSigningKeyRequest, RevertMergeRequest,
-  SplitEventRequest, SetEventStatusRequest, SetEventSeverityRequest, SetSourceStatusRequest, type AdminSourcesResponse, AddModeratorNoteRequest, DismissDuplicateRequest, DATA_EXPORT_FORMAT, type AppConfig, type Attribution, type AttributionsResponse, type DataExport, type EmergencyNumbersResponse, type EventSearchResponse,
+  SplitEventRequest, SetEventStatusRequest, SetEventSeverityRequest, SetSourceStatusRequest, type AdminSourcesResponse, ChangeRoleRequest, type StaffResponse, AddModeratorNoteRequest, DismissDuplicateRequest, DATA_EXPORT_FORMAT, type AppConfig, type Attribution, type AttributionsResponse, type DataExport, type EmergencyNumbersResponse, type EventSearchResponse,
 } from "@dizaster/contracts";
 import { LocalDiskStorage } from "../modules/media/index.js";
 import type { Container } from "../container.js";
@@ -855,6 +855,8 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
   const requirePermission = async (req: FastifyRequest, permission: Permission) => {
     const session = requireSession(req);
     if (!can(session.roles, permission)) throw forbidden("Tu rol no permite esta acción");
+    // El rol también debe seguir vigente en la base (ADR 0167): quitarlo corta el acceso aunque el token siga vivo.
+    if (!can(await c.identity.liveRoles(session.userId), permission)) throw forbidden("Tu rol ya no permite esta acción");
     await c.mfa.assertStaff(session);
     return session;
   };
@@ -936,6 +938,31 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
     const { userId } = await requirePermission(req, "ops.control");
     const b = parse(SetSourceStatusRequest, req.body);
     await c.ingestion.changeSourceStatus(req.params.key, b.to, b.reason, userId);
+    return reply.status(204).send();
+  });
+  // Personal y roles (ADR 0167): solo administración; cada alta y baja con motivo y registro de solo inserción.
+  app.get("/v1/admin/staff", async (req, reply): Promise<StaffResponse> => {
+    await requireAdmin(req);
+    reply.header("cache-control", "no-store");
+    const { members, changes } = await c.identity.staff();
+    const handles = new Map<string, string>();
+    for (const id of new Set([...members.map((m) => m.userId), ...changes.map((x) => x.userId)])) {
+      const p = await c.social.profileForUser(c.db, id).catch(() => null);
+      if (p) handles.set(id, p.handle);
+    }
+    return {
+      staff: members.filter((m) => handles.has(m.userId)).map((m) => ({ handle: handles.get(m.userId)!, roles: m.roles })),
+      changes: changes.map((x) => ({ handle: handles.get(x.userId) ?? null, role: x.role, action: x.action, reason: x.reason, at: x.at.toISOString() })),
+    };
+  });
+  app.post("/v1/admin/staff/roles", async (req, reply) => {
+    const { userId: actor } = await requireAdmin(req);
+    const b = parse(ChangeRoleRequest, req.body);
+    const profileId = await c.social.profileIdByHandle(c.db, b.handle);
+    const userId = (await c.social.userIdsForProfiles(c.db, [profileId])).get(profileId);
+    if (!userId) throw new DomainError("VALIDATION", "Solo una cuenta personal puede tener roles");
+    if (b.action === "GRANT") await c.identity.grantRole(userId, b.role, actor, b.reason);
+    else await c.identity.revokeRole(userId, b.role, actor, b.reason);
     return reply.status(204).send();
   });
   app.get("/v1/admin/quality", async (req, reply) => {

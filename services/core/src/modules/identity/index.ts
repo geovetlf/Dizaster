@@ -9,7 +9,7 @@ import { publish } from "../../platform/outbox.js";
 import type { SocialService } from "../social/index.js";
 
 export type { Role } from "@dizaster/contracts";
-import type { Role, StaffRole } from "@dizaster/contracts";
+import { STAFF_ROLES, type Role, type StaffRole } from "@dizaster/contracts";
 
 export interface Session {
   userId: string;
@@ -157,8 +157,65 @@ export class IdentityService {
     return rows[0]?.ok ?? false;
   }
 
-  async grantRole(userId: string, role: StaffRole): Promise<void> {
-    await this.db.query(`UPDATE identity.users SET roles = array(SELECT DISTINCT unnest(roles || $2::text)) WHERE id = $1`, [userId, role]);
+  /** Dar un rol de personal, con registro (ADR 0167). Vale desde el próximo inicio de sesión. */
+  async grantRole(userId: string, role: StaffRole, actor = "CLI", reason = "Asignado por CLI"): Promise<void> {
+    await withTransaction(this.db, async (tx) => {
+      const r = await tx.query(
+        `UPDATE identity.users SET roles = array(SELECT DISTINCT unnest(roles || $2::text)), updated_at = now() WHERE id = $1 AND NOT ($2 = ANY(roles))`,
+        [userId, role],
+      );
+      if (!r.rowCount) return;
+      await tx.query(`INSERT INTO identity.role_changes (id, user_id, role, action, actor, reason) VALUES ($1, $2, $3, 'GRANT', $4, $5)`, [newId(), userId, role, actor, reason]);
+    });
+    this.rolesCache.delete(userId);
+  }
+
+  /**
+   * Quitar un rol (ADR 0167): con registro, nunca al último administrador, y cerrando todas sus sesiones para que no
+   * siga usándolo con un token ya emitido. Además `liveRoles` lo deja de aceptar en ≤ 30 s.
+   */
+  async revokeRole(userId: string, role: StaffRole, actor: string, reason: string): Promise<void> {
+    await withTransaction(this.db, async (tx) => {
+      // Serializa las bajas de administradores: dos a la vez no pueden dejar el sistema sin ninguno.
+      if (role === "admin") await tx.query(`SELECT pg_advisory_xact_lock(hashtextextended('identity.admin-revoke', 0))`);
+      const has = await tx.query(`SELECT 1 FROM identity.users WHERE id = $1 AND $2 = ANY(roles) FOR UPDATE`, [userId, role]);
+      if (!has.rowCount) throw new DomainError("CONFLICT", "La cuenta no tiene ese rol", 409);
+      if (role === "admin") {
+        const admins = await tx.query<{ n: number }>(`SELECT count(*)::int AS n FROM identity.users WHERE 'admin' = ANY(roles) AND status = 'ACTIVE'`);
+        if ((admins.rows[0]?.n ?? 0) <= 1) throw new DomainError("LAST_ADMIN", "No se puede quitar el rol al último administrador", 409);
+      }
+      await tx.query(`UPDATE identity.users SET roles = array_remove(roles, $2), updated_at = now() WHERE id = $1`, [userId, role]);
+      await tx.query(`INSERT INTO identity.role_changes (id, user_id, role, action, actor, reason) VALUES ($1, $2, $3, 'REVOKE', $4, $5)`, [newId(), userId, role, actor, reason]);
+      await tx.query(`UPDATE identity.sessions SET revoked_at = now(), revoke_reason = 'ROLE_REVOKED' WHERE user_id = $1 AND revoked_at IS NULL`, [userId]);
+    });
+    this.rolesCache.delete(userId);
+  }
+
+  private readonly rolesCache = new Map<string, { roles: string[]; at: number }>();
+  /** Roles vigentes en la base (caché de 30 s): un rol quitado deja de valer aunque el token siga vivo. */
+  async liveRoles(userId: string): Promise<string[]> {
+    const now = Date.now();
+    const hit = this.rolesCache.get(userId);
+    if (hit && now - hit.at <= 30_000) return hit.roles;
+    const { rows } = await this.db.query<{ roles: string[] }>(`SELECT roles FROM identity.users WHERE id = $1 AND status <> 'DELETED'`, [userId]);
+    const roles = rows[0]?.roles ?? [];
+    this.rolesCache.set(userId, { roles, at: now });
+    if (this.rolesCache.size > 10_000) this.rolesCache.clear();
+    return roles;
+  }
+
+  /** Personal con roles y últimos cambios (ADR 0167). Los handles los pone quien llama. */
+  async staff(): Promise<{ members: { userId: string; roles: StaffRole[] }[]; changes: { userId: string; role: StaffRole; action: "GRANT" | "REVOKE"; reason: string; at: Date }[] }> {
+    const members = await this.db.query<{ id: string; roles: string[] }>(
+      `SELECT id, roles FROM identity.users WHERE roles && $1::text[] AND status <> 'DELETED' ORDER BY id`, [[...STAFF_ROLES]],
+    );
+    const changes = await this.db.query<{ user_id: string; role: StaffRole; action: "GRANT" | "REVOKE"; reason: string; at: Date }>(
+      `SELECT user_id, role, action, reason, at FROM identity.role_changes ORDER BY at DESC LIMIT 50`,
+    );
+    return {
+      members: members.rows.map((r) => ({ userId: r.id, roles: r.roles.filter((x): x is StaffRole => (STAFF_ROLES as readonly string[]).includes(x)) })),
+      changes: changes.rows.map((r) => ({ userId: r.user_id, role: r.role, action: r.action, reason: r.reason, at: r.at })),
+    };
   }
 
   /**
