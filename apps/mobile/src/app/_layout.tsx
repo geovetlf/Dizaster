@@ -75,6 +75,8 @@ export default function RootLayout() {
         <Stack.Screen name="admin-transparency" options={{ title: t("adminTransparency") }} />
         <Stack.Screen name="admin-sources" options={{ title: t("adminSources") }} />
         <Stack.Screen name="admin-staff" options={{ title: t("adminStaff") }} />
+        <Stack.Screen name="sign-in" options={{ title: t("signInTitle"), presentation: "modal" }} />
+        <Stack.Screen name="sign-in-methods" options={{ title: t("signInMethods") }} />
         <Stack.Screen name="delete-account" options={{ title: t("deleteAccount") }} />
         <Stack.Screen name="age-check" options={{ title: t("ageTitle"), presentation: "modal" }} />
         <Stack.Screen name="profile-edit" options={{ title: t("editProfile") }} />
@@ -82,9 +84,19 @@ export default function RootLayout() {
         <Stack.Screen name="language" options={{ title: t("language"), presentation: "modal" }} />
       </Stack>
       <NotificationRouting />
+      <SignInGate />
       <AgeGate />
     </SessionProvider>
   );
+}
+
+/** Sin sesión posible (producción sin cuenta, o refresh vencido): abre "Entrar" una vez por arranque (ADR 0171). */
+function SignInGate() {
+  const { ready, needsSignIn } = useSession();
+  useEffect(() => {
+    if (ready && needsSignIn) router.push("/sign-in");
+  }, [ready, needsSignIn]);
+  return null;
 }
 
 /** Abre el EVENT al tocar un aviso; espera a la sesión para que la pantalla pueda cargarlo. */

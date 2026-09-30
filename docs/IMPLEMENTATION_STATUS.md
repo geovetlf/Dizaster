@@ -361,6 +361,7 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | 0168 | Moderación ve el original sin difuminar (sin metadatos) con motivo, tope por hora, enlace de 60 s y registro de solo inserción | ✅ |
 | 0169 | País para emergencias: ubicación → SIM (Android) → perfil → región del sistema | ✅ |
 | 0170 | Inicio de sesión Apple/Google (OIDC propio) y correo con código sin guardar el correo, vinculación de métodos; apagados hasta tener credenciales | ✅ |
+| 0171 | Pantalla "Entrar" con correo y código, arranque sin acceso de desarrollo, vincular métodos; emergencias sin cuenta | ✅ |
 | Licencias, auditoría, SBOM, Dependabot; respaldo con prueba de restauración en CI | ✅ | ADR 0070, `scripts/supply-chain.mjs`, `scripts/db-restore-check.mjs` |
 | Idioma de la app elegible en el perfil (es/en/pt/fr o del teléfono) | ✅ | ADR 0069, `app/language.tsx` |
 | Varias cuentas en un teléfono corroboran como una (clave seudónima del teléfono) | ✅ | ADR 0068, migración 0036 |
@@ -404,7 +405,6 @@ Revisión del Blueprint del 2026-09-30 (tras ADR 0157): completada con ADR 0158�
 
 Revisión del Blueprint del 2026-09-30 (tras ADR 0164), verificada contra el código, sin bloqueos:
 
-1. Pantalla de inicio de sesión en la app: correo con código y vincular métodos; Apple y Google aparecen cuando el servidor los anuncia (§5.1)
 
 Bloqueadas o en espera:
 
@@ -414,4 +414,5 @@ Bloqueadas o en espera:
 - **PENDING DECISION** — Estado de lanzamiento por país (C-06, D-02): `launchStatus` (PILOT, AVAILABLE, AVAILABLE_READ_ONLY, RESTRICTED) existe en los datos pero no se aplica; falta decidir qué pasa con los reportes ciudadanos fuera de PILOT/AVAILABLE.
 - **PENDING DECISION** — Duración de suspensiones: hoy `SUSPEND_USER` no vence; falta decidir si hay duraciones estándar (24 h / 7 d / permanente).
 - **PENDING DECISION** — D-17 fronteras en disputa: sin implementar; falta criterio del propietario (y revisión legal antes de abrir más países).
+- **PENDING DECISION** — Uso sin cuenta (ADR 0171): hoy se puede cerrar "Entrar" y seguir en solo lectura; falta decidir si V1 lo permite o exige cuenta.
 - **BLOQUEADA** — Contacto del cliente de ingesta (§9.3): el User-Agent dice "contacto pendiente"; falta el correo o URL de contacto del propietario.

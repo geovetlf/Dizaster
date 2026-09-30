@@ -9,6 +9,8 @@ export interface StoredIdentity {
   deviceId: string | null;
   /** Refresh rotatorio (60 días, un solo uso). Solo aquí: nunca en AsyncStorage, SQLite ni registros. */
   refreshToken?: string | null;
+  /** DEV: acceso de desarrollo (vuelve a entrar solo). REAL: correo, Apple o Google (ADR 0171). */
+  method?: "DEV" | "REAL";
 }
 
 const KEY = "dizaster.identity.v1";
@@ -24,6 +26,7 @@ export async function loadIdentity(): Promise<StoredIdentity | null> {
       handle: v.handle,
       deviceId: typeof v.deviceId === "string" ? v.deviceId : null,
       refreshToken: typeof v.refreshToken === "string" ? v.refreshToken : null,
+      method: v.method === "REAL" ? "REAL" : "DEV",
     };
   } catch {
     return null;

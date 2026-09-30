@@ -82,6 +82,15 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ handle, platform, ...(deviceId ? { deviceId } : {}), ...(hardwareId ? { hardwareId } : {}) }),
     }),
+  emailStart: (email: string) => request<void>("/v1/auth/email/start", { method: "POST", body: JSON.stringify({ email: email.trim() }) }),
+  emailVerify: (email: string, code: string, platform: DevicePlatform, deviceId?: string | null, hardwareId?: string | null) =>
+    request<TokenPair & { deviceId: string | null }>("/v1/auth/email/verify", {
+      method: "POST",
+      body: JSON.stringify({ email: email.trim(), code, platform, ...(deviceId ? { deviceId } : {}), ...(hardwareId ? { hardwareId } : {}) }),
+    }),
+  myIdentities: () => request<{ providers: string[] }>("/v1/me/identities"),
+  linkEmail: (email: string, code: string) =>
+    request<void>("/v1/me/identities", { method: "POST", body: JSON.stringify({ provider: "EMAIL", email: email.trim(), code }) }),
   refresh: (refreshToken: string) => request<TokenPair>("/v1/auth/refresh", { method: "POST", body: JSON.stringify({ refreshToken }) }),
   logout: (refreshToken: string) => request<void>("/v1/auth/logout", { method: "POST", body: JSON.stringify({ refreshToken }) }),
   /** Irreversible. La pantalla exige escribir la palabra de confirmación antes de llamarlo. */

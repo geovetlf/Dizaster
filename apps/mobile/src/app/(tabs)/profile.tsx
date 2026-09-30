@@ -87,6 +87,7 @@ export default function ProfileScreen() {
         {isStaff(roles) ? <Row icon="two-factor-authentication" label={t("mfaTitle")} onPress={() => router.push("/mfa")} /> : null}
         <Row icon="storefront-outline" label={t("myBusinesses")} onPress={() => router.push("/my-businesses")} />
         <Row icon="cellphone-lock" label={t("sessionsTitle")} onPress={() => router.push("/sessions")} />
+        <Row icon="email-lock-outline" label={t("signInMethods")} onPress={() => router.push("/sign-in-methods")} />
         <Row icon="download-outline" label={t("exportData")} value={exporting ? t("exportPreparing") : undefined} onPress={() => void onExport()} />
         <Row icon="account-remove-outline" label={t("deleteAccount")} onPress={() => router.push("/delete-account")} />
         <Row icon="translate" label={t("language")} value={LANGUAGE_NAMES[lang]} onPress={() => router.push("/language")} />
