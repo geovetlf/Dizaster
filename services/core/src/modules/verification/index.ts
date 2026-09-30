@@ -222,10 +222,13 @@ export class VerificationService {
     });
   }
 
-  /** La IA puede sugerir; la sugerencia se guarda y NO cambia ningún estado. */
+  /** La IA puede sugerir; la sugerencia se guarda y NO cambia ningún estado. Nunca OFFICIALLY_CONFIRMED ni FALSE (ADR 0231). */
   async recordAiSuggestion(input: { eventId: string; task: string; suggestedLevel?: VerificationLevel; suggestedNegative?: NegativeState; rationale: string; provider: string; model: string }): Promise<void> {
     if (input.suggestedLevel === "OFFICIALLY_CONFIRMED") {
       throw new DomainError("AI_CANNOT_CONFIRM", "La IA no puede proponer OFFICIALLY_CONFIRMED");
+    }
+    if (input.suggestedNegative === "FALSE") {
+      throw new DomainError("AI_CANNOT_CONFIRM", "La IA no puede proponer FALSE");
     }
     await this.db.query(
       `INSERT INTO verification.ai_suggestions (id, event_id, task, suggested_level, suggested_negative, rationale, provider, model)

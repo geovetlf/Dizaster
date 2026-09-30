@@ -125,6 +125,16 @@ describe("la IA no puede producir OFFICIALLY_CONFIRMED", () => {
     ).rejects.toThrow(/IA no puede/);
   });
 
+  it("tampoco FALSE: ni el servicio ni la base de datos lo aceptan (ADR 0231)", async () => {
+    const { rows } = await t.c.db.query(`SELECT id FROM event.events LIMIT 1`);
+    await expect(
+      t.c.verification.recordAiSuggestion({ eventId: rows[0].id, task: "dedup", suggestedNegative: "FALSE", rationale: "x", provider: "p", model: "m" }),
+    ).rejects.toThrow(/IA no puede proponer FALSE/);
+    await expect(
+      t.c.db.query(`INSERT INTO verification.ai_suggestions (id, event_id, task, suggested_negative, provider, model) VALUES (gen_random_uuid(), $1, 't', 'FALSE', 'p', 'm')`, [rows[0].id]),
+    ).rejects.toThrow(/ai_never_false/);
+  });
+
   it("la base de datos también lo impide (defensa en profundidad)", async () => {
     const { rows } = await t.c.db.query(`SELECT event_id FROM verification.state WHERE level = 'UNVERIFIED' LIMIT 1`);
     const eventId = rows[0].event_id;

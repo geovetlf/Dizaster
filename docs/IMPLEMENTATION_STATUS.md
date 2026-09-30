@@ -421,6 +421,7 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | Límite por cuenta compartido entre réplicas (ADR 0228) | ✅ | `RATE_LIMIT_SHARED`, tabla UNLOGGED sin IPs |
 | Tokens inválidos gastan el cupo de la IP (ADR 0229) | ✅ | 429 tras el cupo, sin guardar IPs |
 | Eventos cercanos sobre la ubicación pública (ADR 0230) | ✅ | sin `matchScore`, sin triangulación |
+| La IA tampoco sugiere FALSE (ADR 0231) | ✅ | servicio + CHECK `ai_never_false` |
 | Licencias, auditoría, SBOM, Dependabot; respaldo con prueba de restauración en CI | ✅ | ADR 0070, `scripts/supply-chain.mjs`, `scripts/db-restore-check.mjs` |
 | Idioma de la app elegible en el perfil (es/en/pt/fr o del teléfono) | ✅ | ADR 0069, `app/language.tsx` |
 | Varias cuentas en un teléfono corroboran como una (clave seudónima del teléfono) | ✅ | ADR 0068, migración 0036 |
@@ -486,17 +487,16 @@ Revisión del Blueprint del 2026-09-30 (tras ADR 0220): completada con ADR 0221�
 
 Revisión del Blueprint del 2026-09-30 (tras ADR 0228), verificada contra el código, sin bloqueos:
 
-1. La IA tampoco puede sugerir FALSE (regla crítica, CLAUDE.md).
-2. Zonas y suscripciones de alerta: no fallar en silencio sin conexión (errores).
-3. Mis avisos de moderación y cola de moderación: error de carga distinto de lista vacía.
-4. Reportes sensibles seudónimos por defecto (§13.2).
-5. Registros de estado, gravedad, división y fuentes: solo inserción (§13.1).
-6. Borrar la cuenta de personal registra la baja de roles y respeta el último administrador.
-7. Auditoría de acciones por moderador y registro de originales paginado (§5.21, §13.1).
-8. Apelaciones paginadas y búsquedas por id (moderación).
-9. SOS, contador y botones pequeños con texto grande (accesibilidad).
-10. Cuentas suspendidas pueden borrar comentarios y retirar reportes.
-11. Cambios de administración y su registro en la misma transacción (auditoría).
+1. Zonas y suscripciones de alerta: no fallar en silencio sin conexión (errores).
+2. Mis avisos de moderación y cola de moderación: error de carga distinto de lista vacía.
+3. Reportes sensibles seudónimos por defecto (§13.2).
+4. Registros de estado, gravedad, división y fuentes: solo inserción (§13.1).
+5. Borrar la cuenta de personal registra la baja de roles y respeta el último administrador.
+6. Auditoría de acciones por moderador y registro de originales paginado (§5.21, §13.1).
+7. Apelaciones paginadas y búsquedas por id (moderación).
+8. SOS, contador y botones pequeños con texto grande (accesibilidad).
+9. Cuentas suspendidas pueden borrar comentarios y retirar reportes.
+10. Cambios de administración y su registro en la misma transacción (auditoría).
 
 Bloqueadas o en espera:
 
