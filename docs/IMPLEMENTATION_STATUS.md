@@ -345,6 +345,7 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | 0152 | Catálogo de categorías remoto con etag y ajustes por país en la app; misma regla efectiva en servidor y app | ✅ |
 | 0153 | Posts de actualización oficial de perfiles institucionales dentro de su ámbito; destacados, no editables y sin efecto en la verificación | ✅ |
 | 0154 | Preferencias de alerta por zona guardada: gravedad mínima y categorías por zona, y edición de zonas en la app | ✅ |
+| 0155 | Ítems externos en ERROR sin tumbar la corrida, compartidos fuera de la app contados por persona, seguidores al dividir | ✅ |
 | Licencias, auditoría, SBOM, Dependabot; respaldo con prueba de restauración en CI | ✅ | ADR 0070, `scripts/supply-chain.mjs`, `scripts/db-restore-check.mjs` |
 | Idioma de la app elegible en el perfil (es/en/pt/fr o del teléfono) | ✅ | ADR 0069, `app/language.tsx` |
 | Varias cuentas en un teléfono corroboran como una (clave seudónima del teléfono) | ✅ | ADR 0068, migración 0036 |
@@ -384,9 +385,8 @@ Revisión del Blueprint del 2026-09-29 (tras ADR 0112): completada con ADR 0113�
 
 Revisión del Blueprint del 2026-09-29 (tras ADR 0148), verificada contra el código, sin bloqueos:
 
-1. Detalles de datos: ERROR en ítems externos, compartidos externos, seguidores al dividir (§7.3)
-2. "¿Es el mismo evento?" tras un adjunto dudoso (§8.4); la respuesta "No" espera decisión D2
-3. Aviso push de actualizaciones oficiales a quienes siguen el evento (ADR 0153)
+1. "¿Es el mismo evento?" tras un adjunto dudoso (§8.4); la respuesta "No" espera decisión D2
+2. Aviso push de actualizaciones oficiales a quienes siguen el evento (ADR 0153)
 
 
 Bloqueadas o en espera:

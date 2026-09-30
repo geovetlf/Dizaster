@@ -55,3 +55,23 @@ describe("seguidores de un EVENT fusionado (ADR 0093)", () => {
     expect(await followed(manual!)).toEqual([A, B].sort());
   });
 });
+
+describe("seguidores al dividir (ADR 0155)", () => {
+  it("quien seguía el evento original sigue también el nuevo", async () => {
+    const mod = await asModerator("mod_division");
+    const [r1, r2, fan] = await Promise.all(["div_rep1", "div_rep2", "div_fan"].map((h) => createUser(t, h)));
+    const pin = offset(LIMA, 40_000);
+    const A = (await submit(t, r1!, reportBody(r1!, { category: "fire.structure", pin }))).body.eventId!;
+    await t.c.dispatcher.drain();
+    expect((await submit(t, r2!, reportBody(r2!, { category: "fire.structure", pin: offset(pin, 30) }))).body.eventId).toBe(A);
+    await t.c.dispatcher.drain();
+    await follow(fan!, A);
+    const evidence = (await t.app.inject({ url: `/v1/moderation/events/${A}`, headers: auth(mod) })).json().evidence as { id: string }[];
+    const res = await t.app.inject({ method: "POST", url: `/v1/moderation/events/${A}/split`, headers: auth(mod), payload: { evidenceIds: [evidence[1]!.id], reason: "Son dos incendios distintos" } });
+    expect(res.statusCode, res.body).toBe(201);
+    const C = (res.json() as { eventId: string }).eventId;
+    await t.c.dispatcher.drain();
+    expect(await followed(fan!)).toEqual([A, C].sort());
+    expect(await followed(r1!)).not.toContain(C);
+  });
+});

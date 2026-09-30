@@ -587,6 +587,13 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
     return c.composer.share(session, parse(IdParam, req.params).id, req.body ?? {});
   });
 
+  // Compartido fuera de la app (ADR 0155): solo se cuenta, una vez por persona.
+  app.post("/v1/posts/:id/external-shares", async (req, reply) => {
+    const session = requireSession(req);
+    await c.social.recordExternalShare(c.db, parse(IdParam, req.params).id, session.profileId);
+    return reply.status(204).send();
+  });
+
   // Mis reportes (ADR 0094): estado, EVENT y cuándo se borra la ubicación precisa.
   app.get("/v1/me/reports", async (req, reply) => {
     const session = requireSession(req);

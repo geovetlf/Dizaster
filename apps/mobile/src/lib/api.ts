@@ -153,6 +153,7 @@ export const api = {
   publishDelay: (code: string) => request<PublishDelayView>(`/v1/admin/categories/${encodeURIComponent(code)}/publish-delay`),
   setPublishDelay: (code: string, minutes: number) =>
     request<PublishDelayView>(`/v1/admin/categories/${encodeURIComponent(code)}/publish-delay`, { method: "PUT", body: JSON.stringify({ minutes }) }),
+  recordExternalShare: (postId: string) => request<void>(`/v1/posts/${encodeURIComponent(postId)}/external-shares`, { method: "POST" }),
   transparency: (days: number) => request<TransparencyReport>(`/v1/admin/transparency?days=${days}`),
   authorityRequests: () => request<{ requests: AuthorityRequestSummary[] }>("/v1/admin/authority-requests"),
   authorityRequest: (id: string) => request<AuthorityRequestDetail>(`/v1/admin/authority-requests/${encodeURIComponent(id)}`),

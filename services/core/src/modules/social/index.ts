@@ -49,6 +49,7 @@ export interface FeedRow {
   myReactions: ReactionKind[];
   sharedPostId: string | null;
   shareCount: number;
+  externalShareCount: number;
   mentions: string[];
   businessMentions: string[];
   mine: boolean;
@@ -150,6 +151,15 @@ export class SocialService {
         [e.payload.targetEventId, e.payload.mergedEventId],
       );
     });
+    // División (ADR 0155): quien seguía el evento original sigue también el nuevo (puede dejar de seguirlo).
+    dispatcher.on("EventSplit", "social.split-followers", async (e, tx) => {
+      await tx.query(
+        `INSERT INTO social.follows (follower_profile_id, target_type, target_id)
+         SELECT follower_profile_id, 'EVENT', $1 FROM social.follows WHERE target_type = 'EVENT' AND target_id = $2
+         ON CONFLICT DO NOTHING`,
+        [e.payload.newEventId, e.payload.sourceEventId],
+      );
+    });
     dispatcher.on("EventMergeReverted", "social.restore-event-links", async (e, tx) => {
       await tx.query(
         `UPDATE social.post_event_links SET event_id = $2, via_merge = NULL WHERE event_id = $1 AND via_merge = $2`,
@@ -184,6 +194,7 @@ export class SocialService {
     );
     await q.query(`UPDATE social.comments SET text = '-', deleted_at = COALESCE(deleted_at, now()) WHERE author_profile_id = $1`, [profileId]);
     await q.query(`DELETE FROM social.reactions WHERE profile_id = $1`, [profileId]);
+    await q.query(`DELETE FROM social.external_shares WHERE profile_id = $1`, [profileId]);
     await q.query(`DELETE FROM social.comment_reactions WHERE profile_id = $1`, [profileId]);
     await q.query(`DELETE FROM social.post_mentions WHERE profile_id = $1`, [profileId]);
     await q.query(`DELETE FROM social.follows WHERE follower_profile_id = $1 OR (target_type = 'PROFILE' AND target_id = $1::text)`, [profileId]);
@@ -318,6 +329,21 @@ export class SocialService {
     return rows.map((r) => r.post_id);
   }
 
+  /**
+   * Compartido fuera de la app (ADR 0155, §7.3 Share target EXTERNAL). Uno por persona y post; se registra sobre el
+   * original si es un compartido. Solo cuenta: no guarda a dónde ni con quién.
+   */
+  async recordExternalShare(q: Queryable, postId: string, profileId: string): Promise<void> {
+    const { rows } = await q.query<{ id: string }>(
+      `SELECT coalesce(o.id, p.id) AS id FROM social.posts p LEFT JOIN social.posts o ON o.id = p.shared_post_id AND o.deleted_at IS NULL
+        WHERE p.id = $1 AND p.deleted_at IS NULL AND p.moderation_state IN ('VISIBLE','LIMITED')`, [postId],
+    );
+    const target = rows[0]?.id;
+    if (!target) throw new DomainError("NOT_FOUND", "Publicación no encontrada", 404);
+    const ins = await q.query(`INSERT INTO social.external_shares (post_id, profile_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`, [target, profileId]);
+    if (ins.rowCount) await q.query(`UPDATE social.posts SET external_share_count = external_share_count + 1 WHERE id = $1`, [target]);
+  }
+
   async linkPostToEvent(tx: Queryable, postId: string, eventId: string, linkType: "REPORT" | "MENTION" | "UPDATE"): Promise<void> {
     await tx.query(
       `INSERT INTO social.post_event_links (post_id, event_id, link_type) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`,
@@ -410,7 +436,7 @@ export class SocialService {
     const { rows } = await q.query<{
       id: string; kind: FeedRow["kind"]; author_visibility: string; handle: string; display_name: string; text: string | null; lang: string | null;
       created_at: Date; category_code: string | null; event_id: string | null; distance_m: number | null; score: number;
-      media: { id: string; kind: "IMAGE" | "VIDEO_RECORDED" }[] | null; reactions: ReactionCounts | null; my_reactions: ReactionKind[]; comment_count: number; shared_post_id: string | null; share_count: number;
+      media: { id: string; kind: "IMAGE" | "VIDEO_RECORDED" }[] | null; reactions: ReactionCounts | null; my_reactions: ReactionKind[]; comment_count: number; shared_post_id: string | null; share_count: number; external_share_count: number;
       mentions: string[]; business_mentions: string[]; mine: boolean | null; edited_at: Date | null; business_verification: "UNVERIFIED" | "VERIFIED" | "INSTITUTIONAL_OFFICIAL" | null;
       avatar_url: string | null;
     }>(
@@ -418,7 +444,7 @@ export class SocialService {
          SELECT p.id, p.author_id, p.author_type, p.kind, p.author_visibility, coalesce(pr.handle, bp.handle) AS handle,
                 coalesce(pr.display_name, bp.name) AS display_name, bp.verification_status AS business_verification,
                 coalesce(pr.avatar_url, bp.logo_url) AS avatar_url, p.text, p.lang, p.created_at, p.edited_at, p.category_code, le.event_id,
-                p.shared_post_id, p.comment_count, p.share_count, p.reaction_counts,
+                p.shared_post_id, p.comment_count, p.share_count, p.external_share_count, p.reaction_counts,
                 ${nearSql ? `ST_Distance(p.public_point, ${nearSql})` : "NULL"}::float8 AS distance_m,
                 (${score})::float8 AS score
            FROM social.posts p
@@ -468,6 +494,7 @@ export class SocialService {
       myReactions: r.my_reactions,
       sharedPostId: r.shared_post_id,
       shareCount: r.share_count,
+      externalShareCount: r.external_share_count,
       mentions: [...r.mentions, ...r.business_mentions].sort(),
       businessMentions: r.business_mentions,
       mine: r.mine === true,
@@ -1050,7 +1077,7 @@ export class SocialService {
     }>(
       `SELECT p.id, p.text, coalesce(pr.handle, bp.handle) AS handle, coalesce(pr.user_id, bp.owner_user_id) AS user_id,
               p.author_visibility, p.moderation_state, p.category_code,
-              ((SELECT count(*) FROM social.reactions r WHERE r.post_id = p.id) + (SELECT count(*) FROM social.comments c WHERE c.post_id = p.id))::int AS reach,
+              ((SELECT count(*) FROM social.reactions r WHERE r.post_id = p.id) + (SELECT count(*) FROM social.comments c WHERE c.post_id = p.id) + p.external_share_count)::int AS reach,
               (SELECT l.event_id FROM social.post_event_links l WHERE l.post_id = p.id ORDER BY l.created_at LIMIT 1) AS event_id
          FROM social.posts p
            LEFT JOIN social.profiles pr ON p.author_type = 'PROFILE' AND pr.id = p.author_id
@@ -1116,6 +1143,7 @@ export class SocialService {
     const reactions = await q.query(`SELECT post_id, kind, created_at FROM social.reactions WHERE profile_id = $1 ORDER BY created_at DESC LIMIT 10000`, [p]);
     const commentReactions = await q.query(`SELECT comment_id, kind, created_at FROM social.comment_reactions WHERE profile_id = $1 ORDER BY created_at DESC LIMIT 10000`, [p]);
     const follows = await q.query(`SELECT target_type, target_id, created_at FROM social.follows WHERE follower_profile_id = $1`, [p]);
+    const externalShares = await q.query(`SELECT post_id, created_at FROM social.external_shares WHERE profile_id = $1 ORDER BY created_at DESC LIMIT 10000`, [p]);
     const blocks = await q.query(
       `SELECT pr.handle AS blocked_handle, b.created_at FROM social.blocks b JOIN social.profiles pr ON pr.id = b.blocked_profile_id WHERE b.blocker_profile_id = $1
        UNION ALL
@@ -1123,7 +1151,7 @@ export class SocialService {
     );
     return {
       profile: profile.rows, businesses: businesses.rows, posts: posts.rows, comments: comments.rows,
-      reactions: reactions.rows, commentReactions: commentReactions.rows, follows: follows.rows, blocks: blocks.rows,
+      reactions: reactions.rows, commentReactions: commentReactions.rows, follows: follows.rows, blocks: blocks.rows, externalShares: externalShares.rows,
     };
   }
 }

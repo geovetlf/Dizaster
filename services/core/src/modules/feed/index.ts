@@ -290,6 +290,7 @@ export class FeedService {
         reactions: r.reactions,
         myReactions: r.myReactions,
         shareCount: r.shareCount,
+        externalShareCount: r.externalShareCount,
         share: r.sharedPostId ? { post: originals.get(r.sharedPostId) ?? null } : null,
         mentions: r.mentions,
         businessMentions: r.businessMentions,

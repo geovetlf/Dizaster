@@ -57,7 +57,9 @@ export function PostCard({ post, categoryName }: { post: FeedPost; categoryName:
   async function shareOutside() {
     // Se comparte el evento (o el post) con enlace a la app; sin dominio aprobado se usa el esquema propio.
     const url = post.event ? shareUrl("event", post.event.id, LINK_DOMAIN) : shareUrl("post", post.id, LINK_DOMAIN);
-    await Share.share({ message: [post.text, url].filter(Boolean).join("\n\n") }).catch(() => undefined);
+    const r = await Share.share({ message: [post.text, url].filter(Boolean).join("\n\n") }).catch(() => null);
+    // Solo se cuenta (ADR 0155): ni a dónde ni con quién. Sin sesión o si falla, no pasa nada.
+    if (r && r.action === Share.sharedAction && me.handle) void api.recordExternalShare(post.share?.post?.id ?? post.id).catch(() => undefined);
   }
 
   /** Compartir en Dizaster (ADR 0046) o fuera de la app. Lo compartido se comparte desde su original. */
@@ -146,7 +148,7 @@ export function PostCard({ post, categoryName }: { post: FeedPost; categoryName:
         </Pressable>
         <Pressable accessibilityRole="button" accessibilityLabel={t("share")} style={styles.action} onPress={share}>
           <Icon name="share-variant-outline" size={22} color={colors.text} />
-          <Text style={styles.count}>{post.shareCount > 0 ? post.shareCount : t("share")}</Text>
+          <Text style={styles.count}>{post.shareCount + post.externalShareCount > 0 ? post.shareCount + post.externalShareCount : t("share")}</Text>
         </Pressable>
         <View style={styles.spacer} />
         <Pressable

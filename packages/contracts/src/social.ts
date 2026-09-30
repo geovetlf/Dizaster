@@ -57,6 +57,8 @@ export interface FeedPost {
   businessMentions: string[];
   /** Veces que se compartió dentro de la app (ADR 0046). */
   shareCount: number;
+  /** Personas que lo compartieron fuera de la app (ADR 0155). */
+  externalShareCount: number;
   /** Solo en posts SHARE: el original, o `post: null` si ya no está disponible (borrado u oculto). */
   share: { post: FeedPost | null } | null;
   /** La persona que mira es quien lo escribió (puede borrarlo). Nunca revela la autoría de un post seudónimo a otros. */

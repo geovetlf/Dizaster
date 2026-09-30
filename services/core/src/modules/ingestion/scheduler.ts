@@ -3,6 +3,7 @@ import { gunzipSync, gzipSync } from "node:zlib";
 import { publish } from "../../platform/outbox.js";
 import type { Clock } from "../../platform/clock.js";
 import type { Db } from "../../platform/db.js";
+import { DomainError } from "../../platform/errors.js";
 import { newId } from "../../platform/ids.js";
 import { promoteByRule } from "./promotion.js";
 import { FEED_ADAPTERS } from "./adapters/index.js";
@@ -76,7 +77,7 @@ interface SourceRow {
   last_normal_run_at: Date | null; last_urgent_run_at: Date | null; consecutive_failures: number | null; open_until: Date | null;
 }
 
-export interface RunSummary { sourceKey: string; lane: Lane; status: string; itemsSeen: number; itemsNew: number; itemsUrgent: number }
+export interface RunSummary { sourceKey: string; lane: Lane; status: string; itemsSeen: number; itemsNew: number; itemsUrgent: number; itemsFailed?: number }
 
 const BREAKER_THRESHOLD = 3;
 
@@ -211,6 +212,18 @@ export class IngestionScheduler {
     return { deleted };
   }
 
+  /** Un ítem que falla por sí mismo queda en ERROR y no tumba el resto del documento (ADR 0155). */
+  private async ingestSafely(key: string, item: Parameters<IngestionService["ingest"]>[1], lane: "NORMAL" | "URGENT", rawRef: string | null, summary: RunSummary) {
+    try {
+      return await this.ingestion.ingest(key, item, lane, rawRef);
+    } catch (err) {
+      if (!(err instanceof DomainError)) throw err;
+      await this.ingestion.markError(key, item, lane, rawRef, `${err.code}: ${redactSecrets(err.message, this.secrets)}`);
+      summary.itemsFailed = (summary.itemsFailed ?? 0) + 1;
+      return null;
+    }
+  }
+
   /** Interpreta un documento de la fuente y lo ingiere. Común al sondeo y al push. */
   private async processBody(s: SourceRow, body: string, runId: string, now: Date, summary: RunSummary, opts: { onlyUrgent: boolean }): Promise<void> {
     const adapter = FEED_ADAPTERS.get(s.adapter)!;
@@ -222,8 +235,8 @@ export class IngestionScheduler {
       // Lo crítico según el adapter, o lo que la regla de la fuente promueve (ADR 0100).
       const urgent = adapter.isUrgent(item, s.config) || promoteByRule(item, s.config["promote"]);
       if (opts.onlyUrgent && !urgent) continue; // lo no crítico espera al carril NORMAL
-      const r = await this.ingestion.ingest(s.key, item, urgent ? "URGENT" : "NORMAL", rawRef);
-      if (!r.duplicate) summary.itemsNew++;
+      const r = await this.ingestSafely(s.key, item, urgent ? "URGENT" : "NORMAL", rawRef, summary);
+      if (r && !r.duplicate) summary.itemsNew++;
       if (urgent) summary.itemsUrgent++;
     }
     for (const id of adapter.withdrawals?.(body, s.config) ?? []) await this.ingestion.withdraw(s.key, id, now);
@@ -307,8 +320,8 @@ export class IngestionScheduler {
       }
       summary.itemsSeen = latest.size;
       for (const { item, rawRef } of latest.values()) {
-        const r = await this.ingestion.ingest(s.key, item, "NORMAL", rawRef);
-        if (!r.duplicate) summary.itemsNew++;
+        const r = await this.ingestSafely(s.key, item, "NORMAL", rawRef, summary);
+        if (r && !r.duplicate) summary.itemsNew++;
       }
       await this.db.query(
         `UPDATE ingestion.runs SET finished_at = now(), items_seen = $2, items_new = $3, items_urgent = 0, status = 'OK' WHERE id = $1`,

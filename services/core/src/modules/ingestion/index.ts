@@ -106,11 +106,12 @@ export class IngestionService {
       if (source.status !== "ACTIVE") throw new DomainError("SOURCE_NOT_ACTIVE", `La fuente ${sourceKey} no está activa`);
 
       const hash = createHash("sha256").update(JSON.stringify(item)).digest("hex");
-      const existing = (await tx.query<{ id: string; content_hash: string }>(
-        `SELECT id, content_hash FROM ingestion.external_items WHERE source_id = $1 AND external_id = $2`,
+      const existing = (await tx.query<{ id: string; content_hash: string; status: string }>(
+        `SELECT id, content_hash, status FROM ingestion.external_items WHERE source_id = $1 AND external_id = $2`,
         [source.id, item.externalId],
       )).rows[0];
-      if (existing && existing.content_hash === hash) {
+      // Un ítem en ERROR se reintenta aunque no haya cambiado (el fallo pudo ser del catálogo o del índice).
+      if (existing && existing.content_hash === hash && existing.status !== "ERROR") {
         // Sin cambios: solo se actualiza a qué crudo pertenece la última vez que se vio (ADR 0075).
         if (rawRef) await tx.query(`UPDATE ingestion.external_items SET raw_ref = $2 WHERE id = $1`, [existing.id, rawRef]);
         return { externalItemId: existing.id, resolution: null, duplicate: true };
@@ -129,7 +130,7 @@ export class IngestionService {
 
       const itemId = existing?.id ?? newId();
       if (existing) {
-        await tx.query(`UPDATE ingestion.external_items SET content_hash = $2, normalized = $3, lane = $4, fetched_at = now(), ends_at = $5, raw_ref = coalesce($6, raw_ref) WHERE id = $1`, [
+        await tx.query(`UPDATE ingestion.external_items SET content_hash = $2, normalized = $3, lane = $4, fetched_at = now(), ends_at = $5, raw_ref = coalesce($6, raw_ref), error = NULL WHERE id = $1`, [
           itemId, hash, JSON.stringify(item), lane, item.endsAt ?? null, rawRef,
         ]);
       } else {
@@ -173,6 +174,23 @@ export class IngestionService {
       await tx.query(`UPDATE ingestion.external_items SET status = $2, event_id = $3 WHERE id = $1`, [itemId, eventId ? "MAPPED" : "IGNORED", eventId]);
       return { externalItemId: itemId, resolution, duplicate: false };
     });
+  }
+
+  /**
+   * Un ítem que no se pudo procesar (ADR 0155, §7.3 status ERROR): queda registrado con el motivo, sin evento, y el
+   * resto del documento sigue. La próxima vez que llegue se reintenta. Solo errores del propio ítem (DomainError);
+   * un fallo de infraestructura sigue abortando la corrida.
+   */
+  async markError(sourceKey: string, item: NormalizedItem, lane: "NORMAL" | "URGENT", rawRef: string | null, message: string): Promise<void> {
+    const hash = createHash("sha256").update(JSON.stringify(item)).digest("hex");
+    await this.db.query(
+      `INSERT INTO ingestion.external_items (id, source_id, external_id, content_hash, lane, assertion, published_at, normalized, status, raw_ref, error)
+       SELECT $1, s.id, $3, $4, $5, $6, $7, $8, 'ERROR', $9, left($10, 500) FROM ingestion.sources s WHERE s.key = $2
+       ON CONFLICT (source_id, external_id) DO UPDATE SET content_hash = EXCLUDED.content_hash, normalized = EXCLUDED.normalized,
+         status = CASE WHEN ingestion.external_items.status IN ('NEW','ERROR') THEN 'ERROR' ELSE ingestion.external_items.status END,
+         error = EXCLUDED.error, fetched_at = now(), raw_ref = coalesce(EXCLUDED.raw_ref, ingestion.external_items.raw_ref)`,
+      [newId(), sourceKey, item.externalId, hash, lane, item.assertion, item.publishedAt, JSON.stringify(item), rawRef, message],
+    );
   }
 
   /**
