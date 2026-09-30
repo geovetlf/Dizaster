@@ -1,0 +1,18 @@
+{
+  "name": "@dizaster/delivery",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Dizaster Delivery Control Plane (CLI dzd): políticas, impacto, gates, artefactos, verificación, rollback y auditoría. Herramienta de software delivery; el runtime de Dizaster no la importa (Blueprint §20).",
+  "bin": { "dzd": "./dist/cli.js" },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.4",
+    "typescript": "~6.0.3",
+    "vitest": "^5.0.2"
+  }
+}

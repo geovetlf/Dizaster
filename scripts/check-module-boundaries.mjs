@@ -36,6 +36,28 @@ for (const mod of readdirSync(modulesDir)) {
   }
 }
 
+// 3. El Delivery Control Plane (Blueprint §20, ADR 0260) está fuera del runtime: no importa código del producto y el
+//    producto no lo importa. Si el Delivery Plane falla, producción sigue igual.
+const root = new URL("../", import.meta.url).pathname;
+const runtimeDirs = ["services", "apps", "packages"].map((d) => join(root, d));
+const deliveryDir = join(root, "tools/delivery/src");
+for (const file of walk(deliveryDir)) {
+  const src = readFileSync(file, "utf8");
+  for (const m of src.matchAll(/from\s+"([^"]+)"/g)) {
+    if (m[1].startsWith("@dizaster/") || /(^|\/)(services|apps|packages)\//.test(m[1])) {
+      errors.push(`tools/delivery/src/${relative(deliveryDir, file)}: importa ${m[1]} (el Delivery Plane no depende del runtime)`);
+    }
+  }
+}
+const walkSources = (dir) => readdirSync(dir).flatMap((f) => {
+  const p = join(dir, f);
+  if (["node_modules", "dist", ".expo", "dist-check", "android", "ios"].includes(f)) return [];
+  return statSync(p).isDirectory() ? walkSources(p) : /\.(ts|tsx|js|mjs)$/.test(p) ? [p] : [];
+});
+for (const file of runtimeDirs.flatMap(walkSources)) {
+  if (/@dizaster\/delivery|tools\/delivery/.test(readFileSync(file, "utf8"))) errors.push(`${relative(root, file)}: el runtime no importa el Delivery Plane`);
+}
+
 if (errors.length) {
   console.error("Violaciones de fronteras de módulo:\n" + errors.map((e) => ` - ${e}`).join("\n"));
   process.exit(1);

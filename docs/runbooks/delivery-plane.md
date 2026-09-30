@@ -1,0 +1,39 @@
+# Runbook — Delivery Control Plane (`dzd`)
+
+Blueprint §20, ADR 0260–0265. Todo corre sin credenciales, salvo lo marcado como BLOQUEADO.
+
+## Uso diario (local o CI)
+
+```sh
+pnpm --filter @dizaster/delivery build
+pnpm dzd inspect --worktree        # impacto y riesgo de los cambios sin commitear
+pnpm dzd plan --base origin/main   # gates que se van a correr
+pnpm dzd run-gates --base origin/main
+pnpm dzd policy --env production   # auto / review / approval / block
+pnpm dzd autonomy --action merge --outcome auto
+```
+
+## Un gate falló
+
+1. `dzd run-gates` imprime el diagnóstico (`dzd diagnose --log archivo` para un log guardado).
+2. `infra-runner` (red, disco, runner): un solo reintento. Si repite, es un fallo real.
+3. Cualquier otro: se corrige el código. Nunca se desactiva una prueba ni un gate (prohibido en todo nivel, ADR 0262).
+
+## La política bloquea
+
+`block` significa: migración destructiva o editada, destroy o reemplazo de un recurso con datos, rol IAM amplio, o una
+regla del propietario. Se rehace el cambio (expand/contract). Una excepción solo la autoriza el propietario por escrito
+y queda en la auditoría.
+
+## Verificación y rollback (cuando exista staging: D-18, D-23)
+
+- `dzd verify --url https://<servicio>` comprueba `/health`, `/health/ready` y el contrato.
+- El despliegue gradual devuelve solo el tráfico a la revisión anterior si falla la verificación. Manual:
+  `gcloud run services update-traffic <servicio> --to-revisions=<revisión-anterior>=100` (con la identidad de
+  despliegue del entorno, nunca con credenciales personales en CI).
+- La base de datos no se revierte automáticamente: las migraciones son compatibles hacia atrás. Una restauración sigue
+  `respaldo-y-restauracion.md` y la autoriza el propietario.
+
+## Auditoría
+
+`dzd audit verify --log delivery-audit.jsonl` confirma que nadie cambió, borró ni reordenó entradas.

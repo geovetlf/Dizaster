@@ -1,0 +1,11 @@
+# Gitleaks (ADR 0266): reglas por defecto + falsos positivos revisados a mano. Cada excepción dice por qué.
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Nombres de claves que no son secretos: alias del almacén seguro del dispositivo y claves de SLO"
+regexTarget = "match"
+regexes = [
+  '''dizaster\.signing\.v1''',
+  '''(api_p95|urgent_chain_p95|moderation_oldest_open)''',
+]

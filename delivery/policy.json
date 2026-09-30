@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "autonomyLevel": 2,
+  "default": "medium",
+  "rules": [
+    { "class": "low", "paths": ["docs/**", "**/*.md", "services/core/test/**", "apps/mobile/test/**", "packages/*/test/**", "tools/*/test/**", "apps/mobile/src/lib/locales/**"], "reason": "documentación, pruebas o traducciones" },
+    { "class": "critical", "paths": ["services/core/src/modules/identity/**", "services/core/src/platform/auth*.ts", "services/core/src/platform/crypto*.ts", "services/core/src/platform/config.ts", "services/core/src/platform/rate-limit.ts"], "reason": "autenticación, autorización, cifrado o guardas de configuración" },
+    { "class": "critical", "paths": ["services/core/src/modules/report/**", "packages/geo-kit/src/**"], "reason": "presencia, ubicación y generalización de privacidad" },
+    { "class": "critical", "paths": ["services/core/src/modules/verification/**", "services/core/src/modules/event/**", "services/core/src/modules/alert/**", "services/core/src/modules/ingestion/**"], "reason": "verificación de incidentes, alertas y fuentes oficiales" },
+    { "class": "critical", "paths": ["services/core/src/modules/moderation/**", "services/core/src/modules/trust/**"], "reason": "Trust & Safety" },
+    { "class": "critical", "paths": ["services/core/migrations/**"], "reason": "base de datos" },
+    { "class": "critical", "paths": ["data/emergency-numbers/**", "apps/mobile/src/app/emergency*", "apps/mobile/src/lib/emergency/**"], "reason": "funciones de emergencia" },
+    { "class": "critical", "paths": ["infra/**", ".github/**", "delivery/**", "tools/delivery/src/**", "scripts/check-*.mjs", "scripts/supply-chain.mjs", "security/**"], "reason": "infraestructura, CI, políticas o gates de seguridad" },
+    { "class": "critical", "paths": ["pnpm-lock.yaml", "pnpm-workspace.yaml", "patches/**", "package.json", "*/*/package.json"], "reason": "dependencias" }
+  ],
+  "outcomes": {
+    "low": { "staging": "auto", "production": "auto" },
+    "medium": { "staging": "auto", "production": "review" },
+    "critical": { "staging": "review", "production": "approval" },
+    "blocked": { "staging": "block", "production": "block" }
+  },
+  "fullRegression": {
+    "paths": ["packages/contracts/**", "services/core/migrations/**", "pnpm-lock.yaml", "pnpm-workspace.yaml", "package.json", "tsconfig.base.json", "vitest.shared.js", ".github/**"],
+    "refs": ["refs/heads/main", "refs/tags/v*"]
+  },
+  "docRules": [
+    { "when": ["services/core/migrations/**"], "require": ["docs/adr/**", "docs/IMPLEMENTATION_STATUS.md"], "message": "una migración nueva se documenta en una ADR o en IMPLEMENTATION_STATUS" },
+    { "when": ["delivery/**", "infra/tofu/**"], "require": ["docs/adr/**", "docs/runbooks/**"], "message": "un cambio de política o de infraestructura se documenta en una ADR o un runbook" }
+  ],
+  "migrations": { "dir": "services/core/migrations", "derivedTables": ["geo.context_cache"] },
+  "cost": {
+    "monthly": { "cloud-usd": 0, "ai-usd": 0, "eas-builds": 0 },
+    "allowedResourceTypes": ["google_service_account", "google_project_iam_member", "google_service_account_iam_member", "google_iam_workload_identity_pool", "google_iam_workload_identity_pool_provider", "google_project_service"],
+    "statefulResourceTypes": ["google_sql_database_instance", "google_sql_database", "google_storage_bucket", "google_secret_manager_secret", "google_kms_crypto_key", "google_artifact_registry_repository", "google_compute_disk"]
+  }
+}

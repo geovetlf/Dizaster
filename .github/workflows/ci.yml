@@ -5,6 +5,10 @@ on:
     branches: [main]
   pull_request:
 
+# Mínimo privilegio del GITHUB_TOKEN (ADR 0264): CI solo lee el código.
+permissions:
+  contents: read
+
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
@@ -16,9 +20,9 @@ jobs:
     env:
       TEST_DATABASE_URL: postgres://dizaster:dizaster@localhost:5432/dizaster_test
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
           cache: pnpm
@@ -34,6 +38,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint
       - run: pnpm check:boundaries
+      - run: pnpm check:secrets
+      - run: pnpm check:workflows
       - run: pnpm typecheck
       - run: pnpm build
       - name: Servidor compatible con S3 para probar el cliente de almacenamiento
@@ -57,13 +63,46 @@ jobs:
         working-directory: apps/mobile
         run: pnpm run native:check
 
+  # Dizaster Delivery Control Plane (Blueprint §20, ADR 0265): impacto, política y documentación del cambio, con
+  # registro de auditoría. Determinístico, sin IA ni credenciales.
+  delivery:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      DZD_BASE: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || github.event.before }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @dizaster/delivery build
+      - name: Impacto y gates elegidos
+        run: pnpm dzd inspect && pnpm dzd plan
+      - name: Política (block detiene el cambio)
+        run: pnpm dzd policy --env staging
+      - name: Documentación que acompaña al cambio
+        run: pnpm dzd docs
+      - name: Auditoría
+        if: always()
+        run: pnpm dzd audit --actor delivery-plane --action ci --result ${{ job.status == 'success' && 'ok' || 'failed' }}
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: delivery-audit
+          path: delivery-audit.jsonl
+
   supply-chain:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
           cache: pnpm
@@ -71,7 +110,7 @@ jobs:
       - name: Licencias permitidas y avisos de seguridad (ADR 0070)
         run: pnpm supply-chain
       - run: pnpm sbom
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: sbom-cyclonedx
           path: sbom.cdx.json
