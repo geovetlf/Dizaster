@@ -10,6 +10,8 @@ export interface ApnsConfig {
   bundleId: string;
   /** Solo pruebas: sustituye los hosts de Apple. */
   baseUrls?: { production: string; development: string };
+  /** Plazo por petición (ADR 0205). Por defecto 10 s. */
+  timeoutMs?: number;
 }
 
 const HOSTS = { production: "https://api.push.apple.com", development: "https://api.sandbox.push.apple.com" };
@@ -103,6 +105,11 @@ export class ApnsSender implements PushSender {
         resolve({ token: m.token, ok: false, invalidToken: status === 410 || INVALID.has(reason), retryable: isRetryableStatus(status), error: reason });
       });
       req.on("error", (e) => resolve({ token: m.token, ok: false, invalidToken: false, retryable: true, error: e.message }));
+      // Plazo (ADR 0205): APNs que no responde no retiene el envío; se cancela el stream y se reintenta después.
+      req.setTimeout(this.cfg.timeoutMs ?? 10_000, () => {
+        req.close(constants.NGHTTP2_CANCEL);
+        resolve({ token: m.token, ok: false, invalidToken: false, retryable: true, error: "TIMEOUT" });
+      });
       req.end(body);
     });
   }

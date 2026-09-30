@@ -53,6 +53,11 @@ const Env = z.object({
   /** Peticiones esperando conexión a partir de las cuales la API responde 503 al instante. */
   API_MAX_DB_WAITING: z.coerce.number().int().min(1).max(10_000).default(50),
   HTTP_REQUEST_TIMEOUT_MS: z.coerce.number().int().min(1_000).max(600_000).default(30_000),
+  // ADR 0205: plazos y cortocircuito para proveedores externos.
+  PUSH_REQUEST_TIMEOUT_MS: z.coerce.number().int().min(1_000).max(60_000).default(10_000),
+  PUSH_BREAKER_THRESHOLD: z.coerce.number().int().min(1).max(100).default(5),
+  PUSH_BREAKER_COOLDOWN_MS: z.coerce.number().int().min(1_000).max(600_000).default(30_000),
+  STORAGE_REQUEST_TIMEOUT_MS: z.coerce.number().int().min(5_000).max(900_000).default(120_000),
   /** Latido del worker y /health/ready (ADR 0187). */
   WORKER_INSTANCE_ID: z.string().min(1).max(100).optional(),
   WORKER_HEARTBEAT_STALE_SECONDS: z.coerce.number().int().min(30).max(3600).default(180),

@@ -11,6 +11,8 @@ export interface S3Config {
   forcePathStyle: boolean;
   /** Base pública (CDN) para variantes públicas. Sin ella se sirven con URL firmada de lectura. */
   publicBaseUrl: string | null;
+  /** Plazo por petición (ADR 0205). Por defecto 120 s: cubre un video de 60 MB con una red lenta. */
+  timeoutMs?: number;
 }
 
 /**
@@ -100,6 +102,7 @@ export class S3Storage implements StorageProvider {
         authorization: `AWS4-HMAC-SHA256 Credential=${this.c.accessKeyId}/${scope}, SignedHeaders=${signedHeaders}, Signature=${signature}`,
       },
       ...(body ? { body: Buffer.from(body.buffer, body.byteOffset, body.byteLength) } : {}),
+      signal: AbortSignal.timeout(this.c.timeoutMs ?? 120_000),
     });
   }
 

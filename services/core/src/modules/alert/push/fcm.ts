@@ -14,6 +14,8 @@ export interface FcmConfig {
   account: FcmServiceAccount;
   /** Solo pruebas: sustituye https://fcm.googleapis.com. */
   baseUrl?: string;
+  /** Plazo por petición (ADR 0205). Por defecto 10 s. */
+  timeoutMs?: number;
 }
 
 const SCOPE = "https://www.googleapis.com/auth/firebase.messaging";
@@ -28,6 +30,8 @@ export class FcmSender implements PushSender {
 
   constructor(private readonly cfg: FcmConfig, private readonly now: () => Date = () => new Date()) {}
 
+  private get timeoutMs(): number { return this.cfg.timeoutMs ?? 10_000; }
+
   async send(messages: PushMessage[]): Promise<PushResult[]> {
     const token = await this.accessToken();
     const base = this.cfg.baseUrl ?? "https://fcm.googleapis.com";
@@ -37,6 +41,7 @@ export class FcmSender implements PushSender {
           method: "POST",
           headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
           body: JSON.stringify({ message: FcmSender.message(m) }),
+          signal: AbortSignal.timeout(this.timeoutMs),
         });
         if (res.ok) return { token: m.token, ok: true, invalidToken: false };
         const err = (await res.json().catch(() => ({}))) as { error?: { status?: string; details?: { errorCode?: string }[] } };
@@ -80,6 +85,7 @@ export class FcmSender implements PushSender {
       method: "POST",
       headers: { "content-type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({ grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer", assertion }),
+      signal: AbortSignal.timeout(this.timeoutMs),
     });
     if (!res.ok) throw new Error(`OAuth FCM: HTTP ${res.status}`);
     const body = (await res.json()) as { access_token: string; expires_in: number };

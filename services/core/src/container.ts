@@ -9,13 +9,14 @@ import { createPool, type Db } from "./platform/db.js";
 import { OutboxDispatcher } from "./platform/outbox.js";
 import { ClientCrashService } from "./platform/client-crashes.js";
 import { HeartbeatService } from "./platform/heartbeat.js";
+import { CircuitBreaker } from "./platform/breaker.js";
 import { inProcessDecoder, IsolatedDecoder } from "./modules/media/index.js";
 import { buildConnectors, type ConnectorOverrides, type Connectors } from "./platform/connectors/index.js";
 import { defaultDataDir } from "./platform/paths.js";
 import { CostService } from "./modules/cost/index.js";
 import { EventService } from "./modules/event/index.js";
 import { FeedService } from "./modules/feed/index.js";
-import { AlertService, ApnsSender, budgetAlertText, costDegradationText, sourceAlertText, FcmSender, LogPushSender, PushGateway, type FcmServiceAccount, type PushSender } from "./modules/alert/index.js";
+import { AlertService, ApnsSender, budgetAlertText, costDegradationText, sourceAlertText, FcmSender, GuardedSender, LogPushSender, PushGateway, type FcmServiceAccount, type PushSender } from "./modules/alert/index.js";
 import { GeoService } from "./modules/geo/index.js";
 import { AuthorityRequestRegister, ModerationService } from "./modules/moderation/index.js";
 import { TrustService } from "./modules/trust/index.js";
@@ -120,7 +121,7 @@ export function buildContainer(env: AppEnv, overrides: { db?: Db; clock?: Clock;
   verification.registerHandlers(dispatcher);
   media.registerHandlers(dispatcher);
   feed.registerHandlers(dispatcher);
-  const alerts = new AlertService(db, ref, events, social, identity, geo, overrides.push ?? buildPush(env, clock), clock, ingestion, { ttlHours: env.ALERT_DEFAULT_TTL_HOURS });
+  const alerts = new AlertService(db, ref, events, social, identity, geo, overrides.push ?? buildPush(env, clock, meter), clock, ingestion, { ttlHours: env.ALERT_DEFAULT_TTL_HOURS });
   alerts.registerHandlers(dispatcher);
   social.registerHandlers(dispatcher);
   reports.registerHandlers(dispatcher);
@@ -168,14 +169,25 @@ export function buildContainer(env: AppEnv, overrides: { db?: Db; clock?: Clock;
 }
 
 /** APNs y FCM directos. Si falta la credencial de una plataforma, sus avisos quedan solo en el historial. */
-function buildPush(env: AppEnv, clock: Clock): PushSender {
+function buildPush(env: AppEnv, clock: Clock, meter: Meter): PushSender {
   if (env.PUSH_DRIVER === "log") return new LogPushSender();
   const now = () => clock.now();
+  const timeoutMs = env.PUSH_REQUEST_TIMEOUT_MS;
+  // ADR 0205: cada proveedor con su cortocircuito; abrirlo queda en métricas y en el log (alerta de operación).
+  const guard = (sender: PushSender, provider: string) => new GuardedSender(sender, new CircuitBreaker({
+    threshold: env.PUSH_BREAKER_THRESHOLD, cooldownMs: env.PUSH_BREAKER_COOLDOWN_MS, maxCooldownMs: 10 * 60_000,
+    now: () => clock.now().getTime(),
+    onOpen: (i) => {
+      meter.add("push", "circuit_open", 1, provider);
+      console.warn(JSON.stringify({ msg: "push.circuit.open", provider, failures: i.failures, cooldownMs: i.cooldownMs }));
+    },
+    onClose: () => console.warn(JSON.stringify({ msg: "push.circuit.closed", provider })),
+  }));
   const apns = env.APNS_TEAM_ID && env.APNS_KEY_ID && env.APNS_PRIVATE_KEY
-    ? new ApnsSender({ teamId: env.APNS_TEAM_ID, keyId: env.APNS_KEY_ID, privateKeyPem: decodeSecret(env.APNS_PRIVATE_KEY), bundleId: env.APNS_BUNDLE_ID }, now)
+    ? guard(new ApnsSender({ teamId: env.APNS_TEAM_ID, keyId: env.APNS_KEY_ID, privateKeyPem: decodeSecret(env.APNS_PRIVATE_KEY), bundleId: env.APNS_BUNDLE_ID, timeoutMs }, now), "apns")
     : null;
   const fcm = env.FCM_SERVICE_ACCOUNT_JSON
-    ? new FcmSender({ account: JSON.parse(decodeSecret(env.FCM_SERVICE_ACCOUNT_JSON)) as FcmServiceAccount }, now)
+    ? guard(new FcmSender({ account: JSON.parse(decodeSecret(env.FCM_SERVICE_ACCOUNT_JSON)) as FcmServiceAccount, timeoutMs }, now), "fcm")
     : null;
   if (!apns) console.warn(JSON.stringify({ msg: "push.apns.disabled", reason: "faltan APNS_TEAM_ID, APNS_KEY_ID o APNS_PRIVATE_KEY" }));
   if (!fcm) console.warn(JSON.stringify({ msg: "push.fcm.disabled", reason: "falta FCM_SERVICE_ACCOUNT_JSON" }));
@@ -187,7 +199,7 @@ function buildStorage(env: AppEnv, clock: Clock): StorageProvider {
     return new S3Storage({
       endpoint: env.S3_ENDPOINT!, region: env.S3_REGION, bucket: env.S3_BUCKET!,
       accessKeyId: env.S3_ACCESS_KEY_ID!, secretAccessKey: env.S3_SECRET_ACCESS_KEY!,
-      forcePathStyle: env.S3_FORCE_PATH_STYLE, publicBaseUrl: env.MEDIA_PUBLIC_BASE_URL ?? null,
+      forcePathStyle: env.S3_FORCE_PATH_STYLE, publicBaseUrl: env.MEDIA_PUBLIC_BASE_URL ?? null, timeoutMs: env.STORAGE_REQUEST_TIMEOUT_MS,
     }, () => clock.now());
   }
   // La firma local deriva del secreto de sesión con un contexto propio: no reutiliza la misma clave.

@@ -1,3 +1,5 @@
+import type { CircuitBreaker } from "../../../platform/breaker.js";
+
 /**
  * Proveedor de push detrás de una interfaz: hoy APNs y FCM directos (gratis); mañana otro proveedor sin tocar
  * el Alert Engine. Un mensaje lleva solo datos públicos del EVENT y el deep link.
@@ -43,16 +45,41 @@ export class PushGateway implements PushSender {
 
   async send(messages: PushMessage[]): Promise<PushResult[]> {
     const out = new Map<PushMessage, PushResult>();
-    for (const provider of ["APNS", "FCM"] as const) {
+    // En paralelo (ADR 0205): un proveedor lento no retrasa los avisos de la otra plataforma.
+    await Promise.all((["APNS", "FCM"] as const).map(async (provider) => {
       const batch = messages.filter((m) => m.provider === provider);
-      if (batch.length === 0) continue;
+      if (batch.length === 0) return;
       const sender = this.senders[provider];
       const results = sender
         ? await sender.send(batch).catch((e: Error) => batch.map((m) => ({ token: m.token, ok: false, invalidToken: false, retryable: true, error: e.message })))
         : batch.map((m) => ({ token: m.token, ok: false, invalidToken: false, error: `${provider} no configurado` }));
       batch.forEach((m, i) => out.set(m, results[i] ?? { token: m.token, ok: false, invalidToken: false, error: "sin respuesta" }));
-    }
+    }));
     return messages.map((m) => out.get(m)!);
+  }
+}
+
+/**
+ * Proveedor protegido por un cortocircuito (ADR 0205). Un lote en el que todo falla de forma temporal (sin red,
+ * plazo vencido, 5xx, 429) cuenta como fallo del proveedor; con el circuito abierto no se llama y los mensajes
+ * vuelven como reintentables (ADR 0177), así el aviso sale cuando el proveedor se recupera.
+ */
+export class GuardedSender implements PushSender {
+  constructor(private readonly inner: PushSender, private readonly breaker: CircuitBreaker) {}
+  get name(): string { return this.inner.name; }
+
+  async send(messages: PushMessage[]): Promise<PushResult[]> {
+    if (messages.length === 0) return [];
+    if (!this.breaker.allow()) return messages.map((m) => ({ token: m.token, ok: false, invalidToken: false, retryable: true, error: "CIRCUIT_OPEN" }));
+    try {
+      const results = await this.inner.send(messages);
+      if (results.length > 0 && results.every((r) => !r.ok && r.retryable)) this.breaker.failure();
+      else this.breaker.success();
+      return results;
+    } catch (e) {
+      this.breaker.failure();
+      throw e;
+    }
   }
 }
 
