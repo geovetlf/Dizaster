@@ -238,7 +238,7 @@ export default function ReportScreen() {
         </View>
       ) : null}
 
-      <MediaAttachments items={media} onChange={setMedia} suggestRedaction={category.sensitivity !== "NORMAL"} />
+      <MediaAttachments items={media} onChange={setMedia} suggestRedaction={category.sensitivity !== "NORMAL"} cameraOnly />
       <TextInput style={styles.input} multiline maxLength={2000} value={text} onChangeText={setText} placeholder="…" placeholderTextColor={colors.textMuted} />
       {detectPersonalData(text).length ? <Text style={[styles.note, styles.warn]}>{t("personalDataWarning")}</Text> : null}
       {category.forcePseudonymous ? (

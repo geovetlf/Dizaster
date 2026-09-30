@@ -98,7 +98,7 @@ export class ReportService {
     if (Math.max(recent.rows[0]!.mine_day, recent.rows[0]!.phone_day) >= quota * REPORTS_PER_DAY_FACTOR) {
       throw new DomainError("RATE_LIMITED", "Demasiados reportes en las últimas 24 horas", 429);
     }
-    const attachable = await this.d.media.assertAttachable(db, session.profileId, req.mediaIds);
+    const attachable = await this.d.media.assertAttachable(db, session.profileId, req.mediaIds, { requireInAppCapture: true });
     const mediaProofs = await this.d.media.inAppCaptures(db, session.profileId, req.mediaIds);
 
     const receivedAt = clock.now();

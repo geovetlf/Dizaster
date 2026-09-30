@@ -208,8 +208,12 @@ describe("media en reportes y eventos", () => {
 
     const g = await createUser(t, "media_gallery");
     const gallery = await uploadReady(g, makeJpeg({ exif: false }), { capturedAt: new Date().toISOString(), capturedInApp: false });
-    const r2 = await submit(t, g, { ...reportBody(g, { pin: { lat: -12.95, lng: -77.03 } }), mediaIds: [gallery] });
-    expect((await breakdown(r2.body.reportId)).score_breakdown["mediaInApp"]).toBe(0);
+    // D-10 (ADR 0166): en un reporte solo va media capturada con la cámara de la app; en un post, la galería sí.
+    const r2 = await t.app.inject({ method: "POST", url: "/v1/reports", headers: auth(g), payload: { ...reportBody(g, { pin: { lat: -12.95, lng: -77.03 } }), mediaIds: [gallery] } });
+    expect(r2.statusCode).toBe(400);
+    expect(r2.json()).toMatchObject({ error: "MEDIA_NOT_CAPTURED_IN_APP" });
+    const post = await t.app.inject({ method: "POST", url: "/v1/posts", headers: auth(g), payload: { text: "Foto de ayer del puente", mediaIds: [gallery] } });
+    expect(post.statusCode, post.body).toBe(201);
   });
 
   it("la foto de un reporte aparece en la timeline y en la media pública del evento, saneada", async () => {

@@ -10,6 +10,7 @@ import type { MessageKey } from "../i18n";
 export const SERVER_ERROR_KEYS: Readonly<Record<string, MessageKey>> = {
   RATE_LIMITED: "errRateLimited",
   APP_UPDATE_REQUIRED: "errUpdateRequired",
+  MEDIA_NOT_CAPTURED_IN_APP: "errCameraOnly",
   AUTHORITY_REQUEST_TRANSITION: "errAuthorityTransition",
   MEDIA_HELD: "errMediaHeld",
   DAILY_UPLOAD_QUOTA: "errRateLimited",

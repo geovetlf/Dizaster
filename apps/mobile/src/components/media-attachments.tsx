@@ -11,8 +11,10 @@ import { RedactEditor } from "./redact-editor";
 export const MAX_MEDIA_PER_REPORT = 4;
 
 /** Adjuntar fotos y videos a un reporte. Mismo componente en Android e iOS. */
-export function MediaAttachments({ items, onChange, suggestRedaction = false }: {
+export function MediaAttachments({ items, onChange, suggestRedaction = false, cameraOnly = false }: {
   items: LocalMedia[]; onChange: (items: LocalMedia[]) => void;
+  /** Reportes (D-10, ADR 0166): solo la cámara de la app; la galería queda para los posts. */
+  cameraOnly?: boolean;
   /** Categoría sensible (p. ej. delincuencia): se invita a difuminar rostros y matrículas (D-08). */
   suggestRedaction?: boolean;
 }) {
@@ -93,9 +95,10 @@ export function MediaAttachments({ items, onChange, suggestRedaction = false }: 
       <View style={styles.buttons}>
         {avail.photo ? <Button label={t("addPhoto")} disabled={busy || full} onPress={() => void add("camera", "IMAGE")} /> : null}
         {avail.video ? <Button label={t("addVideo")} disabled={busy || full} onPress={() => void add("camera", "VIDEO_RECORDED")} /> : null}
-        {avail.photo ? <Button label={t("fromGallery")} disabled={busy || full} onPress={() => void add("library", "IMAGE")} /> : null}
+        {avail.photo && !cameraOnly ? <Button label={t("fromGallery")} disabled={busy || full} onPress={() => void add("library", "IMAGE")} /> : null}
       </View>
       {!avail.photo ? <Text style={styles.note}>{t("mediaPaused")}</Text> : !avail.video ? <Text style={styles.note}>{t("videoPaused")}</Text> : null}
+      {cameraOnly ? <Text style={styles.note}>{t("cameraOnlyHint")}</Text> : null}
       {items.length > 0 ? <Text style={styles.note}>{t("graphicHint")}</Text> : null}
       {items.some((m) => m.kind === "IMAGE") ? <Text style={[styles.note, suggestRedaction && styles.warn]}>{t(suggestRedaction ? "redactSuggest" : "redactHint")}</Text> : null}
       {editing ? (

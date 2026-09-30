@@ -380,16 +380,23 @@ export class MediaService {
   }
 
   /** Un reporte o post solo puede adjuntar media propia, de un tipo soportado en V1 y ya subida. */
-  async assertAttachable(q: Queryable, ownerProfileId: string, mediaIds: string[]): Promise<{ id: string; kind: "IMAGE" | "VIDEO_RECORDED" }[]> {
+  /**
+   * `requireInAppCapture` (reportes, D-10, ADR 0166): solo media capturada con la cámara de la app; una foto o video de
+   * la galería puede ser antiguo o de otro lugar. Los posts siguen admitiendo galería.
+   */
+  async assertAttachable(q: Queryable, ownerProfileId: string, mediaIds: string[], opts: { requireInAppCapture?: boolean } = {}): Promise<{ id: string; kind: "IMAGE" | "VIDEO_RECORDED" }[]> {
     if (mediaIds.length === 0) return [];
-    const { rows } = await q.query<{ id: string; kind: MediaKind; state: string }>(
-      `SELECT id, kind, state FROM media.media WHERE id = ANY($1) AND owner_profile_id = $2`,
+    const { rows } = await q.query<{ id: string; kind: MediaKind; state: string; captured_in_app: boolean }>(
+      `SELECT id, kind, state, captured_in_app FROM media.media WHERE id = ANY($1) AND owner_profile_id = $2`,
       [mediaIds, ownerProfileId],
     );
     if (rows.length !== new Set(mediaIds).size) throw new DomainError("MEDIA_NOT_FOUND", "Media inexistente o ajena");
     for (const r of rows) {
       if (!V1_MEDIA_KINDS.includes(r.kind)) throw new DomainError("MEDIA_KIND_UNSUPPORTED", `Tipo de media no soportado en V1: ${r.kind}`);
       if (!["UPLOADED", "PROCESSING", "READY"].includes(r.state)) throw new DomainError("MEDIA_NOT_READY", "La media aún no se ha subido");
+      if (opts.requireInAppCapture && !r.captured_in_app) {
+        throw new DomainError("MEDIA_NOT_CAPTURED_IN_APP", "En un reporte solo van fotos o videos tomados con la cámara de la app");
+      }
     }
     const kinds = new Map(rows.map((r) => [r.id, r.kind as "IMAGE" | "VIDEO_RECORDED"]));
     return mediaIds.map((id) => ({ id, kind: kinds.get(id)! }));

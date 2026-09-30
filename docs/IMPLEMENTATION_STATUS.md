@@ -356,6 +356,7 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | 0163 | Códec de video leído del archivo: H.264/HEVC se publican sin transcodificar, el resto se rechaza; iOS exporta a H.264 | ✅ |
 | 0164 | Versión mínima de la app por plataforma en /v1/config; 426 solo al escribir reportes/posts, emergencias nunca bloqueada | ✅ |
 | 0165 | Retención diaria de datos operativos: últimas ubicaciones (72 h), historial de avisos (90 d) y outbox procesado (14 d) | ✅ |
+| 0166 | Reportes solo con media capturada en la app (D-10); los posts siguen admitiendo galería | ✅ |
 | Licencias, auditoría, SBOM, Dependabot; respaldo con prueba de restauración en CI | ✅ | ADR 0070, `scripts/supply-chain.mjs`, `scripts/db-restore-check.mjs` |
 | Idioma de la app elegible en el perfil (es/en/pt/fr o del teléfono) | ✅ | ADR 0069, `app/language.tsx` |
 | Varias cuentas en un teléfono corroboran como una (clave seudónima del teléfono) | ✅ | ADR 0068, migración 0036 |
@@ -399,11 +400,10 @@ Revisión del Blueprint del 2026-09-30 (tras ADR 0157): completada con ADR 0158�
 
 Revisión del Blueprint del 2026-09-30 (tras ADR 0164), verificada contra el código, sin bloqueos:
 
-1. Reportes solo con fotos o videos capturados en la app, como aprobó D-10 (§8.2, C-14); los posts siguen admitiendo galería
-2. Roles de personal: quitar roles y registro auditado de altas y bajas (§13.1)
-3. Acceso auditado de moderación al original privado de una foto o video (§13.1, ADR 0042)
-4. País para emergencias también desde la SIM cuando no hay GPS (§11.5)
-5. Verificadores de inicio de sesión Apple, Google y correo con código, listos detrás de configuración (§5.1, D-11); se activan con las credenciales del propietario
+1. Roles de personal: quitar roles y registro auditado de altas y bajas (§13.1)
+2. Acceso auditado de moderación al original privado de una foto o video (§13.1, ADR 0042)
+3. País para emergencias también desde la SIM cuando no hay GPS (§11.5)
+4. Verificadores de inicio de sesión Apple, Google y correo con código, listos detrás de configuración (§5.1, D-11); se activan con las credenciales del propietario
 
 Bloqueadas o en espera:
 

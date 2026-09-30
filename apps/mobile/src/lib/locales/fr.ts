@@ -89,6 +89,8 @@ export const fr: Record<MessageKey, string> = {
   searchCategories: "Catégories",
   searchPlaces: "Lieux",
   retry: "Réessayer",
+  cameraOnlyHint: "Un signalement n'accepte que des photos ou vidéos prises maintenant avec l'appareil photo. Pour partager depuis la galerie, publiez un post.",
+  errCameraOnly: "Un signalement n'accepte que des photos ou vidéos prises avec l'appareil photo de l'app.",
   updateRequiredTitle: "Mettez l'app à jour",
   updateRequiredBody: "Cette version ne peut plus envoyer de signalements ni publier. Ce qui n'est pas envoyé est conservé et part après la mise à jour. Les urgences fonctionnent toujours.",
   updateApp: "Mettre à jour",

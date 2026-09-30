@@ -89,6 +89,8 @@ export const pt: Record<MessageKey, string> = {
   searchCategories: "Categorias",
   searchPlaces: "Lugares",
   retry: "Tentar de novo",
+  cameraOnlyHint: "Um relato só aceita fotos ou vídeos feitos agora com a câmera. Para compartilhar da galeria, publique um post.",
+  errCameraOnly: "Um relato só aceita fotos ou vídeos feitos com a câmera do app.",
   updateRequiredTitle: "Atualize o app",
   updateRequiredBody: "Esta versão não pode mais enviar relatos nem publicar. O que estiver pendente fica guardado e sai ao atualizar. Emergência continua funcionando.",
   updateApp: "Atualizar",

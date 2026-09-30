@@ -17,7 +17,7 @@ const feed = async (qs: string, u?: TestUser) => {
 
 async function upload(u: TestUser, file: Buffer, over: Record<string, unknown> = {}) {
   const sha256 = createHash("sha256").update(file).digest("hex");
-  const res = await t.app.inject({ method: "POST", url: "/v1/media/uploads", headers: auth(u), payload: { kind: "IMAGE", mime: "image/jpeg", sizeBytes: file.length, sha256, ...over } });
+  const res = await t.app.inject({ method: "POST", url: "/v1/media/uploads", headers: auth(u), payload: { kind: "IMAGE", mime: "image/jpeg", sizeBytes: file.length, sha256, capturedInApp: true, ...over } });
   const { mediaId, upload: up } = res.json();
   const url = new URL(up.url);
   await t.app.inject({ method: "PUT", url: url.pathname + url.search, headers: up.headers, payload: file });
