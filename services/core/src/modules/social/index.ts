@@ -87,6 +87,8 @@ const MAX_FOLLOWS = 2000;
 export const MAX_BLOCKS = 2000;
 /** "Para ti" ordena lo reciente: fuera de esta ventana, el contenido se encuentra por lugar, evento o perfil. */
 export const FOR_YOU_WINDOW_DAYS = 30;
+/** "Siguiendo" muestra lo de los últimos 30 días (ADR 0226); lo anterior sigue en cada perfil, evento o lugar. */
+export const FOLLOWING_WINDOW_DAYS = 30;
 
 /**
  * Ventaja en horas de cada señal (Blueprint §8.4, sin ML). Suma acotada: nada antiguo tapa lo nuevo para siempre.
@@ -479,10 +481,13 @@ export class SocialService {
     if (f.tab === "nearby" && nearSql) where.push(`ST_DWithin(p.public_point, ${nearSql}, $${params.push(f.nearRadiusM ?? 25_000)})`);
     if (f.tab === "videos") where.push(`EXISTS (SELECT 1 FROM social.post_media v WHERE v.post_id = p.id AND v.kind = 'VIDEO_RECORDED')`);
     if (f.tab === "following") {
+      // Ids como uuid (no `author_id::text`): así el planificador usa los índices por autor y por evento (ADR 0226).
       const followed = (type: string) => `(SELECT target_id FROM social.follows WHERE follower_profile_id = $2 AND target_type = '${type}')`;
-      where.push(`((p.author_visibility = 'PUBLIC' AND p.author_type = 'PROFILE' AND p.author_id::text IN ${followed("PROFILE")})
-                   OR (p.author_type = 'BUSINESS' AND p.author_id::text IN ${followed("BUSINESS")})
-                   OR le.event_id::text IN ${followed("EVENT")}
+      const followedIds = (type: string) => `(SELECT target_id::uuid FROM social.follows WHERE follower_profile_id = $2 AND target_type = '${type}')`;
+      where.push(`p.created_at > now() - make_interval(days => ${FOLLOWING_WINDOW_DAYS})`);
+      where.push(`((p.author_visibility = 'PUBLIC' AND p.author_type = 'PROFILE' AND p.author_id IN ${followedIds("PROFILE")})
+                   OR (p.author_type = 'BUSINESS' AND p.author_id IN ${followedIds("BUSINESS")})
+                   OR le.event_id IN ${followedIds("EVENT")}
                    OR s.region_id IN ${followed("PLACE")} OR s.district_id IN ${followed("PLACE")}
                    OR s.city_id IN ${followed("PLACE")}
                    OR EXISTS (SELECT 1 FROM social.post_tags pt JOIN social.tags tg ON tg.id = pt.tag_id
