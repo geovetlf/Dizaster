@@ -55,4 +55,19 @@ describe("aceptación de términos", () => {
     const r = await t.c.db.query<{ platform: string; app_version: string }>(`SELECT platform, app_version FROM identity.policy_acceptances`);
     expect(r.rows).toEqual([{ platform: "android", app_version: "1.0.0" }]);
   });
+
+  it("al borrar la cuenta queda solo id interno, documento, versión y fecha (ADR 0184)", async () => {
+    const u = await createUser(t, "legal_gone");
+    setLegal([{ kind: "TERMS", version: "2026-12", url: "https://example.org/terms", required: true }]);
+    const ok = await t.app.inject({
+      method: "POST", url: "/v1/me/policies/accept", headers: { ...auth(u), "x-app-platform": "ios", "x-app-version": "1.2.0" },
+      payload: { accept: [{ kind: "TERMS", version: "2026-12" }] },
+    });
+    expect(ok.statusCode).toBe(204);
+    expect((await t.app.inject({ method: "DELETE", url: "/v1/me", headers: auth(u), payload: { confirm: "DELETE" } })).statusCode).toBeLessThan(300);
+    const r = await t.c.db.query(`SELECT kind, version, platform, app_version, accepted_at IS NOT NULL AS dated FROM identity.policy_acceptances WHERE user_id = $1`, [u.userId]);
+    expect(r.rows).toEqual([{ kind: "TERMS", version: "2026-12", platform: null, app_version: null, dated: true }]);
+    // Nada más se puede cambiar.
+    await expect(t.c.db.query(`UPDATE identity.policy_acceptances SET version = 'x' WHERE user_id = $1`, [u.userId])).rejects.toThrow(/solo se inserta/);
+  });
 });

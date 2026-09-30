@@ -557,6 +557,8 @@ export class IdentityService {
       for (const table of ["mfa_recovery_codes", "mfa_verified_sessions", "mfa_totp", "mfa_failures"]) {
         await tx.query(`DELETE FROM identity.${table} WHERE user_id = $1`, [userId]);
       }
+      // Consentimiento (ADR 0184): se conserva solo id interno, documento, versión y fecha.
+      await tx.query(`UPDATE identity.policy_acceptances SET platform = NULL, app_version = NULL WHERE user_id = $1`, [userId]);
       await publish(tx, "AccountDeleted", { userId, profileId }, { lane: "interactive" });
     });
     this.statusCache.delete(userId);

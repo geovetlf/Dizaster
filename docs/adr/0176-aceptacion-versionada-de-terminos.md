@@ -23,6 +23,6 @@ aceptación cuando cambian. Los textos legales están BLOQUEADOS hasta tener ase
 
 ## Consecuencias
 
-- Al borrar la cuenta, las aceptaciones quedan con el id interno como prueba. Si deben borrarse también es una
-  decisión legal pendiente (el registro de solo inserción impide borrarlo sin una migración explícita).
+- Al borrar la cuenta, las aceptaciones se conservan mínimas: id interno, documento, versión y fecha (decisión del
+  propietario, ADR 0184; plataforma y versión de la app se vacían).
 - Los textos, sus versiones y qué documentos son obligatorios siguen siendo del propietario con asesoría legal.

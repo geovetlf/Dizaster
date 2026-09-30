@@ -374,6 +374,7 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | 0181 | Pruebas de captura del medio (qué foto/video y cuánto antes del reporte) en la evidencia de presencia privada; sin ubicación por medio | ✅ |
 | 0182 | Particionado mensual preparado (rango por UUIDv7 con la PK actual), probado sobre copias; runbook para activarlo | ✅ |
 | Llamada de emergencia sin esperar al GPS (§8.1) | ✅ | ADR 0183: país por última posición/SIM/perfil/región al elegir categoría, fix con límite de 20 s y reintento, Abrir ajustes si falta permiso de ubicación o cámara |
+| Decisiones: sin señal de red, aceptaciones mínimas tras borrar, todo público en V1 | ✅ | ADR 0184 (propietario, 2026-09-30); migración 0088 |
 | Licencias, auditoría, SBOM, Dependabot; respaldo con prueba de restauración en CI | ✅ | ADR 0070, `scripts/supply-chain.mjs`, `scripts/db-restore-check.mjs` |
 | Idioma de la app elegible en el perfil (es/en/pt/fr o del teléfono) | ✅ | ADR 0069, `app/language.tsx` |
 | Varias cuentas en un teléfono corroboran como una (clave seudónima del teléfono) | ✅ | ADR 0068, migración 0036 |
@@ -437,7 +438,4 @@ Bloqueadas o en espera:
 - **PENDING DECISION** — Duración de suspensiones: hoy `SUSPEND_USER` no vence; falta decidir si hay duraciones estándar (24 h / 7 d / permanente).
 - **PENDING DECISION** — D-17 fronteras en disputa: sin implementar; falta criterio del propietario (y revisión legal antes de abrir más países).
 - **PENDING DECISION** — Uso sin cuenta (ADR 0171): hoy se puede cerrar "Entrar" y seguir en solo lectura; falta decidir si V1 lo permite o exige cuenta.
-- **PENDING DECISION** — Señal de red compartida para coordinación (§8.2, "opcional, decisión"): choca con la decisión del propietario de no usar señales de IP o red (ADR 0142); no se implementa sin su visto bueno.
-- **PENDING DECISION** — Aceptaciones de términos al borrar la cuenta (ADR 0176): hoy se conservan con el id interno como prueba; falta criterio legal sobre si se borran.
-- **PENDING DECISION** — Visibilidad de posts (solo seguidores/privado) y privacidad del perfil (§7): las columnas existen pero qué significa cada una es decisión de producto; hoy todo es público.
 - **BLOQUEADA** — Contacto del cliente de ingesta (§9.3): el User-Agent dice "contacto pendiente"; falta el correo o URL de contacto del propietario.
