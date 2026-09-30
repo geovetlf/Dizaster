@@ -191,7 +191,9 @@ export class VerificationService {
     tx: Queryable, eventId: string, evidence: EvidenceForVerification[], windowMinutes: number,
   ): Promise<WindowWeight> {
     const high = evidence.filter((e) => e.presenceBand === "HIGH" && e.contributorUserId);
-    const weights = await this.trust.contributionWeights(tx, [...new Set(high.map((e) => e.contributorUserId!))], eventId);
+    const devices = new Map<string, string[]>();
+    for (const e of high) if (e.contributorDeviceId) devices.set(e.contributorUserId!, [...(devices.get(e.contributorUserId!) ?? []), e.contributorDeviceId]);
+    const weights = await this.trust.contributionWeights(tx, [...new Set(high.map((e) => e.contributorUserId!))], eventId, devices);
     return bestWindowWeight(high, weights, windowMinutes * 60_000);
   }
 

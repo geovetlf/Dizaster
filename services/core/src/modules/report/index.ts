@@ -23,7 +23,7 @@ import type { AttestationVerifier, IdentityService, Session } from "../identity/
 import type { MediaService } from "../media/index.js";
 import type { ReferenceData } from "../reference/index.js";
 import type { SocialService } from "../social/index.js";
-import { PHONE_TAMPER_REASONS, REPORTS_PER_DAY_FACTOR, type TrustService } from "../trust/index.js";
+import { PHONE_TAMPER_REASONS, REPORTS_PER_DAY_FACTOR, type PhoneSignals, type TrustService } from "../trust/index.js";
 import type { FieldCipher } from "../../platform/field-cipher.js";
 import { verifyEvidence } from "./evidence.js";
 
@@ -83,13 +83,8 @@ export class ReportService {
          FROM report.reports WHERE (author_user_id = $1 OR device_id = ANY($2)) AND received_at > now() - interval '24 hours'`,
       [session.userId, phoneDevices],
     );
-    const tamper = phoneDevices.length === 0 ? 0 : (await db.query<{ n: number }>(
-      `SELECT count(*)::int AS n FROM report.reports r JOIN report.presence_evidence p ON p.report_id = r.id
-        WHERE r.device_id = ANY($1) AND r.received_at > now() - interval '30 days' AND p.reasons && $2::text[]`,
-      [phoneDevices, [...PHONE_TAMPER_REASONS]],
-    )).rows[0]!.n;
     const quota = await this.d.trust.reportQuota(db, session.userId, this.d.limits.reportsPerHour,
-      phone ? { suspendedAccount: phone.suspendedAccount, tamperSignals30d: tamper } : null);
+      phone ? { suspendedAccount: phone.suspendedAccount, tamperSignals30d: await this.tamperSignals(db, phoneDevices) } : null);
     // Cuentas nuevas o con mal historial tienen menos cupo (Blueprint §13.3).
     if (Math.max(recent.rows[0]!.mine, recent.rows[0]!.phone) >= quota) {
       throw new DomainError("RATE_LIMITED", "Demasiados reportes en la última hora", 429);
@@ -242,6 +237,22 @@ export class ReportService {
    * Borrado de cuenta (ADR 0021): la evidencia de presencia se generaliza en el acto, sin esperar la retención,
    * y se desvincula el dispositivo. El reporte sigue contando como evidencia anónima del EVENT.
    */
+  /** Reportes con señales de manipulación en 30 días desde estos dispositivos (ADR 0131). */
+  private async tamperSignals(q: Queryable, deviceIds: readonly string[]): Promise<number> {
+    if (deviceIds.length === 0) return 0;
+    return (await q.query<{ n: number }>(
+      `SELECT count(*)::int AS n FROM report.reports r JOIN report.presence_evidence p ON p.report_id = r.id
+        WHERE r.device_id = ANY($1) AND r.received_at > now() - interval '30 days' AND p.reasons && $2::text[]`,
+      [deviceIds, [...PHONE_TAMPER_REASONS]],
+    )).rows[0]!.n;
+  }
+
+  /** Señales del teléfono de un dispositivo, para el peso de su evidencia (ADR 0180). */
+  async phoneSignals(q: Queryable, deviceId: string): Promise<PhoneSignals> {
+    const phone = await this.d.identity.phoneOf(q, deviceId);
+    return { suspendedAccount: phone.suspendedAccount, tamperSignals30d: await this.tamperSignals(q, phone.deviceIds) };
+  }
+
   registerHandlers(dispatcher: OutboxDispatcher): void {
     // Media rechazada al procesarse (ADR 0121): si sostenía la bonificación "capturada en la app", se retira.
     dispatcher.on("MediaRejected", "report.media-rejected", async (e, tx) => { await this.reviseForRejectedMedia(tx, e.payload.mediaId); });

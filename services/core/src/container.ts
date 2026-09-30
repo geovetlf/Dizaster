@@ -105,6 +105,7 @@ export function buildContainer(env: AppEnv, overrides: { db?: Db; clock?: Clock;
     limits: { reportsPerHour: env.REPORTS_PER_HOUR_LIMIT, presenceRetentionDays: env.PRESENCE_RETENTION_DAYS },
     cipher: fieldCipher,
   });
+  trust.usePhoneSignals((q, deviceId) => reports.phoneSignals(q, deviceId));
   const business = new BusinessService(db);
   const feed = new FeedService(social, events, media, ref, geo, business);
   const dispatcher = new OutboxDispatcher(db);

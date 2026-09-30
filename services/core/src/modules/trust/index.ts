@@ -23,6 +23,12 @@ export class TrustService {
     private readonly events: EventService,
   ) {}
 
+  /** Señales del teléfono por dispositivo (ADR 0180); las da el módulo de reportes, que se construye después. */
+  private phoneSignals: ((q: Queryable, deviceId: string) => Promise<PhoneSignals>) | null = null;
+  usePhoneSignals(fn: (q: Queryable, deviceId: string) => Promise<PhoneSignals>): void {
+    this.phoneSignals = fn;
+  }
+
   registerHandlers(dispatcher: OutboxDispatcher): void {
     dispatcher.on("EventEvidenceAdded", "trust.record-contribution", async (e, tx) => {
       const data = await this.events.evidenceForVerification(tx, e.payload.eventId);
@@ -143,8 +149,20 @@ export class TrustService {
    * (cuentas jóvenes que ya co-reportaron en otros eventos recientes; basta uno si además se crearon juntas, ADR
    * 0142), el grupo cuenta como una.
    */
-  async contributionWeights(q: Queryable, userIds: string[], eventId: string): Promise<Map<string, number>> {
+  async contributionWeights(
+    q: Queryable, userIds: string[], eventId: string, devices: ReadonlyMap<string, readonly string[]> = new Map(),
+  ): Promise<Map<string, number>> {
     const tiers = await this.tiers(q, userIds);
+    // Reputación del teléfono (§8.2, ADR 0180): desde uno con manipulación o una cuenta suspendida se pesa como LOW.
+    if (this.phoneSignals) {
+      for (const u of userIds) {
+        for (const d of devices.get(u) ?? []) {
+          const tier = tiers.get(u) ?? "NEW";
+          const next = withPhone(tier, await this.phoneSignals(q, d));
+          if (next !== tier) { tiers.set(u, next); break; }
+        }
+      }
+    }
     const weights = new Map(userIds.map((u) => [u, TIER_WEIGHT[tiers.get(u) ?? "NEW"]]));
     if (userIds.length < 2) return weights;
     const ages = await this.identity.accountAgeHours(q, userIds);

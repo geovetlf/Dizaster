@@ -15,7 +15,7 @@ export interface ReputationSignals {
   suspensions: number;
 }
 
-export const TRUST_RULES_VERSION = "trust-2";
+export const TRUST_RULES_VERSION = "trust-3";
 
 export const TRUST = {
   newAccountHours: 24,
