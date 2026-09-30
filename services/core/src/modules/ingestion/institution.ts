@@ -35,9 +35,9 @@ export class InstitutionService {
   ) {}
 
   /** Solo administración. Exige el sello institucional. Categorías del catálogo y países del índice. */
-  async setScope(handle: string, raw: unknown): Promise<OfficialScopeView> {
+  async setScope(handle: string, raw: unknown, q: Queryable = this.db): Promise<OfficialScopeView> {
     const scope = parseBody(OfficialScopeRequest, raw);
-    const b = await this.business.officialInfo(this.db, handle);
+    const b = await this.business.officialInfo(q, handle);
     if (!b) throw notFound("Negocio");
     if (b.verification !== "INSTITUTIONAL_OFFICIAL") {
       throw new DomainError("NOT_INSTITUTIONAL", "Primero hay que darle el sello de institución oficial", 409);
@@ -48,7 +48,7 @@ export class InstitutionService {
     if (unknownCountry) throw new DomainError("VALIDATION", `País desconocido: ${unknownCountry}`, 400);
     const categories = [...new Set(scope.categories)].sort();
     const countries = [...new Set(scope.countries)].sort();
-    await this.db.query(
+    await q.query(
       `INSERT INTO ingestion.sources (id, key, name, type, trust_tier, country_scope, categories, adapter, config, status)
        VALUES ($1, $2, $3, 'OFFICIAL', 'OFFICIAL', $4, $5, $6, '{}', 'ACTIVE')
        ON CONFLICT (key) DO UPDATE SET name = EXCLUDED.name, country_scope = EXCLUDED.country_scope, categories = EXCLUDED.categories,

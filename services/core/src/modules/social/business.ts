@@ -115,14 +115,14 @@ export class BusinessService {
   }
 
   /** Solo administración. INSTITUTIONAL_OFFICIAL se reserva a instituciones oficiales (D-04). */
-  async setVerification(handle: string, raw: unknown): Promise<BusinessView> {
+  async setVerification(handle: string, raw: unknown, q: Queryable = this.db): Promise<BusinessView> {
     const { verification } = parse(SetBusinessVerificationRequest, raw);
-    const { rowCount } = await this.db.query(
+    const { rowCount } = await q.query(
       `UPDATE social.business_profiles SET verification_status = $2, updated_at = now() WHERE lower(handle) = lower($1) AND deleted_at IS NULL`,
       [handle, verification],
     );
     if (!rowCount) throw notFound("Negocio");
-    return this.view(this.db, handle, null).catch(() => { throw notFound("Negocio"); });
+    return this.view(q, handle, null).catch(() => { throw notFound("Negocio"); });
   }
 
   async idByHandle(q: Queryable, handle: string): Promise<string> {

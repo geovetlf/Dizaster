@@ -163,21 +163,22 @@ export class CostService implements CostGuard, UsageSink, AiCallSink {
 
   // ───────────── Administración ─────────────
 
-  async setBudget(rawKey: string, raw: unknown, by: string | null): Promise<BudgetView> {
+  /** `q`: la transacción del registro de configuración (ADR 0238), para que el cambio y su auditoría vayan juntos. */
+  async setBudget(rawKey: string, raw: unknown, by: string | null, q: Queryable = this.db): Promise<BudgetView> {
     const key = parse(Key, rawKey);
     const b = parse(UpdateBudgetRequest, raw);
-    await this.db.query(
+    await q.query(
       `INSERT INTO cost.budgets (key, period, limit_usd, updated_by) VALUES ($1, $2, $3, $4)
        ON CONFLICT (key) DO UPDATE SET period = EXCLUDED.period, limit_usd = EXCLUDED.limit_usd, updated_by = EXCLUDED.updated_by, updated_at = now()`,
       [key, b.period, b.limitUsd, by],
     );
-    return (await this.budgets(this.db)).find((x) => x.key === key)!;
+    return (await this.budgets(q)).find((x) => x.key === key)!;
   }
 
-  async setKillSwitch(rawFeature: string, raw: unknown, by: string | null): Promise<KillSwitchView> {
+  async setKillSwitch(rawFeature: string, raw: unknown, by: string | null, q: Queryable = this.db): Promise<KillSwitchView> {
     const feature = parse(Key, rawFeature);
     const k = parse(UpdateKillSwitchRequest, raw);
-    const { rows } = await this.db.query<{ feature: string; killed: boolean; reason: string | null; updated_at: Date }>(
+    const { rows } = await q.query<{ feature: string; killed: boolean; reason: string | null; updated_at: Date }>(
       // Lo que decide una persona deja de ser automático: la degradación ya no lo devuelve sola (ADR 0138).
       `INSERT INTO cost.kill_switches (feature, killed, reason, updated_by, auto) VALUES ($1, $2, $3, $4, false)
        ON CONFLICT (feature) DO UPDATE SET killed = EXCLUDED.killed, reason = EXCLUDED.reason, updated_by = EXCLUDED.updated_by, auto = false, updated_at = now()
@@ -342,8 +343,8 @@ export class CostService implements CostGuard, UsageSink, AiCallSink {
     return out;
   }
 
-  async killSwitches(): Promise<KillSwitchView[]> {
-    const { rows } = await this.db.query<{ feature: string; killed: boolean; reason: string | null; updated_at: Date }>(
+  async killSwitches(q: Queryable = this.db): Promise<KillSwitchView[]> {
+    const { rows } = await q.query<{ feature: string; killed: boolean; reason: string | null; updated_at: Date }>(
       `SELECT feature, killed, reason, updated_at FROM cost.kill_switches ORDER BY feature`,
     );
     const views: KillSwitchView[] = rows.map((r) => ({ feature: r.feature, killed: r.killed, reason: r.reason, updatedAt: r.updated_at.toISOString() }));

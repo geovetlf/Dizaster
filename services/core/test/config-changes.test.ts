@@ -54,4 +54,20 @@ describe("cambios de configuración con motivo e historial", () => {
     const u = await createUser(t, "curioso_config");
     expect((await t.app.inject({ url: "/v1/admin/config-changes", headers: auth(u.token) })).statusCode).toBe(403);
   });
+
+  it("si el registro falla, el cambio no se aplica (misma transacción, ADR 0238)", async () => {
+    await t.c.db.query(`CREATE OR REPLACE FUNCTION platform.test_fail_audit() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'registro caído'; END $$`);
+    await t.c.db.query(`CREATE TRIGGER test_fail_audit BEFORE INSERT ON platform.config_changes FOR EACH ROW EXECUTE FUNCTION platform.test_fail_audit()`);
+    try {
+      const budgetBefore = (await t.c.cost.budgets(t.c.db)).find((b) => b.key === "ai");
+      const killBefore = (await t.c.cost.killSwitches()).find((k) => k.feature === "photos")?.killed ?? false;
+      expect((await put("/v1/admin/cost/budgets/ai", { period: "DAILY", limitUsd: 77, reason: "Prueba de atomicidad" })).statusCode).toBe(500);
+      expect((await put("/v1/admin/kill-switches/photos", { killed: !killBefore, reason: "Prueba de atomicidad" })).statusCode).toBe(500);
+      expect((await t.c.cost.budgets(t.c.db)).find((b) => b.key === "ai")).toEqual(budgetBefore);
+      expect((await t.c.cost.killSwitches()).find((k) => k.feature === "photos")?.killed ?? false).toBe(killBefore);
+    } finally {
+      await t.c.db.query(`DROP TRIGGER test_fail_audit ON platform.config_changes`);
+      await t.c.db.query(`DROP FUNCTION platform.test_fail_audit()`);
+    }
+  });
 });

@@ -791,31 +791,33 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
     const { userId } = await requireAdmin(req);
     const { handle } = parse(HandleParam, req.params);
     const reason = adminReason(req.body);
-    const before = await c.business.officialInfo(c.db, handle);
-    const view = await c.business.setVerification(handle, req.body);
-    await recordConfigChange(c.db, {
-      actorUserId: userId, kind: "BUSINESS_VERIFICATION", target: handle, reason,
-      previous: before ? { verification: before.verification } : null, next: { verification: view.verification },
+    // Cambio, retiro de la fuente oficial y registro en una sola transacción (ADR 0238).
+    return withTransaction(c.db, async (tx) => {
+      const before = await c.business.officialInfo(tx, handle);
+      const view = await c.business.setVerification(handle, req.body, tx);
+      await recordConfigChange(tx, {
+        actorUserId: userId, kind: "BUSINESS_VERIFICATION", target: handle, reason,
+        previous: before ? { verification: before.verification } : null, next: { verification: view.verification },
+      });
+      // Sin el sello institucional, sus declaraciones dejan de contar como oficiales (ADR 0095).
+      if (view.verification !== "INSTITUTIONAL_OFFICIAL" && before) await c.institutions.retire(tx, [before.id]);
+      return view;
     });
-    // Sin el sello institucional, sus declaraciones dejan de contar como oficiales (ADR 0095).
-    if (view.verification !== "INSTITUTIONAL_OFFICIAL") {
-      const info = await c.business.officialInfo(c.db, handle);
-      if (info) await c.institutions.retire(c.db, [info.id]);
-    }
-    return view;
   });
   app.put("/v1/admin/businesses/:handle/official-scope", async (req) => {
     const { userId } = await requireAdmin(req);
     const { handle } = parse(HandleParam, req.params);
     const reason = adminReason(req.body);
-    const info = await c.business.officialInfo(c.db, handle);
-    const before = info ? await c.institutions.scope(c.db, info.id) : null;
-    const view = await c.institutions.setScope(handle, req.body);
-    await recordConfigChange(c.db, {
-      actorUserId: userId, kind: "OFFICIAL_SCOPE", target: handle, reason,
-      previous: before ? { categories: before.categories, countries: before.countries } : null, next: { categories: view.categories, countries: view.countries },
+    return withTransaction(c.db, async (tx) => {
+      const info = await c.business.officialInfo(tx, handle);
+      const before = info ? await c.institutions.scope(tx, info.id) : null;
+      const view = await c.institutions.setScope(handle, req.body, tx);
+      await recordConfigChange(tx, {
+        actorUserId: userId, kind: "OFFICIAL_SCOPE", target: handle, reason,
+        previous: before ? { categories: before.categories, countries: before.countries } : null, next: { categories: view.categories, countries: view.countries },
+      });
+      return view;
     });
-    return view;
   });
   app.get("/v1/businesses/:handle/official-scope", async (req, reply) => {
     reply.header("cache-control", "no-store");
@@ -1130,13 +1132,15 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
     const session = await requireAdmin(req);
     const key = (req.params as { key: string }).key;
     const reason = adminReason(req.body);
-    const before = (await c.cost.budgets(c.db)).find((b) => b.key === key);
-    const view = await c.cost.setBudget(key, req.body, session.userId);
-    await recordConfigChange(c.db, {
-      actorUserId: session.userId, kind: "BUDGET", target: view.key, reason,
-      previous: before ? { period: before.period, limitUsd: before.limitUsd } : null, next: { period: view.period, limitUsd: view.limitUsd },
+    return withTransaction(c.db, async (tx) => {
+      const before = (await c.cost.budgets(tx)).find((b) => b.key === key);
+      const view = await c.cost.setBudget(key, req.body, session.userId, tx);
+      await recordConfigChange(tx, {
+        actorUserId: session.userId, kind: "BUDGET", target: view.key, reason,
+        previous: before ? { period: before.period, limitUsd: before.limitUsd } : null, next: { period: view.period, limitUsd: view.limitUsd },
+      });
+      return view;
     });
-    return view;
   });
   // Historial de cambios de configuración (ADR 0219): solo lectura, solo administración.
   app.get("/v1/admin/config-changes", async (req, reply): Promise<ConfigChangesResponse> => {
@@ -1182,13 +1186,15 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
     const session = await requirePermission(req, "ops.control");
     const feature = (req.params as { feature: string }).feature;
     const reason = adminReason(req.body);
-    const before = (await c.cost.killSwitches()).find((k) => k.feature === feature);
-    const view = await c.cost.setKillSwitch(feature, req.body, session.userId);
-    await recordConfigChange(c.db, {
-      actorUserId: session.userId, kind: "KILL_SWITCH", target: view.feature, reason,
-      previous: before ? { killed: before.killed } : null, next: { killed: view.killed },
+    return withTransaction(c.db, async (tx) => {
+      const before = (await c.cost.killSwitches(tx)).find((k) => k.feature === feature);
+      const view = await c.cost.setKillSwitch(feature, req.body, session.userId, tx);
+      await recordConfigChange(tx, {
+        actorUserId: session.userId, kind: "KILL_SWITCH", target: view.feature, reason,
+        previous: before ? { killed: before.killed } : null, next: { killed: view.killed },
+      });
+      return view;
     });
-    return view;
   });
 
   // ───────────── Denuncias y bloqueos (cualquier persona) ─────────────
