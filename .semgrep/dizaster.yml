@@ -1,0 +1,72 @@
+# Reglas propias de Dizaster para Semgrep (ADR 0266). Deterministas, sin registro remoto: codifican invariantes del
+# Blueprint que un linter genérico no conoce. Bloquean el CI.
+rules:
+  - id: no-dynamic-code
+    languages: [typescript]
+    severity: ERROR
+    message: Código dinámico (eval / new Function) prohibido.
+    pattern-either:
+      - pattern: eval(...)
+      - pattern: new Function(...)
+
+  - id: no-tls-bypass
+    languages: [typescript]
+    severity: ERROR
+    message: No se desactiva la verificación TLS.
+    pattern-either:
+      - pattern: "{..., rejectUnauthorized: false, ...}"
+      - pattern: process.env.NODE_TLS_REJECT_UNAUTHORIZED = $X
+
+  - id: no-shell-exec
+    languages: [typescript]
+    severity: ERROR
+    message: Nada de shell con cadenas; usar execFile/spawn con argumentos separados.
+    pattern-either:
+      - patterns:
+          - pattern-either:
+              - pattern-inside: |
+                  import { ..., exec, ... } from "node:child_process";
+                  ...
+              - pattern-inside: |
+                  import { ..., execSync, ... } from "node:child_process";
+                  ...
+          - pattern-either:
+              - pattern: exec(...)
+              - pattern: execSync(...)
+      - patterns:
+          - pattern-inside: |
+              import * as $CP from "node:child_process";
+              ...
+          - pattern-either:
+              - pattern: $CP.exec(...)
+              - pattern: $CP.execSync(...)
+      - pattern: |
+          $F(..., {..., shell: true, ...})
+    paths:
+      include: [services/, packages/, tools/, apps/mobile/src/]
+
+  - id: no-insecure-random-backend
+    languages: [typescript]
+    severity: ERROR
+    message: En el backend el azar sale de node:crypto (tokens, códigos, ids), nunca de Math.random.
+    pattern: Math.random()
+    paths:
+      include: [services/core/src/]
+
+  - id: ai-never-decides-verification
+    languages: [typescript]
+    severity: ERROR
+    message: La IA nunca produce OFFICIALLY_CONFIRMED ni FALSE (Blueprint, ADR 0110); solo sugiere.
+    pattern-either:
+      - pattern: '"OFFICIALLY_CONFIRMED"'
+      - pattern: '"FALSE"'
+    paths:
+      include: [services/core/src/platform/connectors/ai-*.ts, services/core/src/platform/connectors/capabilities.ts]
+
+  - id: no-sql-concatenation
+    languages: [typescript]
+    severity: ERROR
+    message: SQL por concatenación; usar parámetros ($1…) o fragmentos constantes.
+    pattern-either:
+      - pattern: $Q.query($A + $B, ...)
+      - pattern: $Q.query($A.concat(...), ...)

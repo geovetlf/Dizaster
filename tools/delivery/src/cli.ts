@@ -87,6 +87,8 @@ switch (cmd) {
     for (const s of byStage) {
       for (const g of gates.filter((x) => x.stage === s)) {
         console.log(`▶ ${g.command}`);
+        // Los comandos salen de planGates (código versionado), nunca de entrada externa.
+        // nosemgrep: no-shell-exec
         const r = spawnSync(g.command, { shell: true, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
         process.stdout.write(r.stdout ?? "");
         process.stderr.write(r.stderr ?? "");

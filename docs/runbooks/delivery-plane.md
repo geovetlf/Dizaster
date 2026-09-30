@@ -19,6 +19,16 @@ pnpm dzd autonomy --action merge --outcome auto
 2. `infra-runner` (red, disco, runner): un solo reintento. Si repite, es un fallo real.
 3. Cualquier otro: se corrige el código. Nunca se desactiva una prueba ni un gate (prohibido en todo nivel, ADR 0262).
 
+## Un escáner de seguridad falló (job `security`, ADR 0266)
+
+- Gitleaks: si es un secreto real, rotarlo primero (lo hace el dueño de la credencial) y luego limpiar; un falso
+  positivo se añade a `.gitleaks.toml` con su motivo, nunca desactivando la regla entera.
+- Trivy / OSV-Scanner: actualizar la dependencia o la imagen base; si no hay versión corregida, documentar el riesgo
+  en un ADR antes de ignorarlo.
+- Semgrep (reglas propias): corregir el código. Una excepción lleva `// nosemgrep: <regla>` con el motivo en la línea
+  anterior y pasa por revisión.
+- Reproducir en local con Docker: las mismas imágenes y digests que `ci.yml`.
+
 ## La política bloquea
 
 `block` significa: migración destructiva o editada, destroy o reemplazo de un recurso con datos, rol IAM amplio, o una
