@@ -437,7 +437,8 @@ Revisión del Blueprint del 2026-09-30 (tras ADR 0176): completada con ADR 0177�
 Revisión del Blueprint del 2026-09-30 (tras ADR 0182): completada con ADR 0183–0189 (0184 aplica las decisiones del
 propietario del 2026-09-30: sin señal de red, aceptaciones mínimas tras borrar la cuenta, todo público en V1).
 
-Revisión del Blueprint del 2026-09-30 (tras ADR 0189), verificada contra el código, sin bloqueos:
+Revisión del Blueprint del 2026-09-30 (tras ADR 0189): completada con ADR 0190–0196 (video 720p en Android queda
+BLOQUEADO hasta el primer build de desarrollo).
 
 Bloqueadas o en espera:
 
