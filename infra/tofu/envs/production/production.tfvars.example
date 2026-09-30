@@ -1,0 +1,14 @@
+# Copiar a production.tfvars (ignorado por git) y completar. Todos los valores son decisiones del propietario.
+project_id        = "<id del proyecto production>"
+region            = "<región>"
+github_repository = "<owner>/<repo>"
+image             = "<región>-docker.pkg.dev/<proyecto>/dizaster/core@sha256:<digest>"
+api_min_instances = <número: decisión de costo>
+api_max_instances = <número: decisión de costo>
+worker_instances  = <número: decisión de costo>
+public_api_url    = "https://<dominio de la API>"
+storage = {
+  endpoint        = "<endpoint S3-compatible>"
+  bucket          = "<bucket de media>"
+  public_base_url = "<URL pública de media>"
+}

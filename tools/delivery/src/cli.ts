@@ -140,7 +140,7 @@ switch (cmd) {
     } else {
       const m: ArtifactManifest = {
         name: flag("name", "artifact")!, version: flag("version", "0.0.0")!, commit: flag("commit", process.env["GITHUB_SHA"] ?? "")!,
-        builtAt: new Date().toISOString(), digest: sha256File(file), sbomDigest: flag("sbom") ? sha256File(flag("sbom")!) : undefined,
+        builtAt: new Date().toISOString(), digest: sha256File(file), imageDigest: flag("image-digest"), sbomDigest: flag("sbom") ? sha256File(flag("sbom")!) : undefined,
         buildEnv: { node: process.version, runner: process.env["RUNNER_OS"] }, tests: flag("tests", "skipped") as "passed", security: flag("security", "skipped") as "passed",
       };
       writeFileSync(flag("out", `${file}.manifest.json`)!, `${JSON.stringify(m, null, 2)}\n`);

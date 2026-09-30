@@ -12,6 +12,9 @@ RUN pnpm install --frozen-lockfile --filter @dizaster/core... \
 
 FROM node:22-bookworm-slim
 ENV NODE_ENV=production DATA_DIR=/data
+# La imagen solo ejecuta node: sin npm, npx, corepack ni yarn (npm trae dependencias con avisos HIGH, ADR 0267).
+RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack /opt/yarn-* \
+    /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack /usr/local/bin/yarn /usr/local/bin/yarnpkg
 WORKDIR /app
 COPY --from=build /out /app
 COPY --from=build /data /data

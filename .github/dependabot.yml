@@ -21,3 +21,10 @@ updates:
   - package-ecosystem: github-actions
     directory: /
     schedule: { interval: monthly }
+  # IaC e imágenes base (ADR 0267).
+  - package-ecosystem: terraform
+    directories: [/infra/tofu/envs/staging, /infra/tofu/envs/production]
+    schedule: { interval: monthly }
+  - package-ecosystem: docker
+    directory: /infra/docker
+    schedule: { interval: monthly }

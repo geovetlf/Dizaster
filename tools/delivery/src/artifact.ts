@@ -8,6 +8,8 @@ export interface ArtifactManifest {
   commit: string;
   builtAt: string;
   digest: string;
+  /** Digest del manifiesto OCI de la imagen: el mismo que tendrá en el registro y el único que se despliega. */
+  imageDigest?: string | undefined;
   sbomDigest?: string | undefined;
   buildEnv: { node: string; pnpm?: string | undefined; runner?: string | undefined };
   tests: "passed" | "failed" | "skipped";
@@ -26,6 +28,7 @@ export function verifyManifest(m: ArtifactManifest, actualDigest: string): strin
   const problems: string[] = [];
   if (!/^[0-9a-f]{40}$/.test(m.commit)) problems.push("commit no es un SHA completo");
   if (!/^sha256:[0-9a-f]{64}$/.test(m.digest)) problems.push("digest con formato inválido");
+  if (m.imageDigest !== undefined && !/^sha256:[0-9a-f]{64}$/.test(m.imageDigest)) problems.push("digest de imagen con formato inválido");
   if (m.digest !== actualDigest) problems.push(`el digest no coincide (manifiesto ${m.digest}, real ${actualDigest})`);
   if (m.tests !== "passed") problems.push(`pruebas: ${m.tests}`);
   if (m.security !== "passed") problems.push(`seguridad: ${m.security}`);

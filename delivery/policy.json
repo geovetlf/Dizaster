@@ -30,7 +30,7 @@
   "migrations": { "dir": "services/core/migrations", "derivedTables": ["geo.context_cache"] },
   "cost": {
     "monthly": { "cloud-usd": 0, "ai-usd": 0, "eas-builds": 0 },
-    "allowedResourceTypes": ["google_service_account", "google_project_iam_member", "google_service_account_iam_member", "google_iam_workload_identity_pool", "google_iam_workload_identity_pool_provider", "google_project_service"],
+    "allowedResourceTypes": ["google_service_account", "google_project_iam_member", "google_service_account_iam_member", "google_iam_workload_identity_pool", "google_iam_workload_identity_pool_provider", "google_project_service", "google_artifact_registry_repository_iam_member", "google_secret_manager_secret_iam_member", "google_cloud_run_v2_service_iam_member"],
     "statefulResourceTypes": ["google_sql_database_instance", "google_sql_database", "google_storage_bucket", "google_secret_manager_secret", "google_kms_crypto_key", "google_artifact_registry_repository", "google_compute_disk"]
   }
 }

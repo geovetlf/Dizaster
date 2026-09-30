@@ -455,6 +455,7 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | CI endurecido (ADR 0264) | ✅ | permisos, SHA, `check:workflows` |
 | Delivery Control Plane `dzd` (ADR 0265) | ✅ | `tools/delivery`, `delivery/policy.json`, job `delivery` |
 | Escáneres de seguridad (ADR 0266) | ✅ | job `security`: Gitleaks, Trivy, OSV-Scanner, Semgrep |
+| IaC OpenTofu e imagen verificable (ADR 0267) | ✅ | jobs `iac` e `image`; aplicar: BLOCKED_BY_OWNER (D-18, D-23) |
 | Licencias, auditoría, SBOM, Dependabot; respaldo con prueba de restauración en CI | ✅ | ADR 0070, `scripts/supply-chain.mjs`, `scripts/db-restore-check.mjs` |
 | Idioma de la app elegible en el perfil (es/en/pt/fr o del teléfono) | ✅ | ADR 0069, `app/language.tsx` |
 | Varias cuentas en un teléfono corroboran como una (clave seudónima del teléfono) | ✅ | ADR 0068, migración 0036 |
@@ -536,8 +537,8 @@ Plano de entrega (Blueprint §20, ADR 0260–0265). Nivel de autonomía actual: 
 - Fase D0 — sin credenciales:
   - ✅ CI endurecido (ADR 0264) y CLI `dzd` con políticas, impacto, plan de gates, autonomía, auditoría encadenada, manifiesto de artefactos, verificación, rollback gradual, revisión de IaC, diagnóstico y documentación (ADR 0265).
   - ✅ Escáneres open source en CI: Gitleaks, Trivy, OSV-Scanner y Semgrep con reglas propias (ADR 0266).
-  1. `infra/tofu/` con módulos de staging y producción validados con `tofu validate` y escaneo, sin `apply`.
-  2. Build de la imagen en CI con manifiesto, SBOM adjunto y verificación del artefacto.
+  - ✅ `infra/tofu/` validado con `tofu validate` y escaneo, sin `apply`; imagen del backend con SBOM, manifiesto y verificación en CI (ADR 0267).
+
 - Fase D1 — BLOCKED_BY_OWNER: necesita el repositorio de GitHub de Dizaster (D-20): protección de `main`, entornos, auto-merge de PRs `auto`, informes en PR.
 - Fase D2 — BLOCKED_BY_OWNER / BLOCKED_BY_BILLING: necesita proyectos de Google Cloud con facturación y presupuesto autorizados (D-18 actualizada), base de staging (D-23) y plan de GitHub (D-24): Workload Identity Federation, Artifact Registry, firma cosign, despliegue a staging, verificación y rollback.
 - Fase D3 — BLOCKED_BY_OWNER: además de D2, visto bueno del propietario para el nivel 5: promoción a producción por etiqueta, despliegue gradual, respaldo previo a migraciones.

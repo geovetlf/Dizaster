@@ -67,6 +67,8 @@ describe("artefactos", () => {
     writeFileSync(f, "otro contenido");
     expect(verifyManifest(m, sha256File(f))[0]).toMatch(/no coincide/);
     expect(verifyManifest({ ...m, commit: "abc", tests: "failed" }, m.digest)).toHaveLength(2);
+    expect(verifyManifest({ ...m, imageDigest: "latest" }, m.digest)).toEqual(["digest de imagen con formato inválido"]);
+    expect(verifyManifest({ ...m, imageDigest: `sha256:${"b".repeat(64)}` }, m.digest)).toEqual([]);
   });
 });
 

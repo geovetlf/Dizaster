@@ -30,3 +30,13 @@ GoogleService-Info.plist
 credentials.json
 *service-account*.json
 delivery-audit.jsonl
+# OpenTofu (ADR 0267): estado, planes y valores reales nunca en git.
+.terraform/
+*.tfstate*
+*.tfvars
+!*.tfvars.example
+plan.json
+*.oci.tar
+*.manifest.json
+image-digest.txt
+core.sbom.cdx.json

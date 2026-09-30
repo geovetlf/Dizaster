@@ -1,0 +1,18 @@
+# Contexto de build de infra/docker/*.Dockerfile (ADR 0267): solo el código. Nada de dependencias locales, historial,
+# estado de OpenTofu, variables de entorno ni artefactos de CI dentro de la imagen.
+**/node_modules
+**/dist
+**/dist-check
+.git
+.github
+**/.env
+**/.env.*
+!**/.env.example
+**/.terraform
+**/*.tfstate*
+**/*.tfvars
+delivery-audit.jsonl
+sbom.cdx.json
+*.oci.tar
+*.manifest.json
+docs
