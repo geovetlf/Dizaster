@@ -64,6 +64,7 @@ export class FeedService {
       if (!s) return;
       await this.social.upsertEventSignal(tx, {
         eventId, severity: s.severity, publicState: s.publicVerificationState, regionId: s.regionId, districtId: s.districtId, cityId: s.cityId,
+        publicPoint: s.publicPoint,
       });
     };
     dispatcher.on("EventCreated", "feed.event-signals.created", (e, tx) => refresh(e.payload.eventId, tx));
@@ -71,6 +72,7 @@ export class FeedService {
     // Sensibilidad subida por moderación (ADR 0179): los posts de sus reportes pierden detalle igual que el evento.
     dispatcher.on("EventSensitivityRaised", "feed.regeneralize-report-posts", async (e, tx) => {
       await this.social.regeneralizeReportPosts(tx, e.payload.eventId, (p) => this.geo.generalize(p, e.payload.to).point);
+      await refresh(e.payload.eventId, tx);
     });
     dispatcher.on("EventSeverityChanged", "feed.event-signals.severity", async (e, tx) => {
       await this.social.upsertEventSignal(tx, { eventId: e.payload.eventId, severity: e.payload.to });

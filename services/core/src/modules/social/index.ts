@@ -120,12 +120,15 @@ export const NEW_ACCOUNT_HOURS = 24;
 /** Mismo texto de al menos tantas cuentas distintas dentro de la ventana → a revisión humana como posible spam. */
 export const DUPLICATE_TEXT = { minAuthors: 3, windowHours: 24, maxPosts: 50 } as const;
 
+/** Dónde está un post para "Cerca" (ADR 0255): su punto público o, si no tiene, el punto público de su evento. */
+const POINT = "coalesce(p.public_point, s.public_point)";
+
 function rankSql(nearSql: string | null): string {
   const B = RANK_BOOST_HOURS;
   const state = Object.entries(B.state).map(([k, v]) => `WHEN '${k}' THEN ${v}`).join(" ");
   const lifecycle = Object.entries(B.lifecycle).map(([k, v]) => `WHEN '${k}' THEN ${v}`).join(" ");
   const distance = nearSql
-    ? `CASE WHEN p.public_point IS NULL THEN 0 ${B.distance.map(([m, h]) => `WHEN ST_DWithin(p.public_point, ${nearSql}, ${m}) THEN ${h}`).join(" ")} ELSE 0 END`
+    ? `CASE WHEN ${POINT} IS NULL THEN 0 ${B.distance.map(([m, h]) => `WHEN ST_DWithin(${POINT}, ${nearSql}, ${m}) THEN ${h}`).join(" ")} ELSE 0 END`
     : "0";
   return `extract(epoch FROM p.created_at) / 3600.0
     + CASE coalesce(s.public_state, 'UNVERIFIED') ${state} ELSE 0 END
@@ -470,7 +473,7 @@ export class SocialService {
     if (f.tag) {
       where.push(`EXISTS (SELECT 1 FROM social.post_tags pt JOIN social.tags tg ON tg.id = pt.tag_id WHERE pt.post_id = p.id AND tg.normalized = $${params.push(f.tag)})`);
     }
-    if (f.tab === "nearby" && nearSql) where.push(`ST_DWithin(p.public_point, ${nearSql}, $${params.push(f.nearRadiusM ?? 25_000)})`);
+    if (f.tab === "nearby" && nearSql) where.push(`ST_DWithin(${POINT}, ${nearSql}, $${params.push(f.nearRadiusM ?? 25_000)})`);
     if (f.tab === "videos") where.push(`EXISTS (SELECT 1 FROM social.post_media v WHERE v.post_id = p.id AND v.kind = 'VIDEO_RECORDED')`);
     if (f.tab === "following") {
       // Ids como uuid (no `author_id::text`): así el planificador usa los índices por autor y por evento (ADR 0226).
@@ -503,7 +506,7 @@ export class SocialService {
                 coalesce(pr.display_name, bp.name) AS display_name, bp.verification_status AS business_verification,
                 coalesce(pr.avatar_url, bp.logo_url) AS avatar_url, p.text, p.lang, p.created_at, p.edited_at, p.category_code, le.event_id,
                 p.shared_post_id, p.comment_count, p.share_count, p.external_share_count, p.reaction_counts,
-                ${nearSql ? `ST_Distance(p.public_point, ${nearSql})` : "NULL"}::float8 AS distance_m,
+                ${nearSql ? `ST_Distance(${POINT}, ${nearSql})` : "NULL"}::float8 AS distance_m,
                 (${score})::float8 AS score
            FROM social.posts p
            LEFT JOIN social.profiles pr ON p.author_type = 'PROFILE' AND pr.id = p.author_id
@@ -916,12 +919,14 @@ export class SocialService {
     q: Queryable,
     e: {
       eventId: string; severity?: number; publicState?: string; regionId?: string | null; districtId?: string | null; cityId?: string | null;
-      lifecycle?: string;
+      lifecycle?: string; publicPoint?: GeoPoint | null;
     },
   ): Promise<void> {
+    const point = e.publicPoint ?? null;
     await q.query(
-      `INSERT INTO social.event_signals (event_id, severity, public_state, region_id, district_id, lifecycle, city_id)
-       VALUES ($1, coalesce($2, 1), coalesce($3, 'UNVERIFIED'), $4, $5, coalesce($7, 'ACTIVE'), $8)
+      `INSERT INTO social.event_signals (event_id, severity, public_state, region_id, district_id, lifecycle, city_id, public_point)
+       VALUES ($1, coalesce($2, 1), coalesce($3, 'UNVERIFIED'), $4, $5, coalesce($7, 'ACTIVE'), $8,
+               CASE WHEN $9::float8 IS NULL THEN NULL ELSE ST_SetSRID(ST_MakePoint($10, $9), 4326)::geography END)
        ON CONFLICT (event_id) DO UPDATE SET
          severity = coalesce($2, social.event_signals.severity),
          public_state = coalesce($3, social.event_signals.public_state),
@@ -929,9 +934,10 @@ export class SocialService {
          region_id = CASE WHEN $6 THEN $4 ELSE social.event_signals.region_id END,
          district_id = CASE WHEN $6 THEN $5 ELSE social.event_signals.district_id END,
          city_id = CASE WHEN $6 THEN $8 ELSE social.event_signals.city_id END,
+         public_point = CASE WHEN $11 THEN EXCLUDED.public_point ELSE social.event_signals.public_point END,
          updated_at = now()`,
       [e.eventId, e.severity ?? null, e.publicState ?? null, e.regionId ?? null, e.districtId ?? null, e.regionId !== undefined, e.lifecycle ?? null,
-        e.cityId ?? null],
+        e.cityId ?? null, point?.lat ?? null, point?.lng ?? null, e.publicPoint !== undefined],
     );
   }
 

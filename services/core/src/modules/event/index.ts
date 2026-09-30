@@ -1013,14 +1013,15 @@ export class EventService {
     ids: string[],
   ): Promise<Map<string, {
     publicVerificationState: PublicVerificationState; sensitivity: Sensitivity; place: ContextualLocation | null;
-    severity: number; regionId: string | null; districtId: string | null; cityId: string | null;
+    severity: number; regionId: string | null; districtId: string | null; cityId: string | null; publicPoint: GeoPoint | null;
   }>> {
     if (ids.length === 0) return new Map();
     const { rows } = await q.query<{
       id: string; verification_level: VerificationLevel; negative_state: NegativeState; sensitivity: Sensitivity; place: ContextualLocation | null;
-      severity: number; region_id: string | null; district_id: string | null; city_id: string | null;
+      severity: number; region_id: string | null; district_id: string | null; city_id: string | null; lat: number | null; lng: number | null;
     }>(
-      `SELECT id, verification_level, negative_state, sensitivity, place, severity, region_id, district_id, city_id
+      `SELECT id, verification_level, negative_state, sensitivity, place, severity, region_id, district_id, city_id,
+              ST_Y(public_geom::geometry) AS lat, ST_X(public_geom::geometry) AS lng
          FROM event.events WHERE id = ANY($1) AND publication_state NOT IN ('HIDDEN','DELAYED')`,
       [ids],
     );
@@ -1028,6 +1029,7 @@ export class EventService {
       rows.map((r) => [r.id, {
         publicVerificationState: publicVerificationState(r.verification_level, r.negative_state), sensitivity: r.sensitivity, place: r.place,
         severity: r.severity, regionId: r.region_id, districtId: r.district_id, cityId: r.city_id,
+        publicPoint: r.lat !== null && r.lng !== null ? { lat: r.lat, lng: r.lng } : null,
       }]),
     );
   }
