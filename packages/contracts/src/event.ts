@@ -166,7 +166,8 @@ export const EventMapResponse = z.object({
 export type EventMapResponse = z.infer<typeof EventMapResponse>;
 
 /** "¿Es este el mismo evento?": candidatos cercanos que el reportero puede elegir antes de enviar. */
-export const NearbyEvent = EventSummary.extend({ matchScore: z.number(), distanceBucket: z.enum(["<100m", "<500m", "<2km", ">2km"]) });
+/** Distancia por tramos y medida desde la ubicación pública, nunca la interna (ADR 0012, ADR 0230). */
+export const NearbyEvent = EventSummary.extend({ distanceBucket: z.enum(["<100m", "<500m", "<2km", ">2km"]) });
 export type NearbyEvent = z.infer<typeof NearbyEvent>;
 export const NearbyEventsResponse = z.object({ events: z.array(NearbyEvent) });
 export type NearbyEventsResponse = z.infer<typeof NearbyEventsResponse>;

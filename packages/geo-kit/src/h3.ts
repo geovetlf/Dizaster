@@ -45,6 +45,14 @@ export function generalize(point: GeoPoint, sensitivity: Sensitivity): { point: 
   return { point: h3Center(cell), cell, res };
 }
 
+/**
+ * Distancia máxima entre un punto y su ubicación pública (ADR 0230): el radio de la celda H3 de su sensibilidad
+ * (en un hexágono, centro→vértice = arista). Sirve para buscar sobre la ubicación pública sin perder candidatos.
+ */
+export function generalizationMarginM(sensitivity: Sensitivity): number {
+  return Math.ceil(getHexagonEdgeLengthAvg(SENSITIVITY_RES[sensitivity], UNITS.m) * 1.2);
+}
+
 /** Resolución de agregación para el mapa según el zoom (clusters en zoom bajo, puntos en zoom alto). */
 export function clusterResolutionForZoom(zoom: number): number | null {
   if (zoom >= 13) return null; // puntos individuales

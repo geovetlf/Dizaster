@@ -28,6 +28,7 @@ import {
   decideDedup,
   categoryCompatibility,
   distanceMeters,
+  generalizationMarginM,
   matchScore,
   weightedMedianPoint,
   type DedupCandidateEvent,
@@ -1223,40 +1224,44 @@ export class EventService {
   }
 
   /**
-   * Eventos cercanos para la pregunta "¿es este?" antes de reportar. La distancia se devuelve por tramos
-   * (no exacta) para no permitir triangular la ubicación interna del evento.
+   * Eventos cercanos para la pregunta "¿es este?" antes de reportar (ADR 0230). Todo se calcula sobre la ubicación
+   * pública (la misma que ya muestra el mapa): filtro, distancia por tramos y orden. Así ni la respuesta ni el hecho
+   * de que un evento aparezca permiten triangular la ubicación interna.
    */
   async nearby(q: Queryable, input: { point: GeoPoint; categoryCode: string }): Promise<NearbyEvent[]> {
     const country = this.geo.countryOf(input.point);
     const category = this.ref.category(input.categoryCode, country);
     if (!category) return [];
     const root = input.categoryCode.split(".")[0]!;
-    const { rows } = await q.query<EventRow & { ilat: number; ilng: number }>(
-      `SELECT ${PUBLIC_EVENT_COLUMNS}, ST_Y(e.geom::geometry) AS ilat, ST_X(e.geom::geometry) AS ilng
+    const radius = category.dedupRadiusM * 1.5;
+    const { rows } = await q.query<EventRow>(
+      `SELECT ${PUBLIC_EVENT_COLUMNS}
          FROM event.events e
         WHERE e.status IN ('ACTIVE','MONITORING') AND e.merged_into_id IS NULL AND e.negative_state <> 'FALSE'
           AND e.publication_state NOT IN ('HIDDEN','DELAYED')
           AND (e.category_code = ANY($1) OR e.category_code LIKE $2)
-          AND ST_DWithin(e.geom, ST_SetSRID(ST_MakePoint($3, $4), 4326)::geography, $5)
+          AND ST_DWithin(e.public_geom, ST_SetSRID(ST_MakePoint($3, $4), 4326)::geography, $5)
           AND e.last_activity_at >= now() - make_interval(mins => $6)
-        LIMIT 20`,
-      [[input.categoryCode, ...category.compatibleWith], `${root}.%`, input.point.lng, input.point.lat, category.dedupRadiusM * 1.5, category.dedupWindowMinutes],
+        LIMIT 40`,
+      [[input.categoryCode, ...category.compatibleWith], `${root}.%`, input.point.lng, input.point.lat, radius + generalizationMarginM("HIGHLY_SENSITIVE"), category.dedupWindowMinutes],
     );
     const now = new Date();
     return rows
       .map((r) => {
-        const internal = { lat: r.ilat, lng: r.ilng };
+        const pub = { lat: r.lat, lng: r.lng };
+        const reach = radius + generalizationMarginM(r.sensitivity);
         const score = matchScore(
-          { categoryCode: input.categoryCode, point: input.point, observedAt: now, dedupRadiusM: category.dedupRadiusM * 1.5, dedupWindowMinutes: category.dedupWindowMinutes, compatibleWith: category.compatibleWith },
-          { id: r.id, categoryCode: r.category_code, point: internal, lastActivityAt: r.last_activity_at },
+          { categoryCode: input.categoryCode, point: input.point, observedAt: now, dedupRadiusM: reach, dedupWindowMinutes: category.dedupWindowMinutes, compatibleWith: category.compatibleWith },
+          { id: r.id, categoryCode: r.category_code, point: pub, lastActivityAt: r.last_activity_at },
         );
-        const d = distanceMeters(input.point, internal);
+        const d = distanceMeters(input.point, pub);
         const distanceBucket = d < 100 ? "<100m" : d < 500 ? "<500m" : d < 2000 ? "<2km" : ">2km";
-        return { ...toSummary(r), matchScore: score, distanceBucket } as NearbyEvent;
+        return { event: { ...toSummary(r), distanceBucket } as NearbyEvent, score };
       })
-      .filter((e) => e.matchScore > 0)
-      .sort((a, b) => b.matchScore - a.matchScore)
-      .slice(0, 5);
+      .filter((e) => e.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 5)
+      .map((e) => e.event);
   }
 
   /**
