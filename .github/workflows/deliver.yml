@@ -1,0 +1,163 @@
+# Entrega de una imagen que CI ya construyó, escaneó, firmó y atestó en main (ADR 0277, Blueprint §20.13).
+# CÓDIGO → CI → PRUEBAS → SEGURIDAD → BUILD → SBOM → FIRMA → REGISTRO → STAGING → VERIFICACIÓN → PROMOCIÓN →
+# PRODUCCIÓN → MONITOREO → ROLLBACK. Nunca se reconstruye: producción recibe el mismo digest que pasó staging.
+#
+# Inactivo hasta que existan los proyectos de Google Cloud (D-18), el repositorio (D-24) y los entornos de GitHub
+# `staging` y `production` (este último con el propietario como revisor obligatorio). Ver
+# docs/runbooks/activacion-bloqueos.md. Claude nunca puede aprobar el entorno production.
+name: deliver
+
+on:
+  workflow_dispatch:
+    inputs:
+      digest:
+        description: "Digest sha256 de la imagen firmada por CI en main"
+        required: true
+        type: string
+      promote:
+        description: "Promover a producción después de staging (pide aprobación del propietario)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+# Una entrega a la vez; nunca se cancela una a medias (dejaría tráfico partido).
+concurrency:
+  group: deliver
+  cancel-in-progress: false
+
+jobs:
+  staging:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    environment: staging
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      DIGEST: ${{ inputs.digest }}
+      REGISTRY: ${{ vars.GCP_STAGING_REGISTRY }}
+      PROJECT: ${{ vars.GCP_PROJECT }}
+      REGION: ${{ vars.GCP_REGION }}
+      API_URL: ${{ vars.API_URL }}
+      STATE: ${{ vars.DELIVERY_STATE_BUCKET }}
+      # Solo cuenta como humano si está en owners de delivery/policy.json (ADR 0277).
+      ACTOR: github:${{ github.triggering_actor }}
+    steps:
+      - name: Digest con formato válido
+        run: '[[ "$DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo "::error::digest inválido"; exit 1; }'
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @dizaster/delivery build
+      - uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOY_SERVICE_ACCOUNT }}
+      - uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3.0.1
+      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+        with:
+          cosign-release: v3.1.3
+      - name: Historial de versiones y auditoría
+        run: |
+          gcloud storage cp "gs://$STATE/delivery/delivery-releases.jsonl" . 2>/dev/null || touch delivery-releases.jsonl
+          gcloud storage cp "gs://$STATE/delivery/delivery-audit.jsonl" . 2>/dev/null || touch delivery-audit.jsonl
+          pnpm dzd audit verify
+      - name: Firma, procedencia y SBOM (solo imágenes de CI en main)
+        run: |
+          gcloud auth configure-docker "${REGISTRY%%/*}" --quiet
+          pnpm dzd signature verify --image "$REGISTRY/core" --digest "$DIGEST" --attestations --execute
+      - name: Migraciones (compatibles hacia atrás; job de Cloud Run con la misma imagen)
+        run: |
+          gcloud run jobs update migrate --image="$REGISTRY/core@$DIGEST" --project "$PROJECT" --region "$REGION" --quiet
+          gcloud run jobs execute migrate --wait --project "$PROJECT" --region "$REGION" --quiet
+      - name: API — revisión sin tráfico, verificación, 10 %, 100 %, rollback automático
+        run: >-
+          pnpm dzd deploy --env staging --digest "$DIGEST" --image "$REGISTRY/core" --project "$PROJECT" --region "$REGION"
+          --url "$API_URL" --actor "$ACTOR" --execute
+      - name: Worker con la misma imagen
+        # Comando de worker pools a confirmar en la primera activación (Cloud Run worker pools, ADR 0267).
+        run: gcloud beta run worker-pools update worker --image="$REGISTRY/core@$DIGEST" --project "$PROJECT" --region "$REGION" --quiet
+      - name: SLO de la revisión (p95 < 300 ms, sin 5xx)
+        run: pnpm dzd verify --url "$API_URL" --repeat 5 --slo
+      - name: Guardar historial y auditoría
+        if: always()
+        run: |
+          gcloud storage cp delivery-releases.jsonl delivery-audit.jsonl "gs://$STATE/delivery/"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: delivery-staging
+          path: |
+            delivery-releases.jsonl
+            delivery-audit.jsonl
+
+  production:
+    if: inputs.promote
+    needs: staging
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    # Revisor obligatorio: el propietario. Sin su aprobación este job no empieza.
+    environment: production
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      DIGEST: ${{ inputs.digest }}
+      SOURCE: ${{ vars.GCP_STAGING_REGISTRY }}
+      REGISTRY: ${{ vars.GCP_PRODUCTION_REGISTRY }}
+      PROJECT: ${{ vars.GCP_PROJECT }}
+      REGION: ${{ vars.GCP_REGION }}
+      API_URL: ${{ vars.API_URL }}
+      STATE: ${{ vars.DELIVERY_STATE_BUCKET }}
+      # Solo cuenta como humano si está en owners de delivery/policy.json (ADR 0277).
+      ACTOR: github:${{ github.triggering_actor }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @dizaster/delivery build
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: delivery-staging
+      - uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOY_SERVICE_ACCOUNT }}
+      - uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3.0.1
+      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+        with:
+          cosign-release: v3.1.3
+      - name: Historial de producción
+        run: |
+          gcloud storage cp "gs://$STATE/delivery/delivery-releases.jsonl" prod-releases.jsonl 2>/dev/null || touch prod-releases.jsonl
+          # El historial de staging de esta entrega prueba que el digest pasó staging; el de producción da el rollback.
+          cat prod-releases.jsonl delivery-releases.jsonl > merged.jsonl && mv merged.jsonl delivery-releases.jsonl
+      - name: Copiar el mismo digest con sus firmas (sin reconstruir)
+        run: |
+          gcloud auth configure-docker "${SOURCE%%/*},${REGISTRY%%/*}" --quiet
+          cosign copy "$SOURCE/core@$DIGEST" "$REGISTRY/core"
+      - name: Migraciones
+        run: |
+          gcloud run jobs update migrate --image="$REGISTRY/core@$DIGEST" --project "$PROJECT" --region "$REGION" --quiet
+          gcloud run jobs execute migrate --wait --project "$PROJECT" --region "$REGION" --quiet
+      - name: Promoción gradual con verificación y rollback automático
+        run: >-
+          pnpm dzd promote --digest "$DIGEST" --image "$REGISTRY/core" --project "$PROJECT" --region "$REGION"
+          --url "$API_URL" --actor "$ACTOR" --outcome approval --execute
+      - name: Worker con la misma imagen
+        run: gcloud beta run worker-pools update worker --image="$REGISTRY/core@$DIGEST" --project "$PROJECT" --region "$REGION" --quiet
+      - name: SLO de la revisión
+        run: pnpm dzd verify --url "$API_URL" --repeat 5 --slo
+      - name: Guardar historial y auditoría
+        if: always()
+        run: gcloud storage cp delivery-releases.jsonl delivery-audit.jsonl "gs://$STATE/delivery/"

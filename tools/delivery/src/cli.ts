@@ -8,18 +8,22 @@ import { createHash } from "node:crypto";
 import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { sha256File, verifyManifest, type ArtifactManifest } from "./artifact.js";
 import { appendAudit, readLog, verifyLog, type Actor } from "./audit.js";
-import { decide, LEVELS, type Action } from "./autonomy.js";
+import { decide, isHuman, LEVELS, type Action } from "./autonomy.js";
 import { CloudRunTarget, type Runner } from "./cloudrun.js";
 import { costGate } from "./cost.js";
 import { rollbackTo, rollout } from "./deploy.js";
 import { diagnose } from "./diagnose.js";
+import { checkEnvironment } from "./envcheck.js";
 import { checkDocs } from "./docs.js";
 import { checkIamHcl, checkPlan, type TofuPlan } from "./iac.js";
 import { analyze, gitChanges, parseNameStatus, workspacePackages, type Change } from "./inspect.js";
 import { loadPolicy, outcomeFor, type Environment, type Outcome } from "./policy.js";
 import { planGates } from "./plan.js";
+import { buildProvenance, contextFromEnv, verifyProvenance, type BuildContext, type Provenance } from "./provenance.js";
 import { appendRelease, lastServing, promotable, readReleases, rollbackCandidate } from "./releases.js";
 import { markdownReport } from "./report.js";
+import { checkVerifyOutput, cosignVerifyArgs, cosignVerifyAttestationArgs } from "./signing.js";
+import { evaluateSlo, fromK6Summary, fromSamples, type SloResult } from "./slo.js";
 import { deliveryStats } from "./stats.js";
 import { allOk, runChecks } from "./verify.js";
 
@@ -66,8 +70,8 @@ function runner(): Runner {
 
 /** La automatización respeta el nivel de autonomía; una persona que ejecuta el comando decide por sí misma. */
 function guard(action: Action, outcome: Outcome = "auto"): void {
-  const actor = flag("actor", "human");
-  if (actor === "human") return;
+  const actor = flag("actor", "human")!;
+  if (isHuman(actor, loadPolicy(flag("policy")).owners, process.env)) return;
   const d = decide(loadPolicy(flag("policy")).autonomyLevel, action, outcome);
   if (!d.allowed) fail(`${action} no permitido para ${actor}: ${d.reason}`, 3);
 }
@@ -79,6 +83,35 @@ const latestMigration = (): string | undefined => {
 function fail(msg: string, code = 1): never {
   console.error(msg);
   process.exit(code);
+}
+
+const readJson = <T>(path: string): T => JSON.parse(readFileSync(path, "utf8")) as T;
+
+/**
+ * Firma de la imagen (ADR 0277): en seco se imprime el comando; con `--execute` se ejecuta cosign y además se comprueba
+ * que lo firmado sea exactamente este digest. `--key` (clave local) solo vale para el destino local de pruebas.
+ */
+function verifySignature(image: string, digest: string, env: string): void {
+  const policy = loadPolicy(flag("policy"));
+  const key = flag("key");
+  if (key && env !== "local") fail("--key solo se admite con --env local: staging y production exigen firma keyless de CI.");
+  let args: string[];
+  try {
+    args = cosignVerifyArgs(policy.signing, image, digest, key);
+  } catch (e) {
+    if (!flags.has("execute")) { console.log(`[en seco] firma: ${(e as Error).message}`); return; }
+    fail(`Firma no verificable: ${(e as Error).message}`);
+  }
+  if (!flags.has("execute")) { console.log(`[en seco] cosign ${args.join(" ")}`); return; }
+  const r = spawnSync(flag("cosign", "cosign")!, args, { encoding: "utf8" });
+  if (r.status !== 0) fail(`Firma rechazada por cosign: ${(r.stderr ?? "").trim().split("\n").at(-1)}`);
+  const problems = checkVerifyOutput(r.stdout ?? "", digest);
+  if (problems.length) fail(`Firma rechazada: ${problems.join("; ")}`);
+  console.log(`✓ firma verificada para ${digest.slice(0, 19)}…`);
+}
+
+function printSlo(r: SloResult): void {
+  out(r, () => r.findings.map((f) => `${f.ok ? "✓" : f.enforced ? "✗" : "·"} ${f.check}: ${f.detail}`).join("\n"));
 }
 
 switch (cmd) {
@@ -183,9 +216,17 @@ switch (cmd) {
   }
   case "verify": {
     const url = flag("url") ?? fail("--url es obligatorio");
-    const r = await runChecks(url);
+    const rounds = Math.max(1, Number(flag("repeat", "1")));
+    const all = [];
+    for (let i = 0; i < rounds; i++) all.push(...(await runChecks(url)));
+    const r = all.slice(-all.length / rounds);
     out(r, () => r.map((c) => `${c.ok ? "✓" : "✗"} ${c.name} (${c.ms} ms) ${c.ok ? "" : c.detail}`).join("\n"));
-    if (!allOk(r)) process.exit(1);
+    if (!allOk(all)) process.exit(1);
+    if (flags.has("slo")) {
+      const s = evaluateSlo(fromSamples(all.map((c) => ({ ms: c.ms, status: c.status ?? 0 }))), loadPolicy(flag("policy")).slo, { smoke: true });
+      printSlo(s);
+      if (!s.ok) process.exit(1);
+    }
     break;
   }
   case "iac-check": {
@@ -238,6 +279,64 @@ switch (cmd) {
     if (r.status !== 0) fail(`Configuración rechazada: ${(r.stderr ?? "").trim()}`);
     break;
   }
+  case "slo": {
+    const policy = loadPolicy(flag("policy"));
+    const obs = flag("k6") ? fromK6Summary(readJson(flag("k6")!)) : flag("samples") ? fromSamples(readJson(flag("samples")!)) : fail("--k6 o --samples es obligatorio");
+    const r = evaluateSlo(obs, policy.slo, { smoke: flags.has("smoke") });
+    printSlo(r);
+    if (!r.ok) process.exit(1);
+    break;
+  }
+  case "env-check": {
+    const env = flag("env", "staging") as "staging" | "production";
+    const read = (p?: string) => (p ? readFileSync(p, "utf8") : undefined);
+    const envFile = read(flag("env-file"));
+    const findings = checkEnvironment({
+      env, mainTf: readFileSync(`infra/tofu/envs/${env}/main.tf`, "utf8"), tfvars: read(flag("tfvars")), otherTfvars: read(flag("other-tfvars")),
+      runtimeEnv: envFile ? Object.fromEntries(envFile.split("\n").map((l) => l.trim()).filter((l) => l && !l.startsWith("#")).map((l) => [l.slice(0, l.indexOf("=")).trim(), l.slice(l.indexOf("=") + 1).trim()])) : undefined,
+      repository: loadPolicy(flag("policy")).signing.repository,
+    });
+    out(findings, () => findings.map((x) => `${x.severity}: ${x.where} — ${x.message}`).join("\n") || `${env}: entorno completo`);
+    if (findings.some((x) => x.severity === "block")) process.exit(1);
+    break;
+  }
+  case "provenance": {
+    const policy = loadPolicy(flag("policy"));
+    if (rest[0] === "verify") {
+      const p = readJson<Provenance>(flag("file") ?? fail("--file es obligatorio"));
+      const problems = verifyProvenance(p, { digest: flag("digest") ?? fail("--digest es obligatorio"), commit: flag("commit"), repository: policy.signing.repository, workflows: policy.signing.workflows, refs: policy.signing.refs });
+      if (problems.length) fail(`Procedencia rechazada:\n  ${problems.join("\n  ")}`);
+      console.log("procedencia verificada");
+      break;
+    }
+    const m = readJson<ArtifactManifest>(flag("manifest") ?? fail("--manifest es obligatorio"));
+    const ctx: BuildContext | null = flag("repository")
+      ? { repository: flag("repository")!, ref: flag("ref", "refs/heads/main")!, workflowPath: flag("workflow", ".github/workflows/ci.yml")!, runId: flag("run", "0")!, runAttempt: "1" }
+      : contextFromEnv(process.env);
+    if (!ctx) fail("Sin contexto de GitHub Actions: se da --repository (y opcionalmente --ref, --workflow, --run).");
+    const prov = buildProvenance(m, flag("image") ?? fail("--image es obligatorio"), ctx);
+    // cosign attest --type slsaprovenance1 espera solo el predicado.
+    writeFileSync(flag("out", "provenance.json")!, `${JSON.stringify(flags.has("predicate") ? prov.predicate : prov, null, 2)}\n`);
+    out(prov, () => `procedencia de ${m.imageDigest} escrita en ${flag("out", "provenance.json")}`);
+    break;
+  }
+  case "signature": {
+    if (rest[0] !== "verify") fail("uso: dzd signature verify --image REG/core --digest sha256:… [--execute] [--attestations]");
+    const image = flag("image") ?? fail("--image es obligatorio");
+    const digest = flag("digest") ?? fail("--digest es obligatorio");
+    verifySignature(image, digest, flag("env", "staging")!);
+    if (flags.has("attestations")) {
+      const policy = loadPolicy(flag("policy"));
+      for (const type of ["slsaprovenance1", "cyclonedx"] as const) {
+        const args = cosignVerifyAttestationArgs(policy.signing, image, digest, type, flag("key"));
+        if (!flags.has("execute")) { console.log(`[en seco] cosign ${args.join(" ")}`); continue; }
+        const r = spawnSync(flag("cosign", "cosign")!, args, { encoding: "utf8" });
+        if (r.status !== 0) fail(`Atestación ${type} rechazada: ${(r.stderr ?? "").trim().split("\n").at(-1)}`);
+        console.log(`✓ atestación ${type}`);
+      }
+    }
+    break;
+  }
   case "deploy":
   case "promote": {
     const env = (cmd === "promote" ? "production" : flag("env", "staging")) as "staging" | "production";
@@ -247,6 +346,8 @@ switch (cmd) {
     const history = readReleases(releases);
     if (env === "production" && !promotable(history, service, digest)) fail("Solo se promueve a producción un digest ya desplegado y verificado en staging (§20.13).");
     guard(env === "production" ? "promote-production" : "deploy-staging", flag("outcome", "auto") as Outcome);
+    // Solo imágenes firmadas por CI (ADR 0277), en staging y en producción.
+    verifySignature(flag("image") ?? fail("--image es obligatorio (REGIÓN-docker.pkg.dev/PROYECTO/dizaster/core)"), digest, env);
     const target = new CloudRunTarget({
       project: flag("project") ?? fail("--project es obligatorio"), region: flag("region") ?? fail("--region es obligatorio"),
       service, image: flag("image") ?? fail("--image es obligatorio (REGIÓN-docker.pkg.dev/PROYECTO/dizaster/core)"),
@@ -294,6 +395,6 @@ switch (cmd) {
     break;
   }
   default:
-    console.log("uso: dzd <inspect|plan|policy|run-gates|autonomy|audit [verify]|artifact [verify]|verify|iac-check|diagnose|docs|report|cost|config-check|deploy|promote|rollback|audit stats> [--json]");
+    console.log("uso: dzd <inspect|plan|policy|run-gates|autonomy|audit [verify|stats]|artifact [verify]|verify [--repeat N --slo]|slo|env-check|provenance [verify]|signature verify|iac-check|diagnose|docs|report|cost|config-check|deploy|promote|rollback> [--json]");
     if (cmd) process.exit(1);
 }

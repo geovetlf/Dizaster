@@ -1,6 +1,6 @@
 /** Una comprobación posterior al despliegue (Verification Engine, Blueprint §20.14). */
 export interface Check { name: string; path: string; status?: number; maxMs?: number; bodyIncludes?: string }
-export interface CheckResult { name: string; ok: boolean; ms: number; detail: string }
+export interface CheckResult { name: string; ok: boolean; ms: number; detail: string; status?: number | undefined }
 
 /**
  * Comprobaciones por defecto: solo lectura, sin datos de personas y sin efectos. `/health/ready` ya cubre el latido
@@ -34,9 +34,9 @@ export async function runChecks(baseUrl: string, checks: Check[] = DEFAULT_CHECK
         c.maxMs !== undefined && ms > c.maxMs ? `${ms} ms > ${c.maxMs} ms` : "",
         c.bodyIncludes && !body.includes(c.bodyIncludes) ? "respuesta inesperada" : "",
       ].filter(Boolean);
-      out.push({ name: c.name, ok: problems.length === 0, ms, detail: problems.join("; ") || "ok" });
+      out.push({ name: c.name, ok: problems.length === 0, ms, detail: problems.join("; ") || "ok", status: res.status });
     } catch (e) {
-      out.push({ name: c.name, ok: false, ms: Math.round(performance.now() - started), detail: e instanceof Error ? e.message : String(e) });
+      out.push({ name: c.name, ok: false, ms: Math.round(performance.now() - started), detail: e instanceof Error ? e.message : String(e), status: 0 });
     } finally {
       clearTimeout(timer);
     }

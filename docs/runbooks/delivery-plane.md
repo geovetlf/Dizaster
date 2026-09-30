@@ -59,6 +59,22 @@ pnpm dzd audit stats
 El rollback solo mueve tráfico. Si la versión nueva incluyó una migración, ver
 `docs/runbooks/migracion-fallida.md`.
 
+## Firma, procedencia, SLO y entornos (ADR 0277)
+
+```sh
+pnpm dzd env-check --env staging --tfvars infra/tofu/envs/staging/staging.tfvars --env-file staging.env
+pnpm dzd signature verify --image REGIÓN-docker.pkg.dev/PROYECTO/dizaster/core --digest sha256:… --attestations --execute
+pnpm dzd provenance verify --file core.provenance.json --digest sha256:… --commit <sha>
+pnpm dzd verify --url https://… --repeat 5 --slo      # p95 < 300 ms y ningún 5xx
+pnpm dzd slo --k6 k6-summary.json                    # tras una prueba de carga
+```
+
+- "Firma no verificable: No hay repositorio configurado": falta D-24. Se resuelve con `scripts/github-bootstrap.mjs`.
+- "Firma rechazada": la imagen no la firmó `ci.yml` en `main` de este repositorio. No se despliega; se reconstruye
+  desde `main`.
+- La entrega normal es el workflow `deliver` (manual, con el digest que publicó CI). Producción espera la aprobación
+  del propietario en el entorno `production`.
+
 ## Auditoría
 
 `dzd audit verify --log delivery-audit.jsonl` confirma que nadie cambió, borró ni reordenó entradas.

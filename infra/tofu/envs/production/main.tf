@@ -85,3 +85,5 @@ output "wif_provider" { value = module.stack.wif_provider }
 output "deploy_service_account" { value = module.stack.deploy_service_account }
 output "ci_service_account" { value = module.stack.ci_service_account }
 output "backup_bucket" { value = module.stack.backup_bucket }
+output "project_id" { value = var.project_id }
+output "region" { value = var.region }

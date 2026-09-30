@@ -56,6 +56,11 @@ variable "billing" {
   })
   description = "Cuenta de facturación y presupuesto mensual del entorno (D-18)."
 }
+variable "registry_readers" {
+  type        = list(string)
+  description = "serviceAccount:dz-deploy@<proyecto de producción>.iam.gserviceaccount.com, para promover (ADR 0277)."
+  default     = []
+}
 variable "extra_env" {
   type    = map(string)
   default = {}
@@ -74,6 +79,7 @@ module "stack" {
   public_api_url    = var.public_api_url
   storage           = var.storage
   extra_env         = var.extra_env
+  registry_readers  = var.registry_readers
   backup            = var.backup
   alert_email       = var.alert_email
   billing           = var.billing
@@ -85,3 +91,5 @@ output "wif_provider" { value = module.stack.wif_provider }
 output "deploy_service_account" { value = module.stack.deploy_service_account }
 output "ci_service_account" { value = module.stack.ci_service_account }
 output "backup_bucket" { value = module.stack.backup_bucket }
+output "project_id" { value = var.project_id }
+output "region" { value = var.region }

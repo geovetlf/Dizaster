@@ -12,6 +12,16 @@ variable "pusher_member" {
   type        = string
   description = "Principal que puede subir imágenes (identidad de CI por WIF)."
 }
+variable "promotion_writers" {
+  type        = list(string)
+  description = "Principales que copian aquí un digest ya firmado y verificado en staging (promoción, ADR 0277)."
+  default     = []
+}
+variable "readers" {
+  type        = list(string)
+  description = "Principales de otro entorno que leen imágenes de aquí para promoverlas (ADR 0277)."
+  default     = []
+}
 
 resource "google_artifact_registry_repository" "images" {
   project       = var.project_id
@@ -52,6 +62,24 @@ resource "google_artifact_registry_repository_iam_member" "pusher" {
   repository = google_artifact_registry_repository.images.name
   role       = "roles/artifactregistry.writer"
   member     = var.pusher_member
+}
+
+resource "google_artifact_registry_repository_iam_member" "promotion_writers" {
+  for_each   = toset(var.promotion_writers)
+  project    = var.project_id
+  location   = google_artifact_registry_repository.images.location
+  repository = google_artifact_registry_repository.images.name
+  role       = "roles/artifactregistry.writer"
+  member     = each.value
+}
+
+resource "google_artifact_registry_repository_iam_member" "readers" {
+  for_each   = toset(var.readers)
+  project    = var.project_id
+  location   = google_artifact_registry_repository.images.location
+  repository = google_artifact_registry_repository.images.name
+  role       = "roles/artifactregistry.reader"
+  member     = each.value
 }
 
 output "repository" {

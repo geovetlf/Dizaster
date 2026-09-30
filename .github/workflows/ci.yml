@@ -182,11 +182,19 @@ jobs:
         run: pnpm dzd iac-check --hcl "$(find infra/tofu -name '*.tf' -not -path '*/.terraform/*' | paste -sd, -)"
 
   # Imagen del backend (ADR 0267): se construye en cada cambio, se escanea, lleva SBOM y manifiesto verificable.
-  # No se sube a ningún registro hasta que existan el proyecto y la identidad de CI (D-18, D1).
+  # Se sube, firma (cosign keyless) y atesta solo en main y con Google Cloud activado (D-18, ADR 0277).
   image:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     needs: [check, security]
+    # id-token solo aquí: firma keyless de Sigstore y WIF de Google (ADR 0277). Ningún otro job lo recibe.
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      # Publicar y firmar solo en main y solo cuando Google Cloud esté activado (D-18) y el repositorio registrado (D-24).
+      PUBLISH: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.GCP_WIF_PROVIDER != '' }}
+      REGISTRY: ${{ vars.GCP_STAGING_REGISTRY }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
@@ -216,10 +224,39 @@ jobs:
           pnpm dzd artifact --file core.oci.tar --name core --version "${GITHUB_SHA::12}" --commit "$GITHUB_SHA" \
             --image-digest "$(cat image-digest.txt)" --sbom core.sbom.cdx.json --tests passed --security passed
           pnpm dzd artifact verify --file core.oci.tar --manifest core.oci.tar.manifest.json
+      - name: Procedencia SLSA v1 (predicado para cosign attest)
+        run: pnpm dzd provenance --manifest core.oci.tar.manifest.json --image dizaster/core --predicate --out core.provenance.json
+      - name: Google Cloud por WIF (dz-ci, solo main)
+        if: env.PUBLISH == 'true'
+        id: gcp
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_CI_SERVICE_ACCOUNT }}
+          token_format: access_token
+      - if: env.PUBLISH == 'true'
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+        with:
+          cosign-release: v3.1.3
+      - name: Publicar por digest, firmar y adjuntar procedencia y SBOM
+        if: env.PUBLISH == 'true'
+        env:
+          TOKEN: ${{ steps.gcp.outputs.access_token }}
+        run: |
+          D="$(cat image-digest.txt)"
+          echo "$TOKEN" | docker login -u oauth2accesstoken --password-stdin "${REGISTRY%%/*}"
+          # --all y --preserve-digests: el digest en el registro es el mismo que se escaneó y se describió.
+          skopeo copy --all --preserve-digests --authfile ~/.docker/config.json oci-archive:core.oci.tar "docker://$REGISTRY/core:${GITHUB_SHA::12}"
+          cosign sign --yes "$REGISTRY/core@$D"
+          cosign attest --yes --type slsaprovenance1 --predicate core.provenance.json "$REGISTRY/core@$D"
+          cosign attest --yes --type cyclonedx --predicate core.sbom.cdx.json "$REGISTRY/core@$D"
+          pnpm dzd signature verify --image "$REGISTRY/core" --digest "$D" --attestations --execute
+          echo "### Imagen publicada y firmada: \`$REGISTRY/core@$D\`" >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: core-image
           path: |
             core.oci.tar.manifest.json
             core.sbom.cdx.json
+            core.provenance.json
             image-digest.txt

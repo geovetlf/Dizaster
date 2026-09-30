@@ -1,0 +1,13 @@
+# Plantilla: scripts/github-bootstrap.mjs la copia a .github/CODEOWNERS con el login real del propietario (D-24).
+# Todo cambio crítico según delivery/policy.json necesita la revisión del propietario.
+*                                   @OWNER
+/delivery/                          @OWNER
+/tools/delivery/                    @OWNER
+/.github/                           @OWNER
+/infra/                             @OWNER
+/security/                          @OWNER
+/services/core/migrations/          @OWNER
+/services/core/src/modules/identity/ @OWNER
+/services/core/src/modules/verification/ @OWNER
+/services/core/src/modules/moderation/ @OWNER
+/data/emergency-numbers/            @OWNER

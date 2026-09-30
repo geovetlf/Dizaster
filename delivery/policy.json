@@ -28,6 +28,15 @@
     { "when": ["delivery/**", "infra/tofu/**"], "require": ["docs/adr/**", "docs/runbooks/**"], "message": "un cambio de política o de infraestructura se documenta en una ADR o un runbook" }
   ],
   "migrations": { "dir": "services/core/migrations", "derivedTables": ["geo.context_cache"] },
+  "owners": [],
+  "signing": {
+    "required": true,
+    "issuer": "https://token.actions.githubusercontent.com",
+    "repository": null,
+    "workflows": [".github/workflows/ci.yml"],
+    "refs": ["refs/heads/main"]
+  },
+  "slo": { "apiP95Ms": 300, "maxErrorRate": null, "minSamples": 20 },
   "cost": {
     "monthly": { "cloud-usd": 0, "ai-usd": 0, "eas-builds": 0 },
     "allowedResourceTypes": ["google_service_account", "google_project_iam_member", "google_service_account_iam_member", "google_iam_workload_identity_pool", "google_iam_workload_identity_pool_provider", "google_project_service", "google_artifact_registry_repository_iam_member", "google_secret_manager_secret_iam_member", "google_cloud_run_v2_service_iam_member"],

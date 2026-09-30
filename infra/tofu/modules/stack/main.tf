@@ -40,6 +40,11 @@ variable "billing" {
   })
   description = "Cuenta de facturación y presupuesto mensual del entorno (D-18)."
 }
+variable "registry_readers" {
+  type        = list(string)
+  description = "Solo staging: la cuenta dz-deploy de producción, que lee de aquí el digest que promueve (ADR 0277)."
+  default     = []
+}
 variable "extra_env" {
   type        = map(string)
   description = "Configuración no secreta (APNS_TEAM_ID, APNS_KEY_ID, APNS_BUNDLE_ID, STORE_URL_*, MAP_*, …)."
@@ -93,6 +98,9 @@ module "registry" {
   project_id    = var.project_id
   region        = var.region
   pusher_member = local.member["dz-ci"]
+  # Producción no construye: recibe por copia el mismo digest firmado que pasó staging.
+  promotion_writers = var.environment == "production" ? [local.member["dz-deploy"]] : []
+  readers           = var.registry_readers
 }
 
 module "secrets" {

@@ -1,5 +1,7 @@
 import { readFileSync } from "node:fs";
 import { matchesAny } from "./glob.js";
+import { validateSigningPolicy, type SigningPolicy } from "./signing.js";
+import { validateSloTargets, type SloTargets } from "./slo.js";
 
 /** Clases de riesgo de un cambio (Blueprint §20.16, ADR 0262), de menor a mayor. */
 export const RISK_CLASSES = ["low", "medium", "critical", "blocked"] as const;
@@ -21,6 +23,10 @@ export interface Policy {
   docRules: DocRule[];
   migrations: { dir: string; derivedTables: string[] };
   cost: CostPolicy;
+  signing: SigningPolicy;
+  /** Logins de GitHub del propietario y personas con poder de despliegue (D-24). En CI solo ellos cuentan como humanos. */
+  owners: string[];
+  slo: SloTargets;
 }
 
 export interface CostPolicy {
@@ -87,6 +93,8 @@ export function validatePolicy(raw: unknown): Policy {
   if (!Array.isArray(p.docRules)) errors.push("docRules debe ser una lista");
   if (!p.migrations?.dir) errors.push("migrations.dir vacío");
   if (!p.cost || typeof p.cost.monthly !== "object") errors.push("cost.monthly vacío");
+  errors.push(...validateSigningPolicy(p.signing), ...validateSloTargets(p.slo));
+  if (!Array.isArray(p.owners) || p.owners.some((o) => typeof o !== "string" || !/^[A-Za-z0-9-]{1,39}$/.test(o) || /\[bot\]$/.test(o))) errors.push("owners: logins de GitHub de personas");
   if (errors.length) throw new Error(`Política inválida:\n${errors.map((e) => `  - ${e}`).join("\n")}`);
   return p as Policy;
 }

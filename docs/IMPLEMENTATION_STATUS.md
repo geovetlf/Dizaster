@@ -1,6 +1,6 @@
 # Estado de la implementación
 
-Actualizado: 2026-09-30 (hasta ADR 0276). Informe de preparación para producción: `docs/PRODUCTION_READINESS_REPORT.md`.
+Actualizado: 2026-09-30 (hasta ADR 0277). Informe de preparación para producción: `docs/PRODUCTION_READINESS_REPORT.md`.
 
 ## Etapa 1 — Fundación (hecha)
 
@@ -465,6 +465,7 @@ Actualizado: 2026-09-30 (hasta ADR 0276). Informe de preparación para producci�
 | Donaciones: enlaces a organizaciones verificadas (D-15, ADR 0274) | ✅ | directorio vacío hasta que el propietario lo cargue |
 | OpenTofu: `dz-ci`, respaldos, vigilancia externa y presupuesto (ADR 0275) | ✅ | validado; aplicar espera D-18 |
 | Auditoría completa e informe de preparación para producción (ADR 0276) | ✅ | `docs/PRODUCTION_READINESS_REPORT.md` |
+| Firma keyless, procedencia SLSA, SLO, validación de entornos, workflow `deliver` y GitHub preparado (ADR 0277) | ✅ | activar: D-24 y D-18 |
 | Licencias, auditoría, SBOM, Dependabot; respaldo con prueba de restauración en CI | ✅ | ADR 0070, `scripts/supply-chain.mjs`, `scripts/db-restore-check.mjs` |
 | Idioma de la app elegible en el perfil (es/en/pt/fr o del teléfono) | ✅ | ADR 0069, `app/language.tsx` |
 | Varias cuentas en un teléfono corroboran como una (clave seudónima del teléfono) | ✅ | ADR 0068, migración 0036 |
@@ -542,6 +543,7 @@ Plano de entrega (Blueprint §20, ADR 0260–0275). Ojo con los nombres: las fas
   - ✅ CI endurecido (ADR 0264) y CLI `dzd` con políticas, impacto, plan de gates, autonomía, auditoría encadenada, manifiesto de artefactos, verificación, rollback gradual, revisión de IaC, diagnóstico y documentación (ADR 0265).
   - ✅ Escáneres open source en CI: Gitleaks, Trivy, OSV-Scanner y Semgrep con reglas propias (ADR 0266).
   - ✅ `infra/tofu/` validado con `tofu validate` y escaneo, sin `apply`; imagen del backend con SBOM, manifiesto y verificación en CI (ADR 0267).
+  - ✅ Firma cosign keyless y procedencia SLSA preparadas en CI, verificación en `dzd`, SLO, `env-check`, workflow `deliver`, rulesets, CODEOWNERS y `scripts/github-bootstrap.mjs` (ADR 0277).
 
 - Fase D1 — BLOCKED_BY_OWNER: necesita el repositorio de GitHub de Dizaster (D-20): protección de `main`, entornos, auto-merge de PRs `auto`, informes en PR.
 - Fase D2 — BLOCKED_BY_OWNER / BLOCKED_BY_BILLING: necesita proyectos de Google Cloud con facturación y presupuesto autorizados (D-18 actualizada), base de staging (D-23) y plan de GitHub (D-24): Workload Identity Federation, Artifact Registry, firma cosign, despliegue a staging, verificación y rollback.

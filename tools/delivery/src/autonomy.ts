@@ -44,3 +44,14 @@ export function decide(level: number, action: Action, outcome: Outcome = "auto")
   if (outcome === "review" && (action === "merge" || action === "promote-production")) return { allowed: false, needs: "review", reason: "la política pide revisión" };
   return { allowed: true, needs: "none", reason: `permitido en nivel ${level} (${LEVELS[level]})` };
 }
+
+/**
+ * ¿Quién actúa? En local, `human` (la persona que teclea). En CI, `github:<login>` de quien disparó el workflow: solo
+ * cuenta como humano si está en `owners` de la política (D-24); cualquier otro (un bot, Claude) es automatización.
+ * Dentro de GitHub Actions nadie puede declararse `human` a secas.
+ */
+export function isHuman(actor: string, owners: string[], env: NodeJS.ProcessEnv = {}): boolean {
+  if (actor === "human") return !env["GITHUB_ACTIONS"];
+  const login = /^github:(.+)$/.exec(actor)?.[1];
+  return login !== undefined && owners.includes(login);
+}
