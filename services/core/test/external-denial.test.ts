@@ -25,7 +25,8 @@ describe("negación externa", () => {
     const before = (await t.app.inject({ url: `/v1/events/${eventId}/verification` })).json();
     expect(before).toMatchObject({ level: "EXTERNALLY_CORROBORATED", negativeState: "NONE" });
 
-    await t.c.ingestion.ingest("usgs-earthquakes", quake("us-ret-1-deleted", offset(p, 300), "NOT_OCCURRING"), "URGENT");
+    // USGS retira el sismo con el mismo id (status "deleted"): la misma evidencia pasa a negarlo (ADR 0246).
+    await t.c.ingestion.ingest("usgs-earthquakes", quake("us-ret-1", p, "NOT_OCCURRING"), "URGENT");
     await t.c.dispatcher.drain();
     const v = (await t.app.inject({ url: `/v1/events/${eventId}/verification` })).json() as { level: string; negativeState: string; explanation: { code: string }[] };
     expect(v).toMatchObject({ level: "EXTERNALLY_CORROBORATED", negativeState: "DISPUTED" });

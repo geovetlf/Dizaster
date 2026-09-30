@@ -169,6 +169,19 @@ export class EventService {
         await tx.query(`UPDATE event.evidence SET severity = $2 WHERE id = $1`, [a.id, c.severityHint]);
         if (a.status === "ACTIVE") await this.recomputeSeverity(tx, a.event_id, "EVIDENCE");
       }
+      // Una fuente que corrige su ítem (retirada USGS, CAP Update con otra zona u hora) actualiza su evidencia y el
+      // evento se reevalúa (ADR 0246, §9.2 "actualizar si cambió").
+      const assertion = c.metadata["assertion"] === "NOT_OCCURRING" ? "NOT_OCCURRING" : "OCCURRING";
+      const upd = await tx.query(
+        `UPDATE event.evidence SET assertion = $2, point = ST_SetSRID(ST_MakePoint($3, $4), 4326)::geography, observed_at = $5
+          WHERE id = $1 AND (assertion <> $2 OR observed_at <> $5 OR NOT ST_DWithin(point, ST_SetSRID(ST_MakePoint($3, $4), 4326)::geography, 1))`,
+        [a.id, assertion, c.point.lng, c.point.lat, c.observedAt],
+      );
+      if (c.affectedArea) await this.addAffectedArea(tx, a.event_id, a.id, c.affectedArea);
+      if ((upd.rowCount || c.affectedArea) && a.status === "ACTIVE") {
+        await this.recomputeAggregates(tx, a.event_id, c);
+        await publish(tx, "EventEvidenceAdded", { eventId: a.event_id, evidenceId: a.id, evidenceType }, { lane: c.trustTier === "OFFICIAL" ? "urgent" : "interactive" });
+      }
       return { kind: "ATTACHED", eventId: a.event_id, evidenceId: a.id, confidence: a.match_confidence, score: a.match_score };
     }
 

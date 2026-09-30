@@ -219,8 +219,8 @@ export class IngestionService {
 
       const itemId = existing?.id ?? newId();
       if (existing) {
-        await tx.query(`UPDATE ingestion.external_items SET content_hash = $2, normalized = $3, lane = $4, fetched_at = now(), ends_at = $5, raw_ref = coalesce($6, raw_ref), error = NULL WHERE id = $1`, [
-          itemId, hash, JSON.stringify(item), lane, item.endsAt ?? null, rawRef,
+        await tx.query(`UPDATE ingestion.external_items SET content_hash = $2, normalized = $3, lane = $4, fetched_at = now(), ends_at = $5, raw_ref = coalesce($6, raw_ref), error = NULL, assertion = $7, published_at = $8 WHERE id = $1`, [
+          itemId, hash, JSON.stringify(item), lane, item.endsAt ?? null, rawRef, item.assertion, item.publishedAt,
         ]);
       } else {
         await tx.query(
