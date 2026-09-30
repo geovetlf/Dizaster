@@ -1,5 +1,5 @@
 {
- "version": "categories-2026.09.2",
+ "version": "categories-2026.09.3",
  "categories": [
   {
    "code": "natural",
@@ -985,7 +985,9 @@
    "country": "PE",
    "names": {
     "es": "Huaico",
-    "en": "Huaico (mudflow)"
+    "en": "Huaico (mudflow)",
+    "pt": "Huaico (fluxo de lama)",
+    "fr": "Huaico (coulée de boue)"
    }
   },
   {
@@ -993,7 +995,9 @@
    "country": "PE",
    "names": {
     "es": "Heladas y friaje",
-    "en": "Frost and friaje"
+    "en": "Frost and friaje",
+    "pt": "Geadas e friagem",
+    "fr": "Gelées et friaje"
    }
   }
  ]
