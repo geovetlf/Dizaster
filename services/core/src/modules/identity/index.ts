@@ -132,6 +132,7 @@ export class IdentityService {
   async setUserStatus(q: Queryable, userId: string, status: "ACTIVE" | "SUSPENDED"): Promise<void> {
     await q.query(`UPDATE identity.users SET status = $2, updated_at = now() WHERE id = $1 AND status <> 'DELETED'`, [userId, status]);
     this.statusCache.delete(userId);
+    this.rolesCache.delete(userId);
   }
 
   // ───────────── Términos y políticas (ADR 0176) ─────────────
@@ -269,12 +270,15 @@ export class IdentityService {
   }
 
   private readonly rolesCache = new Map<string, { roles: string[]; at: number }>();
-  /** Roles vigentes en la base (caché de 30 s): un rol quitado deja de valer aunque el token siga vivo. */
+  /**
+   * Roles vigentes en la base (caché de 30 s): un rol quitado deja de valer aunque el token siga vivo. Una cuenta
+   * suspendida no ejerce ningún rol (ADR 0214): así no puede reactivarse ni decidir sobre nada mientras dure.
+   */
   async liveRoles(userId: string): Promise<string[]> {
     const now = Date.now();
     const hit = this.rolesCache.get(userId);
     if (hit && now - hit.at <= 30_000) return hit.roles;
-    const { rows } = await this.db.query<{ roles: string[] }>(`SELECT roles FROM identity.users WHERE id = $1 AND status <> 'DELETED'`, [userId]);
+    const { rows } = await this.db.query<{ roles: string[] }>(`SELECT roles FROM identity.users WHERE id = $1 AND status = 'ACTIVE'`, [userId]);
     const roles = rows[0]?.roles ?? [];
     this.rolesCache.set(userId, { roles, at: now });
     if (this.rolesCache.size > 10_000) this.rolesCache.clear();

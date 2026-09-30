@@ -415,6 +415,8 @@ export class ModerationService {
       const t = await this.social.moderationTarget(tx, p.targetType, p.targetId);
       if (!t) throw notFound("Objeto");
       affectedUserId = t.authorUserId;
+      // Conflicto de interés (ADR 0214): nadie modera su propio contenido, su perfil ni sus negocios.
+      if (affectedUserId === p.moderatorUserId) throw new DomainError("CONFLICT_OF_INTEREST", "Otra persona debe moderar esto", 409);
       if (p.action === "REMOVE_AVATAR") {
         // La foto o el logo se quitan y su media se purga; la cuenta y sus posts siguen igual (ADR 0119).
         const prev = p.targetType === "BUSINESS"
@@ -520,6 +522,9 @@ export class ModerationService {
       if (r.status !== "OPEN") throw new DomainError("ALREADY_DECIDED", "La apelación ya se decidió", 409);
       // Imparcialidad: quien tomó la decisión no revisa su propia apelación.
       if (r.moderator_user_id === moderatorUserId) throw new DomainError("CONFLICT_OF_INTEREST", "Otra persona debe revisar esta apelación", 409);
+      // Ni la propia apelación (ADR 0214).
+      const appellant = (await tx.query<{ appellant_user_id: string }>(`SELECT appellant_user_id FROM moderation.appeals WHERE id = $1`, [appealId])).rows[0];
+      if (appellant?.appellant_user_id === moderatorUserId) throw new DomainError("CONFLICT_OF_INTEREST", "Otra persona debe revisar esta apelación", 409);
       if (d.decision === "REVERSE") {
         await this.apply(tx, { caseId: r.case_id, targetType: r.target_type, targetId: r.target_id, action: INVERSE[r.action]!, reason: d.reason, moderatorUserId, reverses: r.id });
       }
