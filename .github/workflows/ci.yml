@@ -217,16 +217,18 @@ jobs:
           docker buildx create --use --driver docker-container
           docker buildx build -f infra/docker/core.Dockerfile --output type=oci,dest=core.oci.tar .
           tar -xOf core.oci.tar index.json | jq -r '.manifests[0].digest' > image-digest.txt
+          # Trivy lee un OCI como directorio (layout) o un tar de `docker save`, no un tar OCI: se extrae una copia.
+          mkdir core.oci && tar -xf core.oci.tar -C core.oci
       - name: Vulnerabilidades de la imagen (HIGH y CRITICAL con arreglo disponible)
         run: >-
           docker run --rm -v "$PWD:/w" -w /w
           aquasec/trivy:0.74.0@sha256:62b1e65e8869bc4b4c6aa4fa2b21595256c7c2f6018a9d9ad61caf87187c1969
-          image --input core.oci.tar --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 --quiet
+          image --input core.oci --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 --quiet
       - name: SBOM de la imagen (CycloneDX)
         run: >-
           docker run --rm -v "$PWD:/w" -w /w
           aquasec/trivy:0.74.0@sha256:62b1e65e8869bc4b4c6aa4fa2b21595256c7c2f6018a9d9ad61caf87187c1969
-          image --input core.oci.tar --format cyclonedx --output core.sbom.cdx.json --quiet
+          image --input core.oci --format cyclonedx --output core.sbom.cdx.json --quiet
       - name: Manifiesto y verificación
         run: |
           pnpm dzd artifact --file core.oci.tar --name core --version "${GITHUB_SHA::12}" --commit "$GITHUB_SHA" \
