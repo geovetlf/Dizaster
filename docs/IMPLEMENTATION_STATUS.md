@@ -450,6 +450,7 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | Timeline sin ids de media (ADR 0258) | ✅ | solo `mediaCount` |
 | Índices por autor (ADR 0259) | ✅ | migración 0101 |
 | Retraso de publicación en interacciones y menciones (ADR 0257) | ✅ | `assertVisible`, `availableAt` en el outbox |
+| Plano de Software Delivery e Ingeniería: diseño (ADR 0260–0262) | ✅ diseño | Blueprint §20; implementación en "Plano de entrega" |
 | Licencias, auditoría, SBOM, Dependabot; respaldo con prueba de restauración en CI | ✅ | ADR 0070, `scripts/supply-chain.mjs`, `scripts/db-restore-check.mjs` |
 | Idioma de la app elegible en el perfil (es/en/pt/fr o del teléfono) | ✅ | ADR 0069, `app/language.tsx` |
 | Varias cuentas en un teléfono corroboran como una (clave seudónima del teléfono) | ✅ | ADR 0068, migración 0036 |
@@ -526,6 +527,21 @@ Revisión del Blueprint del 2026-09-30 (tras ADR 0256), verificada contra el có
 3. Purgar sesiones rotadas y caducadas (§13.2, §7.4).
 4. La app muestra los fallos al bloquear, desbloquear, borrar o buscar (§13.3).
 5. En iOS el teclado no tapa los campos de texto (RF-01).
+
+Plano de entrega (Blueprint §20, ADR 0260–0262; diseño aprobado por el propietario el 2026-09-30, sin implementar el agente todavía). Nivel de autonomía actual: 2 sin GitHub.
+
+- Fase D0 — sin credenciales, se puede hacer ya:
+  1. Endurecer CI: `permissions:` mínimos, acciones fijadas por SHA, `check:secrets` en CI, `eas-cli` con versión fija.
+  2. `tools/delivery` con `dzd inspect` (cambios, módulos afectados, clase de riesgo) y `delivery/policy.json`, con pruebas; regla de fronteras que lo separa del runtime.
+  3. `dzd plan`: selección de pruebas afectadas y regresión completa en `main`, contratos y migraciones.
+  4. Escáneres open source en CI: Gitleaks, OSV-Scanner, Semgrep, Trivy (imagen e IaC).
+  5. Validador de migraciones: rechaza `DROP`/`TRUNCATE` de datos no derivados sin aprobación; expand/contract.
+  6. `infra/tofu/` con módulos de staging y producción validados con `tofu validate` y escaneo, sin `apply`.
+  7. Informe de auditoría JSON por ejecución y `dzd diagnose` (clasificación determinística de fallos).
+- Fase D1 — BLOQUEADA: necesita el repositorio de GitHub de Dizaster (D-20): protección de `main`, entornos, auto-merge de PRs `auto`, informes en PR.
+- Fase D2 — BLOQUEADA: necesita proyectos de Google Cloud con facturación y presupuesto autorizados (D-18 actualizada), base de staging (D-23) y plan de GitHub (D-24): Workload Identity Federation, Artifact Registry, firma cosign, despliegue a staging, verificación y rollback.
+- Fase D3 — BLOQUEADA: además de D2, visto bueno del propietario para el nivel 5: promoción a producción por etiqueta, despliegue gradual, respaldo previo a migraciones.
+- Riesgo a verificar en D2: soporte de la extensión `h3` de PostgreSQL en Cloud SQL (ADR 0261).
 
 Bloqueadas o en espera:
 

@@ -35,6 +35,7 @@
 17. [Hoja de ruta propuesta](#17-hoja-de-ruta-propuesta)
 18. [Estructura inicial del repositorio y documentación](#18-estructura-inicial-del-repositorio-y-documentación)
 19. [Glosario](#19-glosario)
+20. [Plano de Software Delivery e Ingeniería](#20-plano-de-software-delivery-e-ingeniería)
 
 ---
 
@@ -208,11 +209,11 @@ flowchart LR
 | Cache | Cache HTTP en CDN + cache en proceso | Redis (fase 1+) | Redis solo cuando haya varias instancias de API. |
 | Object storage | **S3-compatible sin costo de egreso** (p. ej. Cloudflare R2) | Backblaze B2 + CDN aliado, S3 | El egreso de media y tiles es el costo variable más grande; eliminarlo es la mayor palanca de ahorro. |
 | CDN | Cloudflare (plan gratuito/pro) | Bunny CDN | Cache de tiles, media y respuestas públicas. |
-| Cómputo | **VPS/servidores de bajo costo con contenedores** (p. ej. Hetzner/OVH) o PaaS económico | Cloud mayor (AWS/GCP) solo si hay créditos | Contenedores Docker portables: se puede cambiar de proveedor sin reescribir. |
+| Cómputo | ~~VPS/servidores de bajo costo con contenedores~~ → **Google Cloud: Cloud Run + Cloud SQL/PostGIS** (instrucción del propietario 2026-09-30, ADR 0261; activar proyectos y facturación sigue pendiente) | VPS con los mismos contenedores | Contenedores Docker portables: se puede cambiar de proveedor sin reescribir. |
 | Push | **APNs + FCM** directos | OneSignal y similares | Gratis. |
 | Email | Proveedor transaccional económico (p. ej. Amazon SES) | Postmark, Resend | Solo para login por email y avisos. |
 | Observabilidad | **OpenTelemetry** + Grafana/Prometheus/Loki autoalojados o capa gratuita de Grafana Cloud; Sentry (capa gratuita o autoalojado) para crashes | — | Estándar abierto, cambiable. |
-| CI/CD | GitHub Actions (repositorio nuevo y propio de Dizaster) + EAS Build (Expo) o Fastlane | — | |
+| CI/CD | GitHub Actions (repositorio nuevo y propio de Dizaster) + EAS Build (Expo) o Fastlane, orquestados por el **Dizaster Delivery Control Plane** propio (§20) | — | Sin plataformas comerciales de delivery. |
 
 ---
 
@@ -1149,10 +1150,12 @@ Para cada una hay una recomendación. Puedes aprobar en bloque ("apruebo todas l
 | **D-15** | Donaciones en V1 | No / enlaces a organizaciones verificadas / integradas | **Enlaces externos a organizaciones verificadas**, sin manejar dinero |
 | **D-16** | Alertas por ubicación | Solo zonas guardadas / + ubicación en segundo plano | **Zonas guardadas + última ubicación aproximada al abrir la app**; segundo plano después |
 | **D-17** | Fronteras disputadas | Una sola visualización / según país del usuario | **Según país del usuario**, con revisión legal |
-| **D-18** | Hosting | VPS económicos (p. ej. Hetzner/OVH) + R2/Cloudflare / cloud mayor (AWS/GCP/Azure) / PaaS | **VPS económicos + object storage sin egreso**, todo en contenedores portables |
+| **D-18** | Hosting | VPS económicos (p. ej. Hetzner/OVH) + R2/Cloudflare / cloud mayor (AWS/GCP/Azure) / PaaS | ~~VPS económicos~~ → **Google Cloud** por instrucción del propietario (2026-09-30, ADR 0261), contenedores portables; crear proyectos y facturación: pendiente de autorización |
 | **D-19** | Idiomas iniciales | Lista | **Español, inglés, portugués, francés** (ajustable según países piloto) |
 | **D-20** | Repositorio | Nuevo repositorio GitHub exclusivo de Dizaster / otro | **Nuevo repositorio exclusivo** (sin relación con WEE ni MelonOffice) |
 | **D-21** | Nombre de marca y dominio | — | Pendiente de tu elección (verificar disponibilidad de dominio y marca) |
+| **D-23** | Base de datos de staging (ADR 0261) | Cloud SQL mínima / PostgreSQL en e2-micro gratuito / staging efímero | **PostgreSQL en e2-micro** mientras no haya usuarios |
+| **D-24** | Plan de GitHub (ADR 0261, 0262) | gratuito / de pago | **Gratuito** + promoción a producción solo desde etiqueta del propietario |
 
 ---
 
@@ -1200,6 +1203,8 @@ dizaster/
 │   ├── styles/  sprites/  glyphs/
 │   └── build/                  # Scripts de generación de PMTiles
 ├── infra/                      # Contenedores, despliegue, backups (sin nada de WEE/MelonOffice)
+├── tools/delivery/             # Dizaster Delivery Control Plane, CLI `dzd` (§20; fuera del runtime)
+├── delivery/                   # Políticas de entrega versionadas (§20.16)
 └── docs/
     ├── DIZASTER_MASTER_BLUEPRINT.md
     ├── adr/                    # Architecture Decision Records (uno por decisión D-xx aprobada)
@@ -1235,6 +1240,283 @@ dizaster/
 
 ---
 
+## 20. Plano de Software Delivery e Ingeniería
+
+> Añadido el 2026-09-30 por instrucción del propietario ("Adición crítica al Blueprint: Dizaster Build & Delivery
+> Agent"). Decisiones: ADR 0260 (arquitectura y forma mínima), ADR 0261 (Google Cloud, entornos, identidades y
+> secretos), ADR 0262 (políticas, permisos y niveles de autonomía). Esta sección es **diseño**: nada de lo nuevo está
+> implementado todavía; el estado vive en `IMPLEMENTATION_STATUS.md` ("Plano de entrega").
+
+### 20.1 Build & Delivery Agent
+
+**Nombre propuesto: Dizaster Delivery Control Plane** (abreviado *Delivery Plane*; CLI `dzd`). "Agente" sugiere una
+IA; lo que se diseña es sobre todo un **plano de control determinístico** que valida, construye, despliega, verifica y
+revierte, con una IA opcional al lado. En los documentos "Build & Delivery Agent" y "Delivery Plane" son lo mismo.
+
+Relación de roles (§24 de la instrucción):
+
+| Rol | Quién | Qué hace |
+|---|---|---|
+| Engineering agent | Claude | Lee, cambia código, escribe pruebas y documentación, abre PRs, corrige lo que el Delivery Plane rechaza. |
+| Engineering control plane | Delivery Plane | Detecta el cambio, decide qué probar, ejecuta gates, construye, firma, despliega, verifica, revierte y audita. |
+| Aprobador | Propietario | Solo decisiones ambiguas, legales, financieras, críticas, credenciales, producción sensible y destrucción irreversible. |
+
+Cadena objetivo: HUMANO → CLAUDE → GITHUB → DELIVERY PLANE → PRUEBAS / SEGURIDAD / BUILD → STAGING → VERIFICACIÓN →
+POLÍTICA → PRODUCCIÓN. **Autonomía ≠ acceso ilimitado**: la acotan mínimo privilegio, política, auditoría, Cost Guard,
+gates de seguridad, fronteras de entorno, rollback y aprobación humana para lo crítico.
+
+### 20.2 Arquitectura
+
+Forma mínima (sin microservicios, sin servidor nuevo, costo fijo 0):
+
+```
+repo dizaster/
+└── tools/delivery/            # paquete TypeScript del monorepo (CLI `dzd`), sin dependencias de runtime del producto
+    ├── inspect/               # Repository Inspector + Change Detector + Impact Analyzer + Dependency Analyzer
+    ├── plan/                  # Task Planner + Test Orchestrator (elige y ordena gates)
+    ├── security/              # Security Engine (orquesta escáneres existentes y open source)
+    ├── build/                 # Build Engine + Artifact Manager (imagen OCI, digest, SBOM, procedencia)
+    ├── deploy/                # Environment Manager + Deployment Engine + Verification + Rollback + Health Monitor
+    ├── policy/                # Policy Engine + Permission Guard + Secrets Boundary + Cost Guard
+    ├── audit/                 # Audit Engine (registro append-only de cada decisión)
+    ├── docs/                  # Documentation Updater (verifica, no reescribe)
+    ├── diagnose/              # Failure Analyzer determinístico (clasifica fallos por patrones)
+    └── assist/                # Optional AI Engineering Assistant (apagado por defecto)
+delivery/policy.json           # políticas versionadas (qué es crítico, qué gates, qué aprobaciones)
+.github/workflows/             # el EJECUTOR: GitHub Actions llama a `dzd` en cada paso
+infra/tofu/                    # IaC OpenTofu (entornos, IAM, Cloud Run, Cloud SQL, buckets, Secret Manager)
+```
+
+- **Ejecutor:** GitHub Actions (ya existe y es el CI actual). El Delivery Plane no es un proceso siempre encendido: es
+  una CLI que los workflows invocan. No hay cola, backend, logging ni gestor de secretos nuevos.
+- **Los 22 componentes conceptuales** de la instrucción quedan como módulos internos de esa CLI (tabla en ADR 0260).
+  Ninguno se despliega por separado.
+- **Separado del runtime:** `tools/delivery` no se importa desde `services/core` ni `apps/mobile` (regla añadida a
+  `check:boundaries`), y el runtime no llama al Delivery Plane. Si el Delivery Plane, Claude o cualquier IA fallan,
+  producción sigue funcionando con la última versión desplegada.
+
+### 20.3 Responsabilidades
+
+Detectar cambios e impacto; elegir y ordenar pruebas; ejecutar gates de calidad, seguridad y costo; construir
+artefactos reproducibles con hash, SBOM y procedencia; desplegar desarrollo y staging; promover a producción bajo
+política; verificar después de desplegar; revertir tráfico cuando la verificación falla; registrar cada decisión;
+comprobar que la documentación acompaña al cambio; resumir fallos para que Claude los corrija.
+
+### 20.4 No-responsabilidades
+
+- No es parte del producto: no es un módulo de `services/core`, ni del AI Core, AI Router, Incident/Report/Event
+  Engine, Social Graph, Trust & Safety ni Geo Engine.
+- No guarda datos de personas usuarias ni accede a la base de producción salvo para migraciones y respaldos, con una
+  identidad propia y acotada.
+- No reemplaza herramientas especializadas (vitest, tsc, eslint, pnpm, OpenTofu, escáneres): las orquesta.
+- No decide producto, legal ni gasto. No lee secretos de producción. No ejecuta `destroy` ni migraciones destructivas
+  sin aprobación explícita.
+- No depende de Harness ni de ninguna plataforma comercial de delivery (Harness queda solo como referencia de
+  capacidades y, si algún día conviene, como integración externa opcional).
+
+### 20.5 Integración con Claude
+
+- Claude trabaja en ramas y abre PRs; nunca tiene credenciales de Google Cloud ni secretos. Su única vía hacia un
+  entorno es GitHub: el Delivery Plane actúa por él con identidades de corta vida.
+- Ciclo: Claude empuja → el Delivery Plane comenta en el PR el **informe de impacto** (módulos, riesgo, gates
+  elegidos) y el **resultado** (qué falló, clasificado por `diagnose/`) → Claude corrige → se repite hasta verde.
+- Claude puede ejecutar `dzd` localmente (mismos gates que CI, sin despliegue) para no gastar minutos de CI.
+- Si Claude no está disponible, nada se detiene: los workflows corren igual por push, horario o disparo manual.
+
+### 20.6 Integración con GitHub
+
+- Repositorio propio de Dizaster (D-20, pendiente de crear). Rama `main` protegida: solo entra por PR con gates en
+  verde; sin force-push; historial lineal o merge commits según convención.
+- **GitHub Environments** `staging` y `production`; los secretos de despliegue no existen en GitHub: la autenticación
+  a Google Cloud es por **Workload Identity Federation** (OIDC, sin claves JSON), condicionada a repositorio, rama y
+  entorno.
+- Aprobación de producción: en repositorios privados, las reglas de protección de entornos con revisores requeridos
+  dependen del plan de GitHub; alternativa gratuita: la promoción a producción solo corre desde una etiqueta de
+  versión creada por el propietario o desde `workflow_dispatch` restringido (ADR 0262). Verificar el plan al crear el
+  repositorio.
+- Dependabot (ya activo) y escaneo de secretos de GitHub cuando el plan lo incluya; el escáner propio
+  (`check:secrets`) corre siempre.
+
+### 20.7 CI
+
+Se conserva `.github/workflows/ci.yml` (lint, fronteras, typecheck, build, pruebas con PostGIS/H3 y S3 simulado,
+prueba de restauración, bundle móvil, proyectos nativos) y el job de cadena de suministro. Cambios de diseño:
+
+- `dzd plan` al inicio decide qué jobs corren (pruebas afectadas en PRs de bajo riesgo; **regresión completa** en
+  `main`, en releases y en cualquier cambio crítico).
+- Endurecimiento: `permissions:` mínimos por workflow, acciones fijadas por SHA, `check:secrets` también en CI,
+  `eas-cli` con versión fija.
+- Caché de pnpm (existente) y de capas de Docker; nada de runners pagos.
+
+### 20.8 Seguridad
+
+Todo open source y a costo 0:
+
+| Control | Herramienta | Estado |
+|---|---|---|
+| Secretos en el repo | `scripts/check-secrets.mjs` (propio) + Gitleaks | existe / añadir |
+| Dependencias (SCA) | `pnpm audit` + allowlist con vencimiento; OSV-Scanner | existe / añadir |
+| Licencias | `security/license-policy.json` | existe |
+| SBOM | CycloneDX (`pnpm sbom`) | existe; se adjunta al artefacto |
+| SAST | Semgrep (reglas comunitarias) o CodeQL si el plan de GitHub lo incluye | añadir |
+| Contenedores | Trivy (imagen) | añadir |
+| IaC | Trivy config / Checkov sobre `infra/tofu` | añadir |
+| Configuración | esquema zod de `config.ts` con guardas de producción | existe; `dzd` lo valida antes de desplegar |
+| IAM | `tofu plan` + política que rechaza roles primitivos (Owner/Editor) y comodines | añadir |
+| Integridad | digest SHA-256 de la imagen, firma Sigstore/cosign keyless | añadir |
+
+### 20.9 Testing
+
+El Test Orchestrator no reemplaza vitest: decide **qué** correr, **en qué orden** y **cuándo parar**.
+
+- Orden: estático barato (lint, fronteras, secretos, typecheck) → unitarias → integración con PostGIS/H3 → contrato
+  (OpenAPI) → móvil (bundle y nativos) → seguridad → smoke en staging. Se detiene en el primer gate rojo.
+- Paralelo: paquetes independientes y el job de cadena de suministro.
+- Selección: el grafo del monorepo y el mapa de módulos (`check:boundaries`) dicen qué paquetes y pruebas toca un
+  cambio. Un cambio en `packages/contracts` o en `migrations/` fuerza la suite completa.
+- Existe hoy: unitarias, integración, API, contrato OpenAPI, base de datos, PostGIS, H3, móvil, restauración de
+  respaldo. Faltan (sin costo): smoke post-despliegue, regresión de IA con fixtures (AI apagada), prueba de rendimiento
+  ligera (k6 local) y E2E móvil (Maestro, en emulador de CI) cuando haya build de desarrollo.
+
+### 20.10 Build
+
+Una sola imagen OCI (`infra/docker/core.Dockerfile`) sirve de API y de worker (roles por `WORKER_ROLES`). La app
+móvil se construye con EAS (workflow manual, cuota gratuita) o localmente (ADR 0218). Builds reproducibles:
+lockfile congelado, Node fijado por `.nvmrc`, imagen base por digest.
+
+### 20.11 Gestión de artefactos
+
+FUENTE → BUILD → ARTEFACTO → HASH → FIRMA (opcional) → REGISTRO → DESPLIEGUE.
+
+Cada artefacto lleva: versión, SHA del commit, fecha de build, dependencias (SBOM), entorno de build (runner, Node,
+pnpm), resultado de pruebas y de seguridad, y procedencia (attestation SLSA cuando sea gratuita). Registro: Artifact
+Registry (imágenes) y artefactos de GitHub (SBOM, informes). **Nunca se despliega un artefacto cuyo origen no pueda
+determinarse**: el despliegue se hace por digest, no por etiqueta, y `dzd` rechaza digests sin registro de build.
+
+### 20.12 Staging
+
+Entorno propio, aislado de producción (otro proyecto de Google Cloud, otras identidades, otros secretos, sin datos
+reales). Despliegue automático tras gates verdes en `main`. Para mantener el costo cerca de 0: Cloud Run con escala a
+cero, base de datos pequeña o efímera (opciones en ADR 0261, decisión D-23), datos sintéticos y geo de fixtures.
+
+### 20.13 Producción
+
+Solo se promueve el **mismo digest** verificado en staging. Despliegue gradual con revisiones de Cloud Run: nueva
+revisión sin tráfico → smoke → porcentaje pequeño → 100 %. Migraciones antes de la promoción, solo si son aditivas
+(expand/contract). Respaldo cifrado previo (`db:backup`) cuando hay migración. Claude nunca despliega directamente a
+producción.
+
+### 20.14 Verificación
+
+Después de cada despliegue: `/health`, `/health/ready` (latido del worker y outbox), contrato `/v1/openapi.json`,
+endpoints críticos de lectura (mapa, evento, feed), conexión a base y almacenamiento, push en modo prueba, consulta
+geoespacial de humo, estado del AI Core (apagado = OK), latencia p95 y tasa de errores de la nueva revisión (Cloud
+Monitoring y las alertas SLO existentes, ADR 0130). Si falla: rollback.
+
+### 20.15 Rollback
+
+- **Aplicación:** mover el tráfico a la revisión anterior de Cloud Run (instantáneo, sin rebuild). Se conservan el
+  digest anterior, sus metadatos de despliegue, la versión de configuración y el estado de migraciones.
+- **Base de datos:** tratamiento aparte. Las migraciones son hacia adelante (runner actual); por eso deben ser
+  compatibles con la versión anterior del código (expand/contract) y el rollback de aplicación no necesita tocar la
+  base. Nunca se ejecuta automáticamente una migración destructiva ni una restauración de respaldo: requieren
+  aprobación del propietario y siguen el runbook `respaldo-y-restauracion.md`.
+
+### 20.16 Políticas
+
+`delivery/policy.json` (versionado, revisable en PR, cambios críticos a él mismo requieren aprobación) define clases
+de riesgo por ruta y tipo de cambio, gates por entorno y aprobaciones. Evaluación determinística en `dzd policy`.
+
+- **Bajo riesgo:** documentación, pruebas, traducciones, UI no crítica, refactor sin cambio de contrato.
+- **Crítico:** autenticación, autorización, privacidad y ubicación, cifrado, pagos y donaciones, migraciones,
+  seguridad, verificación de incidentes, alertas y funciones de emergencia, IaC e IAM, la propia política, workflows.
+- Resultado por cambio: `auto` (se despliega tras gates), `review` (gates + revisión), `approval` (aprobación del
+  propietario), `block`. Detalle y matriz en ADR 0262.
+
+### 20.17 IAM
+
+Mínimo privilegio con cuentas de servicio separadas por entorno y función (ADR 0261):
+`dz-ci` (solo lectura/escritura de Artifact Registry), `dz-deploy-staging`, `dz-deploy-prod` (Cloud Run y migraciones,
+sin roles primitivos), `dz-run-api`, `dz-run-worker` (acceso a sus secretos y bucket), `dz-migrate`, `dz-backup`.
+Nadie usa Owner/Editor en automatización. Claude no tiene ninguna identidad en Google Cloud.
+
+### 20.18 Secretos
+
+Claude → sin secretos. Delivery Plane → identidad controlada por OIDC. Google Cloud → IAM → **Secret Manager**
+(uno por proyecto/entorno). Cloud Run monta los secretos que su cuenta de servicio puede leer (`AUTH_JWT_SECRET`,
+`FIELD_KEYS`, `DATABASE_URL`, APNs, FCM, claves de fuentes). CI nunca ve secretos de producción. Se mantienen
+`check:secrets`, `.gitignore` y el runbook de rotación (ADR 0218). No se crea otro sistema de secretos.
+
+### 20.19 Cost Guard
+
+Separado del Cost Optimization Layer del producto (§5.18), que sigue igual. El Cost Guard de delivery controla:
+minutos de CI (selección de pruebas, caché, cancelar ejecuciones superadas), builds de EAS (manuales), recursos de
+nube (presupuestos y alertas de Google Cloud por proyecto; `tofu plan` con estimación y bloqueo de recursos nuevos
+fuera de una lista permitida), entornos temporales (TTL y apagado), almacenamiento y logs (retención corta en staging),
+llamadas de IA del asistente (apagado; con presupuesto propio si se activa). Una operación que supera el presupuesto
+configurado se bloquea y queda en la auditoría.
+
+### 20.20 Auditoría
+
+Cada ejecución registra: quién la inició (humano, Claude, horario, Delivery Plane), commit, build, pruebas, artefacto
+(digest), despliegue, rollback, decisión de política con sus motivos, aprobación, hora y entorno. Formato JSON firmado
+por el digest del informe; almacenamiento append-only (bucket con versionado y bloqueo de retención) más los
+registros de GitHub Actions. Independiente de la IA.
+
+### 20.21 Observabilidad
+
+Se reutiliza lo existente: OpenTelemetry (ADR 0052), logs sin coordenadas ni IP (ADR 0204), correlación
+(ADR 0172), `/health/ready` (ADR 0187), alertas SLO (ADR 0130), outbox en cuarentena (ADR 0206). En Google Cloud se
+exportan a Cloud Logging, Cloud Trace y Cloud Monitoring dentro de su capa gratuita; el Delivery Plane lee de ahí
+para verificar, no crea otro sistema.
+
+### 20.22 IaC
+
+**OpenTofu** (licencia MPL-2.0, fork abierto de Terraform) en `infra/tofu/`, un estado por entorno en un bucket con
+versionado. El Delivery Plane: `tofu fmt/validate`, escaneo de seguridad, `plan` en cada PR con resumen en el PR,
+detección de cambios peligrosos (destroy/replace de base de datos, buckets, claves, IAM amplio) → `approval`, `apply`
+solo bajo política y solo desde CI. `lifecycle.prevent_destroy` en recursos con estado. **Nunca `destroy`
+automático.**
+
+### 20.23 Niveles de autonomía
+
+| Nivel | Nombre | Claude | Delivery Plane | GitHub | Google Cloud | Aprobación |
+|---|---|---|---|---|---|---|
+| 0 | Solo humano | — | — | — | — | todo |
+| 1 | Asistencia | propone | — | lectura | — | todo cambio |
+| 2 | Desarrollo autónomo | ramas, commits, PRs, pruebas locales | gates en PR | escritura en ramas | — | merge |
+| 3 | Validación y build autónomos | + corrige hasta verde | + build, firma, registro; merge automático de PRs `auto` | + auto-merge por política | Artifact Registry (CI) | PRs `review`/`approval` |
+| 4 | Staging autónomo | igual | + despliegue, verificación y rollback en staging | + entorno `staging` | proyecto staging (deploy) | cambios `approval` |
+| 5 | Producción por política | igual | + promoción del mismo digest, gradual, con rollback | + entorno `production` | proyecto prod (deploy acotado) | `approval`, migraciones con riesgo, IaC destructiva, gasto |
+
+Cada nivel hereda las prohibiciones del anterior: nadie obtiene root, lee secretos arbitrarios, desactiva gates o
+auditoría, borra respaldos o bases, ni se salta políticas. Todo nivel registra auditoría y tiene rollback. **Hoy:
+nivel 2 sin GitHub** (repositorio pendiente, D-20). Subir de nivel requiere que existan sus piezas y el visto bueno
+del propietario (ADR 0262).
+
+### 20.24 Manejo de fallos
+
+| Falla | Respuesta |
+|---|---|
+| Gate rojo en PR | `diagnose/` clasifica (prueba, tipo, lint, seguridad, infraestructura del runner) y lo comenta; Claude corrige. Nunca se desactiva una prueba para pasar. |
+| Runner o red caída antes de las pruebas | un reintento; si repite, es real. |
+| Verificación post-despliegue falla | rollback de tráfico automático, incidente abierto, despliegues bloqueados hasta un verde. |
+| Migración falla | se detiene la promoción; la transacción del runner deja la base como estaba; runbook. |
+| Delivery Plane o GitHub Actions caídos | producción sigue; despliegues esperan; un humano puede operar con los runbooks. |
+| Claude no disponible | todo lo determinístico sigue; la IA es opcional. |
+| Presupuesto superado | Cost Guard bloquea la operación cara; lo esencial (gates de `main`, rollback) no se bloquea. |
+
+### 20.25 Escalabilidad futura
+
+- Cloud Run primero; los mismos artefactos OCI e IaC modular permiten pasar a GKE solo si una necesidad real lo
+  justifica (§14).
+- Varias regiones y réplicas de lectura con el mismo pipeline (un módulo OpenTofu por región).
+- Asistente de IA con varios proveedores detrás de su propia interfaz (no la del AI Core, sin dependencia circular).
+- Integraciones externas opcionales (Harness u otras) sin que la arquitectura propia dependa de ellas.
+- Tarifas reales de capas gratuitas en ADR 0261: "gratis" no es ilimitado.
+
+---
+
 ## Anexo A — Aprobación y modificaciones (2026-09-29)
 
 El propietario aprobó el Blueprint y las decisiones de la sección 16 con estas modificaciones obligatorias (detalle en `docs/adr/0001-aprobacion-blueprint.md`):
@@ -1251,3 +1533,10 @@ El propietario aprobó el Blueprint y las decisiones de la sección 16 con estas
 
 El propietario autorizó además la ejecución autónoma de la construcción por etapas, con parada solo ante decisiones de producto ambiguas, acciones destructivas, decisiones legales o financieras, credenciales imprescindibles o conflictos con este Blueprint.
 
+## Anexo B — Plano de Software Delivery e Ingeniería (2026-09-30)
+
+El propietario añadió el "Dizaster Build & Delivery Agent": capacidad propia de construcción, delivery, pruebas,
+seguridad y operación, sin depender de Harness ni de otra plataforma comercial, separada del runtime, determinística
+primero, free-first, preparada para Google Cloud y con autonomía de Claude acotada por políticas, permisos,
+auditoría, Cost Guard y aprobación humana para lo crítico. Queda como §20 (diseño) y en las ADR 0260, 0261 y 0262.
+Actualiza la fila "Cómputo" de §4.3 y D-18, y añade D-23 y D-24. Se indicó no implementar todavía el agente completo.
