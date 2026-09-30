@@ -13,8 +13,8 @@ import { registerSigningKey } from "./device/signing-key";
 import { clearIdentity, loadIdentity, saveIdentity, type StoredIdentity } from "./device/secure-session";
 import { hardwareId } from "./device/hardware-id";
 import { newId } from "./ids";
-import { readCache } from "./offline/sqlite-cache";
 import { startAutoFlush } from "./report/outbox";
+import { wipeThisDevice } from "./account/wipe-device";
 
 interface SessionState {
   ready: boolean;
@@ -25,14 +25,16 @@ interface SessionState {
 }
 
 interface SessionContextValue extends SessionState {
-  /** Tras borrar la cuenta: olvida la identidad de este teléfono y empieza de cero. */
+  /** Tras borrar la cuenta: olvida la identidad de este teléfono, borra lo que dejó (ADR 0211) y empieza de cero. */
   forgetAndRestart: () => Promise<void>;
+  /** Cerrar sesión en este teléfono (ADR 0211): revoca la sesión en el servidor si hay red y hace lo mismo. */
+  signOut: () => Promise<void>;
   /** Tras entrar con correo (o Apple/Google): guarda la identidad y arranca la sesión como en cada inicio. */
   completeSignIn: (pair: TokenPair & { deviceId: string | null }) => Promise<void>;
 }
 
 const SessionContext = createContext<SessionContextValue>({
-  ready: false, deviceId: null, error: null, forgetAndRestart: async () => undefined, completeSignIn: async () => undefined,
+  ready: false, deviceId: null, error: null, forgetAndRestart: async () => undefined, signOut: async () => undefined, completeSignIn: async () => undefined,
 });
 
 /**
@@ -133,11 +135,19 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setSession(null);
     identity.current = null;
     await clearIdentity().catch(() => undefined);
-    // Lo guardado para leer sin conexión (avisos, eventos) era de la cuenta borrada.
-    await readCache().clear().catch(() => undefined);
+    // Cola de reportes (con ubicación precisa), borrador, errores, caché de lectura y copias exportadas eran de esa
+    // cuenta: con otra cuenta, los reportes en cola saldrían a su nombre (ADR 0211).
+    await wipeThisDevice().catch(() => undefined);
     setState({ ready: false, deviceId: null, error: null });
     setGeneration((g) => g + 1);
   }, []);
+
+  const signOut = useCallback(async () => {
+    const refresh = identity.current?.refreshToken;
+    // Sin red no se puede revocar: la sesión caduca sola en el servidor y este teléfono ya no guarda el token.
+    if (refresh) await api.logout(refresh).catch(() => undefined);
+    await forgetAndRestart();
+  }, [forgetAndRestart]);
 
   const completeSignIn = useCallback(async (pair: TokenPair & { deviceId: string | null }) => {
     setSession(pair);
@@ -149,7 +159,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setGeneration((g) => g + 1);
   }, []);
 
-  return <SessionContext.Provider value={{ ...state, forgetAndRestart, completeSignIn }}>{children}</SessionContext.Provider>;
+  return <SessionContext.Provider value={{ ...state, forgetAndRestart, signOut, completeSignIn }}>{children}</SessionContext.Provider>;
 }
 
 export const useSession = () => useContext(SessionContext);

@@ -49,6 +49,13 @@ export default function ProfileScreen() {
     router.push("/alert-settings");
   }
 
+  // Cerrar sesión en este teléfono (ADR 0211). Avisa si hay reportes sin enviar: se descartan con la sesión.
+  function onSignOut() {
+    void reportQueue.pending().catch(() => []).then((p) => confirmSignOut(p.length, () => {
+      void session.signOut().then(() => router.dismissAll()).catch(() => undefined);
+    }));
+  }
+
   async function onExport() {
     if (exporting) return;
     setExporting(true);
@@ -90,6 +97,7 @@ export default function ProfileScreen() {
         <Row icon="cellphone-lock" label={t("sessionsTitle")} onPress={() => router.push("/sessions")} />
         <Row icon="email-lock-outline" label={t("signInMethods")} onPress={() => router.push("/sign-in-methods")} />
         <Row icon="download-outline" label={t("exportData")} value={exporting ? t("exportPreparing") : undefined} onPress={() => void onExport()} />
+        <Row icon="logout" label={t("signOut")} onPress={onSignOut} />
         <Row icon="account-remove-outline" label={t("deleteAccount")} onPress={() => router.push("/delete-account")} />
         <Row icon="translate" label={t("language")} value={LANGUAGE_NAMES[lang]} onPress={() => router.push("/language")} />
         <Row icon="information-outline" label={t("aboutTitle")} onPress={() => router.push("/about")} />
@@ -98,6 +106,14 @@ export default function ProfileScreen() {
       </ScrollView>
     </SafeAreaView>
   );
+}
+
+function confirmSignOut(pending: number, onConfirm: () => void) {
+  const msg = pending > 0 ? `${t("signOutConfirm")}\n\n${t("signOutPending").replace("{n}", String(pending))}` : t("signOutConfirm");
+  Alert.alert(t("signOut"), msg, [
+    { text: t("cancel"), style: "cancel" },
+    { text: t("signOut"), style: "destructive", onPress: onConfirm },
+  ]);
 }
 
 function Row({ icon, label, value, onPress }: { icon: IconProps["name"]; label: string; value?: string; onPress?: () => void }) {
