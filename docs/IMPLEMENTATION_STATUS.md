@@ -494,8 +494,7 @@ Revisión del Blueprint del 2026-09-30 (tras ADR 0212): completada con ADR 0213�
 
 Revisión del Blueprint del 2026-09-30 (tras ADR 0220): completada con ADR 0221–0228 (los avisos sociales pasan a PENDING DECISION).
 
-Revisión del Blueprint del 2026-09-30 (tras ADR 0228), verificada contra el código, sin bloqueos:
-
+Revisión del Blueprint del 2026-09-30 (tras ADR 0228): completada con ADR 0229–0240 (privacidad de eventos cercanos, IA sin FALSE, auditoría, accesibilidad).
 
 Bloqueadas o en espera:
 
