@@ -8,6 +8,7 @@ import { fieldCipherFromEnv } from "./platform/field-cipher.js";
 import { createPool, type Db } from "./platform/db.js";
 import { OutboxDispatcher } from "./platform/outbox.js";
 import { ClientCrashService } from "./platform/client-crashes.js";
+import { HeartbeatService } from "./platform/heartbeat.js";
 import { buildConnectors, type ConnectorOverrides, type Connectors } from "./platform/connectors/index.js";
 import { defaultDataDir } from "./platform/paths.js";
 import { CostService } from "./modules/cost/index.js";
@@ -50,6 +51,7 @@ export interface Container {
   alerts: AlertService;
   dispatcher: OutboxDispatcher;
   crashes: ClientCrashService;
+  heartbeat: HeartbeatService;
   cost: CostService;
   connectors: Connectors;
   moderation: ModerationService;
@@ -156,7 +158,8 @@ export function buildContainer(env: AppEnv, overrides: { db?: Db; clock?: Clock;
   const composer = new PostComposer(db, social, media, events, business, async (userId) => (await trust.socialLimits(db, userId)).postsPerHour,
     (userId, handle, event) => institutions.assertCanPostUpdate(userId, handle, event));
   const quality = new QualityService(db, clock, { cost, events, verification, alerts, ingestion, moderation, ops: { identity, backlog: () => dispatcher.backlog() } });
-  return { env, db, clock, ref, geo, social, identity, externalAuth, mfa, events, ingestion, ingestionScheduler, verification, media, storage, reports, feed, alerts, dispatcher, crashes: new ClientCrashService(db), cost, moderation, authorityRequests, trust, quality, composer, business, institutions, meter, connectors };
+  return { env, db, clock, ref, geo, social, identity, externalAuth, mfa, events, ingestion, ingestionScheduler, verification, media, storage, reports, feed, alerts, dispatcher, crashes: new ClientCrashService(db),
+    heartbeat: new HeartbeatService(db, { staleSeconds: env.WORKER_HEARTBEAT_STALE_SECONDS, outboxMaxAgeSeconds: env.OUTBOX_READY_MAX_AGE_SECONDS }), cost, moderation, authorityRequests, trust, quality, composer, business, institutions, meter, connectors };
 }
 
 /** APNs y FCM directos. Si falta la credencial de una plataforma, sus avisos quedan solo en el historial. */

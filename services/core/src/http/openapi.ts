@@ -15,6 +15,7 @@ export interface Operation {
 
 export const OPERATIONS: Record<string, Operation> = {
   "GET /health": { summary: "Estado del proceso" },
+  "GET /health/ready": { summary: "Disponibilidad: base de datos, latido del worker y outbox (503 si falla)" },
   "GET /v1/config": { summary: "Configuración remota: proveedor de mapa, interruptores y límites", response: C.AppConfig },
   "GET /v1/openapi.json": { summary: "Este contrato" },
   "GET /v1/reference/categories": { summary: "Catálogo de categorías", response: C.CategoryCatalog },

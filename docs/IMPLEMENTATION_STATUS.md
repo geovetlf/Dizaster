@@ -377,6 +377,7 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | Decisiones: sin señal de red, aceptaciones mínimas tras borrar, todo público en V1 | ✅ | ADR 0184 (propietario, 2026-09-30); migración 0088 |
 | Mapas offline reales (§11.3) | ✅ | ADR 0185: config remota persistida en el teléfono (sin caducidad), una sola petición compartida, mismo estilo oscuro para ver y descargar |
 | Canales de notificación Android como iOS (§5.10) | ✅ | ADR 0186: canal propio para oficiales graves (importancia máxima) y canal general, nombres traducidos, FCM channel_id según critical |
+| Latido del worker y /health/ready (§5.22, §13.1) | ✅ | ADR 0187: latido por rol e instancia, /health/ready con worker y outbox (503 con códigos), healthchecks de API y worker en imagen y compose |
 | Licencias, auditoría, SBOM, Dependabot; respaldo con prueba de restauración en CI | ✅ | ADR 0070, `scripts/supply-chain.mjs`, `scripts/db-restore-check.mjs` |
 | Idioma de la app elegible en el perfil (es/en/pt/fr o del teléfono) | ✅ | ADR 0069, `app/language.tsx` |
 | Varias cuentas en un teléfono corroboran como una (clave seudónima del teléfono) | ✅ | ADR 0068, migración 0036 |
@@ -425,9 +426,8 @@ Revisión del Blueprint del 2026-09-30 (tras ADR 0171): completada con ADR 0172�
 Revisión del Blueprint del 2026-09-30 (tras ADR 0176): completada con ADR 0177–0182.
 
 Revisión del Blueprint del 2026-09-30 (tras ADR 0182), verificada contra el código, sin bloqueos:
-1. Latido del worker y `/health/ready` (§5.22, §13.1): detectar desde fuera que el worker o el outbox se detuvieron.
-2. Galería del evento con miniaturas (§12.1): la imagen grande solo al abrirla.
-3. Backups cifrados con clave pública y con retención (§13.1).
+1. Galería del evento con miniaturas (§12.1): la imagen grande solo al abrirla.
+2. Backups cifrados con clave pública y con retención (§13.1).
 
 Bloqueadas o en espera:
 

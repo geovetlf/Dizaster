@@ -160,6 +160,15 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
     return { status: "ok" };
   });
 
+  /**
+   * Disponibilidad del sistema completo (ADR 0187): base de datos, latido de cada rol del worker y outbox que avanza.
+   * 503 si algo falla, para un monitor externo gratuito. Solo edades y códigos: nada de datos de personas.
+   */
+  app.get("/health/ready", async (_req, reply) => {
+    const r = await c.heartbeat.readiness();
+    return reply.status(r.ready ? 200 : 503).send(r);
+  });
+
   // ───────────── Configuración remota (proveedor de mapa intercambiable, kill switches) ─────────────
   /**
    * Versión mínima (ADR 0164): solo al escribir reportes y posts, y solo si la app declara plataforma y versión.

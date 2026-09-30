@@ -17,4 +17,7 @@ COPY --from=build /out /app
 COPY --from=build /data /data
 USER node
 EXPOSE 8080
+# Por defecto la imagen corre la API: vivo = responde /health (ADR 0187). El worker lo cambia en compose.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+  CMD ["node", "-e", "fetch('http://127.0.0.1:8080/health').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"]
 CMD ["node", "--import", "./dist/telemetry.js", "dist/server.js"]

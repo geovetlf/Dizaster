@@ -1,3 +1,4 @@
+import { hostname } from "node:os";
 import { buildContainer } from "./container.js";
 import { loadEnv } from "./platform/config.js";
 import { parseWorkerRoles, ROLE_LANES, type WorkerRole } from "./worker-roles.js";
@@ -10,6 +11,7 @@ import { parseWorkerRoles, ROLE_LANES, type WorkerRole } from "./worker-roles.js
 const env = loadEnv();
 const c = buildContainer(env);
 const roles = parseWorkerRoles(env.WORKER_ROLES);
+const instanceId = env.WORKER_INSTANCE_ID ?? hostname();
 let stopping = false;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const log = (msg: string, data: Record<string, unknown> = {}) => console.log(JSON.stringify({ msg, ...data }));
@@ -17,7 +19,13 @@ const warn = (msg: string, e: unknown) => console.warn(JSON.stringify({ msg, err
 
 /** Un error en una vuelta se registra y el bucle sigue: un rol nunca muere por un fallo puntual. */
 async function forever(role: WorkerRole, step: () => Promise<number>): Promise<void> {
+  let lastBeat = 0;
   while (!stopping) {
+    // Latido (ADR 0187) tras cada vuelta completa: una vuelta colgada deja de latir aunque el proceso siga vivo.
+    if (Date.now() - lastBeat > 10_000) {
+      lastBeat = Date.now();
+      await c.heartbeat.beat(instanceId, role).catch((e: unknown) => warn(`worker.${role}.heartbeat`, e));
+    }
     let work = 0;
     try {
       work = await step();
@@ -105,6 +113,7 @@ function maintenanceLoop(): Promise<void> {
       log("trust.standing.refresh", await c.trust.refreshStanding());
       log("retention.alerts", await c.alerts.applyRetention(c.env.NOTIFICATION_RETENTION_DAYS));
       log("retention.outbox", { deleted: await c.dispatcher.purgeProcessed(c.env.OUTBOX_RETENTION_DAYS) });
+      log("retention.heartbeats", { deleted: await c.heartbeat.prune() });
       log("retention.client_crashes", { deleted: await c.crashes.applyRetention(c.env.CLIENT_CRASH_RETENTION_DAYS) });
     }
     await sleep(5000);
@@ -125,7 +134,7 @@ async function meterLoop(): Promise<void> {
 
 for (const signal of ["SIGINT", "SIGTERM"] as const) process.on(signal, () => (stopping = true));
 await c.ingestion.syncRegistry(c.ref.sources);
-log("worker.start", { roles });
+log("worker.start", { roles, instanceId });
 const loops: Record<WorkerRole, () => Promise<void>> = { urgent: urgentLoop, normal: normalLoop, maintenance: maintenanceLoop };
 await Promise.all([...roles.map((r) => loops[r]()), meterLoop()]);
 await c.meter.flush(c.cost).catch(() => undefined);

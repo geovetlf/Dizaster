@@ -40,6 +40,10 @@ const Env = z.object({
   ALERT_DEFAULT_TTL_HOURS: z.coerce.number().int().min(1).max(720).default(24),
   /** Fallos de la app (ADR 0173). */
   CLIENT_CRASH_RETENTION_DAYS: z.coerce.number().int().min(1).max(365).default(30),
+  /** Latido del worker y /health/ready (ADR 0187). */
+  WORKER_INSTANCE_ID: z.string().min(1).max(100).optional(),
+  WORKER_HEARTBEAT_STALE_SECONDS: z.coerce.number().int().min(30).max(3600).default(180),
+  OUTBOX_READY_MAX_AGE_SECONDS: z.coerce.number().int().min(30).max(86400).default(300),
   PRESENCE_RETENTION_DAYS: z.coerce.number().int().positive().default(30),
   /** Claves de cifrado por columna (ADR 0048): "kid:base64(32 bytes)", separadas por comas; la primera cifra. */
   FIELD_KEYS: z.string().optional(),

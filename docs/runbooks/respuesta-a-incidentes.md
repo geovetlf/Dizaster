@@ -13,7 +13,7 @@
 - **Comunicación**: avisa a usuarios e instituciones si el incidente les afecta.
 
 ## Primeros 15 minutos
-1. Confirmar el síntoma con datos: `GET /health`, registros `ingestion.run` del worker, `platform.outbox` pendiente,
+1. Confirmar el síntoma con datos: `GET /health/ready` (dice qué rol del worker dejó de latir o si el outbox está parado, ADR 0187), `GET /health`, registros `ingestion.run` del worker, `platform.outbox` pendiente,
    tablero de costo en la app (ADR 0019, 0110).
 2. Contener con los interruptores existentes, sin desplegar código:
    - media: kill switches `media-upload` y `video` (ver presupuesto-y-kill-switches.md);
