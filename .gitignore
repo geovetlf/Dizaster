@@ -16,3 +16,16 @@ apps/mobile/android/
 infra/maps/out/
 sbom.cdx.json
 backups/
+
+# Credenciales de firma y de proveedores: nunca van al repo (se guardan en EAS o en el gestor de secretos).
+*.jks
+*.keystore
+*.p8
+*.p12
+*.pem
+*.key
+*.mobileprovision
+google-services.json
+GoogleService-Info.plist
+credentials.json
+*service-account*.json

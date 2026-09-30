@@ -408,6 +408,7 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | Evento en seguimiento vuelve a activo; inactividad por país (§5.7, §10.1) | ✅ | ADR 0215: actividad nueva reactiva MONITORING con entrada en timeline; ventanas con ajuste por país |
 | DIZASTER Language Engine: registro único de idiomas, locale regional, plurales ICU, formatos, respaldo (§5.15) | ✅ | ADR 0216: extiende el i18n existente; `docs/LANGUAGE_ENGINE.md`; BD sin lista de idiomas (0092); pruebas de completitud |
 | AI CORE → AI ROUTER → PROVIDER ADAPTER; 13 capacidades; matriz ¿necesita IA? (§ IA) | ✅ | ADR 0217: rutas por capacidad (AI_ROUTES), todo apagado; respaldo entre proveedores; la app funciona sin IA (probado) |
+| Secretos fuera del repositorio; build local de Android documentada (§ seguridad, §12) | ✅ | ADR 0218: `.gitignore` de firmas y Firebase; `pnpm check:secrets` en `pnpm check`; prebuild verificado, APK BLOQUEADO (EXPO_TOKEN/SDK) |
 | Licencias, auditoría, SBOM, Dependabot; respaldo con prueba de restauración en CI | ✅ | ADR 0070, `scripts/supply-chain.mjs`, `scripts/db-restore-check.mjs` |
 | Idioma de la app elegible en el perfil (es/en/pt/fr o del teléfono) | ✅ | ADR 0069, `app/language.tsx` |
 | Varias cuentas en un teléfono corroboran como una (clave seudónima del teléfono) | ✅ | ADR 0068, migración 0036 |
@@ -474,6 +475,7 @@ Revisión del Blueprint del 2026-09-30 (tras ADR 0212), verificada contra el có
 
 Bloqueadas o en espera:
 
+- **BLOQUEADA** — Primer APK real de Android: falta `EXPO_TOKEN` (cuenta gratuita de Expo del propietario) o una computadora con el Android SDK; el SDK no se puede descargar en el entorno del agente. `expo prebuild` verificado; pasos locales en `docs/MOBILE_PLATFORMS.md` (ADR 0218).
 - **BLOQUEADA** — Video 720p también en Android (§12.1, paridad): necesita transcodificar en el teléfono (módulo local con Media3 Transformer, Apache-2.0, sin coste). Es código nativo nuevo que no se puede compilar ni probar aquí (sin SDK de Android); se hace con el primer build de desarrollo (EXPO_TOKEN). Mientras tanto el límite de 60 MB acota el coste.
 - **EN ESPERA** — D1: días de retención de la ubicación precisa en categorías sensibles (§2 C-07).
 - **EN ESPERA** — D3: qué se muestra de la reputación en el perfil público (§5.2 vs §13.3).

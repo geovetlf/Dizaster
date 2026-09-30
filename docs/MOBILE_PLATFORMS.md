@@ -48,6 +48,28 @@ No se ejecuta en cada push para no gastar el cupo de builds (cost-first).
 La app usa módulos nativos (MapLibre, SQLite, almacenamiento seguro), así que **no funciona en Expo Go**:
 hay que instalar una build propia (APK en Android).
 
+## Build local de Android (sin EAS)
+
+Estado al 2026-09-30: **BLOQUEADA en el entorno del agente**. `expo prebuild --platform android` genera el proyecto
+nativo sin errores (paquete `app.dizaster.mobile`), pero compilar exige el Android SDK y su descarga
+(`dl.google.com`) está bloqueada en ese entorno; con EAS hace falta `EXPO_TOKEN` (paso del propietario). En cualquier
+computadora con internet normal se puede compilar gratis así:
+
+```sh
+# Requisitos: Node 22, pnpm, JDK 17 o 21 y Android SDK (Android Studio o command-line tools) con ANDROID_HOME.
+pnpm install
+cd apps/mobile
+npx expo prebuild --platform android --clean      # genera apps/mobile/android (no se versiona)
+cd android
+./gradlew assembleDebug                            # APK de prueba: app/build/outputs/apk/debug/app-debug.apk
+# ./gradlew assembleRelease                        # requiere una clave de firma propia (nunca en el repo)
+adb install app/build/outputs/apk/debug/app-debug.apk
+```
+
+La build de desarrollo necesita el servidor de Metro (`pnpm --filter @dizaster/mobile start`) en la misma red. Para
+push hace falta `google-services.json` junto a `app.json`: es un archivo secreto y `.gitignore` lo excluye, como las
+claves `.jks`, `.keystore`, `.p8` y `.pem` (`pnpm check:secrets` falla si alguno entra al repositorio).
+
 ## Pasos que requieren al propietario
 
 El agente no puede crear cuentas, aceptar contratos ni pagar. Todo lo demás ya está preparado.
