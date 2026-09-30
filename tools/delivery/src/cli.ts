@@ -7,6 +7,7 @@ import { execFileSync, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { sha256File, verifyManifest, type ArtifactManifest } from "./artifact.js";
+import { RuleAgent, validateProposal } from "./agent.js";
 import { appendAudit, readLog, verifyLog, type Actor } from "./audit.js";
 import { decide, isHuman, LEVELS, type Action } from "./autonomy.js";
 import { CloudRunTarget, type Runner } from "./cloudrun.js";
@@ -416,6 +417,33 @@ switch (cmd) {
     console.log(`${flags.has("execute") ? "" : "[en seco] "}tráfico al 100 % en ${to.revision.name} (${to.revision.digest.slice(0, 19)}…); esquema compatible hasta ${to.migration ?? "—"}`);
     break;
   }
+  case "agent": {
+    // Delivery Agent opcional (ADR 0283): propone pasos; el ejecutor los valida y cada comando vuelve a pasar sus gates.
+    const policy = loadPolicy(flag("policy"));
+    const env = flag("env", "staging") as "staging" | "production" | "local";
+    if (!["staging", "production", "local"].includes(env)) fail("--env: staging, production o local");
+    const { impact: im } = impact();
+    const history = readReleases(flag("releases", "delivery-releases.jsonl")!).filter((r) => r.env === env);
+    const proposal = await new RuleAgent().propose({ impact: im, policy, env, digest: flag("digest"), lastOutcome: history.at(-1)?.outcome ?? null });
+    const inject = Object.fromEntries(["image", "project", "region", "url", "env-file", "state", "base-port", "files", "base", "head", "worktree", "policy"].filter((k) => flags.has(k)).map((k) => [k, flag(k)!]));
+    const outcome = env === "local" ? "auto" : outcomeFor(policy, im.risk, env);
+    const steps = validateProposal(proposal, policy, outcome, flags.has("execute"), inject);
+    out({ proposal, steps }, () => [
+      `Agente ${proposal.agent} (${env}, riesgo ${im.risk}, política ${outcome}, nivel ${policy.autonomyLevel}):`,
+      ...steps.map((v, i) => `  ${i + 1}. ${v.allowed ? "✓" : "✗"} dzd ${v.argv.join(" ") || v.step.command}  # ${v.step.why}${v.allowed ? "" : ` — ${v.reason}`}`),
+      proposal.stop ? `  ■ se detiene: ${proposal.stop.reason} (${proposal.stop.needs})` : "",
+    ].filter(Boolean).join("\n"));
+    if (rest[0] !== "run") break;
+    for (const v of steps) {
+      if (!v.allowed) fail(`Detenido en ${v.step.command}: ${v.reason}`, 3);
+      console.log(`▶ dzd ${v.argv.join(" ")}`);
+      const r = spawnSync(process.execPath, [process.argv[1]!, ...v.argv], { stdio: "inherit" });
+      if (r.status !== 0) fail(`✗ ${v.step.command} falló (código ${r.status}); el agente no continúa.`);
+    }
+    appendAudit(flag("log", "delivery-audit.jsonl")!, { actor: `agent:${proposal.agent}`, action: "agent-run", environment: env === "local" ? "development" : env, artifactDigest: flag("digest"), result: "ok", details: { steps: steps.map((v) => v.step.command), stop: proposal.stop ?? null } });
+    if (proposal.stop) { console.log(`■ ${proposal.stop.reason}`); process.exit(proposal.stop.needs === "owner-approval" ? 3 : 0); }
+    break;
+  }
   case "local-proxy": {
     const port = Number(flag("port", "8088"));
     startProxy(flag("state", ".dzd/local-state.json")!, port);
@@ -432,6 +460,6 @@ switch (cmd) {
     break;
   }
   default:
-    console.log("uso: dzd <inspect|plan|policy|run-gates|autonomy|audit [verify|stats]|artifact [verify]|verify [--repeat N --slo]|slo|env-check|provenance [verify]|signature verify|iac-check|diagnose|docs|report|cost|config-check|deploy|promote|rollback [--env local]|local-proxy|load> [--json]");
+    console.log("uso: dzd <inspect|plan|policy|run-gates|autonomy|audit [verify|stats]|artifact [verify]|verify [--repeat N --slo]|slo|env-check|provenance [verify]|signature verify|iac-check|diagnose|docs|report|cost|config-check|deploy|promote|rollback [--env local]|local-proxy|load|agent [run]> [--json]");
     if (cmd) process.exit(1);
 }

@@ -2,7 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { appendFileSync, existsSync, readFileSync } from "node:fs";
 
 /** Quién inició la acción (Blueprint §20.20). */
-export type Actor = "human" | "claude" | "schedule" | "delivery-plane";
+export type Actor = "human" | "claude" | "schedule" | "delivery-plane" | `agent:${string}` | `github:${string}`;
 
 export interface AuditInput {
   actor: Actor;

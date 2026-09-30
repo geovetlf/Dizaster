@@ -98,6 +98,12 @@ pnpm dzd rollback --env local --env-file local.env --execute        # si el cont
 - El destino local no exige firma keyless (con `--key` la verifica) y no cuenta para promover: `promote` solo acepta
   digests desplegados en staging.
 
+## Delivery Agent (opcional, ADR 0283)
+
+`pnpm dzd agent --env staging --digest sha256:…` muestra qué propone el agente de reglas y qué permite la autonomía
+vigente. `dzd agent run … [--execute]` ejecuta los pasos permitidos en orden y se detiene en el primero denegado o
+fallido. El agente nunca aprueba producción y siempre actúa como `agent:<nombre>`.
+
 ## Auditoría
 
 `dzd audit verify --log delivery-audit.jsonl` confirma que nadie cambió, borró ni reordenó entradas.
