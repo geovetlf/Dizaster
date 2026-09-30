@@ -80,6 +80,11 @@ const Env = z.object({
   S3_SECRET_ACCESS_KEY: z.string().optional(),
   S3_FORCE_PATH_STYLE: z.enum(["true", "false"]).default("false").transform((v) => v === "true"),
   MEDIA_PUBLIC_BASE_URL: z.string().optional(),
+  /**
+   * Cache-Control de las variantes públicas en el almacenamiento y la CDN (ADR 0286). Una hora por defecto: la
+   * CDN absorbe las lecturas repetidas y una media retirada deja de servirse en, como mucho, ese plazo.
+   */
+  MEDIA_PUBLIC_CACHE_CONTROL: z.string().regex(/^(public|private)(, ?[a-z-]+(=\d+)?)*$/, "Cache-Control inválido").default("public, max-age=3600"),
   MEDIA_UPLOADS_PER_HOUR_LIMIT: z.coerce.number().int().positive().default(30),
   /** MB subidos en 24 h por cuenta con reputación normal; nueva: la mitad; baja: un cuarto (ADR 0072). */
   MEDIA_DAILY_UPLOAD_MB: z.coerce.number().int().min(60).default(300),

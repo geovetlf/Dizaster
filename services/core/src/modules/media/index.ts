@@ -39,6 +39,8 @@ export interface MediaLimits {
   uploadsPerHour: number;
   uploadUrlTtlSeconds: number;
   originalRetentionDays: number;
+  /** Cache-Control de las variantes públicas (ADR 0286). Sin valor, el del proveedor. */
+  publicCacheControl?: string | undefined;
 }
 
 /** Variante pública saneada (sin metadatos de ubicación). La única que sale por la API. */
@@ -221,7 +223,7 @@ export class MediaService {
       throw err;
     }
     const variant = async (name: string, key: string, data: Uint8Array, mime: string) => {
-      await this.storage.put(key, data, mime);
+      await this.storage.put(key, data, mime, this.limits.publicCacheControl ? { cacheControl: this.limits.publicCacheControl } : undefined);
       await tx.query(
         `INSERT INTO media.variants (media_id, variant, storage_key, bytes, mime) VALUES ($1, $2, $3, $4, $5)
          ON CONFLICT (media_id, variant) DO UPDATE SET storage_key = EXCLUDED.storage_key, bytes = EXCLUDED.bytes, mime = EXCLUDED.mime`,
