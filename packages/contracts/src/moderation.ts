@@ -27,6 +27,8 @@ export const ModerationActionType = z.enum([
   "APPROVE_MEDIA", "MARK_GRAPHIC",
   // Quitar la foto de un perfil o el logo de un negocio (ADR 0119) sin tocar la cuenta ni sus posts.
   "REMOVE_AVATAR",
+  // Vaciar la bio y volver el nombre visible al handle (ADR 0263): doxxing o insultos en el perfil.
+  "CLEAR_PROFILE_TEXT",
 ]);
 export type ModerationActionType = z.infer<typeof ModerationActionType>;
 

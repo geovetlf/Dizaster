@@ -152,6 +152,23 @@ describe("foto de perfil y logo", () => {
     expect((await t.app.inject({ method: "POST", url: `/v1/moderation/cases/${postCase}/actions`, headers: auth(mod), payload: { action: "REMOVE_AVATAR", reason: "No aplica a posts" } })).statusCode).toBe(400);
   });
 
+  it("una bio con datos personales va a revisión y moderación la vacía (ADR 0263)", async () => {
+    const dora = await createUser(t, "dora_bio");
+    const doraHandle = await handleOf(dora);
+    const patch = await t.app.inject({ method: "PATCH", url: "/v1/me", headers: auth(dora), payload: { displayName: "Dora", bio: "Escríbeme al 987 654 321" } });
+    expect(patch.statusCode, patch.body).toBe(200);
+    await t.c.dispatcher.drain();
+    const c = (await t.c.db.query<{ id: string }>(`SELECT id FROM moderation.cases WHERE target_type = 'PROFILE' AND target_id = $1 AND status = 'OPEN'`, [dora.profileId])).rows[0];
+    expect(c).toBeTruthy();
+    const detail = (await t.app.inject({ url: `/v1/moderation/cases/${c!.id}`, headers: auth(mod) })).json();
+    expect(JSON.stringify(detail)).toContain("987 654 321");
+
+    const acted = await t.app.inject({ method: "POST", url: `/v1/moderation/cases/${c!.id}/actions`, headers: auth(mod), payload: { action: "CLEAR_PROFILE_TEXT", reason: "La bio expone un teléfono" } });
+    expect(acted.statusCode, acted.body).toBe(200);
+    const view = (await t.app.inject({ url: `/v1/profiles/${doraHandle}` })).json() as ProfileView;
+    expect(view).toMatchObject({ bio: null, displayName: doraHandle });
+  });
+
   it("borrar la cuenta quita la foto", async () => {
     const photo = await upload(ana);
     expect((await setAvatar(ana, photo)).statusCode).toBe(200);

@@ -451,6 +451,7 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | Índices por autor (ADR 0259) | ✅ | migración 0101 |
 | Retraso de publicación en interacciones y menciones (ADR 0257) | ✅ | `assertVisible`, `availableAt` en el outbox |
 | Plano de Software Delivery e Ingeniería: diseño (ADR 0260–0262) | ✅ diseño | Blueprint §20; implementación en "Plano de entrega" |
+| Moderación de bio y nombre de perfil (ADR 0263) | ✅ | `CLEAR_PROFILE_TEXT`, reglas al editar, migración 0102 |
 | Licencias, auditoría, SBOM, Dependabot; respaldo con prueba de restauración en CI | ✅ | ADR 0070, `scripts/supply-chain.mjs`, `scripts/db-restore-check.mjs` |
 | Idioma de la app elegible en el perfil (es/en/pt/fr o del teléfono) | ✅ | ADR 0069, `app/language.tsx` |
 | Varias cuentas en un teléfono corroboran como una (clave seudónima del teléfono) | ✅ | ADR 0068, migración 0036 |
@@ -522,11 +523,10 @@ Revisión del Blueprint del 2026-09-30 (tras ADR 0250): completada con ADR 0251�
 
 Revisión del Blueprint del 2026-09-30 (tras ADR 0256), verificada contra el código, sin bloqueos:
 
-1. Moderación de bio y nombre de perfil (§13.3).
-2. Comentarios y bloqueos en transacción, sin carrera en el cupo (§4.2).
-3. Purgar sesiones rotadas y caducadas (§13.2, §7.4).
-4. La app muestra los fallos al bloquear, desbloquear, borrar o buscar (§13.3).
-5. En iOS el teclado no tapa los campos de texto (RF-01).
+1. Comentarios y bloqueos en transacción, sin carrera en el cupo (§4.2).
+2. Purgar sesiones rotadas y caducadas (§13.2, §7.4).
+3. La app muestra los fallos al bloquear, desbloquear, borrar o buscar (§13.3).
+4. En iOS el teclado no tapa los campos de texto (RF-01).
 
 Plano de entrega (Blueprint §20, ADR 0260–0262; diseño aprobado por el propietario el 2026-09-30, sin implementar el agente todavía). Nivel de autonomía actual: 2 sin GitHub.
 

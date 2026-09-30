@@ -45,9 +45,9 @@ export interface DomainEventMap {
   /** El mismo texto (normalizado) publicado por varias cuentas distintas en pocas horas: posible spam coordinado. */
   DuplicateTextDetected: { postIds: string[] };
   /** Texto con posibles datos personales (ADR 0088). Solo los tipos, nunca el dato. */
-  PersonalDataDetected: { targetType: "POST" | "COMMENT"; targetId: string; kinds: string[] };
+  PersonalDataDetected: { targetType: "POST" | "COMMENT" | "PROFILE"; targetId: string; kinds: string[] };
   /** Texto con términos de las listas de moderación (ADR 0148): va a revisión con el motivo; nunca se oculta solo. */
-  ModerationTermsMatched: { targetType: "POST" | "COMMENT"; targetId: string; matches: { term: string; reason: string }[] };
+  ModerationTermsMatched: { targetType: "POST" | "COMMENT" | "PROFILE"; targetId: string; matches: { term: string; reason: string }[] };
   /** La reputación de una persona entró o salió del nivel bajo (ADR 0031). Solo ordena el feed. */
   AuthorStandingChanged: { userId: string; lowTrust: boolean };
   ModerationActionTaken: {

@@ -8,6 +8,8 @@ describe("moderación (lógica de la app)", () => {
     expect(actionsFor("EVENT")).toEqual(["MARK_DISPUTED", "DISMISS"]);
     expect(actionsFor("PROFILE")).not.toContain("REMOVE");
     expect(actionsFor("PROFILE")).toContain("REMOVE_AVATAR");
+    expect(actionsFor("PROFILE")).toContain("CLEAR_PROFILE_TEXT");
+    expect(actionsFor("BUSINESS")).not.toContain("CLEAR_PROFILE_TEXT");
     expect(actionsFor("BUSINESS")).toContain("REMOVE_AVATAR");
     expect(actionsFor("POST")).not.toContain("REMOVE_AVATAR");
     expect(isSevere("REMOVE")).toBe(true);

@@ -256,6 +256,7 @@ export const fr: Record<MessageKey, string> = {
   avatarRejected: "Impossible d'utiliser cette image. Essayez-en une autre.",
   avatarSlow: "L'image est encore en traitement. Réessayez dans un instant.",
   action_REMOVE_AVATAR: "Retirer la photo ou le logo",
+  action_CLEAR_PROFILE_TEXT: "Retirer la bio et le nom",
   externalSource_one: "source externe",
   externalSources: "sources externes",
   officialSource_one: "source officielle",

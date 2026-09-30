@@ -299,7 +299,7 @@ export class SocialService {
    * nunca con el dato. No se oculta solo: decide una persona (puede ser el teléfono de un albergue).
    */
   private async detectPersonalData(
-    q: Queryable, targetType: "POST" | "COMMENT", targetId: string, text: string, only: readonly string[] | null,
+    q: Queryable, targetType: "POST" | "COMMENT" | "PROFILE", targetId: string, text: string, only: readonly string[] | null,
   ): Promise<void> {
     const kinds = detectPersonalData(text, this.publicNumbers).filter((k) => !only || only.includes(k));
     if (kinds.length) await publish(q, "PersonalDataDetected", { targetType, targetId, kinds });
@@ -901,6 +901,15 @@ export class SocialService {
     if (patch.mentionsFrom !== undefined) sets.push(`mentions_from = $${params.push(patch.mentionsFrom)}`);
     const res = await q.query(`UPDATE social.profiles SET ${sets.join(", ")}, updated_at = now() WHERE id = $1 AND deleted_at IS NULL`, params);
     if (res.rowCount === 0) throw notFound("Perfil");
+    // Mismas reglas que posts y comentarios (ADR 0088, 0148, 0263): nombre y bio van a revisión si parecen exponer
+    // datos personales o contienen términos de las listas. Nada se oculta solo.
+    const text = [patch.displayName, patch.bio].filter(Boolean).join("\n");
+    if (text) await this.detectPersonalData(q, "PROFILE", profileId, text, null);
+  }
+
+  /** Moderación (ADR 0263): bio vacía y nombre visible = handle. */
+  async clearProfileText(q: Queryable, profileId: string): Promise<void> {
+    await q.query(`UPDATE social.profiles SET bio = NULL, display_name = handle, updated_at = now() WHERE id = $1`, [profileId]);
   }
 
   /** Busca personas por handle o nombre (prefijo de palabra). Primero coincidencias exactas y cuentas más seguidas. */
@@ -1191,11 +1200,12 @@ export class SocialService {
       return r ? { id: r.id, text: [r.name, r.description].filter(Boolean).join(" · "), authorHandle: r.handle, authorUserId: r.owner_user_id, state: r.moderation_state, categoryCode: null, reach: 0, eventId: null } : null;
     }
     if (type === "PROFILE") {
-      const { rows } = await q.query<{ id: string; handle: string; display_name: string; user_id: string }>(
-        `SELECT id, handle, display_name, user_id FROM social.profiles WHERE id = $1`, [id],
+      const { rows } = await q.query<{ id: string; handle: string; display_name: string; bio: string | null; user_id: string }>(
+        `SELECT id, handle, display_name, bio, user_id FROM social.profiles WHERE id = $1`, [id],
       );
       const r = rows[0];
-      return r ? { id: r.id, text: r.display_name, authorHandle: r.handle, authorUserId: r.user_id, state: "VISIBLE", categoryCode: null, reach: 0, eventId: null } : null;
+      // Nombre y bio (ADR 0263): la bio es lo que más se usa para exponer a alguien.
+      return r ? { id: r.id, text: [r.display_name, r.bio].filter(Boolean).join(" · "), authorHandle: r.handle, authorUserId: r.user_id, state: "VISIBLE", categoryCode: null, reach: 0, eventId: null } : null;
     }
     if (type === "COMMENT") {
       const { rows } = await q.query<{ id: string; text: string; handle: string; user_id: string; moderation_state: string }>(

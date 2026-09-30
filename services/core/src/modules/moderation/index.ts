@@ -59,7 +59,7 @@ export const APPEAL_WINDOW_DAYS = 30;
 const ALLOWED: Record<FlagTargetType, ModerationActionType[]> = {
   POST: ["HIDE", "REMOVE", "RESTORE", "LIMIT", "WARN_USER", "SUSPEND_USER", "UNSUSPEND_USER", "DISMISS", "APPROVE_MEDIA", "MARK_GRAPHIC"],
   COMMENT: ["HIDE", "REMOVE", "RESTORE", "WARN_USER", "SUSPEND_USER", "UNSUSPEND_USER", "DISMISS"],
-  PROFILE: ["REMOVE_AVATAR", "WARN_USER", "SUSPEND_USER", "UNSUSPEND_USER", "DISMISS"],
+  PROFILE: ["REMOVE_AVATAR", "CLEAR_PROFILE_TEXT", "WARN_USER", "SUSPEND_USER", "UNSUSPEND_USER", "DISMISS"],
   // Retirar un negocio lo oculta con todos sus posts; las acciones sobre la cuenta afectan a quien lo administra.
   BUSINESS: ["REMOVE", "RESTORE", "REMOVE_AVATAR", "WARN_USER", "SUSPEND_USER", "UNSUSPEND_USER", "DISMISS"],
   EVENT: ["MARK_DISPUTED", "DISMISS"],
@@ -67,7 +67,7 @@ const ALLOWED: Record<FlagTargetType, ModerationActionType[]> = {
 /** Acciones que cierran el caso (las demás, como avisar, lo dejan abierto). */
 const CLOSES: Partial<Record<ModerationActionType, CaseStatus>> = {
   HIDE: "RESOLVED", REMOVE: "RESOLVED", RESTORE: "RESOLVED", SUSPEND_USER: "RESOLVED", MARK_DISPUTED: "RESOLVED", DISMISS: "DISMISSED",
-  APPROVE_MEDIA: "RESOLVED", REMOVE_AVATAR: "RESOLVED",
+  APPROVE_MEDIA: "RESOLVED", REMOVE_AVATAR: "RESOLVED", CLEAR_PROFILE_TEXT: "RESOLVED",
 };
 /** Acciones apelables y su inversa si la apelación prospera. */
 const INVERSE: Partial<Record<ModerationActionType, ModerationActionType>> = {
@@ -427,6 +427,10 @@ export class ModerationService {
           await this.media.blockHashes(tx, [prev]);
           await this.media.purgeMedia(tx, [prev]);
         }
+      } else if (p.action === "CLEAR_PROFILE_TEXT") {
+        // Bio vacía y nombre = handle (ADR 0263). La cuenta, la foto y los posts siguen igual; la persona puede
+        // escribir otra bio, que vuelve a pasar por las reglas de datos personales y términos.
+        await this.social.clearProfileText(tx, p.targetId);
       } else if (p.targetType === "POST" && (p.action === "APPROVE_MEDIA" || p.action === "MARK_GRAPHIC")) {
         const mediaIds = await this.social.mediaOfPost(tx, p.targetId);
         if (p.action === "APPROVE_MEDIA") await this.media.approve(tx, mediaIds);
