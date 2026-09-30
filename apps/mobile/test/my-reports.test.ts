@@ -23,3 +23,12 @@ describe("myReportLines", () => {
     expect(canWithdraw(base)).toBe(true);
   });
 });
+
+describe("reportes sin enviar (ADR 0158)", () => {
+  it("distingue esperar red, reintentar y detenido", async () => {
+    const { queuedState } = await import("../src/lib/report/my-reports");
+    expect(queuedState({ attempts: 0 })).toBe("WAITING_NETWORK");
+    expect(queuedState({ attempts: 2 })).toBe("RETRYING");
+    expect(queuedState({ attempts: 2, stuck: { reason: "422", at: "x" } })).toBe("STUCK");
+  });
+});

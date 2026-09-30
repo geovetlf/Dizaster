@@ -31,6 +31,6 @@ export const uploadMedia: MediaUploader = async (m: LocalMedia) => {
     return { ok: true, mediaId };
   } catch (err) {
     const status = (err as { status?: number }).status;
-    return { ok: false, retryable: status === undefined || status >= 500 || status === 429 || status === 409, error: (err as Error).message };
+    return { ok: false, retryable: status === undefined || status >= 500 || status === 429 || status === 409, error: (err as Error).message, ...(status === undefined ? { offline: true } : {}) };
   }
 };

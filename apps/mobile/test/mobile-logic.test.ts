@@ -32,13 +32,15 @@ describe("señales de presencia", () => {
 });
 
 describe("cola offline", () => {
-  it("reintenta errores de red y conserva el orden; elimina errores definitivos", async () => {
-    const q = new ReportQueue(new MemoryQueueStorage());
+  it("sin red reintenta sin gastar intentos y conserva el orden; un error definitivo detiene sin borrar (ADR 0158)", async () => {
+    const q = new ReportQueue(new MemoryQueueStorage(), 3);
     await q.enqueue(body("01928c1e-7b1a-7cc0-8a9e-2c4f5d6e7f81"), new Date("2026-09-29T10:00:00Z"));
     await q.enqueue(body("01928c1e-7b1a-7cc0-8a9e-2c4f5d6e7f82"), new Date("2026-09-29T10:01:00Z"));
-    const offline = await q.flush(async () => ({ ok: false, retryable: true, error: "Network request failed" }));
-    expect(offline).toMatchObject({ sent: [], failed: 2, dropped: 0 });
-    expect((await q.pending()).map((p) => p.attempts)).toEqual([1, 1]);
+    for (let i = 0; i < 5; i++) {
+      const offline = await q.flush(async () => ({ ok: false, retryable: true, offline: true, error: "Network request failed" }));
+      expect(offline).toMatchObject({ sent: [], failed: 2, stuck: 0, offline: true });
+    }
+    expect((await q.pending()).map((p) => p.attempts)).toEqual([0, 0]);
 
     const seen: string[] = [];
     const online = await q.flush(async (b) => {
@@ -48,9 +50,34 @@ describe("cola offline", () => {
         : { ok: false, retryable: false, error: "422" };
     });
     expect(seen).toEqual(["01928c1e-7b1a-7cc0-8a9e-2c4f5d6e7f81", "01928c1e-7b1a-7cc0-8a9e-2c4f5d6e7f82"]);
-    expect(online.sent).toHaveLength(1);
-    expect(online.dropped).toBe(1);
+    expect(online).toMatchObject({ failed: 0, stuck: 1, offline: false });
+    const [left] = await q.pending();
+    expect(left).toMatchObject({ clientReportId: "01928c1e-7b1a-7cc0-8a9e-2c4f5d6e7f82", stuck: { reason: "422" } });
+    // Detenido: no se reenvía solo.
+    let calls = 0;
+    expect(await q.flush(async () => { calls++; return { ok: false, retryable: true, error: "500" }; })).toMatchObject({ stuck: 1 });
+    expect(calls).toBe(0);
+    // Reintentar lo devuelve a la cola; descartar lo saca y lo entrega para borrar sus copias.
+    await q.retry(left!.clientReportId);
+    expect((await q.pending())[0]).toMatchObject({ attempts: 0 });
+    expect((await q.pending())[0]!.stuck).toBeUndefined();
+    expect((await q.discard(left!.clientReportId))?.clientReportId).toBe(left!.clientReportId);
     expect(await q.pending()).toEqual([]);
+  });
+
+  it("errores con red se reintentan hasta el máximo y entonces se detienen", async () => {
+    const q = new ReportQueue(new MemoryQueueStorage(), 3);
+    await q.enqueue(body("01928c1e-7b1a-7cc0-8a9e-2c4f5d6e7f83"));
+    const r500 = async () => ({ ok: false as const, retryable: true, error: "500" });
+    expect(await q.flush(r500)).toMatchObject({ failed: 1, stuck: 0 });
+    expect(await q.flush(r500)).toMatchObject({ failed: 1, stuck: 0 });
+    expect(await q.flush(r500)).toMatchObject({ failed: 0, stuck: 1 });
+    expect(await q.pending()).toHaveLength(1);
+  });
+
+  it("espera creciente entre reintentos automáticos, con techo", async () => {
+    const { retryDelayMs } = await import("../src/lib/report/queue");
+    expect([0, 1, 2, 3, 10].map(retryDelayMs)).toEqual([15_000, 30_000, 60_000, 120_000, 300_000]);
   });
 });
 

@@ -288,7 +288,8 @@ export const sendReport: Sender = async (body) => {
     return { ok: true, response: await api.submitReport(body) };
   } catch (err) {
     const status = (err as { status?: number }).status;
-    const retryable = status === undefined || status >= 500 || status === 429;
-    return { ok: false, retryable, error: (err as Error).message };
+    // 401: sesión vencida o revocada; el reporte espera al nuevo inicio de sesión, no se pierde.
+    const retryable = status === undefined || status >= 500 || status === 429 || status === 401;
+    return { ok: false, retryable, error: (err as Error).message, ...(status === undefined ? { offline: true } : {}) };
   }
 };

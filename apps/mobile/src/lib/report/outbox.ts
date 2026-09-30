@@ -2,7 +2,7 @@ import { AppState } from "react-native";
 import { sendReport } from "../api";
 import { discardLocal } from "../media/capture";
 import { uploadMedia } from "../media/upload";
-import { ReportQueue, type FlushResult, type QueuedReport } from "./queue";
+import { ReportQueue, retryDelayMs, type FlushResult, type QueuedReport } from "./queue";
 import { SqliteQueueStorage } from "./sqlite-storage";
 
 /** Cola única de la app: la usan la pantalla de reporte y el reenvío automático. */
@@ -34,11 +34,41 @@ export async function flushUntilSent(clientReportId: string): Promise<FlushResul
   return null;
 }
 
-/** Reenvío automático: al iniciar sesión y cada vez que la app vuelve a primer plano (Android e iOS). */
+/** Descartar un reporte sin enviar (decisión de la persona): sale de la cola y se borran sus copias locales. */
+export async function discardQueuedReport(clientReportId: string): Promise<void> {
+  const item = await reportQueue.discard(clientReportId);
+  if (item) cleanUp(item);
+}
+
+/** Volver a intentar un reporte detenido. */
+export async function retryQueuedReport(clientReportId: string): Promise<FlushResult> {
+  await reportQueue.retry(clientReportId);
+  return flushReports();
+}
+
+/**
+ * Reenvío automático (ADR 0158): al iniciar sesión, al volver a primer plano y, mientras la app está abierta y
+ * queda algo en cola, con espera creciente (15 s → 5 min). Así, si la red vuelve con la app abierta, el reporte
+ * sale sin que la persona haga nada. En segundo plano no corre nada (eso requiere un módulo nativo). Android e iOS.
+ */
 export function startAutoFlush(): () => void {
-  void flushReports().catch(() => undefined);
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  let failures = 0;
+  const clear = () => { if (timer) clearTimeout(timer); timer = null; };
+  const run = () => {
+    clear();
+    void flushReports().then((r) => {
+      if (r.failed > 0 && AppState.currentState === "active") {
+        timer = setTimeout(run, retryDelayMs(failures));
+        failures++;
+      } else {
+        failures = 0;
+      }
+    }).catch(() => undefined);
+  };
+  run();
   const sub = AppState.addEventListener("change", (s) => {
-    if (s === "active") void flushReports().catch(() => undefined);
+    if (s === "active") { failures = 0; run(); } else clear();
   });
-  return () => sub.remove();
+  return () => { clear(); sub.remove(); };
 }

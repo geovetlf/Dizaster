@@ -18,9 +18,15 @@ export interface QueuedReport {
   clientReportId: string;
   body: SubmitReportRequest;
   media?: QueuedMedia[];
+  /** Intentos fallidos CON conexión (el servidor respondió mal). Estar sin red no cuenta (ADR 0158). */
   attempts: number;
   lastError: string | null;
   createdAt: string;
+  /**
+   * Detenido: error definitivo o demasiados intentos con conexión. Nunca se borra solo: queda con su media para
+   * que la persona lo reintente o lo descarte.
+   */
+  stuck?: { reason: string; at: string };
 }
 
 export interface QueueStorage {
@@ -29,13 +35,19 @@ export interface QueueStorage {
   remove(clientReportId: string): Promise<void>;
 }
 
-export type Sender = (body: SubmitReportRequest) => Promise<{ ok: true; response: SubmitReportResponse } | { ok: false; retryable: boolean; error: string }>;
-export type MediaUploader = (m: LocalMedia) => Promise<{ ok: true; mediaId: string } | { ok: false; retryable: boolean; error: string }>;
+/** `offline`: no hubo respuesta del servidor (sin red). Se reintenta sin gastar intentos. */
+type Failure = { ok: false; retryable: boolean; error: string; offline?: boolean };
+export type Sender = (body: SubmitReportRequest) => Promise<{ ok: true; response: SubmitReportResponse } | Failure>;
+export type MediaUploader = (m: LocalMedia) => Promise<{ ok: true; mediaId: string } | Failure>;
 
 export interface FlushResult {
   sent: SubmitReportResponse[];
+  /** Siguen en cola y se reintentarán. */
   failed: number;
-  dropped: number;
+  /** Detenidos a la espera de la persona (Reintentar / Descartar). */
+  stuck: number;
+  /** Algún fallo fue por falta de conexión. */
+  offline: boolean;
   /** Respuesta de cada reporte enviado, por su clientReportId. */
   byClientId: Record<string, SubmitReportResponse>;
 }
@@ -54,10 +66,26 @@ export class ReportQueue {
     return (await this.storage.all()).sort((a, b) => a.createdAt.localeCompare(b.createdAt));
   }
 
+  /** La persona pide reintentar un reporte detenido: vuelve a la cola con los intentos a cero. */
+  async retry(clientReportId: string): Promise<void> {
+    const item = (await this.storage.all()).find((i) => i.clientReportId === clientReportId);
+    if (!item) return;
+    const { stuck: _s, ...rest } = item;
+    await this.storage.put({ ...rest, attempts: 0, media: (rest.media ?? []).map(({ failed: _f, ...m }) => m) });
+  }
+
+  /** La persona descarta un reporte: sale de la cola. Devuelve el ítem para borrar sus copias locales. */
+  async discard(clientReportId: string): Promise<QueuedReport | null> {
+    const item = (await this.storage.all()).find((i) => i.clientReportId === clientReportId) ?? null;
+    if (item) await this.storage.remove(clientReportId);
+    return item;
+  }
+
   /**
    * Envía en orden de captura. Primero sube la media pendiente del reporte y después el reporte con sus ids.
-   * Los errores definitivos (4xx) salen de la cola; los de red se reintentan. Una foto que falla de forma
-   * definitiva no bloquea el reporte: en un desastre importa más que el aviso llegue.
+   * Sin red se reintenta siempre, sin gastar intentos. Un error definitivo (4xx) o demasiados errores con red
+   * detienen el reporte, que NO se borra: queda con su media hasta que la persona lo reintente o descarte
+   * (ADR 0158). Una foto que falla de forma definitiva no bloquea el reporte.
    */
   async flush(
     send: Sender,
@@ -68,16 +96,31 @@ export class ReportQueue {
     const sent: SubmitReportResponse[] = [];
     const byClientId: Record<string, SubmitReportResponse> = {};
     let failed = 0;
-    let dropped = 0;
+    let stuck = 0;
+    let offline = false;
+    const fail = async (it: QueuedReport, f: { error: string; retryable: boolean; offline?: boolean }) => {
+      if (f.offline) {
+        offline = true;
+        failed++;
+        await this.storage.put({ ...it, lastError: f.error });
+      } else if (!f.retryable || it.attempts + 1 >= this.maxAttempts) {
+        stuck++;
+        await this.storage.put({ ...it, attempts: it.attempts + 1, lastError: f.error, stuck: { reason: f.error, at: now().toISOString() } });
+      } else {
+        failed++;
+        await this.storage.put({ ...it, attempts: it.attempts + 1, lastError: f.error });
+      }
+    };
     for (const queued of await this.pending()) {
+      if (queued.stuck) { stuck++; continue; }
       let item = queued;
       const media = item.media ?? [];
       if (media.some((m) => !m.mediaId && !m.failed)) {
         if (!upload) { failed++; continue; }
         const uploaded = await this.uploadPending(item, media, upload);
         if (!uploaded.ok) {
-          failed++;
-          await this.storage.put({ ...uploaded.item, attempts: item.attempts + 1, lastError: uploaded.error });
+          // Una subida que falla con red se reintenta (la foto no detiene el reporte para siempre).
+          await fail(uploaded.item, { error: uploaded.error, retryable: true, offline: uploaded.offline });
           continue;
         }
         item = uploaded.item;
@@ -90,21 +133,16 @@ export class ReportQueue {
         byClientId[item.clientReportId] = res.response;
         await this.storage.remove(item.clientReportId);
         onDone?.(item);
-      } else if (!res.retryable || item.attempts + 1 >= this.maxAttempts) {
-        dropped++;
-        await this.storage.remove(item.clientReportId);
-        onDone?.(item);
       } else {
-        failed++;
-        await this.storage.put({ ...item, attempts: item.attempts + 1, lastError: res.error });
+        await fail(item, res);
       }
     }
-    return { sent, failed, dropped, byClientId };
+    return { sent, failed, stuck, offline, byClientId };
   }
 
   private async uploadPending(
     item: QueuedReport, media: QueuedMedia[], upload: MediaUploader,
-  ): Promise<{ ok: true; item: QueuedReport } | { ok: false; item: QueuedReport; error: string }> {
+  ): Promise<{ ok: true; item: QueuedReport } | { ok: false; item: QueuedReport; error: string; offline?: boolean }> {
     const next = [...media];
     for (let i = 0; i < next.length; i++) {
       const m = next[i]!;
@@ -112,12 +150,20 @@ export class ReportQueue {
       const r = await upload(m);
       if (r.ok) next[i] = { ...m, mediaId: r.mediaId };
       else if (!r.retryable) next[i] = { ...m, failed: r.error };
-      else return { ok: false, item: { ...item, media: next }, error: r.error };
+      else return { ok: false, item: { ...item, media: next }, error: r.error, ...(r.offline ? { offline: true } : {}) };
       // Progreso persistido: si la app se cierra, no se vuelve a subir lo ya subido.
       await this.storage.put({ ...item, media: next });
     }
     return { ok: true, item: { ...item, media: next } };
   }
+}
+
+/**
+ * Espera antes del siguiente reintento automático con la app abierta: 15 s, 30 s, 1 min… hasta 5 min.
+ * NO AI REQUIRED.
+ */
+export function retryDelayMs(consecutiveFailures: number): number {
+  return Math.min(5 * 60_000, 15_000 * 2 ** Math.max(0, consecutiveFailures));
 }
 
 export class MemoryQueueStorage implements QueueStorage {

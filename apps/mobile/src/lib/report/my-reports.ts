@@ -17,3 +17,10 @@ export function myReportLines(r: MyReportView, t: (k: MessageKey) => string, fmt
 
 /** Se puede retirar mientras no esté retirado. */
 export const canWithdraw = (r: Pick<MyReportView, "status">) => r.status !== "WITHDRAWN";
+
+/** Estado de un reporte que sigue en el teléfono (ADR 0158). */
+export type QueuedState = "WAITING_NETWORK" | "RETRYING" | "STUCK";
+export function queuedState(q: { stuck?: unknown; attempts: number }): QueuedState {
+  if (q.stuck) return "STUCK";
+  return q.attempts > 0 ? "RETRYING" : "WAITING_NETWORK";
+}

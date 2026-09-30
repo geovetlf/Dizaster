@@ -4,7 +4,9 @@ import { useCallback, useState } from "react";
 import { Alert, FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import { api } from "../lib/api";
 import { lang, t } from "../lib/i18n";
-import { canWithdraw, myReportLines } from "../lib/report/my-reports";
+import { canWithdraw, myReportLines, queuedState } from "../lib/report/my-reports";
+import { discardQueuedReport, reportQueue, retryQueuedReport } from "../lib/report/outbox";
+import type { QueuedReport } from "../lib/report/queue";
 import { formatInZone, timeAgo } from "../lib/ui/format";
 import { colors, radius, space } from "../theme";
 import { categoryLabel } from "../lib/category-store";
@@ -17,7 +19,39 @@ const fmt = (iso: string) => formatInZone(iso, lang, undefined, "datetime") ?? i
 export default function MyReportsScreen() {
   const [reports, setReports] = useState<MyReportView[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const load = useCallback(() => { api.myReports().then((r) => setReports(r.reports)).catch((e: Error) => setError(e.message)); }, []);
+  // Lo que sigue en el teléfono (ADR 0158): sin red, reintentando o detenido. Nunca se borra sin preguntar.
+  const [queued, setQueued] = useState<QueuedReport[]>([]);
+  const load = useCallback(() => {
+    reportQueue.pending().then(setQueued).catch(() => setQueued([]));
+    api.myReports().then((r) => setReports(r.reports)).catch((e: Error) => setError(e.message));
+  }, []);
+
+  function confirmDiscard(q: QueuedReport) {
+    Alert.alert(t("queuedDiscard"), t("queuedDiscardConfirm"), [
+      { text: t("cancel"), style: "cancel" },
+      { text: t("queuedDiscard"), style: "destructive", onPress: () => void discardQueuedReport(q.clientReportId).then(load) },
+    ]);
+  }
+
+  const queuedHeader = queued.length ? (
+    <View>
+      <Text style={styles.section}>{t("queuedTitle")}</Text>
+      {queued.map((q) => {
+        const state = queuedState(q);
+        return (
+          <View key={q.clientReportId} style={styles.card}>
+            <Text style={styles.title}>{categoryName(q.body.categoryCode)} · {timeAgo(q.createdAt, lang)}</Text>
+            <Text style={styles.meta}>{t(`queuedState_${state}`)}{state === "STUCK" && q.stuck ? ` · ${q.stuck.reason}` : ""}</Text>
+            {q.media?.length ? <Text style={styles.meta}>{t("queuedMediaKept")}</Text> : null}
+            <View style={styles.actions}>
+              <Pressable accessibilityRole="button" onPress={() => void retryQueuedReport(q.clientReportId).then(load).catch(load)}><Text style={styles.link}>{t("queuedRetry")}</Text></Pressable>
+              <Pressable accessibilityRole="button" onPress={() => confirmDiscard(q)}><Text style={styles.danger}>{t("queuedDiscard")}</Text></Pressable>
+            </View>
+          </View>
+        );
+      })}
+    </View>
+  ) : null;
   useFocusEffect(load);
 
   function confirmWithdraw(r: MyReportView) {
@@ -32,7 +66,7 @@ export default function MyReportsScreen() {
       style={styles.container}
       data={reports ?? []}
       keyExtractor={(r) => r.id}
-      ListHeaderComponent={error ? <Text style={styles.error}>{error}</Text> : null}
+      ListHeaderComponent={<>{queuedHeader}{error ? <Text style={styles.error}>{error}</Text> : null}</>}
       ListEmptyComponent={reports ? <Text style={styles.meta}>{t("myReportsEmpty")}</Text> : null}
       renderItem={({ item }) => (
         <View style={styles.card}>
@@ -59,6 +93,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg, padding: space.lg },
   card: { backgroundColor: colors.surface, borderRadius: radius.md, padding: space.lg, marginBottom: space.sm, gap: space.xs },
   title: { color: colors.text, fontWeight: "700" },
+  section: { color: colors.text, fontSize: 17, fontWeight: "700", marginBottom: space.sm },
   meta: { color: colors.textMuted, fontSize: 13 },
   actions: { flexDirection: "row", gap: space.lg, marginTop: space.xs },
   link: { color: colors.accent, fontWeight: "600" },
