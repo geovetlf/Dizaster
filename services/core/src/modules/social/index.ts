@@ -99,9 +99,18 @@ export const RANK_BOOST_HOURS = {
   followedAuthor: 4,
   /** Autor con reputación baja (ADR 0031): sigue visible, pero medio día detrás en "Para ti". */
   lowTrustAuthor: -12,
+  /**
+   * Post escrito en las primeras `NEW_ACCOUNT_HOURS` de la cuenta (§13.3, ADR 0220): alcance limitado en "Para ti"
+   * hasta ganar reputación. Pequeño a propósito: en un desastre llega mucha gente nueva con información útil, y sigue
+   * igual en Cerca, Siguiendo, el mapa y el evento. Depende de la hora del post, así el orden es estable.
+   */
+  newAccountAuthor: -3,
   /** Ciclo de vida del evento (ADR 0124): lo que ya pasó deja de competir con lo que está pasando. */
   lifecycle: { ACTIVE: 0, MONITORING: -2, RESOLVED: -8, ARCHIVED: -24 },
 };
+
+/** Horas en que una cuenta cuenta como nueva para el alcance (igual que el nivel NEW de reputación, `TRUST.newAccountHours`). */
+export const NEW_ACCOUNT_HOURS = 24;
 
 /** Mismo texto de al menos tantas cuentas distintas dentro de la ventana → a revisión humana como posible spam. */
 export const DUPLICATE_TEXT = { minAuthors: 3, windowHours: 24, maxPosts: 50 } as const;
@@ -121,7 +130,8 @@ function rankSql(nearSql: string | null): string {
     + CASE WHEN p.author_visibility = 'PUBLIC' AND EXISTS (
         SELECT 1 FROM social.follows fa WHERE fa.follower_profile_id = $2 AND fa.target_type = p.author_type AND fa.target_id = p.author_id::text)
       THEN ${B.followedAuthor} ELSE 0 END
-    + CASE WHEN p.author_type = 'PROFILE' AND pr.low_trust THEN ${B.lowTrustAuthor} ELSE 0 END`;
+    + CASE WHEN p.author_type = 'PROFILE' AND pr.low_trust THEN ${B.lowTrustAuthor} ELSE 0 END
+    + CASE WHEN p.author_type = 'PROFILE' AND p.created_at < pr.created_at + make_interval(hours => ${NEW_ACCOUNT_HOURS}) THEN ${B.newAccountAuthor} ELSE 0 END`;
 }
 
 export class SocialService {
