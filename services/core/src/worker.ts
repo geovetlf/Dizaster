@@ -1,5 +1,6 @@
 import { hostname } from "node:os";
 import { buildContainer } from "./container.js";
+import { dailyJobs, hourlyJobs, runJobs } from "./maintenance.js";
 import { loadEnv } from "./platform/config.js";
 import { parseWorkerRoles, ROLE_LANES, type WorkerRole } from "./worker-roles.js";
 
@@ -92,30 +93,11 @@ function maintenanceLoop(): Promise<void> {
     }
     if (Date.now() - lastHourly > 3600_000) {
       lastHourly = Date.now();
-      log("events.lifecycle", await c.events.applyLifecycle(c.db, c.clock.now()));
-      const ended = await c.events.applySourceEnd(c.db, await c.ingestion.endedItems(c.db, c.clock.now()));
-      log("events.source-end", { resolved: ended });
-      log("events.archive", { archived: await c.events.archiveResolved(c.db, c.clock.now()) });
-      // Degradación automática por costo fuera de IA (ADR 0138).
-      const degradation = await c.cost.applyDegradation().catch((e: Error) => { warn("cost.degradation", e); return null; });
-      if (degradation?.changed.length) console.warn(JSON.stringify({ msg: "cost.degradation.applied", ...degradation }));
-      log("moderation.priorities", await c.moderation.refreshPriorities());
-      log("events.duplicates", await c.events.sweepDuplicates(c.db, c.clock.now()));
+      await runJobs(hourlyJobs(c), log, warn);
     }
     if (Date.now() - lastDaily > 24 * 3600_000) {
       lastDaily = Date.now();
-      log("retention.cost", await c.cost.applyRetention());
-      const generalized = await c.reports.generalizeExpiredPresence();
-      await c.reports.encryptLegacyFixes();
-      log("retention.presence.generalized", { count: generalized });
-      log("retention.media", await c.media.applyRetention());
-      log("retention.source-raw", await c.ingestionScheduler.applyRawRetention());
-      log("trust.standing.refresh", await c.trust.refreshStanding());
-      log("retention.alerts", await c.alerts.applyRetention(c.env.NOTIFICATION_RETENTION_DAYS));
-      log("retention.outbox", { deleted: await c.dispatcher.purgeProcessed(c.env.OUTBOX_RETENTION_DAYS) });
-      log("retention.heartbeats", { deleted: await c.heartbeat.prune() });
-      log("retention.identity", await c.identity.applyRetention(c.db, c.clock.now()));
-      log("retention.client_crashes", { deleted: await c.crashes.applyRetention(c.env.CLIENT_CRASH_RETENTION_DAYS) });
+      await runJobs(dailyJobs(c), log, warn);
     }
     await sleep(5000);
     return 0;
