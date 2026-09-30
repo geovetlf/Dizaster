@@ -1,6 +1,6 @@
 # Estado de la implementación
 
-Actualizado: 2026-09-30 (hasta ADR 0277). Informe de preparación para producción: `docs/PRODUCTION_READINESS_REPORT.md`.
+Actualizado: 2026-09-30 (hasta ADR 0278). Informe de preparación para producción: `docs/PRODUCTION_READINESS_REPORT.md`.
 
 ## Etapa 1 — Fundación (hecha)
 
@@ -463,9 +463,10 @@ Actualizado: 2026-09-30 (hasta ADR 0277). Informe de preparación para producci�
 | `dzd` deploy/promote/rollback en seco, config-check, cost, métricas e informe (ADR 0272) | ✅ | `--execute` espera D-18 |
 | Migrador con candado y checksum, runbook de migración fallida, imágenes base por digest (ADR 0273) | ✅ | `test/migrate-runner.test.ts` |
 | Donaciones: enlaces a organizaciones verificadas (D-15, ADR 0274) | ✅ | directorio vacío hasta que el propietario lo cargue |
-| OpenTofu: `dz-ci`, respaldos, vigilancia externa y presupuesto (ADR 0275) | ✅ | validado; aplicar espera D-18 |
+| OpenTofu: `dz-ci-images`, respaldos, vigilancia externa y presupuesto (ADR 0275) | ✅ | validado; aplicar espera D-18 |
 | Auditoría completa e informe de preparación para producción (ADR 0276) | ✅ | `docs/PRODUCTION_READINESS_REPORT.md` |
 | Firma keyless, procedencia SLSA, SLO, validación de entornos, workflow `deliver` y GitHub preparado (ADR 0277) | ✅ | activar: D-24 y D-18 |
+| OpenTofu: base de datos (Cloud SQL, VM propia o externa), bucket de media, bucket de estado y `tofu test` sin nube (ADR 0278) | ✅ | aplicar: D-23 y D-18 |
 | Licencias, auditoría, SBOM, Dependabot; respaldo con prueba de restauración en CI | ✅ | ADR 0070, `scripts/supply-chain.mjs`, `scripts/db-restore-check.mjs` |
 | Idioma de la app elegible en el perfil (es/en/pt/fr o del teléfono) | ✅ | ADR 0069, `app/language.tsx` |
 | Varias cuentas en un teléfono corroboran como una (clave seudónima del teléfono) | ✅ | ADR 0068, migración 0036 |

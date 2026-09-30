@@ -38,7 +38,7 @@ chequeo de SLO, la validación de entornos, el workflow de entrega y la preparac
   política, nada con forma de secreto en tfvars, secretos del runtime como `secret:<id>`, staging y producción en
   proyectos distintos, `NODE_ENV=production` en producción.
 - **CI (`image`).** Genera la procedencia siempre. Solo en `main` y con `vars.GCP_WIF_PROVIDER` definido: WIF como
-  `dz-ci`, `skopeo copy --all --preserve-digests` al registro de staging, `cosign sign`, dos `cosign attest` y
+  `dz-ci-images`, `skopeo copy --all --preserve-digests` al registro de staging, `cosign sign`, dos `cosign attest` y
   `dzd signature verify --attestations --execute`. `id-token: write` solo en ese job.
 - **Entrega (`.github/workflows/deliver.yml`, manual).** Staging: digest válido, auditoría íntegra, firma y
   atestaciones, migraciones (job de Cloud Run con la misma imagen), `dzd deploy` gradual con rollback automático,

@@ -5,8 +5,8 @@ facturación, D-23 base de staging). CI solo corre `tofu fmt`, `tofu validate`, 
 
 | Módulo | Qué crea |
 | --- | --- |
-| `project-base` | APIs y cuentas `dz-ci`, `dz-deploy`, `dz-run-api`, `dz-run-worker`, `dz-migrate`, `dz-backup`; IAM mínimo |
-| `github-wif` | pool y proveedor OIDC de GitHub limitado al repositorio: `dz-ci` desde `main`, `dz-deploy` desde el entorno |
+| `project-base` | APIs y cuentas `dz-ci-images`, `dz-deploy`, `dz-run-api`, `dz-run-worker`, `dz-migrate`, `dz-backup`; IAM mínimo |
+| `github-wif` | pool y proveedor OIDC de GitHub limitado al repositorio: `dz-ci-images` desde `main`, `dz-deploy` desde el entorno |
 | `backups` | bucket de respaldos (otro proyecto si se quiere), versionado, retención, `dz-backup` solo escribe |
 | `monitoring` | chequeo externo de `/health` y alerta por correo |
 | `budget` | presupuesto mensual con avisos al 50, 90 y 100 % |
@@ -15,10 +15,15 @@ facturación, D-23 base de staging). CI solo corre `tofu fmt`, `tofu validate`, 
 | `cloud-run-api` | API pública (imagen por digest, probes `/health`, escala sin valores por defecto) |
 | `cloud-run-worker` | worker pool (sin HTTP; salud por latido en la base) |
 | `cloud-run-job` | job de migraciones con `dz-migrate` |
-| `stack` | compone todo un entorno |
+| `database-cloudsql` | PostgreSQL 16 gestionado, solo por el conector (modo `cloudsql`, ADR 0278) |
+| `database-vm` | PostgreSQL + PostGIS + H3 con la imagen propia en una VM privada (modo `vm`, ADR 0278) |
+| `media` | bucket de media en GCS (opcional; si no, R2 u otro S3) |
+| `stack` | compone todo un entorno; `tests/` lo prueba con proveedor simulado (`tofu test`) |
 
-Fuera a propósito: la base de datos (D-23 y verificación de H3 en Cloud SQL, ADR 0261), el bucket de media (GCS o
-R2, decisión de costo) y el bucket de estado de OpenTofu (lo crea el propietario al activar el proyecto).
+`bootstrap/` crea una sola vez el bucket de estado y del historial del Delivery Plane (lo aplica el propietario).
+
+La base de datos se elige con `database.mode` (`cloudsql`, `vm` o `external`; D-23 y verificación de H3 en Cloud SQL,
+ADR 0261/0278). Contraseñas y claves HMAC nunca pasan por OpenTofu.
 
 Flujo cuando exista autorización:
 

@@ -56,27 +56,43 @@ variable "billing" {
   })
   description = "Cuenta de facturación y presupuesto mensual del entorno (D-18)."
 }
+variable "database" {
+  type        = any
+  description = "Ver modules/stack: mode cloudsql | vm | external (D-23)."
+}
+variable "media_bucket" {
+  type = object({
+    location    = string
+    bucket_name = string
+    public_read = bool
+  })
+  default = null
+}
+variable "delivery_state_bucket" { type = string }
 variable "extra_env" {
   type    = map(string)
   default = {}
 }
 
 module "stack" {
-  source            = "../../modules/stack"
-  environment       = "production"
-  project_id        = var.project_id
-  region            = var.region
-  github_repository = var.github_repository
-  image             = var.image
-  api_min_instances = var.api_min_instances
-  api_max_instances = var.api_max_instances
-  worker_instances  = var.worker_instances
-  public_api_url    = var.public_api_url
-  storage           = var.storage
-  extra_env         = var.extra_env
-  backup            = var.backup
-  alert_email       = var.alert_email
-  billing           = var.billing
+  source                = "../../modules/stack"
+  environment           = "production"
+  project_id            = var.project_id
+  region                = var.region
+  github_repository     = var.github_repository
+  image                 = var.image
+  api_min_instances     = var.api_min_instances
+  api_max_instances     = var.api_max_instances
+  worker_instances      = var.worker_instances
+  public_api_url        = var.public_api_url
+  storage               = var.storage
+  extra_env             = var.extra_env
+  database              = var.database
+  media_bucket          = var.media_bucket
+  delivery_state_bucket = var.delivery_state_bucket
+  backup                = var.backup
+  alert_email           = var.alert_email
+  billing               = var.billing
 }
 
 output "api_uri" { value = module.stack.api_uri }
@@ -85,5 +101,7 @@ output "wif_provider" { value = module.stack.wif_provider }
 output "deploy_service_account" { value = module.stack.deploy_service_account }
 output "ci_service_account" { value = module.stack.ci_service_account }
 output "backup_bucket" { value = module.stack.backup_bucket }
+output "state_bucket" { value = module.stack.state_bucket }
+output "database_connection" { value = module.stack.database_connection }
 output "project_id" { value = var.project_id }
 output "region" { value = var.region }

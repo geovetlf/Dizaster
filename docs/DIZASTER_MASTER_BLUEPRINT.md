@@ -1436,7 +1436,7 @@ de riesgo por ruta y tipo de cambio, gates por entorno y aprobaciones. Evaluaci�
 ### 20.17 IAM
 
 Mínimo privilegio con cuentas de servicio separadas por entorno y función (ADR 0261):
-`dz-ci` (solo lectura/escritura de Artifact Registry), `dz-deploy-staging`, `dz-deploy-prod` (Cloud Run y migraciones,
+`dz-ci-images` (solo lectura/escritura de Artifact Registry), `dz-deploy-staging`, `dz-deploy-prod` (Cloud Run y migraciones,
 sin roles primitivos), `dz-run-api`, `dz-run-worker` (acceso a sus secretos y bucket), `dz-migrate`, `dz-backup`.
 Nadie usa Owner/Editor en automatización. Claude no tiene ninguna identidad en Google Cloud.
 

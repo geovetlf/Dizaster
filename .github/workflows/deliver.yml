@@ -65,8 +65,8 @@ jobs:
           cosign-release: v3.1.3
       - name: Historial de versiones y auditoría
         run: |
-          gcloud storage cp "gs://$STATE/delivery/delivery-releases.jsonl" . 2>/dev/null || touch delivery-releases.jsonl
-          gcloud storage cp "gs://$STATE/delivery/delivery-audit.jsonl" . 2>/dev/null || touch delivery-audit.jsonl
+          gcloud storage cp "gs://$STATE/delivery/staging/delivery-releases.jsonl" . 2>/dev/null || touch delivery-releases.jsonl
+          gcloud storage cp "gs://$STATE/delivery/staging/delivery-audit.jsonl" . 2>/dev/null || touch delivery-audit.jsonl
           pnpm dzd audit verify
       - name: Firma, procedencia y SBOM (solo imágenes de CI en main)
         run: |
@@ -88,7 +88,7 @@ jobs:
       - name: Guardar historial y auditoría
         if: always()
         run: |
-          gcloud storage cp delivery-releases.jsonl delivery-audit.jsonl "gs://$STATE/delivery/"
+          gcloud storage cp delivery-releases.jsonl delivery-audit.jsonl "gs://$STATE/delivery/staging/"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
@@ -139,9 +139,13 @@ jobs:
           cosign-release: v3.1.3
       - name: Historial de producción
         run: |
-          gcloud storage cp "gs://$STATE/delivery/delivery-releases.jsonl" prod-releases.jsonl 2>/dev/null || touch prod-releases.jsonl
+          gcloud storage cp "gs://$STATE/delivery/production/delivery-releases.jsonl" prod-releases.jsonl 2>/dev/null || touch prod-releases.jsonl
           # El historial de staging de esta entrega prueba que el digest pasó staging; el de producción da el rollback.
           cat prod-releases.jsonl delivery-releases.jsonl > merged.jsonl && mv merged.jsonl delivery-releases.jsonl
+          # La auditoría es una cadena por entorno: se continúa la de producción, no la de staging.
+          rm -f delivery-audit.jsonl
+          gcloud storage cp "gs://$STATE/delivery/production/delivery-audit.jsonl" . 2>/dev/null || touch delivery-audit.jsonl
+          pnpm dzd audit verify
       - name: Copiar el mismo digest con sus firmas (sin reconstruir)
         run: |
           gcloud auth configure-docker "${SOURCE%%/*},${REGISTRY%%/*}" --quiet
@@ -160,4 +164,4 @@ jobs:
         run: pnpm dzd verify --url "$API_URL" --repeat 5 --slo
       - name: Guardar historial y auditoría
         if: always()
-        run: gcloud storage cp delivery-releases.jsonl delivery-audit.jsonl "gs://$STATE/delivery/"
+        run: gcloud storage cp delivery-releases.jsonl delivery-audit.jsonl "gs://$STATE/delivery/production/"

@@ -24,3 +24,14 @@ billing = {
   currency_code  = "<moneda de la cuenta>"
   monthly_amount = <presupuesto mensual: decisión del propietario>
 }
+delivery_state_bucket = "<bucket creado por infra/tofu/bootstrap>"
+# Base de datos (D-23): una de las tres. Tamaños y respaldos son decisiones de costo del propietario.
+database = {
+  mode = "<cloudsql | vm | external>"
+  # cloudsql = { tier = "<tipo>", edition = "ENTERPRISE", disk_size_gb = <GB>, availability_type = "ZONAL",
+  #              backup_start_time = "<HH:MM UTC>", retained_backups = <n>, point_in_time_recovery = <true|false> }
+  # vm = { zone = "<zona>", machine_type = "<tipo>", disk_size_gb = <GB>, subnet_cidr = "<rango privado>",
+  #        image = "<región>-docker.pkg.dev/<proyecto>/dizaster/db@sha256:<digest>" }
+}
+# Opcional: bucket de media en GCS (si no, R2 u otro S3 en `storage`).
+# media_bucket = { location = "<ubicación>", bucket_name = "<igual a storage.bucket>", public_read = <true|false> }

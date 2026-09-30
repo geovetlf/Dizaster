@@ -39,7 +39,7 @@
   "slo": { "apiP95Ms": 300, "maxErrorRate": null, "minSamples": 20 },
   "cost": {
     "monthly": { "cloud-usd": 0, "ai-usd": 0, "eas-builds": 0 },
-    "allowedResourceTypes": ["google_service_account", "google_project_iam_member", "google_service_account_iam_member", "google_iam_workload_identity_pool", "google_iam_workload_identity_pool_provider", "google_project_service", "google_artifact_registry_repository_iam_member", "google_secret_manager_secret_iam_member", "google_cloud_run_v2_service_iam_member"],
+    "allowedResourceTypes": ["google_service_account", "google_project_iam_member", "google_service_account_iam_member", "google_iam_workload_identity_pool", "google_iam_workload_identity_pool_provider", "google_project_service", "google_artifact_registry_repository_iam_member", "google_secret_manager_secret_iam_member", "google_cloud_run_v2_service_iam_member", "google_storage_bucket_iam_member", "google_compute_network", "google_compute_subnetwork", "google_compute_firewall"],
     "statefulResourceTypes": ["google_sql_database_instance", "google_sql_database", "google_storage_bucket", "google_secret_manager_secret", "google_kms_crypto_key", "google_artifact_registry_repository", "google_compute_disk"]
   }
 }

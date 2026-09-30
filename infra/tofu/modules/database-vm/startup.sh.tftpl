@@ -1,0 +1,29 @@
+#!/bin/bash
+# Arranque de la VM de base de datos (ADR 0278). Idempotente: se ejecuta en cada arranque.
+set -euo pipefail
+dev=/dev/disk/by-id/google-${disk}
+mnt=/mnt/disks/pgdata
+# Formatear solo si el disco está vacío (primer arranque). Nunca se reformatea un disco con datos.
+if ! blkid "$dev" >/dev/null 2>&1; then mkfs.ext4 -m 0 -E lazy_itable_init=0,lazy_journal_init=0,discard "$dev"; fi
+mkdir -p "$mnt"
+mountpoint -q "$mnt" || mount -o discard,defaults "$dev" "$mnt"
+mkdir -p "$mnt/data" && chown 999:999 "$mnt/data" && chmod 700 "$mnt/data"
+
+token=$(curl -sf -H "Metadata-Flavor: Google" "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token" | sed -E 's/.*"access_token":"([^"]+)".*/\1/')
+# Contraseña a un archivo en memoria, solo legible por el contenedor; nunca en metadatos ni en el estado de OpenTofu.
+mkdir -p /run/dz && chmod 700 /run/dz
+curl -sf -H "Authorization: Bearer $token" "https://secretmanager.googleapis.com/v1/${secret}/versions/latest:access" \
+  | sed -E 's/.*"data":"([^"]+)".*/\1/' | base64 -d > /run/dz/pgpass
+chown 999:999 /run/dz/pgpass && chmod 400 /run/dz/pgpass
+
+export HOME=/home/dz && mkdir -p "$HOME"
+echo "$token" | docker login -u oauth2accesstoken --password-stdin "https://${registry}"
+docker rm -f dizaster-db >/dev/null 2>&1 || true
+docker run -d --name dizaster-db --restart=always \
+  -p 5432:5432 \
+  -v "$mnt/data:/var/lib/postgresql/data" \
+  -v /run/dz/pgpass:/run/secrets/pgpass:ro \
+  -e POSTGRES_DB=dizaster -e POSTGRES_USER=dizaster -e POSTGRES_PASSWORD_FILE=/run/secrets/pgpass \
+  -e PGDATA=/var/lib/postgresql/data/pg \
+  --log-driver=gcplogs \
+  "${image}"
