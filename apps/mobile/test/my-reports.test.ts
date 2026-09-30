@@ -7,7 +7,7 @@ const fmt = (iso: string) => iso.slice(0, 10);
 const base: MyReportView = {
   id: "r", postId: "p", eventId: "e", categoryCode: "fire.structure", assertion: "OCCURRING", status: "ACCEPTED",
   capturedAt: "2026-09-01T10:00:00Z", receivedAt: "2026-09-01T10:00:05Z", capturedOffline: false,
-  preciseLocationRemovesAt: "2026-10-01T10:00:00Z", preciseLocationRemovedAt: null, presenceReviews: 0,
+  preciseLocationRemovesAt: "2026-10-01T10:00:00Z", preciseLocationRemovedAt: null, presenceReviews: 0, askSameEvent: false,
 };
 
 describe("myReportLines", () => {

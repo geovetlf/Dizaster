@@ -61,13 +61,18 @@ export type ReportRejectionCode = z.infer<typeof ReportRejectionCode>;
 
 export const SubmitReportResponse = z.discriminatedUnion("outcome", [
   /** `publishAfter`: categoría con retraso de publicación (ADR 0099); hasta esa hora solo quien reporta ve su post. */
-  z.object({ outcome: z.literal("ATTACHED_TO_EVENT"), reportId: z.uuid(), postId: z.uuid(), eventId: z.uuid(), presenceBand: PresenceBand, publishAfter: z.string().optional() }),
+  /** `askSameEvent`: se sumó en la franja ambigua (§8.4); la app pregunta "¿Es el mismo evento?" (ADR 0156). */
+  z.object({ outcome: z.literal("ATTACHED_TO_EVENT"), reportId: z.uuid(), postId: z.uuid(), eventId: z.uuid(), presenceBand: PresenceBand, publishAfter: z.string().optional(), askSameEvent: z.literal(true).optional() }),
   z.object({ outcome: z.literal("CREATED_EVENT"), reportId: z.uuid(), postId: z.uuid(), eventId: z.uuid(), presenceBand: PresenceBand, publishAfter: z.string().optional() }),
   z.object({ outcome: z.literal("DOWNGRADED_TO_POST"), postId: z.uuid(), reasons: z.array(PresenceRejectionReason) }),
   /** `code` es estable (la app lo traduce); `reason` es el texto del servidor, en español. */
   z.object({ outcome: z.literal("REJECTED"), code: ReportRejectionCode, reason: z.string() }),
 ]);
 export type SubmitReportResponse = z.infer<typeof SubmitReportResponse>;
+
+/** Respuesta a "¿Es el mismo evento?" (ADR 0156). */
+export const ReportMatchAnswerRequest = z.object({ answer: z.enum(["SAME", "DIFFERENT"]) });
+export type ReportMatchAnswerRequest = z.infer<typeof ReportMatchAnswerRequest>;
 
 /**
  * "Mis reportes" (ADR 0094): lo que pasó con cada reporte propio. Sin puntaje de presencia ni razones antiabuso.
@@ -87,4 +92,6 @@ export interface MyReportView {
   preciseLocationRemovedAt: string | null;
   /** Veces que moderación consultó la presencia de este reporte (ADR 0089), sin decir quién. */
   presenceReviews: number;
+  /** Queda por responder "¿Es el mismo evento?" (ADR 0156). */
+  askSameEvent: boolean;
 }

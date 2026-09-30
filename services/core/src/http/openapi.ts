@@ -73,6 +73,7 @@ export const OPERATIONS: Record<string, Operation> = {
   "DELETE /v1/follows/:target/:id": { summary: "Dejar de seguir" },
   "POST /v1/posts": { summary: "Publicar sin reporte", body: C.CreatePostRequest },
   "POST /v1/posts/:id/share": { summary: "Compartir dentro de la app", body: C.SharePostRequest },
+  "POST /v1/me/reports/:id/match": { summary: "Responder \"¿Es el mismo evento?\" sobre un reporte propio", body: C.ReportMatchAnswerRequest },
   "POST /v1/posts/:id/external-shares": { summary: "Registrar que compartí el post fuera de la app (solo cuenta)" },
   "PATCH /v1/posts/:id": { summary: "Editar el texto de un post propio durante 24 h (no reportes); el historial queda para moderación", body: C.EditPostRequest },
   "DELETE /v1/posts/:id": { summary: "Borrar mi publicación" },

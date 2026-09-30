@@ -23,6 +23,7 @@ import { useSession } from "../lib/session";
 import { outcomeLines } from "../lib/report/outcome";
 import { colors } from "../theme";
 import { categoryIn, findCategory, reportCategories, useCategoryCatalogVersion } from "../lib/category-store";
+import { askSameEvent } from "../lib/report/same-event";
 
 
 type Phase = "category" | "locating" | "compose";
@@ -135,6 +136,7 @@ export default function ReportScreen() {
         return;
       }
       setStatus(describe(mine));
+      if (mine.outcome === "ATTACHED_TO_EVENT" && mine.askSameEvent) askSameEvent(mine.reportId);
       if ("eventId" in mine) router.replace(`/event/${mine.eventId}`);
     } catch (e) {
       setStatus((e as Error).message);

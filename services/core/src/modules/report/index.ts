@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import {
+  ReportMatchAnswerRequest,
   PresenceReviewRequest,
   SubmitReportRequest,
   type MyReportView,
@@ -126,6 +127,7 @@ export class ReportService {
       let result: SubmitReportResponse;
       let eventId: string | null = null;
       let downgradeReasons: PresenceRejectionReason[] | null = presence.band === "LOW" ? presence.reasons : null;
+      let ambiguous = false;
 
       if (!downgradeReasons) {
         const resolution = await this.d.events.resolveCandidate(tx, {
@@ -152,7 +154,10 @@ export class ReportService {
         if (resolution.kind === "NO_MATCH") downgradeReasons = presence.lateOffline
           ? presence.reasons.filter((r) => r === "LATE_OFFLINE_SUBMISSION" || r === "UNSIGNED_OFFLINE_EVIDENCE")
           : presence.reasons;
-        else eventId = resolution.eventId;
+        else {
+          eventId = resolution.eventId;
+          ambiguous = resolution.kind === "ATTACHED" && resolution.confidence === "AMBIGUOUS";
+        }
       }
 
       // La ubicación pública del post es la del lugar generalizada según la categoría, nunca la del reportero.
@@ -181,7 +186,9 @@ export class ReportService {
           await this.d.events.addTimeline(tx, eventId, "MEDIA_ADDED", { mediaIds: req.mediaIds, mediaCount: req.mediaIds.length, reportId });
         }
         const created = await this.d.events.wasCreatedBy(tx, eventId, reportId);
-        result = { outcome: created ? "CREATED_EVENT" : "ATTACHED_TO_EVENT", reportId, postId, eventId, presenceBand: presence.band, ...(publishAfter ? { publishAfter } : {}) };
+        result = created
+          ? { outcome: "CREATED_EVENT", reportId, postId, eventId, presenceBand: presence.band, ...(publishAfter ? { publishAfter } : {}) }
+          : { outcome: "ATTACHED_TO_EVENT", reportId, postId, eventId, presenceBand: presence.band, ...(publishAfter ? { publishAfter } : {}), ...(ambiguous ? { askSameEvent: true as const } : {}) };
       } else {
         result = { outcome: "DOWNGRADED_TO_POST", postId, reasons: downgradeReasons ?? [] };
       }
@@ -415,6 +422,19 @@ export class ReportService {
   // ───────────── Mis reportes (ADR 0094) ─────────────
 
   /** Reportes propios, más recientes primero. NO AI REQUIRED. */
+  /** "¿Es el mismo evento?" (ADR 0156): solo quien lo reportó y sobre un reporte vigente. */
+  async answerMatch(session: Session, reportId: string, raw: unknown): Promise<{ answer: "SAME" | "DIFFERENT" }> {
+    const parsed = ReportMatchAnswerRequest.safeParse(raw);
+    if (!parsed.success) throw new DomainError("VALIDATION", parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; "));
+    await withTransaction(this.d.db, async (tx) => {
+      const r = (await tx.query<{ status: string }>(`SELECT status FROM report.reports WHERE id = $1 AND author_user_id = $2`, [reportId, session.userId])).rows[0];
+      if (!r) throw notFound("Reporte");
+      if (r.status !== "ACCEPTED") throw new DomainError("NOTHING_TO_ANSWER", "Este reporte no tiene una pregunta pendiente", 409);
+      await this.d.events.answerMatch(tx, reportId, parsed.data.answer);
+    });
+    return parsed.data;
+  }
+
   async myReports(q: Queryable, userId: string, limit = MY_REPORTS_LIMIT): Promise<MyReportView[]> {
     const { rows } = await q.query<{
       id: string; post_id: string; event_id: string | null; category_code: string; assertion: ReportAssertion; status: MyReportView["status"];
@@ -427,8 +447,10 @@ export class ReportService {
         WHERE r.author_user_id = $1 ORDER BY r.received_at DESC, r.id DESC LIMIT $2`,
       [userId, limit],
     );
+    const pending = await this.d.events.pendingMatchQuestions(q, rows.filter((r) => r.status === "ACCEPTED").map((r) => r.id));
     return rows.map((r) => ({
       id: r.id,
+      askSameEvent: pending.has(r.id),
       // El post de un reporte retirado ya no existe.
       postId: r.status === "WITHDRAWN" ? null : r.post_id,
       eventId: r.event_id,

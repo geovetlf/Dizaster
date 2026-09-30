@@ -8,6 +8,7 @@ import { canWithdraw, myReportLines } from "../lib/report/my-reports";
 import { formatInZone, timeAgo } from "../lib/ui/format";
 import { colors, radius, space } from "../theme";
 import { categoryLabel } from "../lib/category-store";
+import { askSameEvent } from "../lib/report/same-event";
 
 const categoryName = categoryLabel;
 const fmt = (iso: string) => formatInZone(iso, lang, undefined, "datetime") ?? iso;
@@ -40,6 +41,9 @@ export default function MyReportsScreen() {
           <View style={styles.actions}>
             {item.eventId && item.status !== "WITHDRAWN" ? (
               <Pressable accessibilityRole="link" onPress={() => router.push(`/event/${item.eventId}`)}><Text style={styles.link}>{t("myReportOpenEvent")}</Text></Pressable>
+            ) : null}
+            {item.askSameEvent && item.status === "ACCEPTED" ? (
+              <Pressable accessibilityRole="button" onPress={() => askSameEvent(item.id, load)}><Text style={styles.link}>{t("sameEventTitle")}</Text></Pressable>
             ) : null}
             {canWithdraw(item) ? (
               <Pressable accessibilityRole="button" onPress={() => confirmWithdraw(item)}><Text style={styles.danger}>{t("myReportWithdraw")}</Text></Pressable>

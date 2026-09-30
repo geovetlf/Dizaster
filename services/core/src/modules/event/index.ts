@@ -212,6 +212,39 @@ export class EventService {
     return this.create(tx, c, category, country);
   }
 
+  /** Reportes con la pregunta "¿Es el mismo evento?" pendiente (ADR 0156). */
+  async pendingMatchQuestions(q: Queryable, reportIds: string[]): Promise<Set<string>> {
+    if (reportIds.length === 0) return new Set();
+    const { rows } = await q.query<{ ref_id: string }>(
+      `SELECT e.ref_id FROM event.dedup_reviews r JOIN event.evidence e ON e.id = r.evidence_id
+        WHERE e.evidence_type = 'CITIZEN_REPORT' AND e.ref_id = ANY($1) AND e.status = 'ACTIVE' AND r.status = 'OPEN' AND r.reporter_answer IS NULL`,
+      [reportIds],
+    );
+    return new Set(rows.map((r) => r.ref_id));
+  }
+
+  /**
+   * Respuesta de quien reportó a "¿Es el mismo evento?" (ADR 0156). "Sí" cierra la revisión como confirmada.
+   * "No" queda anotado en la revisión, abierta: qué hacer con él (dividir o enviar a moderación) espera la
+   * decisión D2 del propietario. NO AI REQUIRED.
+   */
+  async answerMatch(tx: Queryable, reportId: string, answer: "SAME" | "DIFFERENT"): Promise<void> {
+    const { rows } = await tx.query<{ id: string }>(
+      `SELECT r.id FROM event.dedup_reviews r JOIN event.evidence e ON e.id = r.evidence_id
+        WHERE e.evidence_type = 'CITIZEN_REPORT' AND e.ref_id = $1 AND e.status = 'ACTIVE' AND r.status = 'OPEN' AND r.reporter_answer IS NULL
+        FOR UPDATE OF r`,
+      [reportId],
+    );
+    if (rows.length === 0) throw new DomainError("NOTHING_TO_ANSWER", "Este reporte no tiene una pregunta pendiente", 409);
+    await tx.query(
+      `UPDATE event.dedup_reviews SET reporter_answer = $2, answered_at = now(),
+              status = CASE WHEN $2 = 'SAME' THEN 'CONFIRMED' ELSE status END,
+              resolved_at = CASE WHEN $2 = 'SAME' THEN now() ELSE resolved_at END
+        WHERE id = ANY($1)`,
+      [rows.map((r) => r.id), answer],
+    );
+  }
+
   private async validateTarget(tx: Queryable, c: EventCandidate, category: CategoryConfig): Promise<{ ok: true; eventId: string } | { ok: false; reason: string }> {
     const { rows } = await tx.query<{ id: string; category_code: string; lat: number; lng: number; status: string; merged_into_id: string | null }>(
       `SELECT id, category_code, ST_Y(geom::geometry) AS lat, ST_X(geom::geometry) AS lng, status, merged_into_id

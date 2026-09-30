@@ -601,6 +601,10 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
     return { reports: await c.reports.myReports(c.db, session.userId) };
   });
 
+  app.post("/v1/me/reports/:id/match", async (req) => {
+    const session = requireSession(req);
+    return c.reports.answerMatch(session, parse(IdParam, req.params).id, req.body);
+  });
   app.delete("/v1/me/reports/:id", async (req, reply) => {
     const session = requireSession(req);
     await c.reports.withdraw(session, parse(IdParam, req.params).id);
