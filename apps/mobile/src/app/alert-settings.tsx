@@ -279,7 +279,7 @@ const styles = StyleSheet.create({
   labelText: { color: colors.text, fontSize: 15 },
   sub: { color: colors.textMuted, fontSize: 13, marginTop: 2 },
   value: { color: colors.textMuted },
-  action: { color: colors.accent, fontWeight: "600" },
+  action: { color: colors.accentText, fontWeight: "600" },
   note: { color: colors.textMuted, fontSize: 13, marginBottom: space.md },
   section: { color: colors.text, fontSize: 17, fontWeight: "700", marginTop: space.lg, marginBottom: space.sm },
   chips: { gap: space.sm, paddingVertical: space.sm },

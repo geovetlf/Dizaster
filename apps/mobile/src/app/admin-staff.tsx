@@ -94,7 +94,7 @@ const styles = StyleSheet.create({
   card: { backgroundColor: colors.surface, borderRadius: radius.md, padding: space.md, gap: space.xs },
   title: { color: colors.text, fontWeight: "700" },
   meta: { color: colors.textMuted },
-  error: { color: colors.accent },
+  error: { color: colors.accentText },
   input: { color: colors.text, backgroundColor: colors.surface, borderRadius: radius.sm, paddingHorizontal: space.md, paddingVertical: space.sm },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: space.xs },
   chip: { borderWidth: 1, borderColor: colors.border, borderRadius: radius.pill, paddingHorizontal: space.md, paddingVertical: space.xs },

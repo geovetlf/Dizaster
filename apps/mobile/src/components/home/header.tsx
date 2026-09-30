@@ -50,7 +50,7 @@ const styles = StyleSheet.create({
   row: { flexDirection: "row", alignItems: "center", gap: space.sm },
   brand: { flex: 1 },
   logo: { color: colors.white, fontSize: 32, fontWeight: "900", letterSpacing: 0.5 },
-  logoA: { color: colors.accent },
+  logoA: { color: colors.accentText },
   tagline: { color: colors.textMuted, fontSize: 13, marginTop: 2 },
   iconButton: { width: 44, height: 44, borderRadius: radius.md, backgroundColor: colors.surface, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, alignItems: "center", justifyContent: "center" },
   sos: { backgroundColor: colors.accent, borderColor: colors.accent },

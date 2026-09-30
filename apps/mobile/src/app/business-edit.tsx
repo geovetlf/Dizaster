@@ -129,7 +129,7 @@ const styles = StyleSheet.create({
   save: { backgroundColor: colors.accent, borderRadius: radius.pill, paddingVertical: space.md, alignItems: "center", marginTop: space.md },
   disabled: { opacity: 0.5 },
   saveText: { color: colors.white, fontWeight: "700", fontSize: 16 },
-  error: { color: colors.accent },
+  error: { color: colors.accentText },
   delete: { alignItems: "center", padding: space.lg },
-  deleteText: { color: colors.accent },
+  deleteText: { color: colors.accentText },
 });

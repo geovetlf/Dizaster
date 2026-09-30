@@ -96,7 +96,7 @@ const styles = StyleSheet.create({
   section: { color: colors.text, fontSize: 17, fontWeight: "700", marginBottom: space.sm },
   meta: { color: colors.textMuted, fontSize: 13 },
   actions: { flexDirection: "row", gap: space.lg, marginTop: space.xs },
-  link: { color: colors.accent, fontWeight: "600" },
-  danger: { color: colors.accent, fontWeight: "600" },
-  error: { color: colors.accent, marginBottom: space.sm },
+  link: { color: colors.accentText, fontWeight: "600" },
+  danger: { color: colors.accentText, fontWeight: "600" },
+  error: { color: colors.accentText, marginBottom: space.sm },
 });

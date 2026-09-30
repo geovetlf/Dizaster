@@ -99,5 +99,5 @@ const styles = StyleSheet.create({
   buttonText: { color: colors.white, fontWeight: "700" },
   link: { color: colors.link, paddingVertical: space.xs },
   emergency: { marginTop: "auto", borderWidth: 1, borderColor: colors.accent, borderRadius: radius.pill, paddingVertical: space.md, alignItems: "center" },
-  emergencyText: { color: colors.accent, fontWeight: "700" },
+  emergencyText: { color: colors.accentText, fontWeight: "700" },
 });

@@ -77,6 +77,6 @@ const styles = StyleSheet.create({
   content: { paddingHorizontal: space.lg, paddingBottom: 40 },
   empty: { padding: space.xl, alignItems: "center", backgroundColor: colors.surface, borderRadius: radius.lg },
   emptyText: { color: colors.textMuted, textAlign: "center" },
-  retry: { color: colors.accent, marginTop: space.sm, fontWeight: "600" },
+  retry: { color: colors.accentText, marginTop: space.sm, fontWeight: "600" },
   loader: { marginVertical: space.lg },
 });

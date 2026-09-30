@@ -110,5 +110,5 @@ const styles = StyleSheet.create({
   save: { backgroundColor: colors.accent, borderRadius: radius.md, padding: space.sm, alignItems: "center" },
   disabled: { opacity: 0.4 },
   meta: { color: colors.textMuted, fontSize: 13 },
-  error: { color: colors.accent, fontSize: 13 },
+  error: { color: colors.accentText, fontSize: 13 },
 });

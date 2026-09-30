@@ -84,7 +84,7 @@ const styles = StyleSheet.create({
   tab: { paddingBottom: 6, borderBottomWidth: 2, borderBottomColor: "transparent" },
   tabActive: { borderBottomColor: colors.accent },
   tabText: { color: colors.textMuted, fontSize: 14 },
-  tabTextActive: { color: colors.accent, fontWeight: "600" },
+  tabTextActive: { color: colors.accentText, fontWeight: "600" },
   notice: { backgroundColor: colors.surface, borderRadius: radius.lg, padding: space.xl, alignItems: "center", gap: space.md },
   noticeText: { color: colors.textMuted, textAlign: "center" },
   noticeButton: { backgroundColor: colors.accent, borderRadius: radius.pill, paddingHorizontal: space.xl, paddingVertical: 10 },

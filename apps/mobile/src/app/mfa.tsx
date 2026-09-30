@@ -111,10 +111,10 @@ const styles = StyleSheet.create({
   label: { color: colors.textMuted, fontSize: 13 },
   mono: { color: colors.text, fontFamily: "monospace", fontSize: 18, letterSpacing: 1 },
   box: { backgroundColor: colors.surface, borderRadius: radius.md, padding: space.md, gap: space.sm },
-  link: { color: colors.accent, fontWeight: "600" },
+  link: { color: colors.accentText, fontWeight: "600" },
   input: { color: colors.text, backgroundColor: colors.surface, borderRadius: radius.md, padding: space.md, fontSize: 20, letterSpacing: 4 },
   primary: { backgroundColor: colors.accent, borderRadius: radius.pill, paddingVertical: space.md, alignItems: "center" },
   primaryText: { color: colors.white, fontWeight: "700" },
   disabled: { opacity: 0.4 },
-  error: { color: colors.accent },
+  error: { color: colors.accentText },
 });

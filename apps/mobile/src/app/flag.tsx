@@ -64,7 +64,7 @@ const styles = StyleSheet.create({
   rowOn: { borderWidth: 1, borderColor: colors.accent },
   rowText: { flex: 1, color: colors.text },
   input: { color: colors.text, backgroundColor: colors.surface, borderRadius: radius.md, padding: space.md, minHeight: 80, marginTop: space.sm, textAlignVertical: "top" },
-  error: { color: colors.accent, marginTop: space.sm },
+  error: { color: colors.accentText, marginTop: space.sm },
   button: { backgroundColor: colors.accent, borderRadius: radius.md, padding: space.md, alignItems: "center", marginTop: space.lg, alignSelf: "stretch" },
   disabled: { opacity: 0.5 },
   buttonText: { color: colors.white, fontWeight: "700" },

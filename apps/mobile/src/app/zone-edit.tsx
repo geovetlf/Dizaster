@@ -171,7 +171,7 @@ const styles = StyleSheet.create({
   chipText: { color: colors.text },
   input: { color: colors.text, backgroundColor: colors.surface, borderRadius: radius.md, paddingHorizontal: space.lg, paddingVertical: 12, marginBottom: space.sm },
   note: { color: colors.textMuted, fontSize: 13, marginVertical: space.md },
-  error: { color: colors.accent, fontSize: 13 },
+  error: { color: colors.accentText, fontSize: 13 },
   button: { backgroundColor: colors.accent, borderRadius: radius.md, padding: space.md, alignItems: "center" },
   disabled: { opacity: 0.5 },
   buttonText: { color: colors.white, fontWeight: "700" },

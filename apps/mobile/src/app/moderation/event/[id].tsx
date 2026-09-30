@@ -239,5 +239,5 @@ const styles = StyleSheet.create({
   wide: { alignSelf: "flex-start", marginTop: space.sm },
   disabled: { opacity: 0.4 },
   buttonText: { color: colors.white, fontWeight: "600" },
-  error: { color: colors.accent, padding: space.sm },
+  error: { color: colors.accentText, padding: space.sm },
 });

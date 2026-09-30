@@ -63,10 +63,10 @@ const styles = StyleSheet.create({
   title: { color: colors.text, fontWeight: "700" },
   reason: { color: colors.text },
   meta: { color: colors.textMuted, fontSize: 13 },
-  link: { color: colors.accent, fontWeight: "600", marginTop: space.xs },
+  link: { color: colors.accentText, fontWeight: "600", marginTop: space.xs },
   input: { color: colors.text, backgroundColor: colors.bg, borderRadius: radius.md, padding: space.md, minHeight: 70, textAlignVertical: "top" },
   button: { backgroundColor: colors.accent, borderRadius: radius.md, padding: space.sm, alignItems: "center" },
   disabled: { opacity: 0.5 },
   buttonText: { color: colors.white, fontWeight: "600" },
-  error: { color: colors.accent, fontSize: 12 },
+  error: { color: colors.accentText, fontSize: 12 },
 });

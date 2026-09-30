@@ -117,7 +117,7 @@ const styles = StyleSheet.create({
   row: { flexDirection: "row", alignItems: "center", gap: space.md, backgroundColor: colors.surface, borderRadius: radius.md, padding: space.lg, marginBottom: space.sm },
   rowLabel: { flex: 1, color: colors.text, fontSize: 15 },
   rowValue: { color: colors.textMuted },
-  rowAction: { color: colors.accent, fontWeight: "600" },
+  rowAction: { color: colors.accentText, fontWeight: "600" },
   note: { color: colors.textMuted, marginTop: space.lg },
   version: { color: colors.textMuted, marginTop: space.xl, fontSize: 12 },
 });

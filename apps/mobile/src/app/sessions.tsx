@@ -67,6 +67,6 @@ const styles = StyleSheet.create({
   title: { color: colors.text, fontSize: 16, fontWeight: "600" },
   meta: { color: colors.textMuted, fontSize: 13, marginTop: 2 },
   button: { borderRadius: radius.pill, borderWidth: 1, borderColor: colors.accent, paddingVertical: space.md, alignItems: "center", marginTop: space.md },
-  buttonText: { color: colors.accent, fontWeight: "700" },
+  buttonText: { color: colors.accentText, fontWeight: "700" },
   note: { color: colors.textMuted, fontSize: 12, marginTop: space.md },
 });

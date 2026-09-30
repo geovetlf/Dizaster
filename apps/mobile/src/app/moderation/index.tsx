@@ -188,6 +188,6 @@ const styles = StyleSheet.create({
   primary: { backgroundColor: colors.accent },
   disabled: { opacity: 0.5 },
   buttonText: { color: colors.white, fontWeight: "600" },
-  error: { color: colors.accent, fontSize: 12 },
+  error: { color: colors.accentText, fontSize: 12 },
   empty: { color: colors.textMuted, textAlign: "center", padding: space.xl },
 });

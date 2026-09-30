@@ -153,5 +153,5 @@ const styles = StyleSheet.create({
   thumb: { width: 96, height: 96, borderRadius: radius.md, backgroundColor: colors.surfaceAlt },
   original: { width: "100%", aspectRatio: 1, backgroundColor: colors.surfaceAlt, borderRadius: radius.md },
   actionText: { color: colors.white, fontWeight: "600" },
-  error: { color: colors.accent, padding: space.sm },
+  error: { color: colors.accentText, padding: space.sm },
 });

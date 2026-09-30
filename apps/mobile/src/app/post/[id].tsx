@@ -162,7 +162,7 @@ const styles = StyleSheet.create({
   action: { flexDirection: "row", alignItems: "center", gap: 4 },
   link: { color: colors.textMuted, fontWeight: "600" },
   replying: { paddingHorizontal: space.lg, paddingTop: space.sm },
-  error: { color: colors.accent, paddingHorizontal: space.lg },
+  error: { color: colors.accentText, paddingHorizontal: space.lg },
   composer: { flexDirection: "row", alignItems: "flex-end", gap: space.sm, padding: space.md, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
   input: { flex: 1, color: colors.text, backgroundColor: colors.surface, borderRadius: radius.md, paddingHorizontal: space.md, paddingVertical: 10, maxHeight: 120 },
   send: { backgroundColor: colors.accent, borderRadius: radius.md, paddingHorizontal: space.lg, paddingVertical: 12 },

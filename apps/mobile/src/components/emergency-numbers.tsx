@@ -58,5 +58,5 @@ const styles = StyleSheet.create({
   warning: { backgroundColor: "#3A2A10", color: "#FACC15", padding: 10, borderRadius: 8, marginBottom: 12 },
   row: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 16, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
   label: { fontSize: 16, flex: 1, color: colors.text },
-  number: { fontSize: 22, fontWeight: "700", color: colors.accent },
+  number: { fontSize: 22, fontWeight: "700", color: colors.accentText },
 });

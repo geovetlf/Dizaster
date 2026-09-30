@@ -110,7 +110,7 @@ const styles = StyleSheet.create({
   label: { color: colors.textMuted, flex: 1 },
   value: { color: colors.text, fontVariant: ["tabular-nums"] },
   meta: { color: colors.textMuted },
-  error: { color: colors.accent },
+  error: { color: colors.accentText },
   share: { alignSelf: "flex-start", backgroundColor: colors.accent, borderRadius: radius.pill, paddingHorizontal: space.lg, paddingVertical: space.sm, marginTop: space.sm },
   shareText: { color: colors.white, fontWeight: "700" },
 });

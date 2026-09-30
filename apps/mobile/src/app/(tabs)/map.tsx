@@ -82,7 +82,7 @@ export default function MapScreen() {
         : data.clusters.map((c) => ({
             type: "Feature",
             geometry: { type: "Point", coordinates: [c.point.lng, c.point.lat] },
-            properties: { count: c.count, color: colors.accent, severity: c.maxSeverity, stroke: "#ffffff", strokeWidth: 2, opacity: 1 },
+            properties: { count: c.count, color: colors.accentText, severity: c.maxSeverity, stroke: "#ffffff", strokeWidth: 2, opacity: 1 },
           }));
     return { type: "FeatureCollection", features };
   }, [data]);

@@ -70,8 +70,8 @@ const styles = StyleSheet.create({
   heading: { color: colors.text, fontSize: 16, fontWeight: "700" },
   row: { backgroundColor: colors.surface, borderRadius: radius.md, padding: space.md },
   title: { color: colors.text, fontSize: 14 },
-  link: { color: colors.accent },
+  link: { color: colors.accentText },
   meta: { color: colors.textMuted, fontSize: 12, marginTop: 2 },
   version: { color: colors.textMuted, fontSize: 12, textAlign: "center" },
-  clear: { color: colors.accent, paddingVertical: 8 },
+  clear: { color: colors.accentText, paddingVertical: 8 },
 });

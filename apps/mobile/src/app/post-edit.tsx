@@ -45,7 +45,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg, padding: space.lg, gap: space.md },
   hint: { color: colors.textMuted },
   input: { minHeight: 140, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: space.md, color: colors.text, textAlignVertical: "top" },
-  error: { color: colors.accent },
+  error: { color: colors.accentText },
   button: { backgroundColor: colors.accent, borderRadius: radius.md, padding: space.md, alignItems: "center" },
   disabled: { opacity: 0.5 },
   buttonText: { color: colors.white, fontWeight: "600" },

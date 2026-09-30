@@ -10,6 +10,8 @@ export const colors = {
   text: "#F2F4F7",
   textMuted: "#9AA4B2",
   accent: "#E5262E",
+  // Texto rojo (errores, enlaces de acción): el acento no llega a AA 4,5:1 sobre el fondo oscuro (ADR 0199).
+  accentText: "#FF5A5F",
   accentSoft: "#3A1416",
   like: "#F0434B",
   // Etiquetas y menciones tocables (contraste AA sobre surface).

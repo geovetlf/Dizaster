@@ -89,7 +89,7 @@ export default function AlertsScreen() {
         renderItem={({ item }) => {
           const s = item.kind === "OFFICIAL_UPDATE" ? { icon: "bullhorn-outline" as const, color: colors.link }
             : item.categoryCode ? categoryStyle(item.categoryCode)
-            : item.kind === "MODERATION" ? { icon: "shield-check-outline" as const, color: colors.link } : { icon: "at" as const, color: colors.accent };
+            : item.kind === "MODERATION" ? { icon: "shield-check-outline" as const, color: colors.link } : { icon: "at" as const, color: colors.accentText };
           const note = deliveryNoteKey(item.delivery);
           return (
             <Pressable accessibilityRole="link" style={[styles.row, !item.readAt && styles.unread]} onPress={() => void openItem(item)}>
@@ -124,7 +124,7 @@ const styles = StyleSheet.create({
   meta: { color: colors.textMuted, fontSize: 12, marginTop: space.xs },
   dot: { width: 10, height: 10, borderRadius: radius.pill, backgroundColor: colors.accent, marginTop: 6 },
   readAll: { alignSelf: "flex-end", padding: space.lg },
-  readAllText: { color: colors.accent, fontWeight: "600" },
+  readAllText: { color: colors.accentText, fontWeight: "600" },
   empty: { color: colors.textMuted, textAlign: "center", padding: space.xl },
   privacy: { color: colors.textMuted, fontSize: 12, textAlign: "center", padding: space.md },
 });

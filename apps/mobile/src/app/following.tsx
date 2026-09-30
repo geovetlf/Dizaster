@@ -73,5 +73,5 @@ const styles = StyleSheet.create({
   meta: { color: colors.textMuted, fontSize: 13 },
   button: { backgroundColor: colors.surfaceAlt, borderRadius: radius.pill, paddingHorizontal: space.md, paddingVertical: space.sm },
   buttonText: { color: colors.white, fontWeight: "600" },
-  error: { color: colors.accent, marginBottom: space.sm },
+  error: { color: colors.accentText, marginBottom: space.sm },
 });

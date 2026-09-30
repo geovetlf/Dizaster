@@ -203,7 +203,7 @@ const styles = StyleSheet.create({
   source: { backgroundColor: colors.surface, borderRadius: radius.md, padding: space.md, marginBottom: space.sm },
   sourceName: { color: colors.text, fontWeight: "600" },
   link: { color: colors.link },
-  retracted: { color: colors.accent, fontWeight: "600" },
+  retracted: { color: colors.accentText, fontWeight: "600" },
   sourceMeta: { color: colors.textMuted, fontSize: 12 },
   whyLine: { color: colors.text, marginBottom: 4 },
 });

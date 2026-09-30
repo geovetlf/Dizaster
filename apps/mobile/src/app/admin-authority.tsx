@@ -176,7 +176,7 @@ const styles = StyleSheet.create({
   title: { color: colors.text, fontWeight: "700" },
   body: { color: colors.text },
   meta: { color: colors.textMuted },
-  error: { color: colors.accent },
+  error: { color: colors.accentText },
   input: { color: colors.text, backgroundColor: colors.bg, borderRadius: radius.sm, paddingHorizontal: space.md, paddingVertical: space.sm },
   multiline: { minHeight: 64, textAlignVertical: "top" },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: space.xs },

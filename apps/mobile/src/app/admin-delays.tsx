@@ -77,7 +77,7 @@ const styles = StyleSheet.create({
   card: { backgroundColor: colors.surface, borderRadius: radius.md, padding: space.md, gap: space.xs },
   title: { color: colors.text, fontWeight: "700" },
   meta: { color: colors.textMuted },
-  error: { color: colors.accent },
+  error: { color: colors.accentText },
   editRow: { flexDirection: "row", alignItems: "center", gap: space.sm, marginTop: space.xs },
   input: { flex: 1, color: colors.text, backgroundColor: colors.bg, borderRadius: radius.sm, paddingHorizontal: space.md, paddingVertical: space.sm },
   apply: { backgroundColor: colors.accent, borderRadius: radius.pill, paddingHorizontal: space.lg, paddingVertical: space.sm },
