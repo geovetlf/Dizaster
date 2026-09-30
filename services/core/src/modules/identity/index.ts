@@ -566,8 +566,19 @@ export class IdentityService {
    */
   async deleteAccount(userId: string, profileId: string): Promise<void> {
     await withTransaction(this.db, async (tx) => {
+      // Roles de personal (ADR 0235): la baja queda en el registro y nunca deja el sistema sin administrador.
+      const current = (await tx.query<{ roles: string[] }>(`SELECT roles FROM identity.users WHERE id = $1 AND status <> 'DELETED'`, [userId])).rows[0];
+      if (!current) return;
+      if (current.roles.includes("admin")) {
+        await tx.query(`SELECT pg_advisory_xact_lock(hashtextextended('identity.admin-revoke', 0))`);
+        const admins = await tx.query<{ n: number }>(`SELECT count(*)::int AS n FROM identity.users WHERE 'admin' = ANY(roles) AND status = 'ACTIVE' AND id <> $1`, [userId]);
+        if ((admins.rows[0]?.n ?? 0) < 1) throw new DomainError("LAST_ADMIN", "Eres el último administrador: nombra a otro antes de borrar tu cuenta", 409);
+      }
       const { rowCount } = await tx.query(`UPDATE identity.users SET status = 'DELETED', deleted_at = now(), roles = '{}', updated_at = now() WHERE id = $1 AND status <> 'DELETED'`, [userId]);
       if (!rowCount) return;
+      for (const role of current.roles.filter((r) => r !== "user")) {
+        await tx.query(`INSERT INTO identity.role_changes (id, user_id, role, action, actor, reason) VALUES ($1, $2, $3, 'REVOKE', $4, 'Cuenta borrada')`, [newId(), userId, role, `user:${userId}`]);
+      }
       await tx.query(`UPDATE identity.sessions SET revoked_at = now(), revoke_reason = 'ACCOUNT_DELETED' WHERE user_id = $1 AND revoked_at IS NULL`, [userId]);
       await tx.query(`UPDATE identity.devices SET push_token = NULL, push_provider = NULL, push_environment = NULL, push_token_updated_at = now() WHERE user_id = $1`, [userId]);
       // Sin vínculo con Apple/Google/email: volver a entrar con la misma identidad crea una cuenta nueva.
@@ -581,6 +592,7 @@ export class IdentityService {
       await publish(tx, "AccountDeleted", { userId, profileId }, { lane: "interactive" });
     });
     this.statusCache.delete(userId);
+    this.rolesCache.delete(userId);
   }
 
   async issueToken(session: Session, ttlSeconds = ACCESS_TTL_SECONDS): Promise<string> {
