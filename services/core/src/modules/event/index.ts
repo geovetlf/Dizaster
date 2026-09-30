@@ -75,14 +75,14 @@ interface EventRow {
   id: string; category_code: string; title: Record<string, string> | null; lat: number; lng: number;
   sensitivity: EventSummary["sensitivity"]; country_code: string | null; status: EventSummary["status"];
   severity: number; verification_level: VerificationLevel; negative_state: NegativeState; report_count: number;
-  source_count: number; official_source_count: number; first_seen_at: Date; last_activity_at: Date; occurred_end: Date | null; publication_state: string; merged_into_id: string | null;
+  source_count: number; official_source_count: number; first_seen_at: Date; occurred_start: Date | null; last_activity_at: Date; occurred_end: Date | null; publication_state: string; merged_into_id: string | null;
   place: ContextualLocation | null; secondary_categories: string[] | null;
 }
 
 const PUBLIC_EVENT_COLUMNS = `
   e.id, e.category_code, e.title, ST_Y(e.public_geom::geometry) AS lat, ST_X(e.public_geom::geometry) AS lng,
   e.sensitivity, e.country_code, e.status, e.severity, e.verification_level, e.negative_state,
-  e.report_count, e.source_count, e.official_source_count, e.first_seen_at, e.last_activity_at, e.occurred_end, e.publication_state, e.merged_into_id, e.place,
+  e.report_count, e.source_count, e.official_source_count, e.first_seen_at, e.occurred_start, e.last_activity_at, e.occurred_end, e.publication_state, e.merged_into_id, e.place,
   e.secondary_categories`;
 
 function toSummary(r: EventRow): EventSummary {
@@ -104,6 +104,7 @@ function toSummary(r: EventRow): EventSummary {
     sourceCount: r.source_count,
     officialSourceCount: r.official_source_count ?? 0,
     firstSeenAt: r.first_seen_at.toISOString(),
+    startedAt: r.occurred_start?.toISOString() ?? null,
     lastActivityAt: r.last_activity_at.toISOString(),
     endedAt: r.occurred_end?.toISOString() ?? null,
   };

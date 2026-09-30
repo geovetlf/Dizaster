@@ -270,6 +270,8 @@ export const fr: Record<MessageKey, string> = {
   configBefore: "Avant",
   configAfter: "Après",
   eventEnded: "Terminé",
+  eventStarted: "Survenu",
+  eventDetected: "signalé",
   moderatorNotes: "Notes internes",
   moderatorNoteHint: "Seule la modération voit ces notes",
   affectedArea: "Zone officielle touchée",

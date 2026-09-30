@@ -10,7 +10,7 @@ import { api } from "../../lib/api";
 import { cacheKeys, readThrough } from "../../lib/offline/read-cache";
 import { readCache } from "../../lib/offline/sqlite-cache";
 import { lang, t, tCount, tf, VERIFICATION_LABEL, verificationLabel } from "../../lib/i18n";
-import { eventStatusLine } from "../../lib/ui/event-status";
+import { eventStatusLine, eventWhenParts } from "../../lib/ui/event-status";
 import { eventTime, eventTitle, formatInZone, timeAgo } from "../../lib/ui/format";
 import { evidenceLine, explainLines, timelineLabel } from "../../lib/verification/explain";
 import { followablePlace } from "../../lib/social/place";
@@ -129,7 +129,9 @@ export default function EventScreen() {
       <Text style={styles.meta}>
         {[
           ...evidenceCounts(event, tCount),
-          eventTime(event.firstSeenAt, lang, event.place?.timezone, zoneLabels()),
+          // Hora del suceso y, si se supo mucho después, la de detección (ADR 0224).
+          ...((w) => (w.detected ? [`${t("eventStarted")} ${w.started}`, `${t("eventDetected")} ${w.detected}`] : [w.started]))(
+            eventWhenParts(event, (iso) => eventTime(iso, lang, event.place?.timezone, zoneLabels()))),
           // Hora de fin (ADR 0140), solo en eventos cerrados.
           ...(event.endedAt ? [`${t("eventEnded")} ${eventTime(event.endedAt, lang, event.place?.timezone, zoneLabels())}`] : []),
         ].join(" · ")}

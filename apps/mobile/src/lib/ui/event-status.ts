@@ -20,3 +20,17 @@ export const MAP_CIRCLE_RADIUS = [
   ["interpolate", ["linear"], ["get", "count"], 1, 7, 50, 22],
   ["*", ["-", ["coalesce", ["get", "severity"], 1], 1], 1.5],
 ] as const;
+
+/** Diferencia a partir de la cual se muestran por separado la hora del suceso y la de detección (ADR 0224). */
+export const DETECTION_GAP_MINUTES = 15;
+
+/**
+ * Cuándo pasó (§7.3 occurred_start, ADR 0224): la hora del suceso si se conoce y, si Dizaster lo supo bastante
+ * después (p. ej. un informe publicado horas más tarde), también la de detección. `fmt` formatea cada hora.
+ */
+export function eventWhenParts(e: { startedAt?: string | null; firstSeenAt: string }, fmt: (iso: string) => string):
+  { started: string; detected: string | null } {
+  const start = e.startedAt && Date.parse(e.startedAt) <= Date.parse(e.firstSeenAt) ? e.startedAt : e.firstSeenAt;
+  const gap = (Date.parse(e.firstSeenAt) - Date.parse(start)) / 60_000;
+  return { started: fmt(start), detected: gap >= DETECTION_GAP_MINUTES ? fmt(e.firstSeenAt) : null };
+}

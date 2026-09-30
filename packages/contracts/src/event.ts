@@ -96,6 +96,11 @@ export const EventSummary = z.object({
   /** De ellas, oficiales registradas (ADR 0117). Las externas son la diferencia. */
   officialSourceCount: z.number().int(),
   firstSeenAt: Instant,
+  /**
+   * Hora del suceso (§7.3 occurred_start, ADR 0224): la que da la fuente (p. ej. el origen de un sismo) o la captura
+   * del primer reporte. Puede ser anterior a `firstSeenAt` (cuándo lo supo Dizaster).
+   */
+  startedAt: Instant.nullable().optional(),
   lastActivityAt: Instant,
   /** Hora de fin (§7.3 occurred_end, ADR 0140): solo en eventos RESOLVED o ARCHIVED. */
   endedAt: Instant.nullable().optional(),
