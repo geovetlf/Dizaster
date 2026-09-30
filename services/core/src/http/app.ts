@@ -727,7 +727,7 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
   app.get("/v1/me/reports", async (req, reply) => {
     const session = requireSession(req);
     reply.header("cache-control", "no-store");
-    return { reports: await c.reports.myReports(c.db, session.userId) };
+    return c.reports.myReports(c.db, session.userId, req.query);
   });
 
   app.post("/v1/me/reports/:id/match", async (req) => {

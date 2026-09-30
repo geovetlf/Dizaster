@@ -95,3 +95,14 @@ export interface MyReportView {
   /** Queda por responder "¿Es el mismo evento?" (ADR 0156). */
   askSameEvent: boolean;
 }
+
+/**
+ * "Mis reportes" por páginas (ADR 0287), de lo más reciente a lo más antiguo. `cursor` es el id del último reporte
+ * recibido; la respuesta trae `nextCursor` mientras queden más.
+ */
+export const MyReportsQuery = z.object({
+  cursor: z.uuid().optional(),
+  limit: z.coerce.number().int().min(1).max(200).default(50),
+});
+export type MyReportsQuery = z.infer<typeof MyReportsQuery>;
+export interface MyReportsResponse { reports: MyReportView[]; nextCursor: string | null }
