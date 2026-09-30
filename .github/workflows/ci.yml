@@ -137,7 +137,7 @@ jobs:
           docker run --rm -v "$PWD:/src:ro"
           aquasec/trivy:0.74.0@sha256:62b1e65e8869bc4b4c6aa4fa2b21595256c7c2f6018a9d9ad61caf87187c1969
           fs --scanners vuln,misconfig,secret --severity HIGH,CRITICAL --exit-code 1 --quiet /src
-      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: 1.27.1
           cache: false
