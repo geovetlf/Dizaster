@@ -30,3 +30,4 @@ export * from "./auth.js";
 export * from "./client-crashes.js";
 export * from "./legal.js";
 export * from "./language-engine.js";
+export * from "./admin-config.js";

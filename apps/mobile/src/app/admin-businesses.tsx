@@ -2,6 +2,7 @@ import type { BusinessVerification, BusinessView, OfficialScopeView } from "@diz
 import { useState } from "react";
 import { Alert, FlatList, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { parseScopeList } from "../lib/admin/admin-tools";
+import { validReason } from "../lib/admin/sources-format";
 import { api } from "../lib/api";
 import { t, type MessageKey } from "../lib/i18n";
 import { colors, radius, space } from "../theme";
@@ -16,6 +17,7 @@ export default function AdminBusinessesScreen() {
   const [q, setQ] = useState("");
   const [results, setResults] = useState<BusinessView[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [reason, setReason] = useState("");
 
   async function search() {
     try {
@@ -37,33 +39,35 @@ export default function AdminBusinessesScreen() {
         <View style={styles.search}>
           <TextInput accessibilityLabel={t("bizSearch")} value={q} onChangeText={setQ} onSubmitEditing={() => void search()} placeholder={t("bizSearch")} placeholderTextColor={colors.textMuted}
             autoCapitalize="none" returnKeyType="search" style={styles.input} />
+          <TextInput accessibilityLabel={t("actionReason")} value={reason} onChangeText={setReason} maxLength={500} placeholder={t("actionReason")} placeholderTextColor={colors.textMuted} style={styles.input} />
           {error ? <Text style={styles.error}>{error}</Text> : null}
         </View>
       }
-      renderItem={({ item }) => <BusinessAdminRow business={item} onChange={(b) => setResults((prev) => prev.map((x) => (x.handle === b.handle ? b : x)))} />}
+      renderItem={({ item }) => <BusinessAdminRow business={item} reason={reason.trim()} onChange={(b) => setResults((prev) => prev.map((x) => (x.handle === b.handle ? b : x)))} />}
     />
   );
 }
 
-function BusinessAdminRow({ business, onChange }: { business: BusinessView; onChange: (b: BusinessView) => void }) {
+function BusinessAdminRow({ business, reason, onChange }: { business: BusinessView; reason: string; onChange: (b: BusinessView) => void }) {
+  const reasonOk = validReason(reason);
   const [scope, setScope] = useState<OfficialScopeView | null>(null);
   const [categories, setCategories] = useState("");
   const [countries, setCountries] = useState(business.country ?? "");
   const [error, setError] = useState<string | null>(null);
   const cats = parseScopeList(categories, "category");
   const ctry = parseScopeList(countries, "country");
-  const scopeOk = cats.values.length > 0 && ctry.values.length > 0 && cats.invalid.length === 0 && ctry.invalid.length === 0;
+  const scopeOk = reasonOk && cats.values.length > 0 && ctry.values.length > 0 && cats.invalid.length === 0 && ctry.invalid.length === 0;
 
   function setLevel(v: BusinessVerification) {
     Alert.alert(`@${business.handle}`, `${t("bizConfirmLevel")} ${t(LEVEL_LABEL[v])}`, [
       { text: t("cancel"), style: "cancel" },
-      { text: t("apply"), onPress: () => void api.setBusinessVerification(business.handle, v).then((b) => { onChange(b); setScope(null); }).catch((e: Error) => setError(e.message)) },
+      { text: t("apply"), onPress: () => void api.setBusinessVerification(business.handle, v, reason).then((b) => { onChange(b); setScope(null); }).catch((e: Error) => setError(e.message)) },
     ]);
   }
   function saveScope() {
     Alert.alert(`@${business.handle}`, t("bizConfirmScope"), [
       { text: t("cancel"), style: "cancel" },
-      { text: t("apply"), onPress: () => void api.setOfficialScope(business.handle, cats.values, ctry.values).then(setScope).catch((e: Error) => setError(e.message)) },
+      { text: t("apply"), onPress: () => void api.setOfficialScope(business.handle, cats.values, ctry.values, reason).then(setScope).catch((e: Error) => setError(e.message)) },
     ]);
   }
 
@@ -72,8 +76,8 @@ function BusinessAdminRow({ business, onChange }: { business: BusinessView; onCh
       <Text style={styles.title}>{business.name} · @{business.handle}</Text>
       <View style={styles.chips}>
         {LEVELS.map((v) => (
-          <Pressable key={v} accessibilityRole="button" accessibilityState={{ selected: business.verification === v }} disabled={business.verification === v}
-            style={[styles.chip, business.verification === v && styles.chipOn]} onPress={() => setLevel(v)}>
+          <Pressable key={v} accessibilityRole="button" accessibilityState={{ selected: business.verification === v, disabled: !reasonOk }} disabled={business.verification === v || !reasonOk}
+            style={[styles.chip, business.verification === v && styles.chipOn, !reasonOk && business.verification !== v && styles.disabled]} onPress={() => setLevel(v)}>
             <Text style={styles.chipText}>{t(LEVEL_LABEL[v])}</Text>
           </Pressable>
         ))}

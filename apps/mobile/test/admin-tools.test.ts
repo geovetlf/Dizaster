@@ -48,3 +48,12 @@ describe("requerimientos de autoridades (ADR 0139)", () => {
     for (const bad of ["0", "366", "2.5", "x"]) expect(dueFromDays(bad, now)).toBe("invalid");
   });
 });
+
+describe("historial de configuración (ADR 0219)", () => {
+  it("valores legibles en una línea", async () => {
+    const { configValue } = await import("../src/lib/admin/config-history");
+    expect(configValue(null)).toBe("—");
+    expect(configValue({ period: "DAILY", limitUsd: 8 })).toBe("period: DAILY · limitUsd: 8");
+    expect(configValue({ categories: ["fire", "flood"], countries: ["PE"] })).toBe("categories: fire, flood · countries: PE");
+  });
+});

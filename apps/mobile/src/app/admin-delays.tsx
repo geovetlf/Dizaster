@@ -3,6 +3,7 @@ import { useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { parseDelayMinutes } from "../lib/admin/admin-tools";
+import { validReason } from "../lib/admin/sources-format";
 import { api } from "../lib/api";
 import { lang, t } from "../lib/i18n";
 import { colors, radius, space } from "../theme";
@@ -20,6 +21,8 @@ export default function AdminDelaysScreen() {
   const [views, setViews] = useState<Record<string, PublishDelayView>>({});
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
+  const [reason, setReason] = useState("");
+  const ok = validReason(reason);
 
   useFocusEffect(useCallback(() => {
     Promise.all(SENSITIVE.map((c) => api.publishDelay(c.code)))
@@ -30,7 +33,8 @@ export default function AdminDelaysScreen() {
   function save(code: string) {
     const minutes = parseDelayMinutes(drafts[code] ?? "");
     if (minutes === null) { setError(t("delayInvalid")); return; }
-    api.setPublishDelay(code, minutes)
+    if (!ok) { setError(t("actionReason")); return; }
+    api.setPublishDelay(code, minutes, reason.trim())
       .then((v) => { setViews((prev) => ({ ...prev, [code]: v })); setDrafts((prev) => ({ ...prev, [code]: "" })); setError(null); })
       .catch((e: Error) => setError(e.message));
   }
@@ -41,7 +45,13 @@ export default function AdminDelaysScreen() {
       contentContainerStyle={styles.content}
       data={SENSITIVE}
       keyExtractor={(c) => c.code}
-      ListHeaderComponent={<Text style={error ? styles.error : styles.meta}>{error ?? t("delayHint")}</Text>}
+      keyboardShouldPersistTaps="handled"
+      ListHeaderComponent={
+        <View style={styles.header}>
+          <Text style={error ? styles.error : styles.meta}>{error ?? t("delayHint")}</Text>
+          <TextInput accessibilityLabel={t("actionReason")} value={reason} onChangeText={setReason} maxLength={500} placeholder={t("actionReason")} placeholderTextColor={colors.textMuted} style={[styles.input, styles.reason]} />
+        </View>
+      }
       renderItem={({ item }) => {
         const v = views[item.code];
         return (
@@ -60,7 +70,7 @@ export default function AdminDelaysScreen() {
                 placeholderTextColor={colors.textMuted}
                 style={styles.input}
               />
-              <Pressable accessibilityRole="button" style={styles.apply} onPress={() => save(item.code)}>
+              <Pressable accessibilityRole="button" accessibilityState={{ disabled: !ok }} disabled={!ok} style={[styles.apply, !ok && styles.disabled]} onPress={() => save(item.code)}>
                 <Text style={styles.applyText}>{t("apply")}</Text>
               </Pressable>
             </View>
@@ -82,4 +92,7 @@ const styles = StyleSheet.create({
   input: { flex: 1, color: colors.text, backgroundColor: colors.bg, borderRadius: radius.sm, paddingHorizontal: space.md, paddingVertical: space.sm },
   apply: { backgroundColor: colors.accent, borderRadius: radius.pill, paddingHorizontal: space.lg, paddingVertical: space.sm },
   applyText: { color: colors.white, fontWeight: "700" },
+  header: { gap: space.sm, marginBottom: space.sm },
+  reason: { flex: 0, backgroundColor: colors.surface },
+  disabled: { opacity: 0.4 },
 });

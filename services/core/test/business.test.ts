@@ -63,8 +63,8 @@ describe("perfiles de negocio", () => {
     expect(following.posts.map((p) => p.text)).toEqual(["Tenemos agua embotellada #Ayuda"]);
     expect((await t.app.inject({ url: "/v1/businesses/farmacia_sol", headers: auth(fan) })).json()).toMatchObject({ followerCount: 1, followedByMe: true, postCount: 1, isMine: false });
 
-    expect((await t.app.inject({ method: "PUT", url: "/v1/admin/businesses/farmacia_sol/verification", headers: auth(owner), payload: { verification: "VERIFIED" } })).statusCode).toBe(403);
-    const v = await t.app.inject({ method: "PUT", url: "/v1/admin/businesses/farmacia_sol/verification", headers: auth(admin), payload: { verification: "VERIFIED" } });
+    expect((await t.app.inject({ method: "PUT", url: "/v1/admin/businesses/farmacia_sol/verification", headers: auth(owner), payload: { verification: "VERIFIED", reason: "Documentos revisados" } })).statusCode).toBe(403);
+    const v = await t.app.inject({ method: "PUT", url: "/v1/admin/businesses/farmacia_sol/verification", headers: auth(admin), payload: { verification: "VERIFIED", reason: "Documentos revisados" } });
     expect(v.statusCode, v.body).toBe(200);
     const found = (await t.app.inject({ url: "/v1/businesses?q=farma" })).json().businesses as BusinessView[];
     expect(found[0]).toMatchObject({ handle: "farmacia_sol", verification: "VERIFIED" });

@@ -89,6 +89,7 @@ export default function ProfileScreen() {
         {can(roles, "admin") ? <Row icon="storefront-check-outline" label={t("adminBusinesses")} onPress={() => router.push("/admin-businesses")} /> : null}
         {can(roles, "admin") ? <Row icon="map-marker-account-outline" label={t("presenceLogTitle")} onPress={() => router.push("/admin-presence")} /> : null}
         {can(roles, "admin") ? <Row icon="timer-sand" label={t("adminDelays")} onPress={() => router.push("/admin-delays")} /> : null}
+        {can(roles, "admin") ? <Row icon="history" label={t("adminConfigHistory")} onPress={() => router.push("/admin-config-history")} /> : null}
         {can(roles, "admin") ? <Row icon="scale-balance" label={t("adminAuthority")} onPress={() => router.push("/admin-authority")} /> : null}
         {can(roles, "admin") ? <Row icon="file-chart-outline" label={t("adminTransparency")} onPress={() => router.push("/admin-transparency")} /> : null}
         {can(roles, "admin") ? <Row icon="account-key-outline" label={t("adminStaff")} onPress={() => router.push("/admin-staff")} /> : null}

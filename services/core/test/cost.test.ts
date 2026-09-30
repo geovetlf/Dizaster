@@ -53,7 +53,7 @@ describe("Cost Optimization Layer", () => {
     const u = await createUser(t, "curioso");
     expect((await t.app.inject({ url: "/v1/admin/cost", headers: auth(u.token) })).statusCode).toBe(403);
     expect((await t.app.inject({ url: "/v1/admin/cost" })).statusCode).toBe(401);
-    expect((await t.app.inject({ method: "PUT", url: "/v1/admin/kill-switches/ai", headers: auth(u.token), payload: { killed: false } })).statusCode).toBe(403);
+    expect((await t.app.inject({ method: "PUT", url: "/v1/admin/kill-switches/ai", headers: auth(u.token), payload: { killed: false, reason: "Piloto aprobado" } })).statusCode).toBe(403);
     expect((await t.app.inject({ url: "/v1/me/account", headers: auth(adminToken) })).json()).toMatchObject({ roles: ["user", "admin"], ageConfirmed: true, minAge: 16 });
     expect((await t.app.inject({ url: "/v1/me/account", headers: auth(u.token) })).json()).toMatchObject({ roles: ["user"] });
   });
@@ -91,9 +91,9 @@ describe("Cost Optimization Layer", () => {
   });
 
   it("presupuesto: avisa una vez al 50, 80 y 100 % y deniega al agotarse", async () => {
-    const put = await t.app.inject({ method: "PUT", url: "/v1/admin/cost/budgets/ai", headers: auth(adminToken), payload: { period: "DAILY", limitUsd: 10 } });
+    const put = await t.app.inject({ method: "PUT", url: "/v1/admin/cost/budgets/ai", headers: auth(adminToken), payload: { period: "DAILY", limitUsd: 10, reason: "Presupuesto del piloto" } });
     expect(put.json()).toMatchObject({ key: "ai", period: "DAILY", limitUsd: 10, spentUsd: 0, killed: false });
-    expect((await t.app.inject({ method: "PUT", url: "/v1/admin/cost/budgets/ai", headers: auth(adminToken), payload: { period: "YEARLY", limitUsd: 1 } })).statusCode).toBe(400);
+    expect((await t.app.inject({ method: "PUT", url: "/v1/admin/cost/budgets/ai", headers: auth(adminToken), payload: { period: "YEARLY", limitUsd: 1, reason: "Presupuesto del piloto" } })).statusCode).toBe(400);
 
     const thresholds = async () =>
       (await t.c.db.query<{ payload: { threshold: number } }>(`SELECT payload FROM platform.outbox WHERE type = 'BudgetThresholdReached' ORDER BY occurred_at`)).rows.map((r) => r.payload.threshold);

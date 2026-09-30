@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { AdminReason } from "./admin-config.js";
 
 /**
  * Perfiles de negocio (Blueprint §5.4, §7 BusinessProfile, D-04). V1: sin verificación de pago; la verifica
@@ -36,7 +37,7 @@ export type UpdateBusinessRequest = z.infer<typeof UpdateBusinessRequest>;
 export const CreateBusinessRequest = UpdateBusinessRequest.extend({ handle: BusinessHandle });
 export type CreateBusinessRequest = z.infer<typeof CreateBusinessRequest>;
 
-export const SetBusinessVerificationRequest = z.object({ verification: BusinessVerification });
+export const SetBusinessVerificationRequest = z.object({ verification: BusinessVerification, reason: AdminReason });
 
 export interface BusinessView {
   handle: string;
@@ -72,6 +73,7 @@ export const BusinessSearchQuery = z.object({
 export const OfficialScopeRequest = z.object({
   categories: z.array(z.string().regex(/^[a-z_]+(\.[a-z_]+)*$/)).min(1).max(20),
   countries: z.array(z.string().regex(/^[A-Z]{2}$/)).min(1).max(20),
+  reason: AdminReason,
 });
 export type OfficialScopeRequest = z.infer<typeof OfficialScopeRequest>;
 

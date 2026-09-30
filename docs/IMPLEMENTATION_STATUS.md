@@ -409,6 +409,7 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | DIZASTER Language Engine: registro único de idiomas, locale regional, plurales ICU, formatos, respaldo (§5.15) | ✅ | ADR 0216: extiende el i18n existente; `docs/LANGUAGE_ENGINE.md`; BD sin lista de idiomas (0092); pruebas de completitud |
 | AI CORE → AI ROUTER → PROVIDER ADAPTER; 13 capacidades; matriz ¿necesita IA? (§ IA) | ✅ | ADR 0217: rutas por capacidad (AI_ROUTES), todo apagado; respaldo entre proveedores; la app funciona sin IA (probado) |
 | Secretos fuera del repositorio; build local de Android documentada (§ seguridad, §12) | ✅ | ADR 0218: `.gitignore` de firmas y Firebase; `pnpm check:secrets` en `pnpm check`; prebuild verificado, APK BLOQUEADO (EXPO_TOKEN/SDK) |
+| Historial inmutable y motivo obligatorio en cambios de configuración (§13.1, §13.3) | ✅ | ADR 0219: `platform.config_changes` solo inserción; motivo en sellos, ámbitos, presupuestos, interruptores y retrasos; pantalla de historial |
 | Licencias, auditoría, SBOM, Dependabot; respaldo con prueba de restauración en CI | ✅ | ADR 0070, `scripts/supply-chain.mjs`, `scripts/db-restore-check.mjs` |
 | Idioma de la app elegible en el perfil (es/en/pt/fr o del teléfono) | ✅ | ADR 0069, `app/language.tsx` |
 | Varias cuentas en un teléfono corroboran como una (clave seudónima del teléfono) | ✅ | ADR 0068, migración 0036 |
@@ -470,8 +471,7 @@ Revisión del Blueprint del 2026-09-30 (tras ADR 0208): completada con ADR 0209�
 
 Revisión del Blueprint del 2026-09-30 (tras ADR 0212), verificada contra el código, sin bloqueos:
 
-1. Historial inmutable y motivo obligatorio en cambios de configuración de administración (§13.1, §13.3): verificación de negocios, ámbitos institucionales, presupuestos, kill switches, retrasos.
-2. Alcance limitado para cuentas nuevas en "Para ti" (§13.3).
+1. Alcance limitado para cuentas nuevas en "Para ti" (§13.3).
 
 Bloqueadas o en espera:
 

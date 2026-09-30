@@ -5,6 +5,7 @@ import { Alert, Pressable, RefreshControl, ScrollView, StyleSheet, Switch, Text,
 import { api } from "../lib/api";
 import { useRoles } from "../lib/auth/roles";
 import { parseUsd } from "../lib/admin/admin-tools";
+import { validReason } from "../lib/admin/sources-format";
 import { barHeights, budgetTone, formatBytes, formatUnits, formatUsd, moduleRows } from "../lib/admin/cost-format";
 import { lang, t } from "../lib/i18n";
 import { colors, radius, space } from "../theme";
@@ -18,6 +19,9 @@ export default function AdminCostScreen() {
   const [d, setD] = useState<CostDashboard | null>(null);
   const [error, setError] = useState(false);
   const [editing, setEditing] = useState<string | null>(null);
+  // Motivo de los cambios de presupuesto e interruptores: obligatorio y queda en el historial (ADR 0219).
+  const [reason, setReason] = useState("");
+  const reasonOk = validReason(reason);
   // Operación ve el tablero y usa los kill switches; los presupuestos son solo de administración (ADR 0101).
   const isAdmin = can(useRoles(), "admin");
 
@@ -35,7 +39,7 @@ export default function AdminCostScreen() {
   async function toggle(feature: string, killed: boolean) {
     if (!d) return;
     setD({ ...d, killSwitches: d.killSwitches.map((k) => (k.feature === feature ? { ...k, killed } : k)) });
-    await api.setKillSwitch(feature, killed).catch(() => undefined);
+    await api.setKillSwitch(feature, killed, reason.trim()).catch(() => undefined);
     void load(days);
   }
 
@@ -43,7 +47,7 @@ export default function AdminCostScreen() {
   const heights = d ? barHeights(d.daily.map((x) => x.requests)) : [];
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content} refreshControl={<RefreshControl refreshing={false} onRefresh={() => void load(days)} tintColor={colors.textMuted} />}>
+    <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" refreshControl={<RefreshControl refreshing={false} onRefresh={() => void load(days)} tintColor={colors.textMuted} />}>
       <View style={styles.ranges}>
         {RANGES.map((r) => (
           <Pressable key={r} accessibilityRole="button" accessibilityState={{ selected: r === days }} style={[styles.range, r === days && styles.rangeOn]} onPress={() => setDays(r)}>
@@ -86,6 +90,7 @@ export default function AdminCostScreen() {
             </View>
           ))}
 
+          <TextInput accessibilityLabel={t("actionReason")} value={reason} onChangeText={setReason} maxLength={200} placeholder={t("actionReason")} placeholderTextColor={colors.textMuted} style={styles.reason} />
           <Text style={styles.section}>{t("costBudgets")}</Text>
           {d.budgets.map((b) => (
             <View key={b.key}>
@@ -94,7 +99,7 @@ export default function AdminCostScreen() {
                 <Text style={styles.rowLabel}>{b.key} · {b.period === "DAILY" ? "24 h" : t("costMonth")}</Text>
                 <Text style={styles.amount}>{usd(b.spentUsd)} / {usd(b.limitUsd)}</Text>
               </Pressable>
-              {isAdmin && editing === b.key ? <BudgetEditor budget={b} onSaved={() => { setEditing(null); void load(days); }} /> : null}
+              {isAdmin && editing === b.key ? <BudgetEditor budget={b} reason={reason.trim()} onSaved={() => { setEditing(null); void load(days); }} /> : null}
             </View>
           ))}
 
@@ -105,7 +110,7 @@ export default function AdminCostScreen() {
                 <Text style={styles.rowText}>{k.feature}</Text>
                 {k.reason ? <Text style={styles.value}>{k.reason}</Text> : null}
               </View>
-              <Switch value={!k.killed} onValueChange={(on) => void toggle(k.feature, !on)} trackColor={{ true: colors.accent, false: colors.border }} />
+              <Switch value={!k.killed} disabled={!reasonOk} accessibilityLabel={k.feature} onValueChange={(on) => void toggle(k.feature, !on)} trackColor={{ true: colors.accent, false: colors.border }} />
             </View>
           ))}
           <Text style={styles.note}>{t("costEstimateNote")} ({d.pricesVersion})</Text>
@@ -119,16 +124,17 @@ export default function AdminCostScreen() {
  * Cambiar un tope (ADR 0098). Subirlo de 0 autoriza gasto real: por eso pide confirmación y la decisión queda
  * registrada en el servidor con quién la tomó.
  */
-function BudgetEditor({ budget, onSaved }: { budget: BudgetView; onSaved: () => void }) {
+function BudgetEditor({ budget, reason, onSaved }: { budget: BudgetView; reason: string; onSaved: () => void }) {
   const [text, setText] = useState(String(budget.limitUsd));
   const [period, setPeriod] = useState(budget.period);
   const [error, setError] = useState<string | null>(null);
   const value = parseUsd(text);
   function save() {
     if (value === null) return;
+    if (!validReason(reason)) { setError(t("actionReason")); return; }
     Alert.alert(budget.key, `${t("budgetConfirm")} ${formatUsd(value, lang) ?? value}`, [
       { text: t("cancel"), style: "cancel" },
-      { text: t("apply"), onPress: () => void api.setBudget(budget.key, period, value).then(onSaved).catch((e: Error) => setError(e.message)) },
+      { text: t("apply"), onPress: () => void api.setBudget(budget.key, period, value, reason).then(onSaved).catch((e: Error) => setError(e.message)) },
     ]);
   }
   return (
@@ -152,6 +158,7 @@ function BudgetEditor({ budget, onSaved }: { budget: BudgetView; onSaved: () => 
 const styles = StyleSheet.create({
   editor: { backgroundColor: colors.surface, borderRadius: radius.md, padding: space.md, marginBottom: space.sm, gap: space.sm },
   input: { color: colors.text, backgroundColor: colors.bg, borderRadius: radius.md, padding: space.md },
+  reason: { color: colors.text, backgroundColor: colors.surface, borderRadius: radius.md, padding: space.md, marginTop: space.md },
   save: { backgroundColor: colors.accent, borderRadius: radius.md, padding: space.sm, alignItems: "center" },
   disabled: { opacity: 0.4 },
   container: { flex: 1, backgroundColor: colors.bg },

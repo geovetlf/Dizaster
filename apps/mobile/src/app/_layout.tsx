@@ -75,6 +75,7 @@ export default function RootLayout() {
         <Stack.Screen name="admin-businesses" options={{ title: t("adminBusinesses") }} />
         <Stack.Screen name="admin-presence" options={{ title: t("presenceLogTitle") }} />
         <Stack.Screen name="admin-delays" options={{ title: t("adminDelays") }} />
+        <Stack.Screen name="admin-config-history" options={{ title: t("adminConfigHistory") }} />
         <Stack.Screen name="admin-authority" options={{ title: t("adminAuthority") }} />
         <Stack.Screen name="admin-transparency" options={{ title: t("adminTransparency") }} />
         <Stack.Screen name="admin-sources" options={{ title: t("adminSources") }} />

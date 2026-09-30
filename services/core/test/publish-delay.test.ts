@@ -78,7 +78,7 @@ describe("retraso de publicación en HIGHLY_SENSITIVE (ADR 0099)", () => {
     await t.c.identity.grantRole(admin.userId, "admin");
     const token = (await t.app.inject({ method: "POST", url: "/v1/auth/dev", payload: { handle: "admin_delay", platform: "ANDROID", deviceId: admin.deviceId } })).json().token as string;
     const put = (code: string, minutes: number, as = token) =>
-      t.app.inject({ method: "PUT", url: `/v1/admin/categories/${code}/publish-delay`, headers: { authorization: `Bearer ${as}` }, payload: { minutes } });
+      t.app.inject({ method: "PUT", url: `/v1/admin/categories/${code}/publish-delay`, headers: { authorization: `Bearer ${as}` }, payload: { minutes, reason: "Ajuste del piloto" } });
 
     const plain = await createUser(t, "no_admin_delay");
     expect((await put("crime.violence", 7, plain.token)).statusCode).toBe(403);

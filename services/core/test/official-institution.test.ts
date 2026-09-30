@@ -16,9 +16,9 @@ async function withRole(handle: string, role: "admin" | "moderator"): Promise<Te
 }
 const state = async (eventId: string) => (await t.app.inject({ url: `/v1/events/${eventId}/verification` })).json() as VerificationView;
 const setVerification = (handle: string, verification: string) =>
-  t.app.inject({ method: "PUT", url: `/v1/admin/businesses/${handle}/verification`, headers: auth(admin), payload: { verification } });
+  t.app.inject({ method: "PUT", url: `/v1/admin/businesses/${handle}/verification`, headers: auth(admin), payload: { verification, reason: "Institución verificada" } });
 const setScope = (handle: string, payload: Record<string, unknown>, who = admin) =>
-  t.app.inject({ method: "PUT", url: `/v1/admin/businesses/${handle}/official-scope`, headers: auth(who), payload });
+  t.app.inject({ method: "PUT", url: `/v1/admin/businesses/${handle}/official-scope`, headers: auth(who), payload: { reason: "Ámbito acordado", ...payload } });
 const declare = (u: TestUser, handle: string, eventId: string, assertion = "OCCURRING") =>
   t.app.inject({ method: "POST", url: `/v1/businesses/${handle}/official-statements`, headers: auth(u), payload: { eventId, assertion } });
 async function fireEvent(handle: string, pin = LIMA): Promise<string> {

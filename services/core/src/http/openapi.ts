@@ -121,6 +121,7 @@ export const OPERATIONS: Record<string, Operation> = {
   "GET /v1/admin/sources": { summary: "Salud de las fuentes (estado, breaker, ejecuciones de 24 h)" },
   "POST /v1/admin/sources/:key/status": { summary: "Pausar o reanudar una fuente (auditado)", body: C.SetSourceStatusRequest },
   "GET /v1/admin/staff": { summary: "Personal con roles y últimos cambios de rol" },
+  "GET /v1/admin/config-changes": { summary: "Historial de cambios de configuración con motivo (solo inserción)", query: C.ConfigChangesQuery },
   "POST /v1/admin/staff/roles": { summary: "Dar o quitar un rol de personal (auditado; nunca al último administrador)", body: C.ChangeRoleRequest },
   "POST /v1/moderation/media/:id/original": { summary: "Pedir el original privado de una media (motivo, auditado, 60 s)", body: C.OriginalAccessRequest },
   "GET /v1/moderation/media-originals/:token": { summary: "Original de una media con un permiso vigente (sin metadatos)" },

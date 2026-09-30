@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { APP_PLATFORM_HEADER, APP_VERSION_HEADER, isBelowMinVersion, MAP_WINDOW_HOURS, MEDIA_KILL_SWITCHES, MapWindow, MfaCodeRequest, MfaVerifyRequest, can, isStaff, type MfaStatus, type Permission } from "@dizaster/contracts";
+import { AdminReason, APP_PLATFORM_HEADER, APP_VERSION_HEADER, ConfigChangesQuery, isBelowMinVersion, type ConfigChangesResponse, MAP_WINDOW_HOURS, MEDIA_KILL_SWITCHES, MapWindow, MfaCodeRequest, MfaVerifyRequest, can, isStaff, type MfaStatus, type Permission } from "@dizaster/contracts";
 import { isValidTile, tileBounds } from "@dizaster/geo-kit";
 import Fastify, { type FastifyInstance, type FastifyRequest } from "fastify";
 import { z } from "zod";
@@ -11,6 +11,7 @@ import { LocalDiskStorage } from "../modules/media/index.js";
 import type { Container } from "../container.js";
 import { withWarning } from "../modules/feed/index.js";
 import { TIMEZONE_ATTRIBUTION } from "../modules/geo/index.js";
+import { listConfigChanges, recordConfigChange } from "../platform/config-audit.js";
 import { isOverloadError, withTransaction } from "../platform/db.js";
 import { DomainError, forbidden } from "../platform/errors.js";
 import { latencyMetric } from "../platform/metrics.js";
@@ -757,9 +758,15 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
     return c.feed.businessPosts(c.db, parse(HandleParam, req.params).handle, req.query, req.session?.profileId ?? null);
   });
   app.put("/v1/admin/businesses/:handle/verification", async (req) => {
-    await requireAdmin(req);
+    const { userId } = await requireAdmin(req);
     const { handle } = parse(HandleParam, req.params);
+    const reason = adminReason(req.body);
+    const before = await c.business.officialInfo(c.db, handle);
     const view = await c.business.setVerification(handle, req.body);
+    await recordConfigChange(c.db, {
+      actorUserId: userId, kind: "BUSINESS_VERIFICATION", target: handle, reason,
+      previous: before ? { verification: before.verification } : null, next: { verification: view.verification },
+    });
     // Sin el sello institucional, sus declaraciones dejan de contar como oficiales (ADR 0095).
     if (view.verification !== "INSTITUTIONAL_OFFICIAL") {
       const info = await c.business.officialInfo(c.db, handle);
@@ -768,8 +775,17 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
     return view;
   });
   app.put("/v1/admin/businesses/:handle/official-scope", async (req) => {
-    await requireAdmin(req);
-    return c.institutions.setScope(parse(HandleParam, req.params).handle, req.body);
+    const { userId } = await requireAdmin(req);
+    const { handle } = parse(HandleParam, req.params);
+    const reason = adminReason(req.body);
+    const info = await c.business.officialInfo(c.db, handle);
+    const before = info ? await c.institutions.scope(c.db, info.id) : null;
+    const view = await c.institutions.setScope(handle, req.body);
+    await recordConfigChange(c.db, {
+      actorUserId: userId, kind: "OFFICIAL_SCOPE", target: handle, reason,
+      previous: before ? { categories: before.categories, countries: before.countries } : null, next: { categories: view.categories, countries: view.countries },
+    });
+    return view;
   });
   app.get("/v1/businesses/:handle/official-scope", async (req, reply) => {
     reply.header("cache-control", "no-store");
@@ -968,6 +984,8 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
   // ───────────── Costos (rol admin): tablero, presupuestos y kill switches remotos ─────────────
   // Personal (ADR 0090): además del rol, segundo factor verificado en esta sesión cuando MFA es obligatoria.
   const requireAdmin = (req: FastifyRequest) => requirePermission(req, "admin");
+  /** Motivo obligatorio de todo cambio de configuración (ADR 0219); se valida antes de tocar nada. */
+  const adminReason = (body: unknown): string => parse(z.object({ reason: AdminReason }), body).reason;
   app.get("/v1/admin/cost", async (req, reply) => {
     await requirePermission(req, "ops.view");
     // Lo medido en este proceso entra antes de leer: el tablero no va por detrás de sí mismo.
@@ -1080,7 +1098,30 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
   });
   app.put("/v1/admin/cost/budgets/:key", async (req) => {
     const session = await requireAdmin(req);
-    return c.cost.setBudget((req.params as { key: string }).key, req.body, session.userId);
+    const key = (req.params as { key: string }).key;
+    const reason = adminReason(req.body);
+    const before = (await c.cost.budgets(c.db)).find((b) => b.key === key);
+    const view = await c.cost.setBudget(key, req.body, session.userId);
+    await recordConfigChange(c.db, {
+      actorUserId: session.userId, kind: "BUDGET", target: view.key, reason,
+      previous: before ? { period: before.period, limitUsd: before.limitUsd } : null, next: { period: view.period, limitUsd: view.limitUsd },
+    });
+    return view;
+  });
+  // Historial de cambios de configuración (ADR 0219): solo lectura, solo administración.
+  app.get("/v1/admin/config-changes", async (req, reply): Promise<ConfigChangesResponse> => {
+    await requireAdmin(req);
+    reply.header("cache-control", "no-store");
+    const q = parse(ConfigChangesQuery, req.query);
+    const { rows, nextCursor } = await listConfigChanges(c.db, q);
+    const handles = new Map<string, string | null>();
+    for (const id of new Set(rows.map((r) => r.actorUserId))) {
+      handles.set(id, (await c.social.profileForUser(c.db, id).catch(() => null))?.handle ?? null);
+    }
+    return {
+      changes: rows.map((r) => ({ id: r.id, at: r.at.toISOString(), actorHandle: handles.get(r.actorUserId) ?? null, kind: r.kind, target: r.target, previous: r.previous, next: r.next, reason: r.reason })),
+      nextCursor,
+    };
   });
   // Retraso de publicación de categorías HIGHLY_SENSITIVE (ADR 0109).
   app.get("/v1/admin/categories/:code/publish-delay", async (req) => {
@@ -1089,7 +1130,17 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
   });
   app.put("/v1/admin/categories/:code/publish-delay", async (req) => {
     const session = await requireAdmin(req);
-    return c.events.setPublishDelay(c.db, adminCategory((req.params as { code: string }).code), req.body, session.userId);
+    const category = adminCategory((req.params as { code: string }).code);
+    const reason = adminReason(req.body);
+    return withTransaction(c.db, async (tx) => {
+      const before = await c.events.publishDelayView(tx, category);
+      const view = await c.events.setPublishDelay(tx, category, req.body, session.userId);
+      await recordConfigChange(tx, {
+        actorUserId: session.userId, kind: "PUBLISH_DELAY", target: category.code, reason,
+        previous: { minutes: before.minutes }, next: { minutes: view.minutes },
+      });
+      return view;
+    });
   });
   const adminCategory = (code: string) => {
     const cat = c.ref.category(code);
@@ -1099,7 +1150,15 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
 
   app.put("/v1/admin/kill-switches/:feature", async (req) => {
     const session = await requirePermission(req, "ops.control");
-    return c.cost.setKillSwitch((req.params as { feature: string }).feature, req.body, session.userId);
+    const feature = (req.params as { feature: string }).feature;
+    const reason = adminReason(req.body);
+    const before = (await c.cost.killSwitches()).find((k) => k.feature === feature);
+    const view = await c.cost.setKillSwitch(feature, req.body, session.userId);
+    await recordConfigChange(c.db, {
+      actorUserId: session.userId, kind: "KILL_SWITCH", target: view.feature, reason,
+      previous: before ? { killed: before.killed } : null, next: { killed: view.killed },
+    });
+    return view;
   });
 
   // ───────────── Denuncias y bloqueos (cualquier persona) ─────────────

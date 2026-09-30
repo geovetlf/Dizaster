@@ -1,4 +1,4 @@
-import type { AcceptPoliciesRequest, PolicyStatusResponse, ClientCrashReport, ClientCrashesResponse, AdminSourcesResponse, OriginalAccessEntry, OriginalAccessGrant, ChangeRoleRequest, StaffResponse, TransparencyReport, AuthorityRequestDetail, AuthorityRequestSummary, AuthorityRequestStatus, CreateAuthorityRequest, PublishDelayView, PresenceAccessEntry, DuplicateCandidateView, OfficialScopeView, MyReportView, MfaEnrollResponse, MfaStatus, PresenceReview, EventSourceView, EventStatus, MyProfile, UpdateProfileRequest, ReactionKind, ReactionState, DataExport, VerificationView, ModeratorEventDetail, SavedZone, SavedZoneInput, AppealView, CaseDetail, CaseSummary, CreateFlagRequest, ModerationActionType, ModerationNotice, CostDashboard, KillSwitchView, QualityReport, CreatePostRequest, TagView, BusinessView, SessionView, CreateBusinessRequest, UpdateBusinessRequest, AlertPreferences, CategorySubscription, CategorySubscriptionInput, NotificationsResponse, AppConfig, AttributionsResponse, AreaSearchResult, FollowTarget, MyFollows, ProfileSearchResult, ProfileView, CommentView, CreateUploadRequest, FeedPost, FeedResponse, FeedTab, CreateUploadResponse, DevicePlatform, MediaView, RegisterPushTokenRequest, EventMapResponse, EventDetail, EventSummary, NearbyEventsResponse, SubmitReportRequest, SubmitReportResponse, TimelineEntryView } from "@dizaster/contracts";
+import type { AcceptPoliciesRequest, ConfigChangeKind, ConfigChangesResponse, PolicyStatusResponse, ClientCrashReport, ClientCrashesResponse, AdminSourcesResponse, OriginalAccessEntry, OriginalAccessGrant, ChangeRoleRequest, StaffResponse, TransparencyReport, AuthorityRequestDetail, AuthorityRequestSummary, AuthorityRequestStatus, CreateAuthorityRequest, PublishDelayView, PresenceAccessEntry, DuplicateCandidateView, OfficialScopeView, MyReportView, MfaEnrollResponse, MfaStatus, PresenceReview, EventSourceView, EventStatus, MyProfile, UpdateProfileRequest, ReactionKind, ReactionState, DataExport, VerificationView, ModeratorEventDetail, SavedZone, SavedZoneInput, AppealView, CaseDetail, CaseSummary, CreateFlagRequest, ModerationActionType, ModerationNotice, CostDashboard, KillSwitchView, QualityReport, CreatePostRequest, TagView, BusinessView, SessionView, CreateBusinessRequest, UpdateBusinessRequest, AlertPreferences, CategorySubscription, CategorySubscriptionInput, NotificationsResponse, AppConfig, AttributionsResponse, AreaSearchResult, FollowTarget, MyFollows, ProfileSearchResult, ProfileView, CommentView, CreateUploadRequest, FeedPost, FeedResponse, FeedTab, CreateUploadResponse, DevicePlatform, MediaView, RegisterPushTokenRequest, EventMapResponse, EventDetail, EventSummary, NearbyEventsResponse, SubmitReportRequest, SubmitReportResponse, TimelineEntryView } from "@dizaster/contracts";
 import { mergeMapTiles, tilesForView } from "@dizaster/geo-kit";
 import { canRetryWithRefresh, singleFlight } from "./auth/refresh";
 import { appVersionHeaders } from "./app-identity";
@@ -176,8 +176,8 @@ export const api = {
   profilePosts: (handle: string, cursor?: string | null) =>
     request<FeedResponse>(`/v1/profiles/${encodeURIComponent(handle)}/posts${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`),
   publishDelay: (code: string) => request<PublishDelayView>(`/v1/admin/categories/${encodeURIComponent(code)}/publish-delay`),
-  setPublishDelay: (code: string, minutes: number) =>
-    request<PublishDelayView>(`/v1/admin/categories/${encodeURIComponent(code)}/publish-delay`, { method: "PUT", body: JSON.stringify({ minutes }) }),
+  setPublishDelay: (code: string, minutes: number, reason: string) =>
+    request<PublishDelayView>(`/v1/admin/categories/${encodeURIComponent(code)}/publish-delay`, { method: "PUT", body: JSON.stringify({ minutes, reason }) }),
   answerReportMatch: (reportId: string, answer: "SAME" | "DIFFERENT") =>
     request<{ answer: string }>(`/v1/me/reports/${encodeURIComponent(reportId)}/match`, { method: "POST", body: JSON.stringify({ answer }) }),
   recordExternalShare: (postId: string) => request<void>(`/v1/posts/${encodeURIComponent(postId)}/external-shares`, { method: "POST" }),
@@ -274,17 +274,20 @@ export const api = {
   /** Copia de mis datos (ADR 0038). El servidor limita a una por minuto. */
   exportData: () => request<DataExport>("/v1/me/export"),
   costDashboard: (days = 30) => request<CostDashboard>(`/v1/admin/cost?days=${days}`),
-  setBudget: (key: string, period: "DAILY" | "MONTHLY", limitUsd: number) =>
-    request<unknown>(`/v1/admin/cost/budgets/${encodeURIComponent(key)}`, { method: "PUT", body: JSON.stringify({ period, limitUsd }) }),
-  setBusinessVerification: (handle: string, verification: BusinessView["verification"]) =>
-    request<BusinessView>(`/v1/admin/businesses/${encodeURIComponent(handle)}/verification`, { method: "PUT", body: JSON.stringify({ verification }) }),
-  setOfficialScope: (handle: string, categories: string[], countries: string[]) =>
-    request<OfficialScopeView>(`/v1/admin/businesses/${encodeURIComponent(handle)}/official-scope`, { method: "PUT", body: JSON.stringify({ categories, countries }) }),
+  // Todo cambio de configuración lleva motivo y queda en el historial (ADR 0219).
+  setBudget: (key: string, period: "DAILY" | "MONTHLY", limitUsd: number, reason: string) =>
+    request<unknown>(`/v1/admin/cost/budgets/${encodeURIComponent(key)}`, { method: "PUT", body: JSON.stringify({ period, limitUsd, reason }) }),
+  setBusinessVerification: (handle: string, verification: BusinessView["verification"], reason: string) =>
+    request<BusinessView>(`/v1/admin/businesses/${encodeURIComponent(handle)}/verification`, { method: "PUT", body: JSON.stringify({ verification, reason }) }),
+  setOfficialScope: (handle: string, categories: string[], countries: string[], reason: string) =>
+    request<OfficialScopeView>(`/v1/admin/businesses/${encodeURIComponent(handle)}/official-scope`, { method: "PUT", body: JSON.stringify({ categories, countries, reason }) }),
+  configChanges: (kind?: ConfigChangeKind, cursor?: string | null) =>
+    request<ConfigChangesResponse>(`/v1/admin/config-changes?${new URLSearchParams({ ...(kind ? { kind } : {}), ...(cursor ? { cursor } : {}) }).toString()}`),
   presenceAccessLog: () => request<{ entries: PresenceAccessEntry[] }>("/v1/admin/presence-access"),
   mfaDisable: (code: string) => request<void>("/v1/me/mfa/totp/disable", { method: "POST", body: JSON.stringify({ code }) }),
   qualityReport: (days = 7) => request<QualityReport>(`/v1/admin/quality?days=${days}`),
-  setKillSwitch: (feature: string, killed: boolean) =>
-    request<KillSwitchView>(`/v1/admin/kill-switches/${encodeURIComponent(feature)}`, { method: "PUT", body: JSON.stringify({ killed }) }),
+  setKillSwitch: (feature: string, killed: boolean, reason: string) =>
+    request<KillSwitchView>(`/v1/admin/kill-switches/${encodeURIComponent(feature)}`, { method: "PUT", body: JSON.stringify({ killed, reason }) }),
   myFollows: () => request<MyFollows>("/v1/me/follows"),
   follow: (target: FollowTarget, id: string, on: boolean) =>
     request<{ following: boolean }>(`/v1/follows/${target}/${encodeURIComponent(id)}`, { method: on ? "PUT" : "DELETE" }),

@@ -32,7 +32,7 @@ describe("degradación automática por costo", () => {
   });
 
   it("apaga video, luego fotos nuevas, luego fuentes no urgentes, y restaura solo lo automático", async () => {
-    await t.c.cost.setBudget("infra", { period: "MONTHLY", limitUsd: 100 }, null);
+    await t.c.cost.setBudget("infra", { period: "MONTHLY", limitUsd: 100, reason: "Presupuesto de prueba" }, null);
     await setUsage(90);
     expect(await t.c.cost.applyDegradation()).toEqual({ percent: 90, changed: [] });
 

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { AdminReason } from "./admin-config.js";
 
 /**
  * Cost Optimization Layer (Blueprint §5.18 y §12): tablero de costo por módulo, presupuestos y kill switches.
@@ -11,12 +12,15 @@ export const UpdateBudgetRequest = z.object({
   period: BudgetPeriod,
   /** Tope en USD. 0 = la función de pago no puede gastar nada. */
   limitUsd: z.number().min(0).max(1_000_000),
+  /** Motivo obligatorio: queda en el historial de configuración (ADR 0219). */
+  reason: AdminReason,
 });
 export type UpdateBudgetRequest = z.infer<typeof UpdateBudgetRequest>;
 
 export const UpdateKillSwitchRequest = z.object({
   killed: z.boolean(),
-  reason: z.string().max(200).optional(),
+  /** Motivo obligatorio (ADR 0219); se muestra junto al interruptor. */
+  reason: AdminReason.pipe(z.string().max(200)),
 });
 export type UpdateKillSwitchRequest = z.infer<typeof UpdateKillSwitchRequest>;
 

@@ -43,8 +43,8 @@ describe("roles verificador y operador (ADR 0101)", () => {
       expect(await call(u, "GET", "/v1/moderation/duplicates")).toBe(dup);
       expect(await call(u, "GET", "/v1/moderation/cases")).toBe(cases);
       expect(await call(u, "GET", "/v1/admin/cost")).toBe(cost);
-      expect(await call(u, "PUT", "/v1/admin/kill-switches/video", { killed: false })).toBe(kill);
-      expect(await call(u, "PUT", "/v1/admin/cost/budgets/ai", { period: "MONTHLY", limitUsd: 0 })).toBe(budget);
+      expect(await call(u, "PUT", "/v1/admin/kill-switches/video", { killed: false, reason: "Prueba de rol" })).toBe(kill);
+      expect(await call(u, "PUT", "/v1/admin/cost/budgets/ai", { period: "MONTHLY", limitUsd: 0, reason: "Prueba de rol" })).toBe(budget);
     }
     // Todo el personal puede configurar su segundo factor; una persona sin rol, no.
     expect(await call(operator, "GET", "/v1/me/mfa")).toBe(200);
