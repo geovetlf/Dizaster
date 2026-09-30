@@ -1282,8 +1282,12 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
   app.get("/v1/moderation/appeals", async (req, reply) => {
     await requireModerator(req);
     reply.header("cache-control", "no-store");
-    const { status } = parse(z.object({ status: z.enum(["OPEN", "UPHELD", "REVERSED"]).default("OPEN") }), req.query);
-    return { appeals: await c.moderation.appeals(status) };
+    const q = parse(z.object({
+      status: z.enum(["OPEN", "UPHELD", "REVERSED"]).default("OPEN"),
+      cursor: z.uuid().optional(),
+      limit: z.coerce.number().int().min(1).max(100).default(50),
+    }), req.query);
+    return c.moderation.appeals(q.status, { cursor: q.cursor, limit: q.limit });
   });
   app.post("/v1/moderation/appeals/:id/decision", async (req) => {
     const session = await requireModerator(req);

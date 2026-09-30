@@ -469,15 +469,19 @@ export class ModerationService {
 
   // ───────────── Transparencia y apelaciones ─────────────
 
-  /** Acciones que afectan a mi contenido o a mi cuenta (sin datos de quién denunció). */
-  async myNotices(userId: string): Promise<ModerationNotice[]> {
+  /**
+   * Acciones que afectan a mi contenido o a mi cuenta (sin datos de quién denunció). Con `actionId`, solo esa
+   * (ADR 0236): apelar no depende de que la acción esté entre las 50 más recientes.
+   */
+  async myNotices(userId: string, actionId?: string): Promise<ModerationNotice[]> {
     const { rows } = await this.db.query<ActionRow & { appeal_id: string | null; appeal_status: AppealView["status"] | null; decision_reason: string | null }>(
       `SELECT a.id, a.action, a.reason, a.actor, a.target_type, a.target_id, a.created_at,
               ap.id AS appeal_id, ap.status AS appeal_status, ap.decision_reason
          FROM moderation.actions a LEFT JOIN moderation.appeals ap ON ap.action_id = a.id
         WHERE a.affected_user_id = $1 AND a.action NOT IN ('DISMISS','RESTORE','UNSUSPEND_USER','APPROVE_MEDIA')
+          AND ($2::uuid IS NULL OR a.id = $2)
         ORDER BY a.created_at DESC LIMIT 50`,
-      [userId],
+      [userId, actionId ?? null],
     );
     const cutoff = Date.now() - APPEAL_WINDOW_DAYS * 86_400_000;
     return rows.map((r) => ({
@@ -489,20 +493,36 @@ export class ModerationService {
 
   async appeal(userId: string, actionId: string, raw: unknown): Promise<ModerationNotice> {
     const { text } = parse(AppealRequest, raw);
-    const notice = (await this.myNotices(userId)).find((n) => n.action.id === actionId);
+    const id = parse(z.uuid(), actionId);
+    const notice = (await this.myNotices(userId, id))[0];
     if (!notice) throw notFound("Acción");
     if (!notice.canAppeal) throw new DomainError("NOT_APPEALABLE", "Esta acción no se puede apelar", 409);
-    await this.db.query(`INSERT INTO moderation.appeals (id, action_id, appellant_user_id, text) VALUES ($1, $2, $3, $4)`, [newId(), actionId, userId, text]);
-    return (await this.myNotices(userId)).find((n) => n.action.id === actionId)!;
+    await this.db.query(`INSERT INTO moderation.appeals (id, action_id, appellant_user_id, text) VALUES ($1, $2, $3, $4)`, [newId(), id, userId, text]);
+    return (await this.myNotices(userId, id))[0]!;
   }
 
-  async appeals(status: "OPEN" | "UPHELD" | "REVERSED" = "OPEN"): Promise<AppealView[]> {
+  /**
+   * Apelaciones por estado, paginadas (ADR 0236). Abiertas: las más antiguas primero (es una cola). Decididas: las
+   * más recientes primero. `cursor` = id de la última de la página anterior (UUIDv7, ordenado por tiempo).
+   */
+  async appeals(status: "OPEN" | "UPHELD" | "REVERSED" = "OPEN", opts: { cursor?: string; limit?: number } = {}): Promise<{ appeals: AppealView[]; nextCursor: string | null }> {
+    const limit = opts.limit ?? 50;
+    const open = status === "OPEN";
+    const rows = await this.appealRows(
+      `ap.status = $1 AND ($2::uuid IS NULL OR ap.id ${open ? ">" : "<"} $2) ORDER BY ap.id ${open ? "ASC" : "DESC"} LIMIT $3`,
+      [status, opts.cursor ?? null, limit + 1],
+    );
+    const page = rows.slice(0, limit);
+    return { appeals: page, nextCursor: rows.length > limit ? page[page.length - 1]!.id : null };
+  }
+
+  private async appealRows(where: string, params: unknown[]): Promise<AppealView[]> {
     const { rows } = await this.db.query<ActionRow & { appeal_id: string; appeal_status: AppealView["status"]; text: string; appeal_at: Date }>(
       `SELECT a.id, a.action, a.reason, a.actor, a.target_type, a.target_id, a.created_at,
               ap.id AS appeal_id, ap.status AS appeal_status, ap.text, ap.created_at AS appeal_at
          FROM moderation.appeals ap JOIN moderation.actions a ON a.id = ap.action_id
-        WHERE ap.status = $1 ORDER BY ap.created_at LIMIT 50`,
-      [status],
+        WHERE ${where}`,
+      params,
     );
     return Promise.all(rows.map(async (r) => ({
       id: r.appeal_id, status: r.appeal_status, text: r.text, createdAt: r.appeal_at.toISOString(), action: actionView(r),
@@ -536,8 +556,7 @@ export class ModerationService {
       );
       await publish(tx, "AppealDecided", { appealId, appellantUserId: rows[0]!.appellant_user_id, outcome });
     });
-    const status = (await this.db.query<{ status: string }>(`SELECT status FROM moderation.appeals WHERE id = $1`, [appealId])).rows[0]!.status as "UPHELD" | "REVERSED";
-    return (await this.appeals(status)).find((a) => a.id === appealId)!;
+    return (await this.appealRows(`ap.id = $1`, [appealId]))[0]!;
   }
 
   // ───────────── Auxiliares ─────────────

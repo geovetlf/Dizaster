@@ -16,6 +16,7 @@ export default function ModerationScreen() {
   const [cases, setCases] = useState<CaseSummary[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
   const [appeals, setAppeals] = useState<AppealView[]>([]);
+  const [appealsCursor, setAppealsCursor] = useState<string | null>(null);
   const [duplicates, setDuplicates] = useState<DuplicateCandidateView[]>([]);
   const [loaded, setLoaded] = useState(false);
   // Pestañas cuya carga falló (ADR 0233): se muestra error con Reintentar, nunca "no hay casos".
@@ -36,7 +37,7 @@ export default function ModerationScreen() {
     ]);
     setFailed({ queue: q === undefined, appeals: a === undefined, duplicates: d === undefined });
     if (q) { setCases(q.cases); setCursor(q.nextCursor); }
-    if (a) setAppeals(a.appeals);
+    if (a) { setAppeals(a.appeals); setAppealsCursor(a.nextCursor); }
     if (d) setDuplicates(d.candidates);
     setLoaded(true);
   }, [moderates, verifies]);
@@ -46,6 +47,12 @@ export default function ModerationScreen() {
     if (!cursor) return;
     const q = await api.moderationQueue(cursor).catch(() => null);
     if (q) { setCases((prev) => [...prev, ...q.cases]); setCursor(q.nextCursor); }
+  }
+
+  async function moreAppeals() {
+    if (!appealsCursor) return;
+    const a = await api.appeals(appealsCursor).catch(() => null);
+    if (a) { setAppeals((prev) => [...prev, ...a.appeals]); setAppealsCursor(a.nextCursor); }
   }
 
   return (
@@ -89,6 +96,7 @@ export default function ModerationScreen() {
         <FlatList
           data={appeals}
           keyExtractor={(a) => a.id}
+          onEndReached={() => void moreAppeals()}
           ListEmptyComponent={failed.appeals ? <LoadState state="failed" onRetry={() => void load()} /> : loaded ? <Text style={styles.empty}>{t("noAppeals")}</Text> : null}
           renderItem={({ item }) => <AppealRow appeal={item} onDone={() => setAppeals((prev) => prev.filter((a) => a.id !== item.id))} />}
         />

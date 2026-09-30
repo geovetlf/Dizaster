@@ -235,7 +235,7 @@ export const api = {
   moderationRelease: (id: string) => request<void>(`/v1/moderation/cases/${id}/claim`, { method: "DELETE" }),
   moderationAct: (id: string, action: ModerationActionType, reason: string) =>
     request<CaseDetail>(`/v1/moderation/cases/${id}/actions`, { method: "POST", body: JSON.stringify({ action, reason }) }),
-  appeals: () => request<{ appeals: AppealView[] }>("/v1/moderation/appeals"),
+  appeals: (cursor?: string) => request<{ appeals: AppealView[]; nextCursor: string | null }>(`/v1/moderation/appeals${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`),
   moderatorEvent: (id: string) => request<ModeratorEventDetail>(`/v1/moderation/events/${id}`),
   setNegativeState: (id: string, to: "NONE" | "DISPUTED" | "FALSE", reason: string, evidenceRefs: string[]) =>
     request<VerificationView>(`/v1/moderation/events/${id}/negative-state`, { method: "POST", body: JSON.stringify({ to, reason, evidenceRefs }) }),
