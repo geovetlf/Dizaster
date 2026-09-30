@@ -415,6 +415,7 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | Estado del ciclo de vida y gravedad visibles en evento, mapa y lista accesible (§7.3, §10.1) | ✅ | ADR 0222: línea "En seguimiento · Gravedad 4 de 5"; radio del mapa por reportes y gravedad |
 | Avisar a quien reportó cuando su evento cambia (§8.1, §10.4) | ✅ | ADR 0223: motivo REPORTED en cambios de estado, gravedad, fin y actualizaciones oficiales; respeta preferencias |
 | Hora del suceso (`occurred_start`) además de la de detección (§7.3) | ✅ | ADR 0224: `startedAt` en EventSummary; la app muestra ambas si difieren 15 min o más |
+| Una cuenta suspendida conserva sus avisos de seguridad (§13.3) | ✅ | ADR 0225: token push, preferencias, zonas, ubicación aproximada, seguir eventos y lugares, bloquear; nada que publique; borradas no |
 | Licencias, auditoría, SBOM, Dependabot; respaldo con prueba de restauración en CI | ✅ | ADR 0070, `scripts/supply-chain.mjs`, `scripts/db-restore-check.mjs` |
 | Idioma de la app elegible en el perfil (es/en/pt/fr o del teléfono) | ✅ | ADR 0069, `app/language.tsx` |
 | Varias cuentas en un teléfono corroboran como una (clave seudónima del teléfono) | ✅ | ADR 0068, migración 0036 |
@@ -478,11 +479,10 @@ Revisión del Blueprint del 2026-09-30 (tras ADR 0212): completada con ADR 0213�
 
 Revisión del Blueprint del 2026-09-30 (tras ADR 0220), verificada contra el código, sin bloqueos:
 
-1. Una cuenta suspendida conserva sus avisos de seguridad: puede renovar el token push, sus zonas y preferencias (§13.3).
-2. Feed "Siguiendo" con consulta indexada y ventana de tiempo (rendimiento).
-3. Aviso visible "Dizaster no reemplaza a los servicios de emergencia" en Emergencia y Acerca de (C-18, §5.11), como texto de producto, no documento legal.
-4. Avisos sociales: comentarios en mis posts y respuestas a mis comentarios, con límites y preferencias (RF-02, §5.3).
-5. Límite de peticiones compartido entre réplicas del servidor, en PostgreSQL (seguridad).
+1. Feed "Siguiendo" con consulta indexada y ventana de tiempo (rendimiento).
+2. Aviso visible "Dizaster no reemplaza a los servicios de emergencia" en Emergencia y Acerca de (C-18, §5.11), como texto de producto, no documento legal.
+3. Avisos sociales: comentarios en mis posts y respuestas a mis comentarios, con límites y preferencias (RF-02, §5.3).
+4. Límite de peticiones compartido entre réplicas del servidor, en PostgreSQL (seguridad).
 
 Bloqueadas o en espera:
 

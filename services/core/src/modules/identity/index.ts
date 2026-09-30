@@ -197,7 +197,7 @@ export class IdentityService {
   }
 
   /** Una cuenta suspendida o borrada no puede escribir. Caché corta: una consulta por cuenta cada 30 s como mucho. */
-  async assertCanWrite(userId: string, opts: { requireAge?: boolean } = {}): Promise<void> {
+  async assertCanWrite(userId: string, opts: { requireAge?: boolean; allowSuspended?: boolean } = {}): Promise<void> {
     const now = Date.now();
     let cached = this.statusCache.get(userId);
     if (!cached || now - cached.at > 30_000) {
@@ -208,6 +208,7 @@ export class IdentityService {
       this.statusCache.set(userId, cached);
       if (this.statusCache.size > 10_000) this.statusCache.clear();
     }
+    if (cached.status === "SUSPENDED" && opts.allowSuspended) return;
     if (cached.status === "SUSPENDED") throw new DomainError("ACCOUNT_SUSPENDED", "Tu cuenta está suspendida. Puedes ver el motivo y apelar en Perfil.", 403);
     if (cached.status !== "ACTIVE") throw new DomainError("ACCOUNT_INACTIVE", "Cuenta no activa", 403);
     // Edad mínima (D-13): sin declararla se puede leer, pero no publicar, reportar ni interactuar.

@@ -40,11 +40,21 @@ function requireSession(req: FastifyRequest): Session {
 }
 
 
-/** Escrituras permitidas a una cuenta suspendida: apelar, cerrar y renovar sesiones, borrar sus posts y borrar la cuenta. */
 /** Tope del documento que una fuente puede empujar (ADR 0128). */
 const PUSH_BODY_LIMIT = 2 * 1024 * 1024;
 const SourcePushParams = z.object({ sourceKey: z.string().regex(/^[a-z0-9-]{1,64}$/) });
+/** Escrituras permitidas a una cuenta suspendida: apelar, cerrar y renovar sesiones, borrar sus posts y borrar la cuenta. */
 const WRITE_ALLOWED_WHEN_SUSPENDED = /^(POST \/v1\/me\/policies\/accept|POST \/v1\/me\/moderation\/[^/]+\/appeal|POST \/v1\/auth\/(refresh|logout)|DELETE \/v1\/me|DELETE \/v1\/posts\/[^/]+|DELETE \/v1\/me\/sessions\/[^/]+|POST \/v1\/me\/sessions\/revoke-others)$/;
+/**
+ * La suspensión nunca quita la protección (ADR 0225): una cuenta suspendida (no una borrada) mantiene sus avisos de
+ * seguridad (token push, preferencias, suscripciones, zonas, ubicación aproximada, seguir eventos y lugares, marcar
+ * leídos) y puede bloquear a quien la acose. Nada de esto publica ni interactúa con otras personas.
+ */
+const SAFETY_WRITES_WHEN_SUSPENDED = new RegExp("^(" + [
+  "(PUT|DELETE) /v1/devices/[^/]+/push-token", "PUT /v1/me/alert-preferences", "(POST|DELETE) /v1/me/alert-subscriptions(/[^/]+)?",
+  "(POST|PUT|DELETE) /v1/me/zones(/[^/]+)?", "(PUT|DELETE) /v1/me/approximate-location", "POST /v1/me/notifications/read",
+  "(PUT|DELETE) /v1/follows/(event|place)/[^/]+", "(PUT|DELETE) /v1/blocks/[^/]+",
+].join("|") + ")$");
 
 /**
  * Contenido público e interacción: exigen haber declarado la edad mínima (D-13, ADR 0049). Ajustes, dispositivos,
@@ -123,8 +133,9 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
     }
     // Cuentas suspendidas: pueden leer, apelar, cerrar sesión y borrar su cuenta; no publicar ni interactuar.
     if (req.session && req.method !== "GET" && req.method !== "HEAD" && !WRITE_ALLOWED_WHEN_SUSPENDED.test(`${req.method} ${req.url.split("?")[0]}`)) {
-      const content = AGE_REQUIRED.test(`${req.method} ${req.url.split("?")[0]}`);
-      await c.identity.assertCanWrite(req.session.userId, { requireAge: content });
+      const route = `${req.method} ${req.url.split("?")[0]}`;
+      const content = AGE_REQUIRED.test(route);
+      await c.identity.assertCanWrite(req.session.userId, { requireAge: content, allowSuspended: SAFETY_WRITES_WHEN_SUSPENDED.test(route) });
       // Términos vigentes (ADR 0176): los mismos caminos de contenido e interacción que la edad mínima.
       if (content) await c.identity.assertPoliciesAccepted(req.session.userId, c.ref.legal.documents);
     }
