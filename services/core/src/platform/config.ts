@@ -7,6 +7,11 @@ const Env = z.object({
   /** Roles de este proceso worker (ADR 0159): "urgent", "normal", "maintenance", separados por comas. */
   WORKER_ROLES: z.string().default("urgent,normal,maintenance"),
   AUTH_JWT_SECRET: z.string().min(32),
+  // Inicio de sesión real (ADR 0170): client id de la app en cada proveedor, separados por comas. Vacío = apagado.
+  AUTH_APPLE_AUDIENCES: z.string().default(""),
+  AUTH_GOOGLE_AUDIENCES: z.string().default(""),
+  /** Correo con código: "none" (apagado, hasta elegir proveedor) o "log" (solo desarrollo). */
+  EMAIL_PROVIDER: z.enum(["none", "log"]).default("none"),
   DEV_AUTH_ENABLED: z
     .enum(["true", "false"])
     .default("false")
@@ -80,6 +85,9 @@ export type AppEnv = z.infer<typeof Env>;
 
 export function loadEnv(source: NodeJS.ProcessEnv = process.env): AppEnv {
   const env = Env.parse(source);
+  if (env.NODE_ENV === "production" && env.EMAIL_PROVIDER === "log") {
+    throw new Error("EMAIL_PROVIDER=log no puede usarse en producción");
+  }
   if (env.NODE_ENV === "production" && env.DEV_AUTH_ENABLED) {
     throw new Error("DEV_AUTH_ENABLED no puede estar activo en producción");
   }

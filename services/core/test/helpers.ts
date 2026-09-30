@@ -30,7 +30,7 @@ export interface TestContext {
   close(): Promise<void>;
 }
 
-export async function createTestContext(opts: { push?: PushSender; env?: Record<string, string> } = {}): Promise<TestContext> {
+export async function createTestContext(opts: { push?: PushSender; env?: Record<string, string>; overrides?: Omit<Parameters<typeof buildContainer>[1], "push"> } = {}): Promise<TestContext> {
   await resetDatabase();
   const env = loadEnv({
     NODE_ENV: "test",
@@ -46,7 +46,7 @@ export async function createTestContext(opts: { push?: PushSender; env?: Record<
     RATE_LIMIT_WRITES_PER_MINUTE: "100000",
     ...opts.env,
   });
-  const c = buildContainer(env, { push: opts.push ?? new LogPushSender(() => undefined) });
+  const c = buildContainer(env, { ...opts.overrides, push: opts.push ?? new LogPushSender(() => undefined) });
   await c.ingestion.syncRegistry(c.ref.sources);
   const app = await buildApp(c);
   return { c, app, close: async () => { await app.close(); await c.db.end(); } };

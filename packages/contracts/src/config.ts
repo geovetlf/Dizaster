@@ -31,6 +31,8 @@ export const AppConfig = z.object({
    * Versión mínima por plataforma (ADR 0164). Por debajo, la app no envía reportes ni publica (emergencias siempre
    * funciona) y ofrece actualizar. `null` = sin mínimo. `storeUrl` null mientras no haya ficha en la tienda.
    */
+  /** Métodos de inicio de sesión disponibles (ADR 0170). */
+  authProviders: z.object({ apple: z.boolean(), google: z.boolean(), email: z.boolean() }).default({ apple: false, google: false, email: false }),
   appUpdate: z.object({ android: PlatformUpdate, ios: PlatformUpdate }).default({
     android: { minVersion: null, storeUrl: null }, ios: { minVersion: null, storeUrl: null },
   }),

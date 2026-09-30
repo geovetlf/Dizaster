@@ -86,6 +86,22 @@ export class IdentityService {
     return createHmac("sha256", this.hardwareSecret).update(`${platform}:${hardwareId}`).digest("base64url");
   }
 
+  /** Vincula otra identidad a la cuenta (ADR 0170). Una identidad de otra cuenta no se mueve. */
+  async linkIdentity(userId: string, provider: IdentityProviderVerifier["provider"], subject: string): Promise<void> {
+    const owner = (await this.db.query<{ user_id: string }>(`SELECT user_id FROM identity.auth_identities WHERE provider = $1 AND subject = $2`, [provider, subject])).rows[0];
+    if (owner?.user_id === userId) return;
+    if (owner) throw new DomainError("IDENTITY_IN_USE", "Ese método ya está vinculado a otra cuenta", 409);
+    await this.db.query(
+      `INSERT INTO identity.auth_identities (id, user_id, provider, subject, verified_at) VALUES ($1, $2, $3, $4, now())`, [newId(), userId, provider, subject],
+    );
+  }
+
+  /** Métodos de inicio de sesión de la cuenta (sin datos: solo cuáles). */
+  async linkedProviders(userId: string): Promise<string[]> {
+    const { rows } = await this.db.query<{ provider: string }>(`SELECT DISTINCT provider FROM identity.auth_identities WHERE user_id = $1 ORDER BY provider`, [userId]);
+    return rows.map((r) => r.provider);
+  }
+
   /** Alta o login con una identidad externa ya verificada. Crea usuario y perfil personal la primera vez. */
   async signIn(provider: IdentityProviderVerifier["provider"], subject: string, handleHint: string): Promise<Session> {
     return withTransaction(this.db, async (tx) => {
@@ -530,3 +546,4 @@ export class IdentityService {
 }
 
 export { MfaService } from "./mfa.js";
+export { ExternalAuthService, OidcIdTokenVerifier, APPLE_ISSUERS, GOOGLE_ISSUERS, appleKeys, googleKeys, normalizeEmail } from "./external-auth.js";

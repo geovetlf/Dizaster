@@ -5,7 +5,7 @@ import Fastify, { type FastifyInstance, type FastifyRequest } from "fastify";
 import { z } from "zod";
 import {
   BBox, CreateCommentRequest, DevicePlatform, MEDIA_UPLOAD_LIMITS, MergeEventsRequest, NegativeState, ReactionKind, CommentReactionKind, ConfirmAgeRequest, RegisterPushTokenRequest, RegisterSigningKeyRequest, RevertMergeRequest,
-  SplitEventRequest, SetEventStatusRequest, SetEventSeverityRequest, SetSourceStatusRequest, type AdminSourcesResponse, ChangeRoleRequest, type StaffResponse, OriginalAccessRequest, AddModeratorNoteRequest, DismissDuplicateRequest, DATA_EXPORT_FORMAT, type AppConfig, type Attribution, type AttributionsResponse, type DataExport, type EmergencyNumbersResponse, type EventSearchResponse,
+  SplitEventRequest, SetEventStatusRequest, SetEventSeverityRequest, SetSourceStatusRequest, type AdminSourcesResponse, ChangeRoleRequest, type StaffResponse, OriginalAccessRequest, IdTokenSignInRequest, EmailStartRequest, EmailVerifyRequest, LinkIdentityRequest, AddModeratorNoteRequest, DismissDuplicateRequest, DATA_EXPORT_FORMAT, type AppConfig, type Attribution, type AttributionsResponse, type DataExport, type EmergencyNumbersResponse, type EventSearchResponse,
 } from "@dizaster/contracts";
 import { LocalDiskStorage } from "../modules/media/index.js";
 import type { Container } from "../container.js";
@@ -176,6 +176,7 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
       },
       limits: { maxVideoSeconds: 60, maxReportsPerHour: c.env.REPORTS_PER_HOUR_LIMIT },
       referenceVersions: { categories: c.ref.categories.version, emergencyNumbers: c.ref.emergency.version },
+      authProviders: c.externalAuth.providers(),
       appUpdate: {
         android: { minVersion: c.env.MIN_APP_VERSION_ANDROID || null, storeUrl: c.env.STORE_URL_ANDROID || null },
         ios: { minVersion: c.env.MIN_APP_VERSION_IOS || null, storeUrl: c.env.STORE_URL_IOS || null },
@@ -256,6 +257,41 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
       return { ...pair, userId: session.userId, profileId: session.profileId, deviceId };
     });
   }
+
+  // Inicio de sesión real (§5.1, D-11, ADR 0170): Apple, Google y correo con código. Apagados sin configuración.
+  const finishSignIn = async (session: Session, d: { platform?: DevicePlatform; deviceId?: string; hardwareId?: string }) => {
+    const deviceId = d.platform ? await c.identity.registerDevice(session.userId, d.platform, null, d.deviceId, d.hardwareId) : null;
+    const pair = await c.identity.startSession(session, deviceId);
+    return { ...pair, userId: session.userId, profileId: session.profileId, deviceId };
+  };
+  for (const provider of ["APPLE", "GOOGLE"] as const) {
+    app.post(`/v1/auth/${provider.toLowerCase()}`, async (req, reply) => {
+      const b = parse(IdTokenSignInRequest, req.body);
+      reply.header("cache-control", "no-store");
+      return finishSignIn(await c.externalAuth.signInWithIdToken(provider, b.idToken), b);
+    });
+  }
+  app.post("/v1/auth/email/start", async (req, reply) => {
+    const b = parse(EmailStartRequest, req.body);
+    await c.externalAuth.startEmail(b.email, req.ip ?? null);
+    return reply.status(204).send();
+  });
+  app.post("/v1/auth/email/verify", async (req, reply) => {
+    const b = parse(EmailVerifyRequest, req.body);
+    reply.header("cache-control", "no-store");
+    return finishSignIn(await c.externalAuth.verifyEmail(b.email, b.code), b);
+  });
+  // Vincular otro método a la cuenta (el correo pide antes un código con /v1/auth/email/start).
+  app.get("/v1/me/identities", async (req, reply) => {
+    const session = requireSession(req);
+    reply.header("cache-control", "no-store");
+    return { providers: await c.identity.linkedProviders(session.userId) };
+  });
+  app.post("/v1/me/identities", async (req, reply) => {
+    const session = requireSession(req);
+    await c.externalAuth.link(session.userId, parse(LinkIdentityRequest, req.body));
+    return reply.status(204).send();
+  });
 
   // Sesión: token de acceso corto (15 min) + refresh rotatorio de un solo uso (ADR 0021).
   app.post("/v1/auth/refresh", async (req, reply) => {

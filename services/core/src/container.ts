@@ -16,7 +16,9 @@ import { AlertService, ApnsSender, budgetAlertText, costDegradationText, sourceA
 import { GeoService } from "./modules/geo/index.js";
 import { AuthorityRequestRegister, ModerationService } from "./modules/moderation/index.js";
 import { TrustService } from "./modules/trust/index.js";
-import { DevAttestationVerifier, IdentityService, MfaService, type AttestationVerifier } from "./modules/identity/index.js";
+import { APPLE_ISSUERS, DevAttestationVerifier, ExternalAuthService, GOOGLE_ISSUERS, IdentityService, MfaService, OidcIdTokenVerifier, appleKeys, googleKeys, type AttestationVerifier } from "./modules/identity/index.js";
+import type { JWTVerifyGetKey } from "jose";
+import { DisabledEmailSender, LogEmailSender, type EmailSender } from "./platform/email.js";
 import { IngestionScheduler, IngestionService, InstitutionService, NodeHttpFetcher, type HttpFetcher } from "./modules/ingestion/index.js";
 import { LocalDiskStorage, MediaService, S3Storage, type StorageProvider } from "./modules/media/index.js";
 import { QualityService } from "./modules/quality/index.js";
@@ -34,6 +36,7 @@ export interface Container {
   geo: GeoService;
   social: SocialService;
   identity: IdentityService;
+  externalAuth: ExternalAuthService;
   mfa: MfaService;
   events: EventService;
   ingestion: IngestionService;
@@ -57,7 +60,7 @@ export interface Container {
   meter: Meter;
 }
 
-export function buildContainer(env: AppEnv, overrides: { db?: Db; clock?: Clock; attestation?: AttestationVerifier; fetcher?: HttpFetcher; storage?: StorageProvider; push?: PushSender; connectors?: ConnectorOverrides } = {}): Container {
+export function buildContainer(env: AppEnv, overrides: { db?: Db; clock?: Clock; attestation?: AttestationVerifier; fetcher?: HttpFetcher; storage?: StorageProvider; push?: PushSender; connectors?: ConnectorOverrides; email?: EmailSender; oidcKeys?: { apple?: JWTVerifyGetKey; google?: JWTVerifyGetKey } } = {}): Container {
   const db = overrides.db ?? createPool(env.DATABASE_URL);
   const clock = overrides.clock ?? systemClock;
   const meter = new Meter(() => clock.now());
@@ -67,6 +70,12 @@ export function buildContainer(env: AppEnv, overrides: { db?: Db; clock?: Clock;
   // Números públicos (emergencias) en dígitos: publicarlos no es exponer datos personales (ADR 0088).
   const social = new SocialService(new Set(ref.emergency.numbers.map((n) => n.number.replace(/\D/g, "")).filter((d) => d.length >= 8)), ref.moderationTerms);
   const identity = new IdentityService(db, social, env.AUTH_JWT_SECRET);
+  // Apple, Google y correo (ADR 0170): apagados mientras no haya client id / proveedor de correo del propietario.
+  const list = (v: string) => v.split(",").map((x) => x.trim()).filter(Boolean);
+  const externalAuth = new ExternalAuthService(db, identity, clock, {
+    apple: new OidcIdTokenVerifier("APPLE", APPLE_ISSUERS, list(env.AUTH_APPLE_AUDIENCES), overrides.oidcKeys?.apple ?? appleKeys()),
+    google: new OidcIdTokenVerifier("GOOGLE", GOOGLE_ISSUERS, list(env.AUTH_GOOGLE_AUDIENCES), overrides.oidcKeys?.google ?? googleKeys()),
+  }, overrides.email ?? (env.EMAIL_PROVIDER === "log" ? new LogEmailSender() : new DisabledEmailSender()), env.AUTH_JWT_SECRET);
   const events = new EventService(ref, geo, { archiveAfterDays: env.EVENT_ARCHIVE_AFTER_DAYS });
   const ingestion = new IngestionService(db, events, geo);
   // Claves de fuentes (SOURCE_KEY_*) y secretos de push (SOURCE_PUSH_SECRET_*): solo del entorno (ADR 0067, 0128).
@@ -144,7 +153,7 @@ export function buildContainer(env: AppEnv, overrides: { db?: Db; clock?: Clock;
   const composer = new PostComposer(db, social, media, events, business, async (userId) => (await trust.socialLimits(db, userId)).postsPerHour,
     (userId, handle, event) => institutions.assertCanPostUpdate(userId, handle, event));
   const quality = new QualityService(db, clock, { cost, events, verification, alerts, ingestion, moderation, ops: { identity, backlog: () => dispatcher.backlog() } });
-  return { env, db, clock, ref, geo, social, identity, mfa, events, ingestion, ingestionScheduler, verification, media, storage, reports, feed, alerts, dispatcher, cost, moderation, authorityRequests, trust, quality, composer, business, institutions, meter, connectors };
+  return { env, db, clock, ref, geo, social, identity, externalAuth, mfa, events, ingestion, ingestionScheduler, verification, media, storage, reports, feed, alerts, dispatcher, cost, moderation, authorityRequests, trust, quality, composer, business, institutions, meter, connectors };
 }
 
 /** APNs y FCM directos. Si falta la credencial de una plataforma, sus avisos quedan solo en el historial. */

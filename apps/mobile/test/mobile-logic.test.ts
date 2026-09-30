@@ -100,6 +100,7 @@ describe("proveedor de mapa desacoplado", () => {
       map: { id: "x", kind: "VECTOR_STYLE_URL", styleUrl: { light: "L", dark: "D" }, attribution: "© OSM", maxZoom: 18, offlineRegions: true },
       killSwitches: {}, limits: { maxVideoSeconds: 60, maxReportsPerHour: 10 }, referenceVersions: { categories: "c", emergencyNumbers: "e" },
       appUpdate: { android: { minVersion: null, storeUrl: null }, ios: { minVersion: null, storeUrl: null } },
+      authProviders: { apple: false, google: false, email: false },
     });
     expect(p?.styleUrl("dark")).toBe("D");
     expect(providerFromAppConfig(null)).toBeNull();
