@@ -8,6 +8,7 @@ import { useNotificationRouting } from "../lib/alerts/notifications";
 import { refreshCategoryCatalog } from "../lib/category-store";
 import { refreshEmergencyDataset } from "../lib/emergency-store";
 import { isAgeBlocked } from "../lib/account/age-gate";
+import { pendingPolicies } from "../lib/account/policies";
 import { api } from "../lib/api";
 import { onLanguageChange } from "../lib/language-store";
 import { SessionProvider, useSession } from "../lib/session";
@@ -83,6 +84,7 @@ export default function RootLayout() {
         <Stack.Screen name="sign-in-methods" options={{ title: t("signInMethods") }} />
         <Stack.Screen name="delete-account" options={{ title: t("deleteAccount") }} />
         <Stack.Screen name="age-check" options={{ title: t("ageTitle"), presentation: "modal" }} />
+        <Stack.Screen name="policies" options={{ title: t("policiesTitle"), presentation: "modal" }} />
         <Stack.Screen name="profile-edit" options={{ title: t("editProfile") }} />
         <Stack.Screen name="zone-edit" options={{ title: t("addZone") }} />
         <Stack.Screen name="language" options={{ title: t("language"), presentation: "modal" }} />
@@ -90,6 +92,7 @@ export default function RootLayout() {
       <NotificationRouting />
       <SignInGate />
       <AgeGate />
+      <PolicyGate />
     </SessionProvider>
   );
 }
@@ -106,6 +109,16 @@ function SignInGate() {
 /** Abre el EVENT al tocar un aviso; espera a la sesión para que la pantalla pueda cargarlo. */
 function NotificationRouting() {
   useNotificationRouting(useSession().ready);
+  return null;
+}
+
+/** Términos vigentes (ADR 0176): si hay alguno pendiente se piden una vez por arranque. Sin textos, nada. */
+function PolicyGate() {
+  const { ready, needsSignIn } = useSession();
+  useEffect(() => {
+    if (!ready || needsSignIn) return;
+    api.policies().then((s) => { if (pendingPolicies(s).length > 0) router.push("/policies"); }).catch(() => undefined);
+  }, [ready, needsSignIn]);
   return null;
 }
 

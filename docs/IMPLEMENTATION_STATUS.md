@@ -366,6 +366,7 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | 0173 | Fallos de la app autoalojados: envío anónimo y redactado, agrupados por huella para operación, retención 30 días | ✅ |
 | 0174 | Alertas con origen (oficial/sistema), vencimiento y referencia CAP; lo vencido antes de salir no suena | ✅ |
 | 0175 | Ciudad del evento (`city_id`) desde el lugar público: avisos, búsqueda y "Siguiendo" por ciudad | ✅ |
+| 0176 | Aceptación versionada de términos y políticas (mecanismo; textos bloqueados): registro de solo inserción, 428 al publicar si falta, pantalla en la app | ✅ |
 | Licencias, auditoría, SBOM, Dependabot; respaldo con prueba de restauración en CI | ✅ | ADR 0070, `scripts/supply-chain.mjs`, `scripts/db-restore-check.mjs` |
 | Idioma de la app elegible en el perfil (es/en/pt/fr o del teléfono) | ✅ | ADR 0069, `app/language.tsx` |
 | Varias cuentas en un teléfono corroboran como una (clave seudónima del teléfono) | ✅ | ADR 0068, migración 0036 |
@@ -410,7 +411,6 @@ Revisión del Blueprint del 2026-09-30 (tras ADR 0157): completada con ADR 0158�
 Revisión del Blueprint del 2026-09-30 (tras ADR 0164): completada con ADR 0165–0171.
 
 Revisión del Blueprint del 2026-09-30 (tras ADR 0171), verificada contra el código, sin bloqueos:
-1. Aceptación versionada de términos y políticas (solo el mecanismo; los textos legales siguen bloqueados).
 
 Bloqueadas o en espera:
 
@@ -422,4 +422,5 @@ Bloqueadas o en espera:
 - **PENDING DECISION** — D-17 fronteras en disputa: sin implementar; falta criterio del propietario (y revisión legal antes de abrir más países).
 - **PENDING DECISION** — Uso sin cuenta (ADR 0171): hoy se puede cerrar "Entrar" y seguir en solo lectura; falta decidir si V1 lo permite o exige cuenta.
 - **PENDING DECISION** — Señal de red compartida para coordinación (§8.2, "opcional, decisión"): choca con la decisión del propietario de no usar señales de IP o red (ADR 0142); no se implementa sin su visto bueno.
+- **PENDING DECISION** — Aceptaciones de términos al borrar la cuenta (ADR 0176): hoy se conservan con el id interno como prueba; falta criterio legal sobre si se borran.
 - **BLOQUEADA** — Contacto del cliente de ingesta (§9.3): el User-Agent dice "contacto pendiente"; falta el correo o URL de contacto del propietario.

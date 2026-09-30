@@ -1,0 +1,9 @@
+{
+  "version": "legal-2026.09.30",
+  "notes": "ADR 0176. Textos legales BLOQUEADOS hasta asesoría legal: mientras version sea null no se pide aceptar nada. Al publicar un texto: fijar version y url (y required si debe bloquear publicar e interactuar hasta aceptarlo).",
+  "documents": [
+    { "kind": "TERMS", "version": null, "url": null, "required": true },
+    { "kind": "PRIVACY", "version": null, "url": null, "required": true },
+    { "kind": "COMMUNITY_GUIDELINES", "version": null, "url": null, "required": false }
+  ]
+}

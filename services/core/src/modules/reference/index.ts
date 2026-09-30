@@ -6,6 +6,7 @@ import {
   effectiveCategory,
   EmergencyDataset,
   ModerationTermList,
+  LegalDocumentsFile,
   type CategoryConfig,
   type EmergencyNumber,
 } from "@dizaster/contracts";
@@ -39,6 +40,8 @@ export class ReferenceData {
   readonly sources: Array<Record<string, unknown>>;
   /** Listas de términos que envían a revisión (ADR 0148). Empiezan vacías. */
   readonly moderationTerms: ModerationTermList;
+  /** Términos y políticas con versión (ADR 0176). Sin versión aún: textos bloqueados a la espera de asesoría legal. */
+  readonly legal: LegalDocumentsFile;
 
   constructor(readonly dataDir: string) {
     const read = (p: string) => JSON.parse(readFileSync(join(dataDir, p), "utf8")) as unknown;
@@ -51,6 +54,7 @@ export class ReferenceData {
     this.countries = new Map(countryFile.countries.map((c) => [c.iso2, c]));
     this.sources = (read("source-registry/sources.json") as { sources: Array<Record<string, unknown>> }).sources;
     this.moderationTerms = ModerationTermList.parse(read("moderation/terms.json"));
+    this.legal = LegalDocumentsFile.parse(read("legal/documents.json"));
     this.validate();
   }
 

@@ -5,7 +5,7 @@ import Fastify, { type FastifyInstance, type FastifyRequest } from "fastify";
 import { z } from "zod";
 import {
   BBox, CreateCommentRequest, DevicePlatform, MEDIA_UPLOAD_LIMITS, MergeEventsRequest, NegativeState, ReactionKind, CommentReactionKind, ConfirmAgeRequest, RegisterPushTokenRequest, RegisterSigningKeyRequest, RevertMergeRequest,
-  SplitEventRequest, SetEventStatusRequest, SetEventSeverityRequest, SetSourceStatusRequest, ClientCrashReport, type ClientCrashesResponse, type AdminSourcesResponse, ChangeRoleRequest, type StaffResponse, OriginalAccessRequest, IdTokenSignInRequest, EmailStartRequest, EmailVerifyRequest, LinkIdentityRequest, AddModeratorNoteRequest, DismissDuplicateRequest, DATA_EXPORT_FORMAT, type AppConfig, type Attribution, type AttributionsResponse, type DataExport, type EmergencyNumbersResponse, type EventSearchResponse,
+  SplitEventRequest, SetEventStatusRequest, SetEventSeverityRequest, SetSourceStatusRequest, AcceptPoliciesRequest, type PolicyStatusResponse, ClientCrashReport, type ClientCrashesResponse, type AdminSourcesResponse, ChangeRoleRequest, type StaffResponse, OriginalAccessRequest, IdTokenSignInRequest, EmailStartRequest, EmailVerifyRequest, LinkIdentityRequest, AddModeratorNoteRequest, DismissDuplicateRequest, DATA_EXPORT_FORMAT, type AppConfig, type Attribution, type AttributionsResponse, type DataExport, type EmergencyNumbersResponse, type EventSearchResponse,
 } from "@dizaster/contracts";
 import { LocalDiskStorage } from "../modules/media/index.js";
 import type { Container } from "../container.js";
@@ -42,7 +42,7 @@ function requireSession(req: FastifyRequest): Session {
 /** Tope del documento que una fuente puede empujar (ADR 0128). */
 const PUSH_BODY_LIMIT = 2 * 1024 * 1024;
 const SourcePushParams = z.object({ sourceKey: z.string().regex(/^[a-z0-9-]{1,64}$/) });
-const WRITE_ALLOWED_WHEN_SUSPENDED = /^(POST \/v1\/me\/moderation\/[^/]+\/appeal|POST \/v1\/auth\/(refresh|logout)|DELETE \/v1\/me|DELETE \/v1\/posts\/[^/]+|DELETE \/v1\/me\/sessions\/[^/]+|POST \/v1\/me\/sessions\/revoke-others)$/;
+const WRITE_ALLOWED_WHEN_SUSPENDED = /^(POST \/v1\/me\/policies\/accept|POST \/v1\/me\/moderation\/[^/]+\/appeal|POST \/v1\/auth\/(refresh|logout)|DELETE \/v1\/me|DELETE \/v1\/posts\/[^/]+|DELETE \/v1\/me\/sessions\/[^/]+|POST \/v1\/me\/sessions\/revoke-others)$/;
 
 /**
  * Contenido público e interacción: exigen haber declarado la edad mínima (D-13, ADR 0049). Ajustes, dispositivos,
@@ -110,7 +110,10 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
     }
     // Cuentas suspendidas: pueden leer, apelar, cerrar sesión y borrar su cuenta; no publicar ni interactuar.
     if (req.session && req.method !== "GET" && req.method !== "HEAD" && !WRITE_ALLOWED_WHEN_SUSPENDED.test(`${req.method} ${req.url.split("?")[0]}`)) {
-      await c.identity.assertCanWrite(req.session.userId, { requireAge: AGE_REQUIRED.test(`${req.method} ${req.url.split("?")[0]}`) });
+      const content = AGE_REQUIRED.test(`${req.method} ${req.url.split("?")[0]}`);
+      await c.identity.assertCanWrite(req.session.userId, { requireAge: content });
+      // Términos vigentes (ADR 0176): los mismos caminos de contenido e interacción que la edad mínima.
+      if (content) await c.identity.assertPoliciesAccepted(req.session.userId, c.ref.legal.documents);
     }
   });
 
@@ -985,6 +988,23 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
     const { userId } = await requirePermission(req, "ops.control");
     const b = parse(SetSourceStatusRequest, req.body);
     await c.ingestion.changeSourceStatus(req.params.key, b.to, b.reason, userId);
+    return reply.status(204).send();
+  });
+  // Términos y políticas (ADR 0176): estado y aceptación de la versión vigente.
+  app.get("/v1/me/policies", async (req, reply): Promise<PolicyStatusResponse> => {
+    const { userId } = requireSession(req);
+    reply.header("cache-control", "no-store");
+    return c.identity.policyStatus(c.db, userId, c.ref.legal.documents);
+  });
+  app.post("/v1/me/policies/accept", async (req, reply) => {
+    const { userId } = requireSession(req);
+    const b = parse(AcceptPoliciesRequest, req.body);
+    const platform = req.headers[APP_PLATFORM_HEADER];
+    const version = req.headers[APP_VERSION_HEADER];
+    await c.identity.acceptPolicies(userId, b, c.ref.legal.documents, {
+      platform: platform === "android" || platform === "ios" ? platform : null,
+      appVersion: typeof version === "string" && /^\d{1,4}(\.\d{1,4}){0,3}$/.test(version) ? version : null,
+    });
     return reply.status(204).send();
   });
   // Fallos de la app autoalojados (ADR 0173): sin sesión ni cuenta; el cupo general por IP limita el abuso.

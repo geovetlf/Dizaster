@@ -9,7 +9,7 @@ import { publish } from "../../platform/outbox.js";
 import type { SocialService } from "../social/index.js";
 
 export type { Role } from "@dizaster/contracts";
-import { STAFF_ROLES, type Role, type StaffRole } from "@dizaster/contracts";
+import { STAFF_ROLES, type AcceptPoliciesRequest, type LegalDocument, type PolicyStatusResponse, type Role, type StaffRole } from "@dizaster/contracts";
 
 export interface Session {
   userId: string;
@@ -132,6 +132,67 @@ export class IdentityService {
   async setUserStatus(q: Queryable, userId: string, status: "ACTIVE" | "SUSPENDED"): Promise<void> {
     await q.query(`UPDATE identity.users SET status = $2, updated_at = now() WHERE id = $1 AND status <> 'DELETED'`, [userId, status]);
     this.statusCache.delete(userId);
+  }
+
+  // ───────────── Términos y políticas (ADR 0176) ─────────────
+
+  /** Estado de cada documento publicado (con versión). Lo que aún no tiene versión no aparece. */
+  async policyStatus(q: Queryable, userId: string, docs: readonly LegalDocument[]): Promise<PolicyStatusResponse> {
+    const live = docs.filter((d): d is LegalDocument & { version: string; url: string } => d.version !== null && d.url !== null);
+    if (live.length === 0) return { documents: [] };
+    const { rows } = await q.query<{ kind: string; version: string }>(
+      `SELECT DISTINCT ON (kind) kind, version FROM identity.policy_acceptances WHERE user_id = $1 ORDER BY kind, accepted_at DESC`, [userId],
+    );
+    const last = new Map(rows.map((r) => [r.kind, r.version]));
+    const accepted = new Set((await q.query<{ k: string }>(
+      `SELECT kind || ':' || version AS k FROM identity.policy_acceptances WHERE user_id = $1`, [userId],
+    )).rows.map((r) => r.k));
+    return {
+      documents: live.map((d) => ({
+        kind: d.kind, version: d.version, url: d.url, required: d.required,
+        acceptedVersion: last.get(d.kind) ?? null, pending: !accepted.has(`${d.kind}:${d.version}`),
+      })),
+    };
+  }
+
+  /** Solo se acepta la versión vigente; aceptar dos veces la misma no cambia nada. */
+  async acceptPolicies(
+    userId: string, req: AcceptPoliciesRequest, docs: readonly LegalDocument[], client: { platform: string | null; appVersion: string | null },
+  ): Promise<void> {
+    for (const a of req.accept) {
+      const d = docs.find((x) => x.kind === a.kind);
+      if (!d?.version || d.version !== a.version) throw new DomainError("POLICY_VERSION_MISMATCH", "Esa versión ya no es la vigente", 409);
+    }
+    for (const a of req.accept) {
+      await this.db.query(
+        `INSERT INTO identity.policy_acceptances (id, user_id, kind, version, platform, app_version) VALUES ($1, $2, $3, $4, $5, $6)
+         ON CONFLICT (user_id, kind, version) DO NOTHING`,
+        [newId(), userId, a.kind, a.version, client.platform, client.appVersion],
+      );
+    }
+    this.policyCache.delete(userId);
+  }
+
+  private readonly policyCache = new Map<string, { key: string; at: number }>();
+
+  /**
+   * Publicar e interactuar exigen haber aceptado la versión vigente de lo marcado `required` (ADR 0176). Sin textos
+   * publicados no hay nada que exigir ni consulta. Caché de 30 s por cuenta y conjunto de versiones.
+   */
+  async assertPoliciesAccepted(userId: string, docs: readonly LegalDocument[]): Promise<void> {
+    const required = docs.filter((d) => d.required && d.version !== null);
+    if (required.length === 0) return;
+    const key = required.map((d) => `${d.kind}:${d.version}`).sort().join(",");
+    const hit = this.policyCache.get(userId);
+    if (hit && hit.key === key && Date.now() - hit.at < 30_000) return;
+    const { rows } = await this.db.query<{ n: number }>(
+      `SELECT count(*)::int AS n FROM identity.policy_acceptances WHERE user_id = $1 AND kind || ':' || version = ANY($2)`,
+      [userId, required.map((d) => `${d.kind}:${d.version}`)],
+    );
+    if (rows[0]!.n < required.length) {
+      throw new DomainError("POLICY_ACCEPTANCE_REQUIRED", "Acepta los términos vigentes para continuar", 428);
+    }
+    this.policyCache.set(userId, { key, at: Date.now() });
   }
 
   /** Una cuenta suspendida o borrada no puede escribir. Caché corta: una consulta por cuenta cada 30 s como mucho. */
