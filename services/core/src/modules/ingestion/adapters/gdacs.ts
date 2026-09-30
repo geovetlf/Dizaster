@@ -1,6 +1,6 @@
 import { XMLParser } from "fast-xml-parser";
 import type { NormalizedItem } from "../index.js";
-import { categoryMap, type FeedAdapter } from "./types.js";
+import { categoryMap, validLatLng, type FeedAdapter } from "./types.js";
 
 /**
  * Tipos de evento GDACS → taxonomía de Dizaster, por defecto (el registro puede traer su `categoryMap`, ADR 0122).
@@ -37,7 +37,7 @@ export const gdacsAdapter: FeedAdapter = {
       const category = map[type];
       const eventId = it["eventid"];
       const point = it["Point"] as { lat?: number; long?: number } | undefined;
-      if (!category || eventId === undefined || typeof point?.lat !== "number" || typeof point?.long !== "number") continue;
+      if (!category || eventId === undefined || typeof point?.lat !== "number" || typeof point.long !== "number" || !validLatLng(point.lat, point.long)) continue;
       const alert = String(it["alertlevel"] ?? "").toLowerCase();
       // Sin ninguna fecha no se puede ubicar en el tiempo; inventar "ahora" cambiaría el ítem en cada lectura (ADR 0133).
       const from = parseDate(it["fromdate"]) ?? parseDate(it["pubDate"]);

@@ -188,6 +188,11 @@ export class IngestionService {
       const source = (await tx.query<SourceRow>(`SELECT id, key, type, trust_tier, status FROM ingestion.sources WHERE key = $1`, [sourceKey])).rows[0];
       if (!source) throw new DomainError("UNKNOWN_SOURCE", `Fuente no registrada: ${sourceKey}`);
       if (source.status !== "ACTIVE") throw new DomainError("SOURCE_NOT_ACTIVE", `La fuente ${sourceKey} no está activa`);
+      // Defensa general (ADR 0242): cualquier adaptador con un punto imposible deja ese ítem en ERROR, no la corrida.
+      const pt = item.point;
+      if (pt && (!Number.isFinite(pt.lat) || !Number.isFinite(pt.lng) || Math.abs(pt.lat) > 90 || Math.abs(pt.lng) > 180)) {
+        throw new DomainError("VALIDATION", `Coordenadas fuera de rango en ${item.externalId}`);
+      }
 
       const hash = createHash("sha256").update(JSON.stringify(item)).digest("hex");
       const existing = (await tx.query<{ id: string; content_hash: string; status: string }>(

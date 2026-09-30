@@ -1,5 +1,5 @@
 import type { NormalizedItem } from "../index.js";
-import { num, type FeedAdapter } from "./types.js";
+import { num, validLatLng, type FeedAdapter } from "./types.js";
 
 interface UsgsFeature {
   id?: string;
@@ -35,7 +35,7 @@ export const usgsAdapter: FeedAdapter = {
     for (const f of doc.features) {
       const p = f.properties ?? {};
       const c = f.geometry?.coordinates;
-      if (!f.id || !c || typeof c[0] !== "number" || typeof c[1] !== "number" || typeof p.time !== "number") continue;
+      if (!f.id || !c || typeof c[0] !== "number" || typeof c[1] !== "number" || !validLatLng(c[1], c[0]) || typeof p.time !== "number" || !Number.isFinite(p.time)) continue;
       if (p.type && p.type !== "earthquake") continue;
       const mag = typeof p.mag === "number" ? p.mag : null;
       if (mag === null || mag < minMag) continue;

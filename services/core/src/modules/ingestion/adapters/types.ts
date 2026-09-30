@@ -13,6 +13,10 @@ export interface FeedAdapter {
   withdrawals?(body: string, config: Record<string, unknown>): string[];
 }
 
+/** Coordenada utilizable (ADR 0242): finita y dentro de rango. Un punto malo se salta, no tumba la corrida. */
+export const validLatLng = (lat: unknown, lng: unknown): boolean =>
+  typeof lat === "number" && typeof lng === "number" && Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180;
+
 export const num = (v: unknown, fallback: number): number => (typeof v === "number" && Number.isFinite(v) ? v : fallback);
 
 /**
