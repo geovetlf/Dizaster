@@ -262,6 +262,17 @@ export class ReportService {
     return { suspendedAccount: phone.suspendedAccount, tamperSignals30d: await this.tamperSignals(q, phone.deviceIds) };
   }
 
+  /**
+   * Quién reportó un evento (sin retirar), para avisarle de lo que pasó con su reporte (ADR 0223). Máximo 1000
+   * personas: un evento enorme ya avisa por zonas y seguimientos.
+   */
+  async reportersOf(q: Queryable, eventId: string): Promise<{ profileId: string; userId: string }[]> {
+    const { rows } = await q.query<{ author_profile_id: string; author_user_id: string }>(
+      `SELECT DISTINCT author_profile_id, author_user_id FROM report.reports WHERE event_id = $1 AND status <> 'WITHDRAWN' LIMIT 1000`, [eventId],
+    );
+    return rows.map((r) => ({ profileId: r.author_profile_id, userId: r.author_user_id }));
+  }
+
   registerHandlers(dispatcher: OutboxDispatcher): void {
     // Media rechazada al procesarse (ADR 0121): si sostenía la bonificación "capturada en la app", se retira.
     dispatcher.on("MediaRejected", "report.media-rejected", async (e, tx) => { await this.reviseForRejectedMedia(tx, e.payload.mediaId); });

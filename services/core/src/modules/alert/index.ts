@@ -75,6 +75,11 @@ const subjectUrl = (r: { event_id: string | null; post_id: string | null }) =>
 
 interface Recipient { profileId: string; userId: string; match: AlertMatch; prefs: AlertPreferences }
 
+/** Quién reportó un evento (lo da el módulo de reportes; ADR 0223). */
+export interface ReporterDirectory {
+  reportersOf(q: Queryable, eventId: string): Promise<{ profileId: string; userId: string }[]>;
+}
+
 interface PrefRow {
   profile_id: string; enabled: boolean; followed_events: boolean; followed_places: boolean; saved_zones: boolean; near_me: boolean;
   categories: boolean; status_changes: boolean; mentions: boolean;
@@ -119,7 +124,7 @@ export class AlertService {
     private readonly push: PushSender,
     private readonly clock: Clock,
     private readonly ingestion: Pick<IngestionService, "officialAlertSource">,
-    private readonly opts: { ttlHours: number } = { ttlHours: 24 },
+    private readonly opts: { ttlHours: number; reporters?: ReporterDirectory } = { ttlHours: 24 },
   ) {}
 
   /** Plazo por defecto de una alerta sin `expires` de la fuente (ADR 0174). */
@@ -215,6 +220,10 @@ export class AlertService {
       [snap.id],
     );
     for (const r of prior.rows) if (!found.has(r.profile_id)) found.set(r.profile_id, { userId: r.user_id, match: "PREVIOUSLY_ALERTED" });
+    for (const r of (await this.opts.reporters?.reportersOf(tx, snap.id)) ?? []) {
+      const cur = found.get(r.profileId);
+      if (!cur || cur.match === "PREVIOUSLY_ALERTED") found.set(r.profileId, { userId: r.userId, match: "REPORTED" });
+    }
     if (found.size === 0) return 0;
     const prefs = await this.prefsFor(tx, [...found.keys()]);
     const recipients = [...found.entries()]
@@ -416,6 +425,8 @@ export class AlertService {
         [snap.id],
       );
       for (const r of prior.rows) add(r.profile_id, r.user_id, "PREVIOUSLY_ALERTED");
+      // Quien reportó se entera de lo que pasó con su reporte (§8.1, ADR 0223).
+      for (const r of (await this.opts.reporters?.reportersOf(tx, snap.id)) ?? []) add(r.profileId, r.userId, "REPORTED");
     }
     if (found.size === 0) return [];
     const prefs = await this.prefsFor(tx, [...found.keys()]);

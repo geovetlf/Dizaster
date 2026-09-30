@@ -72,7 +72,8 @@ export function decideAlerts(prev: SeenState | null, snap: EventSnapshot): Alert
 }
 
 /** Prioridad cuando una persona coincide por varios motivos: se guarda el más directo. */
-export const MATCH_PRIORITY: AlertMatch[] = ["FOLLOWED_EVENT", "SAVED_ZONE", "NEAR_ME", "FOLLOWED_PLACE", "CATEGORY", "PREVIOUSLY_ALERTED", "MENTIONED"];
+// REPORTED (ADR 0223): quien reportó el evento se entera de si se confirmó, resultó falso o terminó.
+export const MATCH_PRIORITY: AlertMatch[] = ["FOLLOWED_EVENT", "REPORTED", "SAVED_ZONE", "NEAR_ME", "FOLLOWED_PLACE", "CATEGORY", "PREVIOUSLY_ALERTED", "MENTIONED"];
 
 /** ¿Quiere esta persona este aviso según sus preferencias? */
 export function wants(p: AlertPreferences, kind: AlertKind, match: AlertMatch, severity: number): boolean {

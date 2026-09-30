@@ -5,7 +5,7 @@ import { CategoryCode, Lang } from "./common.js";
  * Por qué le llega una alerta a esta persona. SAVED_ZONE: una de sus zonas guardadas. NEAR_ME: cerca de la
  * última ubicación aproximada que envió la app al abrirse (D-16).
  */
-export const AlertMatch = z.enum(["FOLLOWED_EVENT", "SAVED_ZONE", "NEAR_ME", "FOLLOWED_PLACE", "CATEGORY", "PREVIOUSLY_ALERTED", "MENTIONED", "MODERATION_NOTICE"]);
+export const AlertMatch = z.enum(["FOLLOWED_EVENT", "SAVED_ZONE", "NEAR_ME", "FOLLOWED_PLACE", "CATEGORY", "PREVIOUSLY_ALERTED", "MENTIONED", "MODERATION_NOTICE", "REPORTED"]);
 export type AlertMatch = z.infer<typeof AlertMatch>;
 
 /**

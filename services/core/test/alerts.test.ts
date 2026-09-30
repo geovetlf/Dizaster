@@ -154,6 +154,8 @@ describe("Alert Engine: lugares y categorías seguidas", () => {
     expect(sent.map((m) => m.title)).toEqual(expect.arrayContaining(["Marcado como falso: Inundación"]));
     expect((await inbox(seguidor)).notifications[0]).toMatchObject({ kind: "STATE_CHANGED", match: "FOLLOWED_EVENT" });
     expect((await inbox(vecina)).notifications[0]).toMatchObject({ kind: "STATE_CHANGED", match: "PREVIOUSLY_ALERTED" });
+    // Quien reportó se entera de lo que pasó con su reporte (ADR 0223).
+    expect((await inbox(reporters[0]!)).notifications[0]).toMatchObject({ kind: "STATE_CHANGED", match: "REPORTED", eventId });
   });
 
   it("historial: marcar como leído y paginar", async () => {
