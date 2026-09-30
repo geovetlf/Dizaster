@@ -17,7 +17,8 @@ function files(dir: string): string[] {
 describe("códigos de error del servidor", () => {
   it("cada código que el servidor puede devolver tiene clave de traducción", () => {
     const codes = new Set<string>();
-    for (const f of files(SRC)) {
+    // Los resultados de los proveedores de push (`PushResult.error`) quedan en el servidor; nunca llegan a la app.
+    for (const f of files(SRC).filter((p) => !p.includes("/modules/alert/push/"))) {
       const src = readFileSync(f, "utf8");
       for (const m of src.matchAll(/(?:new DomainError\(\s*|error:\s*)"([A-Z][A-Z0-9_]+)"/g)) codes.add(m[1]!);
     }
