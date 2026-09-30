@@ -1,4 +1,5 @@
 import type { Container } from "./container.js";
+import { withTransaction } from "./platform/db.js";
 
 /** Una tarea de mantenimiento: nombre para el registro y lo que hace (devuelve lo que se registra). */
 export type Job = readonly [name: string, run: () => Promise<unknown>];
@@ -21,12 +22,14 @@ export async function runJobs(jobs: readonly Job[], log: (msg: string, data: Rec
   return { failed };
 }
 
-/** Cada hora: ciclo de vida, fin oficial, archivo, degradación por costo, prioridades y duplicados. */
+/** Cada hora: ciclo de vida (sin cerrar eventos con aviso vigente), fin oficial, archivo, degradación por costo, prioridades y duplicados. */
 export function hourlyJobs(c: Container): Job[] {
   return [
-    ["events.lifecycle", () => c.events.applyLifecycle(c.db, c.clock.now())],
-    ["events.source-end", async () => ({ resolved: await c.events.applySourceEnd(c.db, await c.ingestion.endedItems(c.db, c.clock.now())) })],
-    ["events.archive", async () => ({ archived: await c.events.archiveResolved(c.db, c.clock.now()) })],
+    // Cada cambio de estado y su evento de dominio (outbox) en una sola transacción (ADR 0244): si algo falla a
+    // medias, no quedan eventos cerrados sin su aviso de "Terminado".
+    ["events.lifecycle", () => withTransaction(c.db, async (tx) => c.events.applyLifecycle(tx, c.clock.now(), await c.ingestion.activeItemEvents(tx, c.clock.now())))],
+    ["events.source-end", () => withTransaction(c.db, async (tx) => ({ resolved: await c.events.applySourceEnd(tx, await c.ingestion.endedItems(tx, c.clock.now())) }))],
+    ["events.archive", () => withTransaction(c.db, async (tx) => ({ archived: await c.events.archiveResolved(tx, c.clock.now()) }))],
     ["cost.degradation", async () => {
       const d = await c.cost.applyDegradation();
       if (d.changed.length) console.warn(JSON.stringify({ msg: "cost.degradation.applied", ...d }));

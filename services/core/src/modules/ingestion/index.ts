@@ -343,6 +343,19 @@ export class IngestionService {
     });
   }
 
+  /**
+   * Eventos con un aviso de fuente todavía vigente (ADR 0244): `ends_at` en el futuro y sin retirar. El ciclo por
+   * inactividad no los cierra: un aviso de tormenta de 5 días sigue vigente aunque nadie reporte.
+   */
+  async activeItemEvents(q: Queryable, now: Date): Promise<string[]> {
+    const { rows } = await q.query<{ event_id: string }>(
+      `SELECT DISTINCT event_id FROM ingestion.external_items
+        WHERE event_id IS NOT NULL AND withdrawn_at IS NULL AND ends_at > $1`,
+      [now],
+    );
+    return rows.map((r) => r.event_id);
+  }
+
   async endedItems(q: Queryable, now: Date, windowDays = 7): Promise<{ id: string; reason: "WITHDRAWN" | "EXPIRED"; at: Date }[]> {
     const { rows } = await q.query<{ id: string; reason: "WITHDRAWN" | "EXPIRED"; at: Date }>(
       `SELECT id, CASE WHEN withdrawn_at IS NOT NULL THEN 'WITHDRAWN' ELSE 'EXPIRED' END AS reason, coalesce(withdrawn_at, ends_at) AS at

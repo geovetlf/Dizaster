@@ -1268,7 +1268,7 @@ export class EventService {
    * Ciclo de vida por inactividad (determinista y barato, en lote): ACTIVE → MONITORING tras 2 ventanas de
    * deduplicación sin actividad; MONITORING → RESOLVED tras 6 (mínimo 24 h). Cada cambio queda en la timeline.
    */
-  async applyLifecycle(q: Queryable, now: Date): Promise<{ monitoring: number; resolved: number }> {
+  async applyLifecycle(q: Queryable, now: Date, keepActive: string[] = []): Promise<{ monitoring: number; resolved: number }> {
     // Ventana efectiva por país (ADR 0215): la misma que usan la deduplicación y la verificación.
     const pairs = (await q.query<{ category_code: string; country_code: string | null }>(
       `SELECT DISTINCT category_code, country_code FROM event.events WHERE status IN ('ACTIVE','MONITORING') AND merged_into_id IS NULL`,
@@ -1288,10 +1288,11 @@ export class EventService {
           updated_at = now()
          FROM cfg
         WHERE cfg.code = e.category_code AND cfg.country = coalesce(e.country_code, '') AND e.merged_into_id IS NULL
+          AND NOT (e.id = ANY($6::uuid[]))
           AND ((e.status = 'ACTIVE' AND e.last_activity_at < $4::timestamptz - make_interval(mins => cfg.monitor_min))
             OR (e.status = 'MONITORING' AND e.last_activity_at < $4::timestamptz - make_interval(mins => cfg.resolve_min)))
        RETURNING e.id, e.status`,
-      [codes, monitorMin, resolveMin, now, countries],
+      [codes, monitorMin, resolveMin, now, countries, keepActive],
     );
     for (const r of moved.rows) {
       await this.addTimeline(q, r.id, "STATUS_CHANGED", { to: r.status, cause: "INACTIVITY" });
