@@ -25,6 +25,8 @@ import { appendPage, newestFirst } from "../../lib/ui/pages";
 import { evidenceCounts } from "../../lib/events/counts";
 import { secondaryLine } from "../../lib/events/secondary";
 import { categoryLabel } from "../../lib/category-store";
+import { LoadState } from "../../components/load-state";
+import { classifyLoadError, type LoadErrorKind } from "../../lib/errors/load-error";
 
 const categoryName = categoryLabel;
 
@@ -41,7 +43,9 @@ export default function EventScreen() {
   const [mediaNext, setMediaNext] = useState<string | null>(null);
   const [verification, setVerification] = useState<VerificationView | null>(null);
   const [sources, setSources] = useState<EventSourceView[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  // ADR 0212: por qué no cargó (borrado, sin red, otro) y un contador para reintentar.
+  const [error, setError] = useState<LoadErrorKind | null>(null);
+  const [attempt, setAttempt] = useState(0);
   const [savedAt, setSavedAt] = useState<number | null>(null);
   const follows = useFollows();
   const [institutions, setInstitutions] = useState<{ handle: string; name: string; scope: OfficialScopeView | null }[]>([]);
@@ -56,7 +60,7 @@ export default function EventScreen() {
         if (target) { router.replace(`/event/${target}?hops=${Number(hops ?? 0) + 1}`); return; }
         setEvent(e); setTimeline(tl.entries); setTimelineNext(tl.nextCursor ?? null); setSavedAt(savedAt);
       })
-      .catch((e: Error) => setError(e.message));
+      .catch((e: unknown) => setError(classifyLoadError(e)));
     // La media es secundaria: si falla, el evento se muestra igual.
     api.eventMedia(id).then((r) => { setMedia(r.media); setMediaNext(r.nextCursor ?? null); }).catch(() => setMedia([]));
     api.verification(id).then(setVerification).catch(() => setVerification(null));
@@ -67,7 +71,7 @@ export default function EventScreen() {
         .map(async (b) => ({ handle: b.handle, name: b.name, scope: (await api.officialScope(b.handle)).scope }))))
       .then(setInstitutions)
       .catch(() => setInstitutions([]));
-  }, [id, hops]);
+  }, [id, hops, attempt]);
 
   function officialStatement(handle: string, name: string) {
     if (!event) return;
@@ -84,8 +88,8 @@ export default function EventScreen() {
 
   const fetchPage = useCallback((cursor: string | null) => api.eventPosts(id ?? "", cursor), [id]);
 
-  if (error) return <Text style={[styles.container, styles.header, styles.entry]}>{error}</Text>;
-  if (!event) return <View style={styles.container} />;
+  if (error) return <LoadState state={error} onRetry={() => { setError(null); setAttempt((n) => n + 1); }} />;
+  if (!event) return <LoadState state="loading" />;
   const color = VERIFICATION_LABEL[event.publicVerificationState]?.color ?? "#8a94a6";
   const place = followablePlace(event.place);
   const also = secondaryLine(event, categoryName, t("alsoCategories"));

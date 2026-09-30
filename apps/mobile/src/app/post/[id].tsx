@@ -17,6 +17,8 @@ import { applyReaction } from "../../lib/social/reactions";
 import { timeAgo } from "../../lib/ui/format";
 import { colors, radius, space } from "../../theme";
 import { appendPage } from "../../lib/ui/pages";
+import { LoadState } from "../../components/load-state";
+import { classifyLoadError, type LoadErrorKind } from "../../lib/errors/load-error";
 
 /** Una publicación y sus comentarios. Destino de dizaster://post/<id> y https://<dominio>/p/<id> (ADR 0083). */
 export default function PostCommentsScreen() {
@@ -31,12 +33,16 @@ export default function PostCommentsScreen() {
   const [replyTo, setReplyTo] = useState<CommentView | null>(null);
   const me = useMe();
   const [post, setPost] = useState<FeedPost | null>(null);
+  // ADR 0212: el post borrado o inexistente muestra "no disponible"; sin red, reintentar.
+  const [postError, setPostError] = useState<LoadErrorKind | null>(null);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     if (!id) return;
-    api.post(id).then(setPost).catch(() => setPost(null));
+    setPostError(null);
+    api.post(id).then(setPost).catch((e: unknown) => { setPost(null); setPostError(classifyLoadError(e)); });
     api.comments(id).then((r) => { setComments(r.comments); setNext(r.nextCursor ?? null); }).catch(() => setError(t("loadError")));
-  }, [id]);
+  }, [id, attempt]);
 
   // Id del borrador (ADR 0178): se repite en los reintentos y cambia al enviarse bien.
   const draftId = useRef(newId());
@@ -87,6 +93,9 @@ export default function PostCommentsScreen() {
       },
     ]);
   }
+
+  if (postError === "notFound") return <LoadState state="notFound" />;
+  if (postError && !post) return <LoadState state={postError} onRetry={() => setAttempt((n) => n + 1)} />;
 
   return (
     <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === "ios" ? "padding" : undefined} keyboardVerticalOffset={90}>
