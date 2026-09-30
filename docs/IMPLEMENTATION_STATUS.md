@@ -385,48 +385,25 @@ Revisión del Blueprint del 2026-09-29 (tras ADR 0109, mensaje de bajo costo del
 
 Revisión del Blueprint del 2026-09-29 (tras ADR 0112): completada con ADR 0113–0120.
 
-Revisión del Blueprint del 2026-09-29 (tras ADR 0148), verificada contra el código, sin bloqueos:
+Revisión del Blueprint del 2026-09-29 (tras ADR 0148): completada con ADR 0149–0157.
 
+Revisión del Blueprint del 2026-09-30 (tras ADR 0157), verificada contra el código, sin bloqueos:
 
+1. Cola de reportes offline sin pérdidas: no contar fallos sin conexión, conservar fallidos con Reintentar/Descartar (§8.3, C-04)
+2. Reintento de la cola al volver la conexión (con la app abierta) y con espera creciente (§8.3, C-04)
+3. Worker por roles: urgente (ingesta URGENT, outbox, avisos) aislado de lo normal y del mantenimiento (§4.2, §9.2)
+4. Gravedad del evento recalculada desde su evidencia activa (baja si corresponde) y corrección auditada por moderación (§5.7, §10.1)
+5. Pantalla de error global en la app que siempre deja llegar a emergencias (§5.22)
+6. Salud y pausa/reanudación de fuentes desde la app de administración (§5.21, §9.2)
+7. Códec de video verificado en el servidor (H.264), sin transcodificar (§5.9, §12.1)
+8. Versión mínima de la app por plataforma en /v1/config (§6.3)
 
 Bloqueadas o en espera:
 
 - **EN ESPERA** — D1: días de retención de la ubicación precisa en categorías sensibles (§2 C-07).
 - **EN ESPERA** — D3: qué se muestra de la reputación en el perfil público (§5.2 vs §13.3).
-
-- **EN ESPERA (decisión del propietario 2026-09-29)** — Hash del prefijo de red para anti-coordinación: NO se guarda
-  hasta contar con asesoría legal.
-
-- **BLOQUEADA** — Identity real: Sign in with Apple, Google y email; App Attest / Play Integrity. Falta: cuentas de
-  Apple Developer y Google (client IDs, Service ID, Team ID) y un proveedor de email aprobado (gasto).
-- **BLOQUEADA** — Detección automática de rostros que proponga recuadros (ADR 0042): la opción barata es en el
-  teléfono (ML Kit), pero sin `EXPO_TOKEN` no se puede probar un módulo nativo nuevo en una development build.
-- **BLOQUEADA** — Publicar el mapa propio: `infra/maps/publish.sh --apply` cuando haya bucket; después validar en un
-  teléfono la descarga offline con `pmtiles://` (ADR 0041).
-- **En espera de acción humana** — Activar EMSC (ADR 0080): confirmar que sus términos permiten el uso en la app.
-- **En espera de acción humana** — Activar ReliefWeb y OMS DON (ADR 0092): ReliefWeb pide registrar un `appname`
-  y aceptar sus términos; la OMS, confirmar los términos de uso del sitio. Noticias RSS: falta elegir qué medios
-  (decisión de producto y de derechos).
-- **En espera de acción humana** — Fuentes IGP, INDECI y SENAMHI (confirmar formato/URL y términos; si publican CAP,
-  activar es solo configuración, ADR 0033).
-- **Requiere al propietario** — Capa de IA (proveedor y presupuesto), enlaces de donación verificados (D-15), textos
-  legales (términos, privacidad, aviso "no es un servicio de emergencias", edad), detección de CSAM (proveedor y
-  procedimiento legal), Sentry (cuenta gratuita y DSN), procedimiento de solicitudes legales.
-
-## Requiere acción humana
-
-| Qué | Por qué no lo puede hacer el agente | Qué hacer |
-|---|---|---|
-| Repositorio GitHub propio de Dizaster | Las herramientas de esta sesión no permiten crear repositorios | Crear un repositorio vacío (p. ej. `dizaster`) e instalar la app de Claude en él |
-| Cuenta cloud, dominio y object storage | Implican gasto y titularidad legal | Aprobar proveedor y presupuesto (Blueprint D-18, D-21). Para media basta un bucket S3 compatible (recomendado: sin egreso) y sus claves |
-| Cuenta Expo (gratis) y token `EXPO_TOKEN` | Crear cuentas es personal | Ver `docs/MOBILE_PLATFORMS.md`; con eso el agente compila el APK para tu Android |
-| Apple Developer Program (US$99/año) y clave de App Store Connect API | Titularidad, pago y decisión legal (individual u organización) | Ver `docs/MOBILE_PLATFORMS.md` |
-| Firebase (FCM, gratis) y Google Play Console (US$25) | Titularidad y pago | Ver `docs/MOBILE_PLATFORMS.md` |
-| Credenciales push del servidor: clave APNs `.p8` (+ Team ID, Key ID) y cuenta de servicio de Firebase | Salen de las cuentas de Apple y Google del propietario | Entregarlas como secretos del servidor (`APNS_*`, `FCM_SERVICE_ACCOUNT_JSON`) y poner `PUSH_DRIVER=live` |
-| Probar iOS en un iPhone físico antes de publicar | El agente no tiene dispositivos | Un iPhone propio o de un tester de confianza |
-| Verificar números de emergencia de Perú | Debe hacerlo una persona contra la fuente oficial | Confirmar 105, 116, 106, 115, 100 y fuentes |
-| Clave NASA FIRMS | Registro personal | Solicitar MAP_KEY gratuita cuando se active la fuente |
-| Acceso de red a las fuentes (USGS, GDACS) desde el entorno de desarrollo | La política de red de este entorno bloquea esos dominios | Opcional: permitirlos en la configuración de red del entorno para validar los adapters con datos reales |
-| Revisión de portugués y francés por hablantes nativos | Calidad de marca y tono; no bloquea el piloto en Perú | Revisar `apps/mobile/src/lib/locales/pt.ts` y `fr.ts` antes de lanzar en países de esos idiomas |
-| Revisar términos de uso de GDACS | Decisión legal | Confirmar que el uso previsto está permitido; entonces se activa |
-| Revisar la licencia MPL-2.0 de los límites de Perú (juaneladio/peru-geojson, datos INEI) | Decisión legal | Se usan solo en el servidor y se atribuyen; alternativa: límites oficiales de INEI/IGN directamente |
+- **PENDING DECISION** — D2 (parte de ADR 0156): la respuesta "No, es otro" se guarda en `event.dedup_reviews.reporter_answer`; falta decidir si divide el evento, va a la cola de duplicados u otra cosa. Nada se mueve hasta entonces.
+- **PENDING DECISION** — Estado de lanzamiento por país (C-06, D-02): `launchStatus` (PILOT, AVAILABLE, AVAILABLE_READ_ONLY, RESTRICTED) existe en los datos pero no se aplica; falta decidir qué pasa con los reportes ciudadanos fuera de PILOT/AVAILABLE.
+- **PENDING DECISION** — Duración de suspensiones: hoy `SUSPEND_USER` no vence; falta decidir si hay duraciones estándar (24 h / 7 d / permanente).
+- **PENDING DECISION** — D-17 fronteras en disputa: sin implementar; falta criterio del propietario (y revisión legal antes de abrir más países).
+- **BLOQUEADA** — Contacto del cliente de ingesta (§9.3): el User-Agent dice "contacto pendiente"; falta el correo o URL de contacto del propietario.
