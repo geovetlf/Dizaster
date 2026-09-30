@@ -89,7 +89,7 @@ export default function AlertsScreen() {
         renderItem={({ item }) => {
           const s = item.kind === "OFFICIAL_UPDATE" ? { icon: "bullhorn-outline" as const, color: colors.link }
             : item.categoryCode ? categoryStyle(item.categoryCode)
-            : item.kind === "MODERATION" ? { icon: "shield-check-outline" as const, color: colors.link } : { icon: "at" as const, color: colors.accentText };
+            : item.kind === "MODERATION" ? { icon: "shield-check-outline" as const, color: colors.link } : { icon: "at" as const, color: colors.accent };
           const note = deliveryNoteKey(item.delivery);
           return (
             <Pressable accessibilityRole="link" style={[styles.row, !item.readAt && styles.unread]} onPress={() => void openItem(item)}>

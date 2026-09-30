@@ -390,6 +390,7 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | Todos los errores del servidor traducidos (§5.15) | ✅ | ADR 0197: 76 códigos mapeados, 13 mensajes nuevos en 4 idiomas y prueba que falla si aparece un código sin traducción |
 | Lector de pantalla y anuncios (§11.4) | ✅ | ADR 0198: nombres accesibles en todos los campos y controles clave, anuncios de estado al reportar, reducir movimiento, pruebas que lo exigen |
 | Contraste AA del texto rojo (§11.4) | ✅ | ADR 0199: token accentText para todo texto rojo (41 usos) y prueba WCAG de contraste del tema |
+| Mapa accesible (§11.4, §5.6) | ✅ | ADR 0200: lista de los eventos de la vista en texto (gravedad, verificación, lugar) y tocar un grupo acerca el mapa |
 | Licencias, auditoría, SBOM, Dependabot; respaldo con prueba de restauración en CI | ✅ | ADR 0070, `scripts/supply-chain.mjs`, `scripts/db-restore-check.mjs` |
 | Idioma de la app elegible en el perfil (es/en/pt/fr o del teléfono) | ✅ | ADR 0069, `app/language.tsx` |
 | Varias cuentas en un teléfono corroboran como una (clave seudónima del teléfono) | ✅ | ADR 0068, migración 0036 |
@@ -444,9 +445,8 @@ Revisión del Blueprint del 2026-09-30 (tras ADR 0189): completada con ADR 0190�
 BLOQUEADO hasta el primer build de desarrollo).
 
 Revisión del Blueprint del 2026-09-30 (tras ADR 0196), verificada contra el código, sin bloqueos:
-1. Mapa accesible (§11.4, §5.6): lista de eventos visibles y tocar un grupo acerca el mapa.
-2. Tiempos límite en base de datos y HTTP (§5.22, §14): fallar rápido con 503 en picos en vez de encolar sin límite.
-3. Nombres regionales de categorías en los 4 idiomas y prueba de que todo texto localizado de `data/` los tiene.
+1. Tiempos límite en base de datos y HTTP (§5.22, §14): fallar rápido con 503 en picos en vez de encolar sin límite.
+2. Nombres regionales de categorías en los 4 idiomas y prueba de que todo texto localizado de `data/` los tiene.
 
 Bloqueadas o en espera:
 

@@ -36,3 +36,20 @@ const WINDOW_CYCLE: (MapWindow | null)[] = [null, "24h", "6h", "7d"];
 export function nextMapWindow(w: MapWindow | null | undefined): MapWindow | null {
   return WINDOW_CYCLE[(WINDOW_CYCLE.indexOf(w ?? null) + 1) % WINDOW_CYCLE.length]!;
 }
+
+// ───────────── Mapa accesible (ADR 0200) ─────────────
+
+/** Tocar un grupo acerca el mapa sobre él: dos niveles, sin pasar del zoom de calle. */
+export const clusterZoom = (current: number) => Math.min(Math.max(current + 2, 6), 16);
+
+/**
+ * Lo que hay en la vista como lista (lector de pantalla o sin distinguir colores): lo más grave y oficial primero,
+ * y a igualdad, lo más reciente. Mismos eventos que dibuja el mapa.
+ */
+export function mapListOrder<T extends { severity: number; publicVerificationState: PublicVerificationState; lastActivityAt: string }>(events: T[]): T[] {
+  const rank: Record<PublicVerificationState, number> = {
+    OFFICIALLY_CONFIRMED: 0, EXTERNALLY_CORROBORATED: 1, COMMUNITY_CORROBORATED: 2, UNVERIFIED: 3, DISPUTED: 4, FALSE: 5,
+  };
+  return [...events].sort((a, b) => b.severity - a.severity || rank[a.publicVerificationState] - rank[b.publicVerificationState]
+    || b.lastActivityAt.localeCompare(a.lastActivityAt));
+}

@@ -2,10 +2,10 @@ import { Camera, GeoJSONSource, Layer, Map, type CameraRef, type ViewStateChange
 import type { EventMapResponse } from "@dizaster/contracts";
 import { router, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View, type NativeSyntheticEvent } from "react-native";
+import { FlatList, Pressable, ScrollView, StyleSheet, Text, View, type NativeSyntheticEvent } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { categoryStyle, homeChips } from "../../lib/ui/categories";
-import { VERIFICATION_STROKE, mapFilterQuery, nextMapWindow, pointOpacity, type MapFilter } from "../../lib/map/event-style";
+import { VERIFICATION_STROKE, clusterZoom, mapFilterQuery, mapListOrder, nextMapWindow, pointOpacity, type MapFilter } from "../../lib/map/event-style";
 import { parseBboxParam } from "../../lib/ui/format";
 import { useCoarseLocation } from "../../lib/ui/use-coarse-location";
 import { colors } from "../../theme";
@@ -14,9 +14,10 @@ import { OfflineNote } from "../../components/offline-note";
 import { cacheKeys, readThrough } from "../../lib/offline/read-cache";
 import { readCache } from "../../lib/offline/sqlite-cache";
 import { limitAmbientCache } from "../../lib/map/offline";
-import { lang, t } from "../../lib/i18n";
+import { lang, t, verificationLabel } from "../../lib/i18n";
+import { useReduceMotion } from "../../lib/a11y/announce";
 import { APP_MAP_SCHEME, OFFLINE_FALLBACK_STYLE, providerFromAppConfig, type MapProvider } from "../../lib/map/provider";
-import { categoryCatalog, pickerCategories, useCategoryCatalogVersion } from "../../lib/category-store";
+import { categoryCatalog, categoryLabel, pickerCategories, useCategoryCatalogVersion } from "../../lib/category-store";
 import { appConfig } from "../../lib/config/app-config";
 
 
@@ -38,6 +39,10 @@ export default function MapScreen() {
   const { bbox } = useLocalSearchParams<{ bbox?: string }>();
   const target = useMemo(() => parseBboxParam(bbox), [bbox]);
   const camera = useRef<CameraRef>(null);
+  // Mapa accesible (ADR 0200): lista de lo que hay en la vista y grupos que se acercan al tocarlos.
+  const [listMode, setListMode] = useState(false);
+  const reduceMotion = useReduceMotion();
+  const listed = useMemo(() => (data?.mode === "points" ? mapListOrder(data.events) : []), [data]);
   useEffect(() => {
     if (target) camera.current?.fitBounds(target, { padding: { top: 48, right: 24, bottom: 120, left: 24 }, duration: 600 });
   }, [target]);
@@ -82,7 +87,7 @@ export default function MapScreen() {
         : data.clusters.map((c) => ({
             type: "Feature",
             geometry: { type: "Point", coordinates: [c.point.lng, c.point.lat] },
-            properties: { count: c.count, color: colors.accentText, severity: c.maxSeverity, stroke: "#ffffff", strokeWidth: 2, opacity: 1 },
+            properties: { cluster: 1, count: c.count, color: colors.accent, severity: c.maxSeverity, stroke: "#ffffff", strokeWidth: 2, opacity: 1 },
           }));
     return { type: "FeatureCollection", features };
   }, [data]);
@@ -95,6 +100,7 @@ export default function MapScreen() {
         onRegionDidChange={onRegionDidChange}
         attribution
         logo={false}
+        accessibilityLabel={t("mapA11y")}
       >
         <Camera
           ref={camera}
@@ -107,8 +113,13 @@ export default function MapScreen() {
           id="events"
           data={geojson}
           onPress={(e) => {
-            const id = e.nativeEvent.features?.[0]?.properties?.["id"];
-            if (typeof id === "string") router.push(`/event/${id}`);
+            const f = e.nativeEvent.features?.[0];
+            const id = f?.properties?.["id"];
+            if (typeof id === "string") return router.push(`/event/${id}`);
+            if (f?.properties?.["cluster"] && f.geometry.type === "Point") {
+              const [lng, lat] = f.geometry.coordinates as [number, number];
+              camera.current?.easeTo({ center: [lng, lat], zoom: clusterZoom(view.current?.zoom ?? 5), duration: reduceMotion ? 0 : 400 });
+            }
           }}
         >
           <Layer
@@ -148,7 +159,26 @@ export default function MapScreen() {
         {savedAt ? <View style={styles.offline}><OfflineNote savedAt={savedAt} /></View> : null}
       </SafeAreaView>
       {provider ? <Text style={styles.attribution}>{provider.attribution}</Text> : null}
+      {listMode ? (
+        <View style={styles.listPanel}>
+          {data?.mode === "clusters" ? <Text style={styles.listNote}>{t("mapClustersHint")}</Text> : null}
+          <FlatList
+            data={listed}
+            keyExtractor={(e) => e.id}
+            ListEmptyComponent={data?.mode === "clusters" ? null : <Text style={styles.listNote}>{t("mapListEmpty")}</Text>}
+            renderItem={({ item: e }) => (
+              <Pressable accessibilityRole="button" style={styles.listRow} onPress={() => router.push(`/event/${e.id}`)}>
+                <Text style={styles.listTitle}>{e.title?.[lang] ?? e.title?.["es"] ?? categoryLabel(e.categoryCode)}</Text>
+                <Text style={styles.listMeta}>{[e.place?.label, verificationLabel(e.publicVerificationState)].filter(Boolean).join(" · ")}</Text>
+              </Pressable>
+            )}
+          />
+        </View>
+      ) : null}
       <View style={styles.actions}>
+        <Pressable accessibilityRole="button" accessibilityState={{ selected: listMode }} style={[styles.button, styles.listButton]} onPress={() => setListMode(!listMode)}>
+          <Text style={styles.buttonText}>{listMode ? t("mapShowMap") : t("mapShowList")}</Text>
+        </Pressable>
         <Pressable accessibilityRole="button" style={[styles.button, styles.sos]} onPress={() => router.push("/emergency")}>
           <Text style={styles.buttonText}>{t("emergency")}</Text>
         </Pressable>
@@ -170,5 +200,11 @@ const styles = StyleSheet.create({
   actions: { position: "absolute", bottom: 24, left: 16, right: 16, flexDirection: "row", gap: 12 },
   button: { flex: 1, borderRadius: 12, paddingVertical: 16, alignItems: "center" },
   sos: { backgroundColor: colors.accent },
+  listButton: { backgroundColor: colors.surfaceAlt, borderWidth: 1, borderColor: colors.border },
+  listPanel: { position: "absolute", top: 104, bottom: 92, left: 12, right: 12, backgroundColor: colors.bg, borderRadius: 12, borderWidth: 1, borderColor: colors.border, overflow: "hidden" },
+  listNote: { color: colors.textMuted, padding: 12 },
+  listRow: { paddingHorizontal: 12, paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+  listTitle: { color: colors.text, fontSize: 16, fontWeight: "600" },
+  listMeta: { color: colors.textMuted, marginTop: 2 },
   buttonText: { color: "#fff", fontSize: 16, fontWeight: "600" },
 });
