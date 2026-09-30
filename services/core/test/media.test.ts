@@ -426,3 +426,38 @@ describe("difuminado de rostros y matrículas (ADR 0042)", () => {
     expect(out.statusCode).toBe(400);
   });
 });
+
+describe("original privado para moderación (ADR 0168)", () => {
+  it("con motivo, enlace de 60 s, sin metadatos y registrado; un ciudadano no puede", async () => {
+    const u = await createUser(t, "media_original_autor");
+    const file = makeJpeg();
+    const id = await uploadReady(u, file);
+    const m = await createUser(t, "mod_original");
+    await t.c.identity.grantRole(m.userId, "moderator");
+    const mod = { ...m, token: (await t.app.inject({ method: "POST", url: "/v1/auth/dev", payload: { handle: "mod_original", platform: "ANDROID", deviceId: m.deviceId } })).json().token as string };
+
+    const ask = (who: TestUser, reason: string) => t.app.inject({ method: "POST", url: `/v1/moderation/media/${id}/original`, headers: auth(who), payload: { reason } });
+    expect((await ask(u, "quiero verlo")).statusCode).toBe(403);
+    expect((await ask(mod, "x")).statusCode).toBe(400);
+    const grant = await ask(mod, "Denuncia de montaje: revisar zona difuminada");
+    expect(grant.statusCode, grant.body).toBe(200);
+    const { path, mime } = grant.json() as { path: string; mime: string };
+    expect(mime).toBe("image/jpeg");
+
+    const got = await t.app.inject({ url: path });
+    expect(got.statusCode).toBe(200);
+    expect(got.headers["cache-control"]).toContain("no-store");
+    expect(got.rawPayload.includes(Buffer.from("GPSLatitude"))).toBe(false);
+    expect(got.rawPayload.subarray(0, 2).equals(Buffer.from([0xff, 0xd8]))).toBe(true);
+    expect((await t.app.inject({ url: "/v1/moderation/media-originals/" + "a".repeat(32) })).statusCode).toBe(404);
+
+    const log = await t.c.media.originalAccessLog();
+    expect(log[0]).toMatchObject({ mediaId: id, actorUserId: mod.userId, reason: "Denuncia de montaje: revisar zona difuminada" });
+    await expect(t.c.db.query(`UPDATE media.original_access_log SET reason = 'otro'`)).rejects.toThrow(/solo se inserta/);
+    // Vencido: el mismo enlace ya no sirve.
+    await t.c.db.query(`ALTER TABLE media.original_access_log DISABLE TRIGGER original_access_append_only`);
+    await t.c.db.query(`UPDATE media.original_access_log SET expires_at = now() - interval '1 second'`);
+    await t.c.db.query(`ALTER TABLE media.original_access_log ENABLE TRIGGER original_access_append_only`);
+    expect((await t.app.inject({ url: path })).statusCode).toBe(404);
+  });
+});

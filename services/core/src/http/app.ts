@@ -5,7 +5,7 @@ import Fastify, { type FastifyInstance, type FastifyRequest } from "fastify";
 import { z } from "zod";
 import {
   BBox, CreateCommentRequest, DevicePlatform, MEDIA_UPLOAD_LIMITS, MergeEventsRequest, NegativeState, ReactionKind, CommentReactionKind, ConfirmAgeRequest, RegisterPushTokenRequest, RegisterSigningKeyRequest, RevertMergeRequest,
-  SplitEventRequest, SetEventStatusRequest, SetEventSeverityRequest, SetSourceStatusRequest, type AdminSourcesResponse, ChangeRoleRequest, type StaffResponse, AddModeratorNoteRequest, DismissDuplicateRequest, DATA_EXPORT_FORMAT, type AppConfig, type Attribution, type AttributionsResponse, type DataExport, type EmergencyNumbersResponse, type EventSearchResponse,
+  SplitEventRequest, SetEventStatusRequest, SetEventSeverityRequest, SetSourceStatusRequest, type AdminSourcesResponse, ChangeRoleRequest, type StaffResponse, OriginalAccessRequest, AddModeratorNoteRequest, DismissDuplicateRequest, DATA_EXPORT_FORMAT, type AppConfig, type Attribution, type AttributionsResponse, type DataExport, type EmergencyNumbersResponse, type EventSearchResponse,
 } from "@dizaster/contracts";
 import { LocalDiskStorage } from "../modules/media/index.js";
 import type { Container } from "../container.js";
@@ -1055,6 +1055,26 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
     const session = await requireModerator(req);
     reply.header("cache-control", "no-store");
     return c.reports.presenceForReview(parse(IdParam, req.params).id, session.userId, req.body);
+  });
+  // Original privado de una media para moderación (ADR 0168): motivo, tope por hora y registro; enlace de 60 s.
+  app.post("/v1/moderation/media/:id/original", async (req, reply) => {
+    const session = await requirePermission(req, "content.moderate");
+    const b = parse(OriginalAccessRequest, req.body);
+    reply.header("cache-control", "no-store");
+    return c.media.grantOriginalAccess(parse(IdParam, req.params).id, session.userId, b.reason, b.caseId ?? null);
+  });
+  // Sin sesión a propósito: el token secreto de un solo permiso es la credencial (la app lo carga en un <Image>).
+  app.get<{ Params: { token: string } }>("/v1/moderation/media-originals/:token", async (req, reply) => {
+    const token = req.params.token;
+    const file = /^[\w-]{32}$/.test(token) ? await c.media.readOriginal(token) : null;
+    if (!file) throw new DomainError("NOT_FOUND", "Enlace vencido o inexistente", 404);
+    reply.header("cache-control", "no-store, private").header("content-disposition", "inline");
+    return reply.type(file.mime).send(Buffer.from(file.data));
+  });
+  app.get("/v1/admin/media-original-access", async (req, reply) => {
+    await requireAdmin(req);
+    reply.header("cache-control", "no-store");
+    return { entries: await c.media.originalAccessLog() };
   });
   app.get("/v1/admin/presence-access", async (req, reply) => {
     await requireAdmin(req);

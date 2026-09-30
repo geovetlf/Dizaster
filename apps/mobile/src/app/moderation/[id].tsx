@@ -1,8 +1,9 @@
 import type { CaseDetail, ModerationActionType, PresenceReview } from "@dizaster/contracts";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
-import { Alert, Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Alert, Image, Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { api } from "../../lib/api";
+import { API_URL } from "../../lib/config";
 import { lang, t } from "../../lib/i18n";
 import { actionsFor, isSevere, presenceLines, reasonSummary, validReason } from "../../lib/moderation/logic";
 import { timeAgo } from "../../lib/ui/format";
@@ -15,6 +16,7 @@ export default function CaseScreen() {
   const [reason, setReason] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [presence, setPresence] = useState<PresenceReview | null>(null);
+  const [original, setOriginal] = useState<{ mediaId: string; uri: string } | null>(null);
 
   // Al abrir el caso se toma (ADR 0134); si otra persona lo tiene, se ve igual pero sin poder actuar. Al salir se suelta.
   useEffect(() => {
@@ -51,6 +53,20 @@ export default function CaseScreen() {
     }
   }
 
+  /** Original sin difuminar (ADR 0168): mismo motivo escrito, queda en auditoría; el enlace dura 60 s. */
+  async function viewOriginal(mediaId: string, kind: string) {
+    if (!c) return;
+    try {
+      const g = await api.moderationOriginal(mediaId, reason.trim(), c.id);
+      const uri = `${API_URL}${g.path}`;
+      if (kind === "IMAGE") setOriginal({ mediaId, uri });
+      else await Linking.openURL(uri);
+      setError(null);
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }
+
   function confirm(action: ModerationActionType) {
     if (!isSevere(action)) return void apply(action);
     Alert.alert(t(`action_${action}`), t("confirmSevere"), [
@@ -69,9 +85,20 @@ export default function CaseScreen() {
       {c.target.media?.length ? (
         <View style={styles.media}>
           {c.target.media.map((m) => (
-            <Image key={m.id} source={{ uri: m.thumbUrl ?? m.url }} style={styles.thumb} accessibilityIgnoresInvertColors />
+            <View key={m.id} style={{ gap: space.xs }}>
+              <Image source={{ uri: m.thumbUrl ?? m.url }} style={styles.thumb} accessibilityIgnoresInvertColors />
+              <Pressable accessibilityRole="button" accessibilityState={{ disabled: !validReason(reason) }} disabled={!validReason(reason)}
+                onPress={() => void viewOriginal(m.id, m.kind)}>
+                <Text style={[styles.meta, !validReason(reason) && { opacity: 0.4 }]}>{t("viewOriginal")}</Text>
+              </Pressable>
+            </View>
           ))}
         </View>
+      ) : null}
+      {original ? (
+        <Pressable accessibilityRole="button" accessibilityLabel={t("close")} onPress={() => setOriginal(null)}>
+          <Image source={{ uri: original.uri }} style={styles.original} resizeMode="contain" accessibilityIgnoresInvertColors />
+        </Pressable>
       ) : null}
       <Text style={styles.meta}>{reasonSummary(c.reasons, (r) => t(`reason_${r}`))}</Text>
       {c.target.type === "EVENT" ? (
@@ -124,6 +151,7 @@ const styles = StyleSheet.create({
   tools: { alignSelf: "flex-start", marginTop: space.sm },
   media: { flexDirection: "row", flexWrap: "wrap", gap: space.sm, marginVertical: space.sm },
   thumb: { width: 96, height: 96, borderRadius: radius.md, backgroundColor: colors.surfaceAlt },
+  original: { width: "100%", aspectRatio: 1, backgroundColor: colors.surfaceAlt, borderRadius: radius.md },
   actionText: { color: colors.white, fontWeight: "600" },
   error: { color: colors.accent, padding: space.sm },
 });

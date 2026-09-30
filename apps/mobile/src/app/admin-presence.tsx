@@ -1,4 +1,4 @@
-import type { PresenceAccessEntry } from "@dizaster/contracts";
+import type { OriginalAccessEntry, PresenceAccessEntry } from "@dizaster/contracts";
 import { useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 import { FlatList, StyleSheet, Text, View } from "react-native";
@@ -12,7 +12,12 @@ import { colors, radius, space } from "../theme";
 export default function AdminPresenceScreen() {
   const [entries, setEntries] = useState<PresenceAccessEntry[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  useFocusEffect(useCallback(() => { api.presenceAccessLog().then((r) => setEntries(r.entries)).catch((e: Error) => setError(e.message)); }, []));
+  // Originales de media vistos por moderación (ADR 0168): mismo principio, otro registro.
+  const [originals, setOriginals] = useState<OriginalAccessEntry[]>([]);
+  useFocusEffect(useCallback(() => {
+    api.presenceAccessLog().then((r) => setEntries(r.entries)).catch((e: Error) => setError(e.message));
+    api.originalAccessLog().then((r) => setOriginals(r.entries)).catch(() => undefined);
+  }, []));
   return (
     <FlatList
       style={styles.container}
@@ -21,6 +26,18 @@ export default function AdminPresenceScreen() {
       keyExtractor={(e) => e.id}
       ListHeaderComponent={<Text style={styles.meta}>{error ?? t("presenceLogHint")}</Text>}
       ListEmptyComponent={entries ? <Text style={styles.meta}>{t("presenceLogEmpty")}</Text> : null}
+      ListFooterComponent={originals.length ? (
+        <View style={{ gap: space.sm, marginTop: space.lg }}>
+          <Text style={styles.title}>{t("originalLogTitle")}</Text>
+          {originals.map((o) => (
+            <View key={o.id} style={styles.card}>
+              <Text style={styles.title}>{timeAgo(o.accessedAt, lang)}</Text>
+              <Text style={styles.text}>{o.reason}</Text>
+              <Text style={styles.meta}>{t("presenceLogActor")} {shortId(o.actorUserId)} · media {shortId(o.mediaId)}{o.caseId ? ` · ${t("presenceLogCase")} ${shortId(o.caseId)}` : ""}</Text>
+            </View>
+          ))}
+        </View>
+      ) : null}
       renderItem={({ item }) => (
         <View style={styles.card}>
           <Text style={styles.title}>{timeAgo(item.accessedAt, lang)} · {item.preciseShown ? t("presenceLogPrecise") : t("presenceLogGeneral")}</Text>

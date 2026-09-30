@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import {
   CreateUploadRequest,
   MEDIA_UPLOAD_LIMITS,
@@ -8,6 +8,8 @@ import {
   type MediaDelivery,
   type MediaKind,
   type MediaView,
+  type OriginalAccessEntry,
+  type OriginalAccessGrant,
   type RedactionBox,
 } from "@dizaster/contracts";
 import type { Clock } from "../../platform/clock.js";
@@ -49,6 +51,11 @@ export const REUSE_MIN_AGE_HOURS = 1;
 export const VIDEO_DURATION_TOLERANCE_MS = 1_000;
 /** Lado mayor máximo de un video (4K). */
 export const MAX_VIDEO_SIDE_PX = 4096;
+
+/** Originales vistos por moderación: tope por persona y hora, y vida del enlace (ADR 0168). */
+export const ORIGINAL_ACCESS_PER_HOUR = 30;
+export const ORIGINAL_ACCESS_TTL_SECONDS = 60;
+const tokenHash = (token: string) => createHash("sha256").update(token).digest("hex");
 
 const EXT: Record<string, string> = { "image/jpeg": "jpg", "video/mp4": "mp4", "video/quicktime": "mov" };
 
@@ -400,6 +407,55 @@ export class MediaService {
     }
     const kinds = new Map(rows.map((r) => [r.id, r.kind as "IMAGE" | "VIDEO_RECORDED"]));
     return mediaIds.map((id) => ({ id, kind: kinds.get(id)! }));
+  }
+
+  /**
+   * Original privado para moderación (§13.1, ADR 0168): con motivo, límite por hora y registro de solo inserción.
+   * Devuelve una ruta de un solo uso lógico que vale 60 s; el archivo se sirve sin metadatos (nunca el GPS del
+   * teléfono) pero sin el difuminado que la persona aplicó, que es lo que moderación necesita revisar.
+   */
+  async grantOriginalAccess(mediaId: string, actorUserId: string, reason: string, caseId: string | null): Promise<OriginalAccessGrant> {
+    return withTransaction(this.db, async (tx) => {
+      await tx.query(`SELECT pg_advisory_xact_lock(hashtext('media-original:' || $1))`, [actorUserId]);
+      const recent = (await tx.query<{ n: number }>(
+        `SELECT count(*)::int AS n FROM media.original_access_log WHERE actor_user_id = $1 AND accessed_at > now() - interval '1 hour'`, [actorUserId],
+      )).rows[0]!.n;
+      if (recent >= ORIGINAL_ACCESS_PER_HOUR) throw new DomainError("RATE_LIMITED", "Demasiados originales vistos en una hora", 429);
+      const m = (await tx.query<{ mime: string; storage_key_original: string | null }>(
+        `SELECT mime, storage_key_original FROM media.media WHERE id = $1 AND state IN ('READY','REJECTED')`, [mediaId],
+      )).rows[0];
+      if (!m) throw notFound("Media");
+      if (!m.storage_key_original) throw new DomainError("ORIGINAL_GONE", "El original ya se borró por retención", 410);
+      const token = randomBytes(24).toString("base64url");
+      const expiresAt = new Date(this.clock.now().getTime() + ORIGINAL_ACCESS_TTL_SECONDS * 1000);
+      await tx.query(
+        `INSERT INTO media.original_access_log (id, media_id, actor_user_id, reason, case_id, token_hash, expires_at) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [newId(), mediaId, actorUserId, reason, caseId, tokenHash(token), expiresAt],
+      );
+      return { path: `/v1/moderation/media-originals/${token}`, mime: m.mime, expiresAt: expiresAt.toISOString() };
+    });
+  }
+
+  /** Lee el original de un permiso vigente, sin metadatos. `null` si el permiso no existe o venció. */
+  async readOriginal(token: string): Promise<{ data: Uint8Array; mime: string } | null> {
+    const { rows } = await this.db.query<{ mime: string; storage_key_original: string | null }>(
+      `SELECT m.mime, m.storage_key_original FROM media.original_access_log l JOIN media.media m ON m.id = l.media_id
+        WHERE l.token_hash = $1 AND l.expires_at > $2`,
+      [tokenHash(token), this.clock.now()],
+    );
+    const r = rows[0];
+    if (!r?.storage_key_original) return null;
+    const family = familyOfMime(r.mime);
+    if (!family) return null;
+    const original = await this.storage.get(r.storage_key_original);
+    return { data: sanitize(family, original).data, mime: r.mime };
+  }
+
+  async originalAccessLog(limit = 100): Promise<OriginalAccessEntry[]> {
+    const { rows } = await this.db.query<{ id: string; media_id: string; actor_user_id: string; reason: string; case_id: string | null; accessed_at: Date }>(
+      `SELECT id, media_id, actor_user_id, reason, case_id, accessed_at FROM media.original_access_log ORDER BY accessed_at DESC, id DESC LIMIT $1`, [limit],
+    );
+    return rows.map((r) => ({ id: r.id, mediaId: r.media_id, actorUserId: r.actor_user_id, reason: r.reason, caseId: r.case_id, accessedAt: r.accessed_at.toISOString() }));
   }
 
   /** SHA-256 declarados (y verificados al procesar) de la media, para cotejar con la firma de la captura (ADR 0129). */

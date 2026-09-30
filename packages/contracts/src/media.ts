@@ -127,3 +127,13 @@ export interface MediaView {
   /** GRAPHIC: la app la muestra difuminada con aviso hasta que la persona toque para verla (ADR 0035). */
   contentWarning: ContentWarning | null;
 }
+
+/** Ver el original privado (sin difuminar) de una media, para moderación (ADR 0168). Siempre con motivo. */
+export const OriginalAccessRequest = z.object({
+  reason: z.string().trim().min(3).max(1000),
+  caseId: z.uuid().optional(),
+});
+export type OriginalAccessRequest = z.infer<typeof OriginalAccessRequest>;
+/** Ruta relativa a la API, válida unos segundos; el archivo sale sin metadatos pero sin el difuminado. */
+export interface OriginalAccessGrant { path: string; mime: string; expiresAt: string }
+export interface OriginalAccessEntry { id: string; mediaId: string; actorUserId: string; reason: string; caseId: string | null; accessedAt: string }
