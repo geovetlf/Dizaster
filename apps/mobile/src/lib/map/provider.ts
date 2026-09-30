@@ -1,4 +1,5 @@
-import type { AppConfig, MapProviderConfig } from "@dizaster/contracts";
+import { localizedStyleUrl, type AppConfig, type MapProviderConfig } from "@dizaster/contracts";
+import { lang } from "../i18n";
 
 /**
  * El Map Engine de la app depende SOLO de esta interfaz. El proveedor real (tiles OSM propios en PMTiles,
@@ -27,7 +28,8 @@ export const OFFLINE_FALLBACK_STYLE = {
 export function providerFromConfig(map: MapProviderConfig): MapProvider {
   return {
     id: map.id,
-    styleUrl: (scheme) => (scheme === "dark" ? map.styleUrl.dark : map.styleUrl.light),
+    // Etiquetas en el idioma de la app si el estilo lo admite (ADR 0193).
+    styleUrl: (scheme) => localizedStyleUrl(scheme === "dark" ? map.styleUrl.dark : map.styleUrl.light, lang),
     attribution: map.attribution,
     maxZoom: map.maxZoom,
   };

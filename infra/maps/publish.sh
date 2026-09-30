@@ -16,4 +16,4 @@ run() { if [ "$APPLY" = 1 ]; then "$@"; else echo "(simulación) $*"; fi; }
 for f in "$OUT"/*.pmtiles; do run aws s3 cp "$f" "$MAPS_BUCKET/" --endpoint-url "$S3_ENDPOINT" --cache-control "public, max-age=604800"; done
 for f in "$OUT"/style-*.json; do run aws s3 cp "$f" "$MAPS_BUCKET/" --endpoint-url "$S3_ENDPOINT" --content-type application/json --cache-control "public, max-age=300"; done
 [ -d "$OUT/assets" ] && run aws s3 sync "$OUT/assets" "$MAPS_BUCKET/assets" --endpoint-url "$S3_ENDPOINT" --cache-control "public, max-age=604800"
-echo "Listo. Configura MAP_STYLE_URL_LIGHT/DARK con las URLs públicas de style-light.json y style-dark.json."
+echo "Listo. Configura MAP_STYLE_URL_LIGHT/DARK con las URLs públicas de style-light-{lang}.json y style-dark-{lang}.json (la app pone su idioma, ADR 0193)."

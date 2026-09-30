@@ -6,7 +6,7 @@ Pipeline para servir el mapa desde nuestro object storage sin proveedor de pago 
 |---|---|---|
 | 1. Extraer el país del build planetario de Protomaps | `infra/maps/build-region.sh PE` | Listo (requiere el binario `pmtiles`) |
 | 2. Descargar fuentes y sprites | `infra/maps/fetch-assets.sh` | Listo |
-| 3. Generar estilos claro/oscuro | `TILES_URL=… ASSETS_URL=… node infra/maps/make-style.mjs` | Listo y probado |
+| 3. Generar estilos claro/oscuro por idioma (es, en, pt, fr; ADR 0193) | `TILES_URL=… ASSETS_URL=… node infra/maps/make-style.mjs` | Listo y probado |
 | 4. Subir al bucket | `infra/maps/publish.sh` (simula) / `--apply` | **BLOQUEADO**: falta aprobar storage y bucket |
 | 5. Apuntar la app | `MAP_STYLE_URL_LIGHT`, `MAP_STYLE_URL_DARK` en el servidor | Tras el paso 4 |
 

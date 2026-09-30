@@ -7,6 +7,10 @@ import { z } from "zod";
 export const MapProviderConfig = z.object({
   id: z.string(),
   kind: z.enum(["SELF_HOSTED_PMTILES", "VECTOR_STYLE_URL", "NONE"]),
+  /**
+   * URL del estilo por esquema. Puede llevar `{lang}` (ADR 0193): la app lo reemplaza por su idioma para que las
+   * etiquetas del mapa salgan en el idioma de la persona. Sin `{lang}`, un solo idioma para todos.
+   */
   styleUrl: z.object({ light: z.string(), dark: z.string() }),
   attribution: z.string(),
   maxZoom: z.number().int().min(0).max(24),
@@ -87,4 +91,13 @@ export const MEDIA_KILL_SWITCHES = { uploads: "media-upload", video: "video" } a
 export function mediaAvailability(killSwitches: Record<string, boolean> | undefined): { photo: boolean; video: boolean } {
   const uploads = killSwitches?.[MEDIA_KILL_SWITCHES.uploads] !== true;
   return { photo: uploads, video: uploads && killSwitches?.[MEDIA_KILL_SWITCHES.video] !== true };
+}
+
+/** Idiomas con estilo de mapa propio (los de la app). Otro idioma usa el primero. */
+export const MAP_STYLE_LANGUAGES = ["es", "en", "pt", "fr"] as const;
+
+/** Reemplaza `{lang}` en la URL del estilo por el idioma de la app (ADR 0193). NO AI REQUIRED. */
+export function localizedStyleUrl(url: string, lang: string): string {
+  const l = (MAP_STYLE_LANGUAGES as readonly string[]).includes(lang) ? lang : MAP_STYLE_LANGUAGES[0];
+  return url.replaceAll("{lang}", l);
 }
