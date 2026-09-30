@@ -1,0 +1,25 @@
+diff --git a/ios/LocationUtils.swift b/ios/LocationUtils.swift
+index 752762ecd521780fd918a6ebaf68bf7572d55a45..1bf03f14343c9088d77bbe2523e1a1161215f163 100644
+--- a/ios/LocationUtils.swift
++++ b/ios/LocationUtils.swift
+@@ -20,7 +20,7 @@ internal func normalizeAccuracy(_ accuracy: CLLocationDirection) -> Int {
+ }
+ 
+ internal func exportLocation(_ location: CLLocation) -> [String: Any] {
+-  return [
++  var result: [String: Any] = [
+     "coords": [
+       "latitude": location.coordinate.latitude,
+       "longitude": location.coordinate.longitude,
+@@ -32,6 +32,11 @@ internal func exportLocation(_ location: CLLocation) -> [String: Any] {
+     ],
+     "timestamp": location.timestamp.timeIntervalSince1970 * 1000
+   ]
++  // Dizaster (ADR 0195): ubicación simulada por software, como `mocked` en Android. Sin dato en iOS < 15.
++  if #available(iOS 15.0, *), let info = location.sourceInformation {
++    result["mocked"] = info.isSimulatedBySoftware
++  }
++  return result
+ }
+ 
+ internal func handleCLError<ReturnType>(error: NSError, defaultValue: ReturnType) throws -> ReturnType {
