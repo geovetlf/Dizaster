@@ -66,7 +66,10 @@ export interface Container {
 }
 
 export function buildContainer(env: AppEnv, overrides: { db?: Db; clock?: Clock; attestation?: AttestationVerifier; fetcher?: HttpFetcher; storage?: StorageProvider; push?: PushSender; connectors?: ConnectorOverrides; email?: EmailSender; oidcKeys?: { apple?: JWTVerifyGetKey; google?: JWTVerifyGetKey } } = {}): Container {
-  const db = overrides.db ?? createPool(env.DATABASE_URL);
+  const db = overrides.db ?? createPool(env.DATABASE_URL, {
+    max: env.DB_POOL_MAX, connectionTimeoutMs: env.DB_CONNECTION_TIMEOUT_MS, statementTimeoutMs: env.DB_STATEMENT_TIMEOUT_MS,
+    lockTimeoutMs: env.DB_LOCK_TIMEOUT_MS, idleInTransactionTimeoutMs: env.DB_IDLE_IN_TRANSACTION_TIMEOUT_MS, applicationName: "dizaster-core",
+  });
   const clock = overrides.clock ?? systemClock;
   const meter = new Meter(() => clock.now());
   const dataDir = env.DATA_DIR ?? defaultDataDir();

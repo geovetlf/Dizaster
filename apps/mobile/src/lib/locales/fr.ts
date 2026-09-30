@@ -391,6 +391,7 @@ export const fr: Record<MessageKey, string> = {
   errPostNotEditable: "Cette publication ne peut plus être modifiée",
   errCaseClaimed: "Une autre personne examine ce cas",
   errInternal: "Un problème est survenu sur le serveur ; réessayez plus tard",
+  errOverloaded: "Forte affluence en ce moment. Réessayez dans quelques secondes.",
   costRequestsChart: "Requêtes par jour",
   a11yLike: "J'aime",
   a11yOpenMedia: "Ouvrir les photos et vidéos",

@@ -11,7 +11,7 @@ import { LocalDiskStorage } from "../modules/media/index.js";
 import type { Container } from "../container.js";
 import { withWarning } from "../modules/feed/index.js";
 import { TIMEZONE_ATTRIBUTION } from "../modules/geo/index.js";
-import { withTransaction } from "../platform/db.js";
+import { isOverloadError, withTransaction } from "../platform/db.js";
 import { DomainError, forbidden } from "../platform/errors.js";
 import { latencyMetric } from "../platform/metrics.js";
 import { FixedWindowLimiter } from "../platform/rate-limit.js";
@@ -68,6 +68,8 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
   const app = Fastify({
     logger: c.env.NODE_ENV === "test" ? false : { level: "info", redact: ["req.headers.authorization"] },
     bodyLimit: 256 * 1024,
+    // ADR 0201: una petición que no termina en este plazo se corta (el cliente reintenta).
+    requestTimeout: c.env.HTTP_REQUEST_TIMEOUT_MS,
     trustProxy: c.env.TRUST_PROXY,
     // Id de correlación de extremo a extremo (§6.2, ADR 0172): el de la app si es válido; si no, uno nuevo.
     genReqId: (req) => acceptRequestId(req.headers[REQUEST_ID_HEADER]) ?? newId(),
@@ -88,6 +90,14 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
   app.addHook("onRequest", (req, reply, done) => {
     reply.header(REQUEST_ID_HEADER, req.id);
     runWithContext({ correlationId: req.id, actor: null }, done);
+  });
+  // Descarga en picos (ADR 0201): con demasiadas peticiones esperando base de datos se responde 503 al instante con
+  // Retry-After, en vez de encolarlas sin límite. /health queda fuera (lo usan los healthchecks).
+  app.addHook("onRequest", async (req, reply) => {
+    if (c.db.waitingCount <= c.env.API_MAX_DB_WAITING || req.url.startsWith("/health")) return;
+    c.meter.add("http", "shed", 1);
+    reply.header("retry-after", "5");
+    return reply.status(503).send({ error: "OVERLOADED", message: "Mucha demanda en este momento. Reintenta en unos segundos." });
   });
   // Cabeceras de seguridad (§13.1, ADR 0114) en toda respuesta, errores incluidos. La API solo sirve JSON y teselas:
   // nada que ejecutar ni incrustar. HSTS solo tiene efecto detrás de TLS (el proxy de producción).
@@ -151,6 +161,11 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
     }
     const status = (err as { statusCode?: number }).statusCode;
     if (status && status < 500) return reply.status(status).send({ error: "BAD_REQUEST", message: (err as Error).message });
+    if (isOverloadError(err)) {
+      req.log.warn({ err }, "sobrecarga");
+      reply.header("retry-after", "5");
+      return reply.status(503).send({ error: "OVERLOADED", message: "Mucha demanda en este momento. Reintenta en unos segundos.", requestId: req.id });
+    }
     req.log.error(err);
     return reply.status(500).send({ error: "INTERNAL", message: "Error interno", requestId: req.id });
   });

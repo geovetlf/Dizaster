@@ -44,6 +44,15 @@ const Env = z.object({
   MEDIA_DECODER: z.enum(["isolated", "inprocess"]).default("isolated"),
   MEDIA_DECODE_TIMEOUT_MS: z.coerce.number().int().min(1000).max(300_000).default(30_000),
   MEDIA_DECODER_MAX_OLD_SPACE_MB: z.coerce.number().int().min(64).max(4096).default(256),
+  /** Límites de base de datos y HTTP (ADR 0201). */
+  DB_POOL_MAX: z.coerce.number().int().min(1).max(200).default(10),
+  DB_CONNECTION_TIMEOUT_MS: z.coerce.number().int().min(100).max(60_000).default(5_000),
+  DB_STATEMENT_TIMEOUT_MS: z.coerce.number().int().min(1_000).max(3_600_000).default(30_000),
+  DB_LOCK_TIMEOUT_MS: z.coerce.number().int().min(100).max(600_000).default(10_000),
+  DB_IDLE_IN_TRANSACTION_TIMEOUT_MS: z.coerce.number().int().min(1_000).max(3_600_000).default(60_000),
+  /** Peticiones esperando conexión a partir de las cuales la API responde 503 al instante. */
+  API_MAX_DB_WAITING: z.coerce.number().int().min(1).max(10_000).default(50),
+  HTTP_REQUEST_TIMEOUT_MS: z.coerce.number().int().min(1_000).max(600_000).default(30_000),
   /** Latido del worker y /health/ready (ADR 0187). */
   WORKER_INSTANCE_ID: z.string().min(1).max(100).optional(),
   WORKER_HEARTBEAT_STALE_SECONDS: z.coerce.number().int().min(30).max(3600).default(180),

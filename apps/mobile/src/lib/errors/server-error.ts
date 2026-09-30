@@ -84,6 +84,7 @@ export const SERVER_ERROR_KEYS: Readonly<Record<string, MessageKey>> = {
   ORIGINAL_GONE: "errNotFound",
   UNKNOWN_SOURCE: "errNotFound",
   AI_CANNOT_CONFIRM: "errForbidden",
+  OVERLOADED: "errOverloaded",
 };
 
 /** Mensaje que ve la persona para una respuesta de error del servidor. */
