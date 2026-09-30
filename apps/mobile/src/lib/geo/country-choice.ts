@@ -1,11 +1,14 @@
 /**
- * Qué país usar cuando hace falta uno (ADR 0085). NO AI REQUIRED.
- * Orden: ubicación actual (calculada en el teléfono) → país preferido del perfil → región de los ajustes del sistema.
+ * Qué país usar cuando hace falta uno (ADR 0085, 0169). NO AI REQUIRED.
+ * Orden (§11.5): ubicación actual (calculada en el teléfono) → país de la SIM (solo Android; iOS no lo da) → país
+ * preferido del perfil → región de los ajustes del sistema.
  */
-export type CountrySource = "location" | "profile" | "settings";
+export type CountrySource = "location" | "sim" | "profile" | "settings";
 
-export function chooseCountry(located: string | null, preferred: string | null, region: string | null): { country: string | null; source: CountrySource | null } {
+export function chooseCountry(located: string | null, preferred: string | null, region: string | null, sim: string | null = null): { country: string | null; source: CountrySource | null } {
   if (located) return { country: located, source: "location" };
+  const simCode = sim && /^[a-z]{2}$/i.test(sim) ? sim.toUpperCase() : null;
+  if (simCode) return { country: simCode, source: "sim" };
   if (preferred) return { country: preferred, source: "profile" };
   if (region) return { country: region, source: "settings" };
   return { country: null, source: null };

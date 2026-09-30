@@ -16,6 +16,11 @@ describe("chooseCountry", () => {
     expect(chooseCountry(null, "PE", "ES")).toEqual({ country: "PE", source: "profile" });
     expect(chooseCountry(null, null, "ES")).toEqual({ country: "ES", source: "settings" });
     expect(chooseCountry(null, null, null)).toEqual({ country: null, source: null });
+    // SIM (ADR 0169): después de la ubicación y antes del perfil; códigos raros se ignoran.
+    expect(chooseCountry(null, "PE", "ES", "cl")).toEqual({ country: "CL", source: "sim" });
+    expect(chooseCountry("AR", "PE", "ES", "cl")).toEqual({ country: "AR", source: "location" });
+    expect(chooseCountry(null, "PE", "ES", "")).toEqual({ country: "PE", source: "profile" });
+    expect(chooseCountry(null, "PE", "ES", "xyz")).toEqual({ country: "PE", source: "profile" });
   });
 });
 

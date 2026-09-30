@@ -558,6 +558,7 @@ export const pt: Record<MessageKey, string> = {
   seenTooReportHint: "Sua reação não conta para verificar o evento. Se você está lá, envie um reporte.",
   notNow: "Agora não",
   countryFromSettings: "País pelas configurações do telefone (sem localização).",
+  countryFromSim: "País pela sua SIM (sem localização). Se estiver em outro país, ative a localização.",
   countryFromProfile: "País preferido do seu perfil (sem localização).",
   preferredCountry: "País preferido",
   preferredCountryHint: "Privado. Usado só quando não há localização: números de emergência e alertas do país inteiro.",

@@ -1,4 +1,5 @@
 import type { EmergencyDataset } from "@dizaster/contracts";
+import * as Cellular from "expo-cellular";
 import * as Location from "expo-location";
 import { useEffect, useState } from "react";
 import { FlatList, Linking, Pressable, StyleSheet, Text, View } from "react-native";
@@ -23,7 +24,9 @@ async function detectCountry(): Promise<{ country: string | null; source: Countr
   } catch {
     // Sin permiso o sin señal: país preferido o región del teléfono.
   }
-  return chooseCountry(located, preferredCountry(), regionOf(locale));
+  // País de la SIM: sin permisos y sin red; en iOS devuelve null.
+  const sim = await Cellular.getIsoCountryCodeAsync().catch(() => null);
+  return chooseCountry(located, preferredCountry(), regionOf(locale), sim);
 }
 
 /** Números de emergencia, 100 % locales primero (ADR 0035). La usa la pantalla de emergencia y la pantalla de error. */
@@ -50,6 +53,7 @@ export function EmergencyNumbers({ compact = false }: { compact?: boolean }) {
     <View style={compact ? styles.compact : styles.container}>
       <Text style={styles.title}>{t("emergencyTitle")}{lookup.country ? ` · ${lookup.country}` : ""}</Text>
       {source === "settings" ? <Text style={styles.hint}>{t("countryFromSettings")}</Text> : null}
+      {source === "sim" ? <Text style={styles.hint}>{t("countryFromSim")}</Text> : null}
       {source === "profile" ? <Text style={styles.hint}>{t("countryFromProfile")}</Text> : null}
       {lookup.unverified ? <Text style={styles.warning}>{t("unverifiedNumbers")}</Text> : null}
       {lookup.fallbackToGsm112 ? <Text style={styles.warning}>{t("gsmFallback")}</Text> : null}
