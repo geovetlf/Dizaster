@@ -40,6 +40,10 @@ const Env = z.object({
   ALERT_DEFAULT_TTL_HOURS: z.coerce.number().int().min(1).max(720).default(24),
   /** Fallos de la app (ADR 0173). */
   CLIENT_CRASH_RETENTION_DAYS: z.coerce.number().int().min(1).max(365).default(30),
+  /** Decodificación aislada de media subida (ADR 0194). `inprocess` solo para desarrollo. */
+  MEDIA_DECODER: z.enum(["isolated", "inprocess"]).default("isolated"),
+  MEDIA_DECODE_TIMEOUT_MS: z.coerce.number().int().min(1000).max(300_000).default(30_000),
+  MEDIA_DECODER_MAX_OLD_SPACE_MB: z.coerce.number().int().min(64).max(4096).default(256),
   /** Latido del worker y /health/ready (ADR 0187). */
   WORKER_INSTANCE_ID: z.string().min(1).max(100).optional(),
   WORKER_HEARTBEAT_STALE_SECONDS: z.coerce.number().int().min(30).max(3600).default(180),

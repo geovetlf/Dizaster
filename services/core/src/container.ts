@@ -9,6 +9,7 @@ import { createPool, type Db } from "./platform/db.js";
 import { OutboxDispatcher } from "./platform/outbox.js";
 import { ClientCrashService } from "./platform/client-crashes.js";
 import { HeartbeatService } from "./platform/heartbeat.js";
+import { inProcessDecoder, IsolatedDecoder } from "./modules/media/index.js";
 import { buildConnectors, type ConnectorOverrides, type Connectors } from "./platform/connectors/index.js";
 import { defaultDataDir } from "./platform/paths.js";
 import { CostService } from "./modules/cost/index.js";
@@ -95,7 +96,8 @@ export function buildContainer(env: AppEnv, overrides: { db?: Db; clock?: Clock;
     uploadsPerHour: env.MEDIA_UPLOADS_PER_HOUR_LIMIT,
     uploadUrlTtlSeconds: env.MEDIA_UPLOAD_URL_TTL_SECONDS,
     originalRetentionDays: env.MEDIA_ORIGINAL_RETENTION_DAYS,
-  });
+  }, env.MEDIA_DECODER === "inprocess" ? inProcessDecoder
+    : new IsolatedDecoder({ timeoutMs: env.MEDIA_DECODE_TIMEOUT_MS, maxOldSpaceMb: env.MEDIA_DECODER_MAX_OLD_SPACE_MB }));
   if (env.NODE_ENV === "production" && !overrides.attestation) {
     throw new Error("Producción requiere un verificador real de App Attest / Play Integrity");
   }

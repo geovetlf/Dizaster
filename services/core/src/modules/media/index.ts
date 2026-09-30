@@ -17,13 +17,15 @@ import { withTransaction, type Db, type Queryable } from "../../platform/db.js";
 import { DomainError, notFound } from "../../platform/errors.js";
 import { newId } from "../../platform/ids.js";
 import { publish, type OutboxDispatcher } from "../../platform/outbox.js";
-import { NEAR_DUPLICATE_BITS, phashBands, renderImage } from "./images.js";
-import { ACCEPTED_VIDEO_CODECS, familyOfMime, MalformedMediaError, sanitize, sniffFamily, videoInfo } from "./sanitize.js";
+import { inProcessDecoder, type MediaDecoder } from "./decoder.js";
+import { NEAR_DUPLICATE_BITS, phashBands } from "./images.js";
+import { ACCEPTED_VIDEO_CODECS, familyOfMime, MalformedMediaError, sanitize, sniffFamily } from "./sanitize.js";
 import type { StorageProvider } from "./storage/types.js";
 
 export type { StorageProvider } from "./storage/types.js";
 export { LocalDiskStorage } from "./storage/local.js";
 export { S3Storage, type S3Config } from "./storage/s3.js";
+export { inProcessDecoder, IsolatedDecoder, type MediaDecoder } from "./decoder.js";
 
 /** Punto de extensión para directo: un proveedor de streaming (SFU propio o gestionado). Sin implementación en V1. */
 export interface LiveStreamProvider {
@@ -80,6 +82,8 @@ export class MediaService {
     private readonly storage: StorageProvider,
     private readonly clock: Clock,
     private readonly limits: MediaLimits,
+    /** Decodificación aislada de lo subido (ADR 0194). */
+    private readonly decoder: MediaDecoder = inProcessDecoder,
   ) {}
 
   registerHandlers(dispatcher: OutboxDispatcher): void {
@@ -207,7 +211,7 @@ export class MediaService {
 
     let result;
     try {
-      result = sanitize(declared, original);
+      result = await this.decoder.sanitize(declared, original);
     } catch (err) {
       if (err instanceof MalformedMediaError) return this.reject(tx, mediaId, `Archivo dañado: ${err.message}`);
       throw err;
@@ -226,7 +230,7 @@ export class MediaService {
       // hash perceptual. Lo que no se puede decodificar se rechaza.
       let img;
       try {
-        img = await renderImage(original, row.redactions);
+        img = await this.decoder.renderImage(original, row.redactions);
       } catch (err) {
         if (err instanceof MalformedMediaError) return this.reject(tx, mediaId, err.message);
         throw err;
@@ -243,7 +247,7 @@ export class MediaService {
       // Duración y tamaño salen del archivo, no de lo declarado (ADR 0071).
       let info;
       try {
-        info = videoInfo(original);
+        info = await this.decoder.videoInfo(original);
       } catch (err) {
         if (err instanceof MalformedMediaError) return this.reject(tx, mediaId, `Video ilegible: ${err.message}`);
         throw err;
@@ -303,7 +307,7 @@ export class MediaService {
   private async renderPoster(data: Uint8Array, sha256: string) {
     if (createHash("sha256").update(data).digest("hex") !== sha256 || sniffFamily(data.subarray(0, 16)) !== "image/jpeg") return null;
     try {
-      return await renderImage(data);
+      return await this.decoder.renderImage(data);
     } catch (err) {
       if (err instanceof MalformedMediaError) return null;
       throw err;
