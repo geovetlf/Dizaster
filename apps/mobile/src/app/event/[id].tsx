@@ -1,4 +1,4 @@
-import type { EventDetail, EventSourceView, OfficialScopeView, MediaView, TimelineEntryView, VerificationView } from "@dizaster/contracts";
+import type { DonationLink, EventDetail, EventSourceView, OfficialScopeView, MediaView, TimelineEntryView, VerificationView } from "@dizaster/contracts";
 import { router, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import { Alert, Linking, Pressable, Share, StyleSheet, Text, View } from "react-native";
@@ -44,6 +44,7 @@ export default function EventScreen() {
   const [mediaNext, setMediaNext] = useState<string | null>(null);
   const [verification, setVerification] = useState<VerificationView | null>(null);
   const [sources, setSources] = useState<EventSourceView[]>([]);
+  const [donations, setDonations] = useState<DonationLink[]>([]);
   // ADR 0212: por qué no cargó (borrado, sin red, otro) y un contador para reintentar.
   const [error, setError] = useState<LoadErrorKind | null>(null);
   const [attempt, setAttempt] = useState(0);
@@ -66,6 +67,8 @@ export default function EventScreen() {
     api.eventMedia(id).then((r) => { setMedia(r.media); setMediaNext(r.nextCursor ?? null); }).catch(() => setMedia([]));
     api.verification(id).then(setVerification).catch(() => setVerification(null));
     api.eventSources(id).then((r) => setSources(r.sources)).catch(() => setSources([]));
+    // Cómo ayudar (D-15, ADR 0274): sección opcional; si falla o no hay organizaciones, no se muestra.
+    api.eventDonations(id).then((r) => setDonations(r.organizations)).catch(() => setDonations([]));
     // Perfiles institucionales oficiales que administro (ADR 0095): pueden confirmar o desmentir en su ámbito.
     api.myBusinesses()
       .then((r) => Promise.all(r.businesses.filter((b) => b.verification === "INSTITUTIONAL_OFFICIAL")
@@ -155,6 +158,17 @@ export default function EventScreen() {
               <Text style={styles.sourceMeta}>{[s.publishedAt ? timeAgo(s.publishedAt, lang) : null, s.license].filter(Boolean).join(" · ")}</Text>
             </Pressable>
           ))}
+        </View>
+      ) : null}
+      {donations.length > 0 ? (
+        <View style={styles.why}>
+          <Text style={styles.section}>{t("howToHelp")}</Text>
+          {donations.map((d) => (
+            <Pressable key={d.id} accessibilityRole="link" style={styles.source} onPress={() => void Linking.openURL(d.url)}>
+              <Text style={[styles.sourceName, styles.link]}>{d.name}</Text>
+            </Pressable>
+          ))}
+          <Text style={styles.sourceMeta}>{t("howToHelpNote")}</Text>
         </View>
       ) : null}
       {event.affectedArea ? <EventAreaMap area={event.affectedArea} point={event.point} color={categoryStyle(event.categoryCode).color} /> : null}

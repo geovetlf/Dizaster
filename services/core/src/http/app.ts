@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { AdminReason, APP_PLATFORM_HEADER, APP_VERSION_HEADER, ConfigChangesQuery, ModerationActionsQuery, type ModerationActionsResponse, OriginalAccessQuery, isBelowMinVersion, type ConfigChangesResponse, MAP_WINDOW_HOURS, MEDIA_KILL_SWITCHES, MapWindow, MfaCodeRequest, MfaVerifyRequest, can, isStaff, type MfaStatus, type Permission } from "@dizaster/contracts";
+import { AdminReason, donationLinksFor, type EventDonationsResponse, APP_PLATFORM_HEADER, APP_VERSION_HEADER, ConfigChangesQuery, ModerationActionsQuery, type ModerationActionsResponse, OriginalAccessQuery, isBelowMinVersion, type ConfigChangesResponse, MAP_WINDOW_HOURS, MEDIA_KILL_SWITCHES, MapWindow, MfaCodeRequest, MfaVerifyRequest, can, isStaff, type MfaStatus, type Permission } from "@dizaster/contracts";
 import { isValidTile, tileBounds } from "@dizaster/geo-kit";
 import Fastify, { type FastifyInstance, type FastifyRequest } from "fastify";
 import { z } from "zod";
@@ -499,6 +499,12 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
     const refs = await c.events.sourceItemRefs(c.db, parse(IdParam, req.params).id);
     reply.header("cache-control", "public, max-age=60");
     return { sources: await c.ingestion.sourcesView(c.db, refs) };
+  });
+  // Cómo ayudar (D-15, ADR 0274): enlaces externos a organizaciones verificadas del país y la categoría del evento.
+  app.get("/v1/events/:id/donations", async (req, reply): Promise<EventDonationsResponse> => {
+    const e = await c.events.getEvent(c.db, parse(IdParam, req.params).id);
+    reply.header("cache-control", "public, max-age=300");
+    return { organizations: donationLinksFor(c.ref.donations, e) };
   });
   app.get("/v1/events/:id/verification", async (req) => {
     const { id } = parse(IdParam, req.params);

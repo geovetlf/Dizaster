@@ -3,6 +3,7 @@ import { join } from "node:path";
 import {
   CategoryCatalog,
   DEFAULT_MIN_AGE,
+  DonationDirectory,
   effectiveCategory,
   EmergencyDataset,
   ModerationTermList,
@@ -44,6 +45,8 @@ export class ReferenceData {
   readonly moderationTerms: ModerationTermList;
   /** Términos y políticas con versión (ADR 0176). Sin versión aún: textos bloqueados a la espera de asesoría legal. */
   readonly legal: LegalDocumentsFile;
+  /** Organizaciones verificadas para donar (D-15, ADR 0274). Vacío hasta que el propietario las cargue. */
+  readonly donations: DonationDirectory;
 
   constructor(readonly dataDir: string) {
     const read = (p: string) => JSON.parse(readFileSync(join(dataDir, p), "utf8")) as unknown;
@@ -57,6 +60,7 @@ export class ReferenceData {
     this.sources = (read("source-registry/sources.json") as { sources: Array<Record<string, unknown>> }).sources;
     this.moderationTerms = ModerationTermList.parse(read("moderation/terms.json"));
     this.legal = LegalDocumentsFile.parse(read("legal/documents.json"));
+    this.donations = DonationDirectory.parse(read("donations/organizations.json"));
     this.validate();
   }
 
@@ -70,6 +74,9 @@ export class ReferenceData {
       if ((o.overrides.publishDelayMinutes ?? 0) > 0 && this.byCode.get(o.category)?.sensitivity !== "HIGHLY_SENSITIVE") {
         throw new Error(`Override ${o.category}/${o.country}: el retraso de publicación es solo para HIGHLY_SENSITIVE`);
       }
+    }
+    for (const o of this.donations.organizations) {
+      for (const c of o.categories) if (!this.byCode.has(c)) throw new Error(`Donaciones ${o.id}: categoría ${c} inexistente`);
     }
     validateSourceCategoryMaps(this.sources, (code) => this.byCode.has(code) && this.isLeaf(code));
   }

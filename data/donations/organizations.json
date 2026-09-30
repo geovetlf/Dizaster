@@ -1,0 +1,5 @@
+{
+  "version": "2026-09-30",
+  "_comment": "Directorio de organizaciones verificadas para donar (D-15, ADR 0274). Vacío hasta que el propietario verifique y cargue cada organización: id, name, countries, categories, url https y verification {by, at, evidence}. Dizaster no maneja dinero.",
+  "organizations": []
+}

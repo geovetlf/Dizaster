@@ -599,6 +599,8 @@ export const fr: Record<MessageKey, string> = {
   rejected_INVALID_CATEGORY: "Cette catégorie n'existe pas. Choisissez-en une autre.",
   rejected_OFFICIAL_ONLY: "Seules les sources officielles publient cette catégorie. Vous pouvez la publier comme post.",
   sourcesSection: "Sources",
+  howToHelp: "Comment aider",
+  howToHelpNote: "Organisations vérifiées. Le lien s'ouvre hors de l'application ; Dizaster ne reçoit ni ne gère d'argent.",
   sourceRetracted: "La source l'a retiré ou démenti",
   lifecycleSection: "État de l'événement",
   st_ACTIVE: "Actif",
