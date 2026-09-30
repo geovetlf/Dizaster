@@ -514,8 +514,18 @@ Revisión del Blueprint del 2026-09-30 (tras ADR 0228): completada con ADR 0229�
 
 Revisión del Blueprint del 2026-09-30 (tras ADR 0240): completada con ADR 0241–0250 (alertas vencidas, ingesta robusta, worker aislado y transaccional, cola offline, retención, fusión, mapa offline).
 
-Revisión del Blueprint del 2026-09-30 (tras ADR 0250), verificada contra el código, sin bloqueos:
+Revisión del Blueprint del 2026-09-30 (tras ADR 0250): completada con ADR 0251–0256 (disputas de moderación estables, bloqueo en reacciones a comentarios, enlaces de posts en iOS, borrado de negocio, Cerca por evento, exportación completa). La propuesta de quitar el aviso de mención en posts seudónimos se descartó: ADR 0063 sigue vigente.
 
+Revisión del Blueprint del 2026-09-30 (tras ADR 0256), verificada contra el código, sin bloqueos:
+
+1. La línea de tiempo pública no expone ids de media (§13.3, §5.9).
+2. El retraso de publicación también en menciones, comentarios, reacciones y compartidos (§8.5).
+3. Moderación de bio y nombre de perfil (§13.3).
+4. Comentarios y bloqueos en transacción, sin carrera en el cupo (§4.2).
+5. Purgar sesiones rotadas y caducadas (§13.2, §7.4).
+6. La app muestra los fallos al bloquear, desbloquear, borrar o buscar (§13.3).
+7. En iOS el teclado no tapa los campos de texto (RF-01).
+8. Índices para cupos y borrado por autor en comentarios y reacciones (§7.4).
 
 Bloqueadas o en espera:
 
