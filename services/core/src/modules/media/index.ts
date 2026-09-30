@@ -459,11 +459,19 @@ export class MediaService {
     return { data: sanitize(family, original).data, mime: r.mime };
   }
 
-  async originalAccessLog(limit = 100): Promise<OriginalAccessEntry[]> {
+  /** Accesos a originales, más recientes primero, con filtros y cursor (id UUIDv7 de la última entrada; ADR 0239). */
+  async originalAccessLog(f: { mediaId?: string; actorUserId?: string; cursor?: string; limit: number }): Promise<{ entries: OriginalAccessEntry[]; nextCursor: string | null }> {
     const { rows } = await this.db.query<{ id: string; media_id: string; actor_user_id: string; reason: string; case_id: string | null; accessed_at: Date }>(
-      `SELECT id, media_id, actor_user_id, reason, case_id, accessed_at FROM media.original_access_log ORDER BY accessed_at DESC, id DESC LIMIT $1`, [limit],
+      `SELECT id, media_id, actor_user_id, reason, case_id, accessed_at FROM media.original_access_log
+        WHERE ($1::uuid IS NULL OR media_id = $1) AND ($2::uuid IS NULL OR actor_user_id = $2) AND ($3::uuid IS NULL OR id < $3)
+        ORDER BY id DESC LIMIT $4`,
+      [f.mediaId ?? null, f.actorUserId ?? null, f.cursor ?? null, f.limit + 1],
     );
-    return rows.map((r) => ({ id: r.id, mediaId: r.media_id, actorUserId: r.actor_user_id, reason: r.reason, caseId: r.case_id, accessedAt: r.accessed_at.toISOString() }));
+    const page = rows.slice(0, f.limit);
+    return {
+      entries: page.map((r) => ({ id: r.id, mediaId: r.media_id, actorUserId: r.actor_user_id, reason: r.reason, caseId: r.case_id, accessedAt: r.accessed_at.toISOString() })),
+      nextCursor: rows.length > f.limit ? page[page.length - 1]!.id : null,
+    };
   }
 
   /** SHA-256 declarados (y verificados al procesar) de la media, para cotejar con la firma de la captura (ADR 0129). */

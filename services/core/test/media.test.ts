@@ -487,7 +487,7 @@ describe("original privado para moderación (ADR 0168)", () => {
     expect(got.rawPayload.subarray(0, 2).equals(Buffer.from([0xff, 0xd8]))).toBe(true);
     expect((await t.app.inject({ url: "/v1/moderation/media-originals/" + "a".repeat(32) })).statusCode).toBe(404);
 
-    const log = await t.c.media.originalAccessLog();
+    const log = (await t.c.media.originalAccessLog({ mediaId: id, limit: 10 })).entries;
     expect(log[0]).toMatchObject({ mediaId: id, actorUserId: mod.userId, reason: "Denuncia de montaje: revisar zona difuminada" });
     await expect(t.c.db.query(`UPDATE media.original_access_log SET reason = 'otro'`)).rejects.toThrow(/solo se inserta/);
     // Vencido: el mismo enlace ya no sirve.

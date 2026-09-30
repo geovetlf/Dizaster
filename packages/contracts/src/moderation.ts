@@ -198,3 +198,14 @@ export interface TransparencyReport {
 }
 export const TRANSPARENCY_MIN_COUNT = 5;
 export const transparencyCount = (n: number): TransparencyCount => (n > 0 && n < TRANSPARENCY_MIN_COUNT ? "<5" : n);
+
+/** Registro de acciones de moderación para administración (§5.21, §13.1, ADR 0239). Más recientes primero. */
+export const ModerationActionsQuery = z.object({
+  /** Handle de quien moderó; sin él, todas (automáticas incluidas). */
+  moderator: z.string().trim().min(1).max(40).optional(),
+  cursor: z.uuid().optional(),
+  limit: z.coerce.number().int().min(1).max(200).default(50),
+});
+export type ModerationActionsQuery = z.infer<typeof ModerationActionsQuery>;
+export interface ModerationActionLogEntry extends ModerationActionView { moderatorHandle: string | null }
+export interface ModerationActionsResponse { actions: ModerationActionLogEntry[]; nextCursor: string | null }

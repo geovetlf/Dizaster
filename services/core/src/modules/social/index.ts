@@ -797,6 +797,20 @@ export class SocialService {
     return new Map(rows.map((r) => [r.id, r.user_id]));
   }
 
+  /** Cuenta de un handle (para filtros de administración). 404 si no existe. */
+  async userIdByHandle(q: Queryable, handle: string): Promise<string> {
+    const { rows } = await q.query<{ user_id: string }>(`SELECT user_id FROM social.profiles WHERE lower(handle) = lower($1)`, [handle.replace(/^@/, "")]);
+    if (!rows[0]) throw notFound("Perfil");
+    return rows[0].user_id;
+  }
+
+  /** Handles de varias cuentas en una consulta (listas de administración). */
+  async handlesForUsers(q: Queryable, userIds: string[]): Promise<Map<string, string>> {
+    if (userIds.length === 0) return new Map();
+    const { rows } = await q.query<{ user_id: string; handle: string }>(`SELECT user_id, handle FROM social.profiles WHERE user_id = ANY($1)`, [[...new Set(userIds)]]);
+    return new Map(rows.map((r) => [r.user_id, r.handle]));
+  }
+
   async handleById(q: Queryable, profileId: string): Promise<string> {
     const { rows } = await q.query<{ handle: string }>(`SELECT handle FROM social.profiles WHERE id = $1`, [profileId]);
     if (!rows[0]) throw notFound("Perfil");

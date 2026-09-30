@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { AdminReason, APP_PLATFORM_HEADER, APP_VERSION_HEADER, ConfigChangesQuery, isBelowMinVersion, type ConfigChangesResponse, MAP_WINDOW_HOURS, MEDIA_KILL_SWITCHES, MapWindow, MfaCodeRequest, MfaVerifyRequest, can, isStaff, type MfaStatus, type Permission } from "@dizaster/contracts";
+import { AdminReason, APP_PLATFORM_HEADER, APP_VERSION_HEADER, ConfigChangesQuery, ModerationActionsQuery, type ModerationActionsResponse, OriginalAccessQuery, isBelowMinVersion, type ConfigChangesResponse, MAP_WINDOW_HOURS, MEDIA_KILL_SWITCHES, MapWindow, MfaCodeRequest, MfaVerifyRequest, can, isStaff, type MfaStatus, type Permission } from "@dizaster/contracts";
 import { isValidTile, tileBounds } from "@dizaster/geo-kit";
 import Fastify, { type FastifyInstance, type FastifyRequest } from "fastify";
 import { z } from "zod";
@@ -1102,11 +1102,7 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
     await requireAdmin(req);
     reply.header("cache-control", "no-store");
     const { members, changes } = await c.identity.staff();
-    const handles = new Map<string, string>();
-    for (const id of new Set([...members.map((m) => m.userId), ...changes.map((x) => x.userId)])) {
-      const p = await c.social.profileForUser(c.db, id).catch(() => null);
-      if (p) handles.set(id, p.handle);
-    }
+    const handles = await c.social.handlesForUsers(c.db, [...members.map((m) => m.userId), ...changes.map((x) => x.userId)]);
     return {
       staff: members.filter((m) => handles.has(m.userId)).map((m) => ({ handle: handles.get(m.userId)!, roles: m.roles })),
       changes: changes.map((x) => ({ handle: handles.get(x.userId) ?? null, role: x.role, action: x.action, reason: x.reason, at: x.at.toISOString() })),
@@ -1148,10 +1144,7 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
     reply.header("cache-control", "no-store");
     const q = parse(ConfigChangesQuery, req.query);
     const { rows, nextCursor } = await listConfigChanges(c.db, q);
-    const handles = new Map<string, string | null>();
-    for (const id of new Set(rows.map((r) => r.actorUserId))) {
-      handles.set(id, (await c.social.profileForUser(c.db, id).catch(() => null))?.handle ?? null);
-    }
+    const handles = await c.social.handlesForUsers(c.db, rows.map((r) => r.actorUserId));
     return {
       changes: rows.map((r) => ({ id: r.id, at: r.at.toISOString(), actorHandle: handles.get(r.actorUserId) ?? null, kind: r.kind, target: r.target, previous: r.previous, next: r.next, reason: r.reason })),
       nextCursor,
@@ -1276,7 +1269,20 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
   app.get("/v1/admin/media-original-access", async (req, reply) => {
     await requireAdmin(req);
     reply.header("cache-control", "no-store");
-    return { entries: await c.media.originalAccessLog() };
+    return c.media.originalAccessLog(parse(OriginalAccessQuery, req.query));
+  });
+  // Quién moderó qué (§5.21, §13.1, ADR 0239): solo administración, solo lectura.
+  app.get("/v1/admin/moderation-actions", async (req, reply): Promise<ModerationActionsResponse> => {
+    await requireAdmin(req);
+    reply.header("cache-control", "no-store");
+    const q = parse(ModerationActionsQuery, req.query);
+    const moderatorUserId = q.moderator ? await c.social.userIdByHandle(c.db, q.moderator) : undefined;
+    const log = await c.moderation.actionLog(c.db, { moderatorUserId, cursor: q.cursor, limit: q.limit });
+    const handles = await c.social.handlesForUsers(c.db, log.actions.flatMap((a) => (a.moderatorUserId ? [a.moderatorUserId] : [])));
+    return {
+      actions: log.actions.map(({ moderatorUserId: m, ...a }) => ({ ...a, moderatorHandle: m ? handles.get(m) ?? null : null })),
+      nextCursor: log.nextCursor,
+    };
   });
   app.get("/v1/admin/presence-access", async (req, reply) => {
     await requireAdmin(req);

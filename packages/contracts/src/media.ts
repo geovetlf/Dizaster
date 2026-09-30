@@ -136,4 +136,12 @@ export const OriginalAccessRequest = z.object({
 export type OriginalAccessRequest = z.infer<typeof OriginalAccessRequest>;
 /** Ruta relativa a la API, válida unos segundos; el archivo sale sin metadatos pero sin el difuminado. */
 export interface OriginalAccessGrant { path: string; mime: string; expiresAt: string }
+/** Filtros del registro de accesos a originales (ADR 0239). */
+export const OriginalAccessQuery = z.object({
+  mediaId: z.uuid().optional(),
+  actorUserId: z.uuid().optional(),
+  cursor: z.uuid().optional(),
+  limit: z.coerce.number().int().min(1).max(200).default(100),
+});
+export type OriginalAccessQuery = z.infer<typeof OriginalAccessQuery>;
 export interface OriginalAccessEntry { id: string; mediaId: string; actorUserId: string; reason: string; caseId: string | null; accessedAt: string }

@@ -559,6 +559,22 @@ export class ModerationService {
     return (await this.appealRows(`ap.id = $1`, [appealId]))[0]!;
   }
 
+  /** Registro de acciones para administración (ADR 0239): quién moderó qué, más recientes primero, con cursor. */
+  async actionLog(q: Queryable, f: { moderatorUserId?: string; cursor?: string; limit: number }): Promise<{ actions: Array<ModerationActionView & { moderatorUserId: string | null }>; nextCursor: string | null }> {
+    const { rows } = await q.query<ActionRow & { moderator_user_id: string | null }>(
+      `SELECT a.id, a.action, a.reason, a.actor, a.target_type, a.target_id, a.created_at, a.moderator_user_id
+         FROM moderation.actions a
+        WHERE ($1::uuid IS NULL OR a.moderator_user_id = $1) AND ($2::uuid IS NULL OR a.id < $2)
+        ORDER BY a.id DESC LIMIT $3`,
+      [f.moderatorUserId ?? null, f.cursor ?? null, f.limit + 1],
+    );
+    const page = rows.slice(0, f.limit);
+    return {
+      actions: page.map((r) => ({ ...actionView(r), moderatorUserId: r.moderator_user_id })),
+      nextCursor: rows.length > f.limit ? page[page.length - 1]!.id : null,
+    };
+  }
+
   // ───────────── Auxiliares ─────────────
 
   private async resolveTarget(q: Queryable, type: FlagTargetType, raw: string): Promise<string> {
