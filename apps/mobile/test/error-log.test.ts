@@ -22,4 +22,11 @@ describe("registro local de errores (ADR 0161)", () => {
     expect(e.message.length).toBeLessThanOrEqual(300);
     expect(e.where).toBe("global");
   });
+
+  it("conserva el id de la petición fallida si es seguro (ADR 0172)", () => {
+    const ok = Object.assign(new Error("500"), { requestId: "0192aa00-1111-7000-8000-000000000001" });
+    expect(toEntry(ok, null, new Date(0)).requestId).toBe("0192aa00-1111-7000-8000-000000000001");
+    const bad = Object.assign(new Error("500"), { requestId: "<script>" });
+    expect(toEntry(bad, null, new Date(0)).requestId).toBeUndefined();
+  });
 });

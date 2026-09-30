@@ -15,6 +15,8 @@ import { withTransaction } from "../platform/db.js";
 import { DomainError, forbidden } from "../platform/errors.js";
 import { latencyMetric } from "../platform/metrics.js";
 import { FixedWindowLimiter } from "../platform/rate-limit.js";
+import { acceptRequestId, currentContext, REQUEST_ID_HEADER, runWithContext } from "../platform/request-context.js";
+import { newId } from "../platform/ids.js";
 import { buildOpenApi } from "./openapi.js";
 import type { Session } from "../modules/identity/index.js";
 
@@ -67,6 +69,8 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
     logger: c.env.NODE_ENV === "test" ? false : { level: "info", redact: ["req.headers.authorization"] },
     bodyLimit: 256 * 1024,
     trustProxy: c.env.TRUST_PROXY,
+    // Id de correlación de extremo a extremo (§6.2, ADR 0172): el de la app si es válido; si no, uno nuevo.
+    genReqId: (req) => acceptRequestId(req.headers[REQUEST_ID_HEADER]) ?? newId(),
   });
 
   // Límite general (ADR 0047): por cuenta con sesión, por IP sin ella. Las escrituras tienen un cupo menor.
@@ -80,6 +84,11 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
   });
 
   app.decorateRequest("session", null);
+  // Todo lo que ocurra en la petición (eventos de dominio incluidos) lleva su id; la respuesta lo devuelve.
+  app.addHook("onRequest", (req, reply, done) => {
+    reply.header(REQUEST_ID_HEADER, req.id);
+    runWithContext({ correlationId: req.id, actor: null }, done);
+  });
   // Cabeceras de seguridad (§13.1, ADR 0114) en toda respuesta, errores incluidos. La API solo sirve JSON y teselas:
   // nada que ejecutar ni incrustar. HSTS solo tiene efecto detrás de TLS (el proxy de producción).
   app.addHook("onRequest", async (_req, reply) => {
@@ -88,6 +97,8 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
   app.addHook("onRequest", async (req) => {
     const h = req.headers.authorization;
     if (h?.startsWith("Bearer ")) req.session = await c.identity.verifyToken(h.slice(7));
+    const ctx = currentContext();
+    if (ctx && req.session) ctx.actor = `user:${req.session.userId}`;
     if (req.url.startsWith("/v1/")) {
       const key = req.session ? `u:${req.session.userId}` : `ip:${req.ip}`;
       const write = req.method !== "GET" && req.method !== "HEAD";
@@ -138,7 +149,7 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
     const status = (err as { statusCode?: number }).statusCode;
     if (status && status < 500) return reply.status(status).send({ error: "BAD_REQUEST", message: (err as Error).message });
     req.log.error(err);
-    return reply.status(500).send({ error: "INTERNAL", message: "Error interno" });
+    return reply.status(500).send({ error: "INTERNAL", message: "Error interno", requestId: req.id });
   });
 
   app.get("/health", async () => {

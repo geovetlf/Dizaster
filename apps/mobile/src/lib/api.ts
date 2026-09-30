@@ -3,6 +3,7 @@ import { mergeMapTiles, tilesForView } from "@dizaster/geo-kit";
 import { canRetryWithRefresh, singleFlight } from "./auth/refresh";
 import { appVersionHeaders } from "./app-identity";
 import { API_URL } from "./config";
+import { newId } from "./ids";
 import { EtagCache } from "./http/etag-cache";
 import { isMfaError } from "./auth/mfa";
 import { serverErrorMessage } from "./errors/server-error";
@@ -57,10 +58,12 @@ const etags = new EtagCache();
 async function request<T>(path: string, init: RequestInit = {}, retried = false): Promise<T> {
   const auth: Record<string, string> = token && !NO_AUTH_PREFIXES.some((p) => path.startsWith(p)) ? { authorization: `Bearer ${token}` } : {};
   const isGet = (init.method ?? "GET") === "GET";
+  // Id de correlación (ADR 0172): el servidor lo propaga a sus eventos y lo devuelve; queda en el error si falla.
+  const requestId = newId();
   const res = await fetch(`${API_URL}${path}`, {
     ...init,
     // Sin cuerpo no se declara JSON: el servidor rechaza un cuerpo JSON vacío (p. ej. DELETE o POST .../complete).
-    headers: { ...(init.body ? { "content-type": "application/json" } : {}), ...appVersionHeaders, ...auth, ...(isGet ? etags.headers(path) : {}), ...(init.headers ?? {}) },
+    headers: { ...(init.body ? { "content-type": "application/json" } : {}), "x-request-id": requestId, ...appVersionHeaders, ...auth, ...(isGet ? etags.headers(path) : {}), ...(init.headers ?? {}) },
   });
   if (canRetryWithRefresh(path, res.status, retried, refreshToken !== null) && (await renew())) return request<T>(path, init, true);
   if (res.status === 304 && isGet) {
@@ -69,7 +72,7 @@ async function request<T>(path: string, init: RequestInit = {}, retried = false)
   }
   const body = (await res.json().catch(() => ({}))) as T & { message?: string };
   if (res.status === 403 && isMfaError(body)) listeners.mfa?.();
-  if (!res.ok) throw Object.assign(new Error(serverErrorMessage(body, res.status, lang, t)), { status: res.status, body });
+  if (!res.ok) throw Object.assign(new Error(serverErrorMessage(body, res.status, lang, t)), { status: res.status, body, requestId: res.headers.get("x-request-id") ?? requestId });
   if (isGet) etags.store(path, res.headers.get("etag"), body);
   return body;
 }

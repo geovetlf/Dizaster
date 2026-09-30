@@ -79,5 +79,7 @@ export interface DomainEvent<T extends DomainEventType = DomainEventType> {
   payload: DomainEventMap[T];
   occurredAt: string;
   correlationId: string | null;
+  /** "user:<id>" o "system:<origen>" (ADR 0172). */
+  actor: string | null;
   lane: OutboxLane;
 }

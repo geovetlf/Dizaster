@@ -2,6 +2,7 @@ import type { DomainEvent, DomainEventMap, DomainEventType, OutboxLane } from "@
 import type { Db, Queryable } from "./db.js";
 import { withTransaction } from "./db.js";
 import { newId } from "./ids.js";
+import { currentContext, runWithContext } from "./request-context.js";
 
 /**
  * Transactional outbox: el evento de dominio se guarda en la MISMA transacción que el cambio de datos.
@@ -14,9 +15,11 @@ export async function publish<T extends DomainEventType>(
   opts: { lane?: OutboxLane; correlationId?: string | null } = {},
 ): Promise<string> {
   const id = newId();
+  // Correlación y actor salen del contexto de la petición o del evento que se está procesando (ADR 0172).
+  const ctx = currentContext();
   await tx.query(
-    `INSERT INTO platform.outbox (id, type, payload, lane, correlation_id) VALUES ($1, $2, $3, $4, $5)`,
-    [id, type, JSON.stringify(payload), opts.lane ?? "normal", opts.correlationId ?? null],
+    `INSERT INTO platform.outbox (id, type, payload, lane, correlation_id, actor) VALUES ($1, $2, $3, $4, $5, $6)`,
+    [id, type, JSON.stringify(payload), opts.lane ?? "normal", opts.correlationId ?? ctx?.correlationId ?? null, ctx?.actor ?? "system"],
   );
   return id;
 }
@@ -48,9 +51,9 @@ export class OutboxDispatcher {
       const done = await withTransaction(this.db, async (tx) => {
         const { rows } = await tx.query<{
           id: string; type: DomainEventType; version: number; payload: unknown; lane: OutboxLane;
-          correlation_id: string | null; occurred_at: Date; attempts: number;
+          correlation_id: string | null; actor: string | null; occurred_at: Date; attempts: number;
         }>(
-          `SELECT id, type, version, payload, lane, correlation_id, occurred_at, attempts
+          `SELECT id, type, version, payload, lane, correlation_id, actor, occurred_at, attempts
              FROM platform.outbox
             WHERE processed_at IS NULL AND available_at <= now() AND lane = ANY($1)
             ORDER BY array_position($2::text[], lane), occurred_at
@@ -62,7 +65,7 @@ export class OutboxDispatcher {
         if (!row) return false;
         const event = {
           id: row.id, type: row.type, version: row.version, payload: row.payload, lane: row.lane,
-          correlationId: row.correlation_id, occurredAt: row.occurred_at.toISOString(),
+          correlationId: row.correlation_id, actor: row.actor, occurredAt: row.occurred_at.toISOString(),
         } as DomainEvent;
         await tx.query("SAVEPOINT handlers");
         try {
@@ -71,7 +74,10 @@ export class OutboxDispatcher {
               `INSERT INTO platform.outbox_consumption (consumer, outbox_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
               [r.consumer, row.id],
             );
-            if (claimed.rowCount === 1) await r.handler(event, tx);
+            // Lo que publique el consumidor hereda la correlación; lo hace el sistema, no quien originó el evento.
+            if (claimed.rowCount === 1) {
+              await runWithContext({ correlationId: row.correlation_id ?? row.id, actor: `system:${r.consumer}` }, () => r.handler(event, tx));
+            }
           }
           await tx.query(`UPDATE platform.outbox SET processed_at = now() WHERE id = $1`, [row.id]);
         } catch (err) {

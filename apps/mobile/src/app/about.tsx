@@ -42,7 +42,7 @@ export default function AboutScreen() {
       {errors.length ? (
         <View style={styles.group}>
           <Text style={styles.heading}>{t("errorLogTitle")}</Text>
-          {errors.slice(0, 5).map((e) => <Item key={e.at} title={e.message} meta={e.at.slice(0, 16).replace("T", " ")} url={null} />)}
+          {errors.slice(0, 5).map((e) => <Item key={e.at} title={e.message} meta={`${e.at.slice(0, 16).replace("T", " ")}${e.requestId ? ` · ${e.requestId}` : ""}`} url={null} />)}
           <Pressable accessibilityRole="button" onPress={() => { clearErrorLog(); setErrors([]); }}>
             <Text style={styles.clear}>{t("errorLogClear")}</Text>
           </Pressable>

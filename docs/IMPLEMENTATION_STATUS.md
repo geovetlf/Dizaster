@@ -362,6 +362,7 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | 0169 | País para emergencias: ubicación → SIM (Android) → perfil → región del sistema | ✅ |
 | 0170 | Inicio de sesión Apple/Google (OIDC propio) y correo con código sin guardar el correo, vinculación de métodos; apagados hasta tener credenciales | ✅ |
 | 0171 | Pantalla "Entrar" con correo y código, arranque sin acceso de desarrollo, vincular métodos; emergencias sin cuenta | ✅ |
+| 0172 | Correlación de extremo a extremo (`x-request-id`) y actor en cada evento de dominio; los consumidores heredan la correlación | ✅ |
 | Licencias, auditoría, SBOM, Dependabot; respaldo con prueba de restauración en CI | ✅ | ADR 0070, `scripts/supply-chain.mjs`, `scripts/db-restore-check.mjs` |
 | Idioma de la app elegible en el perfil (es/en/pt/fr o del teléfono) | ✅ | ADR 0069, `app/language.tsx` |
 | Varias cuentas en un teléfono corroboran como una (clave seudónima del teléfono) | ✅ | ADR 0068, migración 0036 |
@@ -405,6 +406,12 @@ Revisión del Blueprint del 2026-09-30 (tras ADR 0157): completada con ADR 0158�
 
 Revisión del Blueprint del 2026-09-30 (tras ADR 0164): completada con ADR 0165–0171.
 
+Revisión del Blueprint del 2026-09-30 (tras ADR 0171), verificada contra el código, sin bloqueos:
+1. Informes de fallos de la app autoalojados (`POST /v1/client-crashes`), sin SDK de terceros.
+2. Campos CAP en las alertas: origen, vencimiento y referencia CAP.
+3. `event.events.city_id` para filtrar y agrupar eventos por ciudad.
+4. Aceptación versionada de términos y políticas (solo el mecanismo; los textos legales siguen bloqueados).
+
 Bloqueadas o en espera:
 
 - **EN ESPERA** — D1: días de retención de la ubicación precisa en categorías sensibles (§2 C-07).
@@ -414,4 +421,5 @@ Bloqueadas o en espera:
 - **PENDING DECISION** — Duración de suspensiones: hoy `SUSPEND_USER` no vence; falta decidir si hay duraciones estándar (24 h / 7 d / permanente).
 - **PENDING DECISION** — D-17 fronteras en disputa: sin implementar; falta criterio del propietario (y revisión legal antes de abrir más países).
 - **PENDING DECISION** — Uso sin cuenta (ADR 0171): hoy se puede cerrar "Entrar" y seguir en solo lectura; falta decidir si V1 lo permite o exige cuenta.
+- **PENDING DECISION** — Señal de red compartida para coordinación (§8.2, "opcional, decisión"): choca con la decisión del propietario de no usar señales de IP o red (ADR 0142); no se implementa sin su visto bueno.
 - **BLOQUEADA** — Contacto del cliente de ingesta (§9.3): el User-Agent dice "contacto pendiente"; falta el correo o URL de contacto del propietario.
