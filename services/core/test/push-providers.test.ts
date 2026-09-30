@@ -138,7 +138,7 @@ describe("FCM HTTP v1 (contra un servidor local)", () => {
       data: { url: "dizaster://event/abc", alertId: "a1" },
       android: { priority: "NORMAL", collapse_key: "event-abc", notification: { channel_id: "alerts", tag: "event-abc", notification_count: 2 } },
     });
-    expect(sent.find((s) => s.body.message["token"] === "tok-busy")!.body.message).toMatchObject({ android: { priority: "HIGH" } });
+    expect(sent.find((s) => s.body.message["token"] === "tok-busy")!.body.message).toMatchObject({ android: { priority: "HIGH", notification: { channel_id: "official_critical" } } });
   });
 });
 

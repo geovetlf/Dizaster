@@ -142,3 +142,11 @@ export interface SavedZone {
 
 /** Ubicación aproximada al abrir la app. El servidor solo guarda la celda H3 r7 (~5 km²) y la olvida a las 72 h. */
 export const ApproximateLocationRequest = z.object({ lat, lng });
+
+/**
+ * Canales de notificación de Android (ADR 0186), equivalentes a los niveles de interrupción de iOS: las
+ * confirmaciones oficiales graves van por un canal propio que la persona puede dejar sonando aunque silencie el
+ * de la comunidad. El servidor elige el canal con `critical`; la app los crea con nombres traducidos.
+ */
+export const ANDROID_CHANNELS = { critical: "official_critical", general: "alerts" } as const;
+export const androidChannelFor = (critical: boolean) => (critical ? ANDROID_CHANNELS.critical : ANDROID_CHANNELS.general);

@@ -1,15 +1,29 @@
+import { ANDROID_CHANNELS } from "@dizaster/contracts";
 import * as Notifications from "expo-notifications";
 import { Linking, Platform } from "react-native";
 import { permissionView, type PermissionView } from "../alerts/logic";
 import { api } from "../api";
 import { APNS_MODE } from "../config";
+import { t } from "../i18n";
 import { toPushRegistration } from "./push-token";
 
-/** Canal Android equivalente a las alertas de iOS. Se crea al inicio para que el aviso de permiso funcione en Android 13+. */
+/**
+ * Canales Android equivalentes a los niveles de iOS (ADR 0186): oficiales graves (≈ time-sensitive) y el resto.
+ * Se crean al inicio para que el aviso de permiso funcione en Android 13+; volver a crearlos actualiza el nombre
+ * traducido si cambió el idioma (Android no deja cambiar la importancia que eligió la persona).
+ */
 export async function ensureAlertChannel(): Promise<void> {
   if (Platform.OS !== "android") return;
-  await Notifications.setNotificationChannelAsync("alerts", {
-    name: "Alertas",
+  await Notifications.setNotificationChannelAsync(ANDROID_CHANNELS.critical, {
+    name: t("channelCritical"),
+    description: t("channelCriticalDesc"),
+    importance: Notifications.AndroidImportance.MAX,
+    lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+    vibrationPattern: [0, 500, 250, 500, 250, 500],
+  });
+  await Notifications.setNotificationChannelAsync(ANDROID_CHANNELS.general, {
+    name: t("channelCommunity"),
+    description: t("channelCommunityDesc"),
     importance: Notifications.AndroidImportance.HIGH,
   });
 }

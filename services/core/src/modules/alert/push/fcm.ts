@@ -1,3 +1,4 @@
+import { androidChannelFor } from "@dizaster/contracts";
 import { importPKCS8, SignJWT } from "jose";
 import { isRetryableStatus, mapLimit, type PushMessage, type PushResult, type PushSender } from "./types.js";
 
@@ -56,7 +57,7 @@ export class FcmSender implements PushSender {
         priority: m.critical ? "HIGH" : "NORMAL",
         collapse_key: m.groupKey,
         ttl: "86400s",
-        notification: { channel_id: "alerts", tag: m.groupKey, notification_count: m.badge },
+        notification: { channel_id: androidChannelFor(m.critical), tag: m.groupKey, notification_count: m.badge },
       },
     };
   }
