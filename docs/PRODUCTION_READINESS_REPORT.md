@@ -148,8 +148,8 @@ En orden de impacto:
 
 ## 7. Siguiente paso mínimo para producción
 
-1. El propietario instala la app de Claude en `geovetlf/Dizaster`.
-2. El agente hace push de `main` y de las etiquetas, sin force, y deja CI en verde.
+1. ✅ Push de `main` sin force y CI en verde (PR #10).
+2. El propietario fusiona los PRs y autoriza las reglas de `main`.
 3. Con `EXPO_TOKEN`, el primer APK de prueba.
 4. Con D-18 y D-23:
    1. `tofu plan` → `dzd iac-check`;
