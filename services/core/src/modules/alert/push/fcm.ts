@@ -1,5 +1,5 @@
 import { importPKCS8, SignJWT } from "jose";
-import { mapLimit, type PushMessage, type PushResult, type PushSender } from "./types.js";
+import { isRetryableStatus, mapLimit, type PushMessage, type PushResult, type PushSender } from "./types.js";
 
 /** Cuenta de servicio de Firebase (JSON descargado de la consola). */
 export interface FcmServiceAccount {
@@ -40,9 +40,9 @@ export class FcmSender implements PushSender {
         if (res.ok) return { token: m.token, ok: true, invalidToken: false };
         const err = (await res.json().catch(() => ({}))) as { error?: { status?: string; details?: { errorCode?: string }[] } };
         const code = err.error?.details?.find((d) => d.errorCode)?.errorCode ?? err.error?.status ?? `HTTP ${res.status}`;
-        return { token: m.token, ok: false, invalidToken: res.status === 404 || code === "UNREGISTERED", error: code };
+        return { token: m.token, ok: false, invalidToken: res.status === 404 || code === "UNREGISTERED", retryable: isRetryableStatus(res.status), error: code };
       } catch (e) {
-        return { token: m.token, ok: false, invalidToken: false, error: (e as Error).message };
+        return { token: m.token, ok: false, invalidToken: false, retryable: true, error: (e as Error).message };
       }
     });
   }

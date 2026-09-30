@@ -23,8 +23,13 @@ export interface PushResult {
   ok: boolean;
   /** El sistema dice que el token ya no sirve: hay que olvidarlo. */
   invalidToken: boolean;
+  /** Error temporal (límite, caída del servicio, sin red): vale la pena reintentar (ADR 0177). */
+  retryable?: boolean;
   error?: string;
 }
+
+/** 429 y 5xx son temporales; 0 = no hubo respuesta (red). */
+export const isRetryableStatus = (status: number) => status === 0 || status === 429 || status >= 500;
 
 export interface PushSender {
   readonly name: string;
@@ -43,7 +48,7 @@ export class PushGateway implements PushSender {
       if (batch.length === 0) continue;
       const sender = this.senders[provider];
       const results = sender
-        ? await sender.send(batch).catch((e: Error) => batch.map((m) => ({ token: m.token, ok: false, invalidToken: false, error: e.message })))
+        ? await sender.send(batch).catch((e: Error) => batch.map((m) => ({ token: m.token, ok: false, invalidToken: false, retryable: true, error: e.message })))
         : batch.map((m) => ({ token: m.token, ok: false, invalidToken: false, error: `${provider} no configurado` }));
       batch.forEach((m, i) => out.set(m, results[i] ?? { token: m.token, ok: false, invalidToken: false, error: "sin respuesta" }));
     }

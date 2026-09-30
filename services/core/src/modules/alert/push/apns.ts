@@ -1,6 +1,6 @@
 import { connect, constants, type ClientHttp2Session } from "node:http2";
 import { importPKCS8, SignJWT } from "jose";
-import { mapLimit, type PushMessage, type PushResult, type PushSender } from "./types.js";
+import { isRetryableStatus, mapLimit, type PushMessage, type PushResult, type PushSender } from "./types.js";
 
 export interface ApnsConfig {
   teamId: string;
@@ -100,9 +100,9 @@ export class ApnsSender implements PushSender {
         if (status === 200) return resolve({ token: m.token, ok: true, invalidToken: false });
         let reason = `HTTP ${status}`;
         try { reason = (JSON.parse(text) as { reason?: string }).reason ?? reason; } catch { /* cuerpo vacío */ }
-        resolve({ token: m.token, ok: false, invalidToken: status === 410 || INVALID.has(reason), error: reason });
+        resolve({ token: m.token, ok: false, invalidToken: status === 410 || INVALID.has(reason), retryable: isRetryableStatus(status), error: reason });
       });
-      req.on("error", (e) => resolve({ token: m.token, ok: false, invalidToken: false, error: e.message }));
+      req.on("error", (e) => resolve({ token: m.token, ok: false, invalidToken: false, retryable: true, error: e.message }));
       req.end(body);
     });
   }

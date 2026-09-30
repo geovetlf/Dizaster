@@ -367,6 +367,7 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | 0174 | Alertas con origen (oficial/sistema), vencimiento y referencia CAP; lo vencido antes de salir no suena | ✅ |
 | 0175 | Ciudad del evento (`city_id`) desde el lugar público: avisos, búsqueda y "Siguiendo" por ciudad | ✅ |
 | 0176 | Aceptación versionada de términos y políticas (mecanismo; textos bloqueados): registro de solo inserción, 428 al publicar si falta, pantalla en la app | ✅ |
+| 0177 | Reintento de push con error temporal (429, 5xx, red): 3 reintentos en menos de 2 min, luego FAILED | ✅ |
 | Licencias, auditoría, SBOM, Dependabot; respaldo con prueba de restauración en CI | ✅ | ADR 0070, `scripts/supply-chain.mjs`, `scripts/db-restore-check.mjs` |
 | Idioma de la app elegible en el perfil (es/en/pt/fr o del teléfono) | ✅ | ADR 0069, `app/language.tsx` |
 | Varias cuentas en un teléfono corroboran como una (clave seudónima del teléfono) | ✅ | ADR 0068, migración 0036 |
@@ -412,6 +413,13 @@ Revisión del Blueprint del 2026-09-30 (tras ADR 0164): completada con ADR 0165�
 
 Revisión del Blueprint del 2026-09-30 (tras ADR 0171): completada con ADR 0172–0176.
 
+Revisión del Blueprint del 2026-09-30 (tras ADR 0176), verificada contra el código, sin bloqueos:
+1. Posts y comentarios idempotentes con id generado en el cliente (§13.1 reintentos idempotentes).
+2. Marcar un evento como sensible por contexto (§7 flags SENSITIVE, Anexo A.5): solo sube el nivel, auditado.
+3. La reputación del teléfono ajusta el peso de la evidencia (§8.2, §13.3), no solo el cupo.
+4. Pruebas de captura del medio en la evidencia de presencia (§7 `media_capture_proofs`, `capture_geo` privado).
+5. Preparación para particionar eventos y reportes por mes (§7.4, §14): decisión y prueba, sin partir aún.
+
 Bloqueadas o en espera:
 
 - **EN ESPERA** — D1: días de retención de la ubicación precisa en categorías sensibles (§2 C-07).
@@ -423,4 +431,5 @@ Bloqueadas o en espera:
 - **PENDING DECISION** — Uso sin cuenta (ADR 0171): hoy se puede cerrar "Entrar" y seguir en solo lectura; falta decidir si V1 lo permite o exige cuenta.
 - **PENDING DECISION** — Señal de red compartida para coordinación (§8.2, "opcional, decisión"): choca con la decisión del propietario de no usar señales de IP o red (ADR 0142); no se implementa sin su visto bueno.
 - **PENDING DECISION** — Aceptaciones de términos al borrar la cuenta (ADR 0176): hoy se conservan con el id interno como prueba; falta criterio legal sobre si se borran.
+- **PENDING DECISION** — Visibilidad de posts (solo seguidores/privado) y privacidad del perfil (§7): las columnas existen pero qué significa cada una es decisión de producto; hoy todo es público.
 - **BLOQUEADA** — Contacto del cliente de ingesta (§9.3): el User-Agent dice "contacto pendiente"; falta el correo o URL de contacto del propietario.

@@ -89,6 +89,9 @@ const toPrefs = (r: PrefRow | undefined): AlertPreferences =>
       }
     : DEFAULT_PREFERENCES;
 
+/** Reintentos de un aviso push con error temporal (ADR 0177). */
+export const PUSH_MAX_RETRIES = 3;
+
 /**
  * Alert Engine (Blueprint §5.10): decide a quién avisar, de qué y cuándo, y entrega por el proveedor push
  * configurado (APNs/FCM directos). Módulo independiente: solo reacciona a eventos de dominio y lee a otros
@@ -443,10 +446,11 @@ export class AlertService {
       }>(
         `SELECT n.id, n.profile_id, n.user_id, n.title, n.body, a.event_id, a.post_id, a.critical, a.expires_at
            FROM alert.notifications n JOIN alert.alerts a ON a.id = n.alert_id
-          WHERE n.status = 'PENDING'
+          WHERE n.status = 'PENDING' AND (n.next_attempt_at IS NULL OR n.next_attempt_at <= $1)
           ORDER BY a.critical DESC, n.created_at, n.id
           LIMIT ${FLUSH_BATCH}
           FOR UPDATE OF n SKIP LOCKED`,
+        [now],
       );
       if (rows.length === 0) return;
       const profiles = [...new Set(rows.map((r) => r.profile_id))];
@@ -526,16 +530,34 @@ export class AlertService {
     const results = await this.push.send(all);
     const byMessage = new Map(all.map((m, i) => [m, results[i]!]));
     const failed: string[] = [];
+    const retry: string[] = [];
     for (const u of units) {
       for (const m of u.messages) {
         const r = byMessage.get(m)!;
         if (r.invalidToken) await this.identity.dropPushToken(this.db, m.provider, m.token);
       }
       if (!u.messages.some((m) => byMessage.get(m)!.ok)) {
-        failed.push(...u.ids);
+        // Algún dispositivo falló por algo temporal: se reintenta (ADR 0177); si no, queda como FAILED.
+        const temporary = u.messages.some((m) => byMessage.get(m)!.retryable && !byMessage.get(m)!.invalidToken);
+        (temporary ? retry : failed).push(...u.ids);
         counts[u.status] -= u.ids.length;
-        counts.FAILED += u.ids.length;
+        counts[temporary ? "PENDING" : "FAILED"] += u.ids.length;
       }
+    }
+    if (retry.length) {
+      // Espera creciente (15 s, 30 s, 60 s): tres reintentos caben en los 2 minutos del SLO de alertas URGENT.
+      // Agotados, FAILED. El vencimiento de la alerta sigue mandando en la próxima vuelta.
+      const moved = await this.db.query<{ id: string }>(
+        `UPDATE alert.notifications SET status = 'PENDING', group_id = NULL, pushed_at = NULL, attempts = attempts + 1,
+                next_attempt_at = $2::timestamptz + make_interval(secs => 15 * power(2, attempts))
+          WHERE id = ANY($1) AND attempts < $3 RETURNING id`,
+        [retry, now, PUSH_MAX_RETRIES],
+      );
+      const kept = new Set(moved.rows.map((r) => r.id));
+      const exhausted = retry.filter((id) => !kept.has(id));
+      failed.push(...exhausted);
+      counts.PENDING -= exhausted.length;
+      counts.FAILED += exhausted.length;
     }
     // Ningún dispositivo lo aceptó: queda en el historial y no cuenta para el límite por hora.
     if (failed.length) await this.db.query(`UPDATE alert.notifications SET status = 'FAILED', pushed_at = NULL WHERE id = ANY($1)`, [failed]);
