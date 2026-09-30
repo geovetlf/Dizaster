@@ -8,6 +8,7 @@ export const fr: Record<MessageKey, string> = {
   categoryNotHere: "Cette catégorie ne peut pas être signalée dans le pays où vous êtes. Choisissez-en une autre.",
   locating: "Localisation en cours…",
   locationDenied: "Sans autorisation de localisation, impossible de créer un signalement épinglé. Vous pouvez publier une publication normale.",
+  improvingAccuracy: "Affinage de votre position… vous pouvez envoyer quand même.",
   draftFound: "Vous avez un signalement non terminé :",
   draftResume: "Continuer",
   draftDiscard: "Supprimer",

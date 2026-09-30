@@ -8,6 +8,7 @@ export const pt: Record<MessageKey, string> = {
   categoryNotHere: "Esta categoria não pode ser relatada no país onde você está. Escolha outra.",
   locating: "Obtendo sua localização…",
   locationDenied: "Sem permissão de localização não dá para criar um reporte com pin. Você pode publicar um post normal.",
+  improvingAccuracy: "Refinando sua localização… você pode enviar mesmo assim.",
   draftFound: "Você tem um relato não concluído:",
   draftResume: "Continuar",
   draftDiscard: "Descartar",

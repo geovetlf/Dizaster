@@ -382,6 +382,7 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | Respaldos cifrados con clave pública y retención (§13.1) | ✅ | ADR 0189: pg_dump por tubería a age (nunca en claro), obligatorio en producción, restore-check con sha256 y descifrado, retención N últimos + semanales |
 | Cola offline que se envía sola (§8.3, C-04) | ✅ | ADR 0190: tiempo límite de 30 s, envío al volver la red (expo-network) y tarea en segundo plano (expo-background-task) sin renovar sesión desde segundo plano |
 | Borrador de reporte en el teléfono (§5.4) | ✅ | ADR 0191: borrador sin ubicación con guardado automático, retomar/descartar, recuperación de la cámara en Android, limpieza de media huérfana al arrancar |
+| Seguimiento breve del GPS al reportar (§8.2) | ✅ | ADR 0192: lecturas cada 5 s hasta 2 min en primer plano, fix afinado hasta 50 m, trayectoria para la regla de movimiento imposible |
 | Licencias, auditoría, SBOM, Dependabot; respaldo con prueba de restauración en CI | ✅ | ADR 0070, `scripts/supply-chain.mjs`, `scripts/db-restore-check.mjs` |
 | Idioma de la app elegible en el perfil (es/en/pt/fr o del teléfono) | ✅ | ADR 0069, `app/language.tsx` |
 | Varias cuentas en un teléfono corroboran como una (clave seudónima del teléfono) | ✅ | ADR 0068, migración 0036 |
@@ -433,12 +434,11 @@ Revisión del Blueprint del 2026-09-30 (tras ADR 0182): completada con ADR 0183�
 propietario del 2026-09-30: sin señal de red, aceptaciones mínimas tras borrar la cuenta, todo público en V1).
 
 Revisión del Blueprint del 2026-09-30 (tras ADR 0189), verificada contra el código, sin bloqueos:
-1. Presencia con seguimiento breve del GPS (§8.2): varias lecturas hasta ≤ 50 m y datos para la regla de velocidad imposible.
-2. Etiquetas del mapa en el idioma de la persona (§6.1 `styleUrl(theme, locale)`).
-3. Decodificación de media aislada (§13.1): proceso aparte con límites de memoria y tiempo.
-4. Ubicación simulada en iOS y proveedor real (§8.2, paridad): módulo nativo local.
-5. Video 720p también en Android (§12.1, paridad).
-6. Números de emergencia verificados contra fuentes oficiales, empezando por Perú (§5.11, C-06).
+1. Etiquetas del mapa en el idioma de la persona (§6.1 `styleUrl(theme, locale)`).
+2. Decodificación de media aislada (§13.1): proceso aparte con límites de memoria y tiempo.
+3. Ubicación simulada en iOS y proveedor real (§8.2, paridad): módulo nativo local.
+4. Video 720p también en Android (§12.1, paridad).
+5. Números de emergencia verificados contra fuentes oficiales, empezando por Perú (§5.11, C-06).
 
 Bloqueadas o en espera:
 

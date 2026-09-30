@@ -28,6 +28,7 @@ import { categoryIn, findCategory, reportCategories, useCategoryCatalogVersion }
 import { askSameEvent } from "../lib/report/same-event";
 import { UpdateRequired, useUpdateRequirement } from "../components/update-required";
 import { appConfig } from "../lib/config/app-config";
+import { betterFix, pinFollowsFix, pushRecent, WATCH_INTERVAL_MS, WATCH_MAX_MS, FIX_TARGET_ACCURACY_M } from "../lib/report/fix-refine";
 import { recoverPendingCapture, type CaptureKind, type CaptureSource } from "../lib/media/capture";
 import { draftWorthKeeping, type ReportDraft } from "../lib/report/draft";
 import { clearDraft, loadDraft, saveDraft } from "../lib/report/draft-store";
@@ -125,6 +126,24 @@ export default function ReportScreen() {
     await clearDraft({ discardMedia: true, draft: d }).catch(() => undefined);
   }
 
+  // Seguimiento breve del GPS mientras se redacta (ADR 0192): afina la precisión y da trayectoria a la presencia.
+  const fixRef = useRef<Location.LocationObject | null>(null);
+  fixRef.current = fix;
+  useEffect(() => {
+    if (phase !== "compose") return;
+    let sub: Location.LocationSubscription | null = null;
+    let stopped = false;
+    void Location.watchPositionAsync({ accuracy: Location.Accuracy.Highest, timeInterval: WATCH_INTERVAL_MS, distanceInterval: 0 }, (loc) => {
+      recent.current = pushRecent(recent.current, loc);
+      const cur = fixRef.current;
+      if (!cur || !betterFix(cur, loc)) return;
+      setPin((p) => (p && pinFollowsFix(p, cur) ? { lat: loc.coords.latitude, lng: loc.coords.longitude } : p));
+      setFix(loc);
+    }).then((s) => { if (stopped) s.remove(); else sub = s; }).catch(() => undefined);
+    const limit = setTimeout(() => { sub?.remove(); sub = null; }, WATCH_MAX_MS);
+    return () => { stopped = true; clearTimeout(limit); sub?.remove(); };
+  }, [phase]);
+
   useEffect(() => {
     appConfig().then((c) => setStyleUrl(providerFromAppConfig(c)?.styleUrl(APP_MAP_SCHEME) ?? null)).catch(() => setStyleUrl(null));
   }, []);
@@ -155,7 +174,7 @@ export default function ReportScreen() {
       setBlocked("timeout");
       return;
     }
-    recent.current.push(loc);
+    recent.current = pushRecent(recent.current, loc);
     const here = { lat: loc.coords.latitude, lng: loc.coords.longitude };
     // Los ajustes que rigen son los del país donde está la persona (radio de presencia, etc.; ADR 0152).
     const local = categoryIn(c.code, countryOf(here));
@@ -197,7 +216,7 @@ export default function ReportScreen() {
         mediaIds: [],
         pin,
         // La atestación real (App Attest / Play Integrity) se integra con la Identity Layer.
-        presence: toPresenceSignals(fix, recent.current.slice(0, -1), null, now),
+        presence: toPresenceSignals(fix, recent.current.filter((r) => r.timestamp !== fix.timestamp), null, now),
         capturedAt: new Date(fix.timestamp).toISOString(),
         capturedOffline: false,
         anonymityMode: pseudonymous || category.forcePseudonymous ? "PSEUDONYMOUS" : "PUBLIC",
@@ -315,6 +334,7 @@ export default function ReportScreen() {
       {callFirst}
 
       <Text style={styles.note}>{t("adjustPin")}</Text>
+      {(fix.coords.accuracy ?? Infinity) > FIX_TARGET_ACCURACY_M ? <Text style={styles.note}>{t("improvingAccuracy")}</Text> : null}
       <View style={styles.mapBox}>
         <Map
           style={styles.map}
