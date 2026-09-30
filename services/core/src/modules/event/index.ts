@@ -418,8 +418,8 @@ export class EventService {
          FROM event.evidence WHERE event_id = $1 AND status = 'ACTIVE' AND assertion = 'OCCURRING'`,
       [eventId],
     );
-    const ev = (await tx.query<{ sensitivity: EventSummary["sensitivity"]; publication_state: string; delay_pending: boolean }>(
-      `SELECT sensitivity, publication_state, coalesce(publish_after > now(), false) AS delay_pending FROM event.events WHERE id = $1`, [eventId],
+    const ev = (await tx.query<{ sensitivity: EventSummary["sensitivity"]; publication_state: string; delay_pending: boolean; status: EventStatus; last_activity_at: Date }>(
+      `SELECT sensitivity, publication_state, coalesce(publish_after > now(), false) AS delay_pending, status, last_activity_at FROM event.events WHERE id = $1`, [eventId],
     )).rows[0];
     if (!ev || rows.length === 0) {
       await tx.query(
@@ -456,6 +456,13 @@ export class EventService {
         rows.filter((r) => r.trust_tier === "OFFICIAL").length,
       ],
     );
+    // Actividad nueva en un evento en seguimiento (ADR 0215): vuelve a activo. Un reporte tardío (observado antes de
+    // la última actividad) o un recálculo por moderación no lo reactivan.
+    if (ev.status === "MONITORING" && Date.parse(c.observedAt) > ev.last_activity_at.getTime()) {
+      await tx.query(`UPDATE event.events SET status = 'ACTIVE', updated_at = now() WHERE id = $1 AND status = 'MONITORING'`, [eventId]);
+      await this.addTimeline(tx, eventId, "STATUS_CHANGED", { from: "MONITORING", to: "ACTIVE", cause: "NEW_ACTIVITY" });
+      await publish(tx, "EventLifecycleChanged", { eventId, to: "ACTIVE" }, { lane: "normal" });
+    }
     await this.recomputeSeverity(tx, eventId, "EVIDENCE");
   }
 
@@ -1256,21 +1263,29 @@ export class EventService {
    * deduplicación sin actividad; MONITORING → RESOLVED tras 6 (mínimo 24 h). Cada cambio queda en la timeline.
    */
   async applyLifecycle(q: Queryable, now: Date): Promise<{ monitoring: number; resolved: number }> {
-    const cats = this.ref.categories.categories;
-    const codes = cats.map((c) => c.code);
-    const monitorMin = cats.map((c) => c.dedupWindowMinutes * 2);
-    const resolveMin = cats.map((c) => Math.max(c.dedupWindowMinutes * 6, 1440));
+    // Ventana efectiva por país (ADR 0215): la misma que usan la deduplicación y la verificación.
+    const pairs = (await q.query<{ category_code: string; country_code: string | null }>(
+      `SELECT DISTINCT category_code, country_code FROM event.events WHERE status IN ('ACTIVE','MONITORING') AND merged_into_id IS NULL`,
+    )).rows.flatMap((r) => {
+      const cat = this.ref.category(r.category_code, r.country_code);
+      return cat ? [{ code: r.category_code, country: r.country_code ?? "", window: cat.dedupWindowMinutes }] : [];
+    });
+    if (pairs.length === 0) return { monitoring: 0, resolved: 0 };
+    const codes = pairs.map((p) => p.code);
+    const countries = pairs.map((p) => p.country);
+    const monitorMin = pairs.map((p) => p.window * 2);
+    const resolveMin = pairs.map((p) => Math.max(p.window * 6, 1440));
     const moved = await q.query<{ id: string; status: string }>(
-      `WITH cfg AS (SELECT * FROM unnest($1::text[], $2::int[], $3::int[]) AS t(code, monitor_min, resolve_min))
+      `WITH cfg AS (SELECT * FROM unnest($1::text[], $5::text[], $2::int[], $3::int[]) AS t(code, country, monitor_min, resolve_min))
        UPDATE event.events e SET
           status = CASE WHEN e.last_activity_at < $4::timestamptz - make_interval(mins => cfg.resolve_min) THEN 'RESOLVED' ELSE 'MONITORING' END,
           updated_at = now()
          FROM cfg
-        WHERE cfg.code = e.category_code AND e.merged_into_id IS NULL
+        WHERE cfg.code = e.category_code AND cfg.country = coalesce(e.country_code, '') AND e.merged_into_id IS NULL
           AND ((e.status = 'ACTIVE' AND e.last_activity_at < $4::timestamptz - make_interval(mins => cfg.monitor_min))
             OR (e.status = 'MONITORING' AND e.last_activity_at < $4::timestamptz - make_interval(mins => cfg.resolve_min)))
        RETURNING e.id, e.status`,
-      [codes, monitorMin, resolveMin, now],
+      [codes, monitorMin, resolveMin, now, countries],
     );
     for (const r of moved.rows) {
       await this.addTimeline(q, r.id, "STATUS_CHANGED", { to: r.status, cause: "INACTIVITY" });

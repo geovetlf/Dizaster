@@ -182,4 +182,20 @@ describe("ciclo de vida", () => {
     const tl = (await t.app.inject({ url: `/v1/events/${r.body.eventId}/timeline` })).json().entries as Array<{ type: string }>;
     expect(tl.filter((e) => e.type === "STATUS_CHANGED")).toHaveLength(2);
   });
+
+  it("un evento en seguimiento vuelve a activo cuando llega un reporte nuevo (ADR 0215)", async () => {
+    const [u, v] = [await createUser(t, "ciclo_a"), await createUser(t, "ciclo_b")];
+    const pin = offset(LIMA, -95000);
+    const r = await submit(t, u, reportBody(u, { pin }));
+    const eventId = r.body.eventId!;
+    // Solo se adelanta el reloj del ciclo: la última actividad sigue siendo la del primer reporte.
+    await t.c.events.applyLifecycle(t.c.db, new Date(Date.now() + 5 * 3600_000));
+    expect((await t.app.inject({ url: `/v1/events/${eventId}` })).json().status).toBe("MONITORING");
+    await new Promise((res) => setTimeout(res, 20));
+    const r2 = await submit(t, v, reportBody(v, { pin: offset(pin, 30), targetEventId: eventId }));
+    expect(r2.body.eventId).toBe(eventId);
+    expect((await t.app.inject({ url: `/v1/events/${eventId}` })).json().status).toBe("ACTIVE");
+    const tl = (await t.app.inject({ url: `/v1/events/${eventId}/timeline` })).json().entries as Array<{ type: string; payload: { cause?: string } }>;
+    expect(tl.filter((e) => e.type === "STATUS_CHANGED").map((e) => e.payload.cause)).toEqual(expect.arrayContaining(["INACTIVITY", "NEW_ACTIVITY"]));
+  });
 });
