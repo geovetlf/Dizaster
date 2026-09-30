@@ -19,6 +19,7 @@ import { acceptRequestId, currentContext, REQUEST_ID_HEADER, runWithContext } fr
 import { newId } from "../platform/ids.js";
 import { buildOpenApi } from "./openapi.js";
 import type { Session } from "../modules/identity/index.js";
+import { requestLogOptions } from "./log.js";
 
 declare module "fastify" {
   interface FastifyRequest {
@@ -66,7 +67,8 @@ export const API_VERSION = "1.0.0";
 
 export async function buildApp(c: Container): Promise<FastifyInstance> {
   const app = Fastify({
-    logger: c.env.NODE_ENV === "test" ? false : { level: "info", redact: ["req.headers.authorization"] },
+    // ADR 0204: sin query string (lleva coordenadas) ni IP del cliente.
+    logger: c.env.NODE_ENV === "test" ? false : requestLogOptions(),
     bodyLimit: 256 * 1024,
     // ADR 0201: una petición que no termina en este plazo se corta (el cliente reintenta).
     requestTimeout: c.env.HTTP_REQUEST_TIMEOUT_MS,
