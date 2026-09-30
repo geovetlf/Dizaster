@@ -40,7 +40,7 @@ export default function AdminDelaysScreen() {
   }
 
   return (
-    <FlatList
+    <FlatList automaticallyAdjustKeyboardInsets
       style={styles.container}
       contentContainerStyle={styles.content}
       data={SENSITIVE}

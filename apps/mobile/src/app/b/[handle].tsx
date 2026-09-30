@@ -7,7 +7,7 @@ import { Avatar } from "../../components/avatar";
 import { Icon } from "../../components/icon";
 import { api } from "../../lib/api";
 import { lang, t } from "../../lib/i18n";
-import { confirmBlock, openFlag } from "../../lib/moderation/menu";
+import { alertFailure, confirmBlock, openFlag } from "../../lib/moderation/menu";
 import { BUSINESS_CATEGORY_LABEL, telUri, verificationIcon } from "../../lib/social/business";
 import { colors, radius, space } from "../../theme";
 
@@ -35,8 +35,9 @@ export default function BusinessScreen() {
   async function toggleBlock() {
     if (!b) return;
     if (b.blockedByMe) {
-      await api.block(b.handle, false).catch(() => undefined);
-      setB({ ...b, blockedByMe: false });
+      // Si falla, sigue bloqueado y se dice por qué (ADR 0270).
+      const ok = await api.block(b.handle, false).then(() => true, (e: unknown) => { alertFailure(`${t("unblock")} @${b.handle}`)(e); return false; });
+      if (ok) setB({ ...b, blockedByMe: false });
     } else if (await confirmBlock(b.handle)) {
       setB({ ...b, blockedByMe: true, followedByMe: false });
     }

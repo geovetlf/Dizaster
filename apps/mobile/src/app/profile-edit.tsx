@@ -53,7 +53,7 @@ export default function ProfileEditScreen() {
   if (!me) return <View style={styles.container}>{error ? <Text style={styles.error}>{error}</Text> : null}</View>;
   const valid = name.trim().length > 0;
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+    <ScrollView automaticallyAdjustKeyboardInsets style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
       <AvatarPicker name={me.displayName} url={me.avatarUrl} apply={async (id) => { const m = await api.setAvatar(id); forgetMe(); return m.avatarUrl; }} />
       <Text style={styles.label}>@{me.handle}</Text>
       <Text style={styles.label}>{t("displayName")}</Text>

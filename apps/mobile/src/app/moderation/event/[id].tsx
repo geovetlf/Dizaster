@@ -69,7 +69,7 @@ export default function EventToolsScreen() {
   const ok = validReason(reason) && !busy;
   const merged = detail.mergedIntoId !== null;
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+    <ScrollView automaticallyAdjustKeyboardInsets style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
       <Pressable accessibilityRole="link" onPress={() => router.push(`/event/${event.id}`)}>
         <Text style={styles.title}>{eventTitle(event, lang)}</Text>
       </Pressable>

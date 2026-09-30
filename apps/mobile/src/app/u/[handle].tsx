@@ -6,7 +6,7 @@ import { FeedList } from "../../components/feed-list";
 import { api } from "../../lib/api";
 import { t } from "../../lib/i18n";
 import { Avatar } from "../../components/avatar";
-import { confirmBlock, openFlag } from "../../lib/moderation/menu";
+import { alertFailure, confirmBlock, openFlag } from "../../lib/moderation/menu";
 import { colors, radius, space } from "../../theme";
 
 /** Perfil público: solo publicaciones con autoría pública (los reportes seudónimos nunca aparecen aquí). */
@@ -33,8 +33,9 @@ export default function PublicProfileScreen() {
   async function toggleBlock() {
     if (!profile) return;
     if (profile.blockedByMe) {
-      await api.block(profile.handle, false).catch(() => undefined);
-      setProfile({ ...profile, blockedByMe: false });
+      // Si falla, sigue bloqueado y se dice por qué (ADR 0270).
+      const ok = await api.block(profile.handle, false).then(() => true, (e: unknown) => { alertFailure(`${t("unblock")} @${profile.handle}`)(e); return false; });
+      if (ok) setProfile({ ...profile, blockedByMe: false });
     } else if (await confirmBlock(profile.handle)) {
       setProfile({ ...profile, blockedByMe: true, followedByMe: false });
     }

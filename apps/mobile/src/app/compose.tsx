@@ -71,7 +71,7 @@ export default function ComposeScreen() {
   if (update.required) return <UpdateRequired storeUrl={update.storeUrl} />;
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+    <ScrollView automaticallyAdjustKeyboardInsets style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
       {official ? <Text style={styles.note}>{t("officialUpdateNote")}</Text> : params.eventId ? <Text style={styles.note}>{t("postAboutEvent")}</Text> : null}
       {sharing ? <Text style={styles.note}>{t("sharingNote")}</Text> : null}
       <TextInput

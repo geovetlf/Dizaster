@@ -7,12 +7,18 @@ import { t } from "../i18n";
 /** Abre la pantalla de denuncia (modal, igual en iOS y Android). */
 export const openFlag = (targetType: FlagTargetType, targetId: string) => router.push({ pathname: "/flag", params: { targetType, targetId } });
 
-/** Bloquear con confirmación. Devuelve true si quedó bloqueado. */
+/** Un fallo nunca pasa en silencio (ADR 0270): el título es la acción y el texto, el motivo que dio el servidor. */
+export const alertFailure = (action: string) => (e: unknown): void => {
+  Alert.alert(action, e instanceof Error && e.message ? e.message : t("errInternal"));
+};
+
+/** Bloquear con confirmación. Devuelve true si quedó bloqueado; si falla, lo dice (p. ej. tope de bloqueos). */
 export function confirmBlock(handle: string): Promise<boolean> {
+  const title = `${t("block")} @${handle}`;
   return new Promise((resolve) => {
-    Alert.alert(`${t("block")} @${handle}`, t("blockConfirm"), [
+    Alert.alert(title, t("blockConfirm"), [
       { text: t("cancel"), style: "cancel", onPress: () => resolve(false) },
-      { text: t("block"), style: "destructive", onPress: () => { api.block(handle, true).then(() => resolve(true)).catch(() => resolve(false)); } },
+      { text: t("block"), style: "destructive", onPress: () => { api.block(handle, true).then(() => resolve(true)).catch((e: unknown) => { alertFailure(title)(e); resolve(false); }); } },
     ], { cancelable: true, onDismiss: () => resolve(false) });
   });
 }
@@ -44,7 +50,7 @@ export function openOwnPostMenu(post: { id: string; isReport: boolean; onEdit?: 
       onPress: () => {
         Alert.alert(label, confirm, [
           { text: t("cancel"), style: "cancel" },
-          { text: label, style: "destructive", onPress: () => { api.deletePost(post.id).then(onDeleted).catch(() => undefined); } },
+          { text: label, style: "destructive", onPress: () => { api.deletePost(post.id).then(onDeleted).catch(alertFailure(label)); } },
         ]);
       },
     },

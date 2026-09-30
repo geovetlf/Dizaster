@@ -1,7 +1,7 @@
 import { POST_TEXT_MAX } from "@dizaster/contracts";
 import { router, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
-import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, TextInput } from "react-native";
 import { api } from "../lib/api";
 import { t } from "../lib/i18n";
 import { colors, radius, space } from "../theme";
@@ -27,7 +27,7 @@ export default function PostEditScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <ScrollView automaticallyAdjustKeyboardInsets style={styles.screen} contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
       <Text style={styles.hint}>{t("editPostHint")}</Text>
       <TextInput
         style={styles.input} value={text} onChangeText={setText} multiline maxLength={POST_TEXT_MAX}
@@ -37,12 +37,13 @@ export default function PostEditScreen() {
       <Pressable accessibilityRole="button" disabled={busy || !text.trim()} style={[styles.button, (busy || !text.trim()) && styles.disabled]} onPress={() => void save()}>
         <Text style={styles.buttonText}>{t("save")}</Text>
       </Pressable>
-    </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg, padding: space.lg, gap: space.md },
+  screen: { flex: 1, backgroundColor: colors.bg },
+  container: { flexGrow: 1, padding: space.lg, gap: space.md },
   hint: { color: colors.textMuted },
   input: { minHeight: 140, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: space.md, color: colors.text, textAlignVertical: "top" },
   error: { color: colors.accentText },

@@ -38,7 +38,7 @@ export default function FlagScreen() {
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+    <ScrollView automaticallyAdjustKeyboardInsets style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
       <Text style={styles.title}>{t("flagTitle")}</Text>
       {FLAG_REASONS.map((r) => (
         <Pressable key={r} accessibilityRole="radio" accessibilityState={{ checked: reason === r }} style={[styles.row, reason === r && styles.rowOn]} onPress={() => setReason(r)}>

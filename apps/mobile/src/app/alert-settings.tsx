@@ -111,7 +111,7 @@ export default function AlertSettingsScreen() {
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+    <ScrollView automaticallyAdjustKeyboardInsets style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
       <View style={styles.row}>
         <Icon name="bell-outline" size={22} color={colors.text} />
         <Text style={styles.label}>{t("permission")}</Text>
@@ -230,7 +230,7 @@ function Subscriptions({ subs, onChange }: { subs: CategorySubscription[]; onCha
           </View>
         );
       })}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
+      <ScrollView automaticallyAdjustKeyboardInsets horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
         {ROOTS.map((c) => {
           const st = categoryStyle(c.code);
           const on = category === c.code;

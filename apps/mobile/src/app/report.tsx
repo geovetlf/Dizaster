@@ -281,7 +281,7 @@ export default function ReportScreen() {
           <Text style={styles.rowText}>{t("postWithoutReport")}</Text>
           <Text style={styles.meta}>{t("postWithoutReportHint")}</Text>
         </Pressable>
-        <FlatList
+        <FlatList automaticallyAdjustKeyboardInsets
           data={categories}
           keyExtractor={(c) => c.code}
           renderItem={({ item }) => (
@@ -331,7 +331,7 @@ export default function ReportScreen() {
 
   const pinFeature: GeoJSON.Feature = { type: "Feature", geometry: { type: "Point", coordinates: [pin.lng, pin.lat] }, properties: {} };
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView automaticallyAdjustKeyboardInsets style={styles.container} contentContainerStyle={styles.content}>
       <Text style={styles.title}>{category.names[lang] ?? category.names["es"]}</Text>
       {deny ? (
         <View style={styles.nearby}>

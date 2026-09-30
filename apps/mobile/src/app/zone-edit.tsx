@@ -75,7 +75,7 @@ export default function ZoneEditScreen() {
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+    <ScrollView automaticallyAdjustKeyboardInsets style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
       {id ? <Stack.Screen options={{ title: t("editZone") }} /> : null}
       <View style={styles.chips}>
         {ZONE_KINDS.map((k) => (

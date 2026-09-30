@@ -42,7 +42,7 @@ export default function MfaScreen() {
 
   if (recovery) {
     return (
-      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      <ScrollView automaticallyAdjustKeyboardInsets style={styles.container} contentContainerStyle={styles.content}>
         <Text style={styles.text}>{t("mfaRecoveryTitle")}</Text>
         {recovery.map((c) => <Text key={c} selectable style={styles.mono}>{c}</Text>)}
         <Pressable accessibilityRole="button" style={styles.primary} onPress={() => router.back()}>
@@ -54,7 +54,7 @@ export default function MfaScreen() {
 
   const valid = recoveryMode ? code.trim().length >= 8 : code.length === 6;
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+    <ScrollView automaticallyAdjustKeyboardInsets style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
       <Text style={styles.text}>{t("mfaIntro")}</Text>
       {status && !status.enrolled && !enroll ? (
         <Pressable accessibilityRole="button" disabled={busy} style={styles.primary} onPress={() => void start()}>

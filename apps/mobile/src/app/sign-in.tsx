@@ -1,7 +1,7 @@
 import type { AuthProviders } from "@dizaster/contracts";
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
-import { Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { Platform, Pressable, ScrollView, StyleSheet, Text, TextInput } from "react-native";
 import { api } from "../lib/api";
 import { isEmail, normalizeCode } from "../lib/auth/sign-in-flow";
 import { hardwareId } from "../lib/device/hardware-id";
@@ -58,7 +58,7 @@ export default function SignInScreen() {
 
   const emailOff = providers !== null && !providers.email;
   return (
-    <View style={styles.container}>
+    <ScrollView automaticallyAdjustKeyboardInsets style={styles.screen} contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
       <Text accessibilityRole="header" style={styles.title}>{t("signInTitle")}</Text>
       <Text style={styles.body}>{t("signInBody")}</Text>
       {emailOff ? <Text style={styles.body}>{t("signInUnavailable")}</Text> : step === "email" ? (
@@ -85,12 +85,13 @@ export default function SignInScreen() {
       <Pressable accessibilityRole="button" style={styles.emergency} onPress={() => router.push("/emergency")}>
         <Text style={styles.emergencyText}>{t("emergencyTitle")}</Text>
       </Pressable>
-    </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg, padding: space.lg, gap: space.md },
+  screen: { flex: 1, backgroundColor: colors.bg },
+  container: { flexGrow: 1, padding: space.lg, gap: space.md },
   title: { color: colors.text, fontSize: 22, fontWeight: "700" },
   body: { color: colors.textMuted },
   input: { color: colors.text, backgroundColor: colors.surface, borderRadius: radius.sm, paddingHorizontal: space.md, paddingVertical: space.md, fontSize: 16 },

@@ -28,7 +28,7 @@ export default function AdminModerationLogScreen() {
   useFocusEffect(useCallback(() => { load(filter.current, null); }, [load]));
 
   return (
-    <FlatList
+    <FlatList automaticallyAdjustKeyboardInsets
       style={styles.container}
       contentContainerStyle={styles.content}
       data={items}

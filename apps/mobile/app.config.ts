@@ -116,6 +116,8 @@ const config: ExpoConfig = {
   },
   android: {
     package: "app.dizaster.mobile",
+    // El teclado encoge la ventana en Android; en iOS lo resuelve automaticallyAdjustKeyboardInsets (ADR 0271).
+    softwareKeyboardLayoutMode: "resize",
     adaptiveIcon: {
       backgroundColor: "#E6F4FE",
       foregroundImage: "./assets/android-icon-foreground.png",

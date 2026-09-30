@@ -33,7 +33,7 @@ export default function DeleteAccountScreen() {
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+    <ScrollView automaticallyAdjustKeyboardInsets style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
       <Text style={styles.intro}>{t("deleteAccountIntro")}</Text>
       {(["deleteAccountPoint1", "deleteAccountPoint2", "deleteAccountPoint3", "deleteAccountPoint4"] as const).map((k) => (
         <Text key={k} style={styles.point}>• {t(k)}</Text>

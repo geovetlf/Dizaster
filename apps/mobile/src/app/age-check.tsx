@@ -67,7 +67,7 @@ export default function AgeCheckScreen() {
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+    <ScrollView automaticallyAdjustKeyboardInsets style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
       <Text style={styles.title}>{t("ageTitle")}</Text>
       <Text style={styles.body}>{tf("ageBody", { age: minAge })}</Text>
       <Text style={styles.label}>{t("ageYear")}</Text>

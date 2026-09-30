@@ -78,7 +78,7 @@ export default function CaseScreen() {
   if (!c) return <View style={styles.container}>{error ? <Text style={styles.error}>{error}</Text> : null}</View>;
   const ok = validReason(reason);
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+    <ScrollView automaticallyAdjustKeyboardInsets style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
       <Text style={styles.kind}>{c.target.type} · {c.target.state} · {c.status}</Text>
       <Text style={styles.author}>{c.target.authorHandle ? `@${c.target.authorHandle}` : t("pseudonymousAuthor")}</Text>
       <Text style={styles.text}>{c.target.text ?? "—"}</Text>

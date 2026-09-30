@@ -38,6 +38,8 @@ export default function SearchScreen() {
   const [tags, setTags] = useState<TagView[]>([]);
   const [businesses, setBusinesses] = useState<BusinessView[]>([]);
   const [posts, setPosts] = useState<FeedPost[]>([]);
+  // Si la búsqueda falla (sin conexión, servidor caído) se dice, en vez de parecer que no hay resultados (ADR 0270).
+  const [failure, setFailure] = useState<string | null>(null);
   const location = useCoarseLocation();
   const near = location.point;
 
@@ -49,17 +51,20 @@ export default function SearchScreen() {
 
   useEffect(() => {
     const text = q.trim();
+    setFailure(null);
     if (text.length < 2) { setEvents([]); setAreas([]); setPeople([]); setTags([]); setBusinesses([]); setPosts([]); return; }
     let live = true;
+    const run = <T,>(call: Promise<T>, apply: (r: T | null) => void) =>
+      call.then((r) => { if (live) apply(r); }, (e: unknown) => { if (!live) return; apply(null); setFailure(e instanceof Error && e.message ? e.message : t("errInternal")); });
     // Espera a que el usuario deje de escribir: menos peticiones, menos coste.
     const timer = setTimeout(() => {
-      api.searchEvents(text, near).then((r) => { if (live) setEvents(r.events); }).catch(() => { if (live) setEvents([]); });
-      api.areas(text, near).then((r) => { if (live) setAreas(r.areas); }).catch(() => { if (live) setAreas([]); });
-      api.searchProfiles(text).then((r) => { if (live) setPeople(r.profiles); }).catch(() => { if (live) setPeople([]); });
-      api.searchTags(text).then((r) => { if (live) setTags(r.tags); }).catch(() => { if (live) setTags([]); });
-      api.searchBusinesses(text).then((r) => { if (live) setBusinesses(r.businesses); }).catch(() => { if (live) setBusinesses([]); });
+      void run(api.searchEvents(text, near), (r) => setEvents(r?.events ?? []));
+      void run(api.areas(text, near), (r) => setAreas(r?.areas ?? []));
+      void run(api.searchProfiles(text), (r) => setPeople(r?.profiles ?? []));
+      void run(api.searchTags(text), (r) => setTags(r?.tags ?? []));
+      void run(api.searchBusinesses(text), (r) => setBusinesses(r?.businesses ?? []));
       // Publicaciones por texto (ADR 0107): desde 3 letras, como el servidor.
-      if (text.length >= POST_SEARCH_MIN) api.searchPosts(text).then((r) => { if (live) setPosts(r.posts); }).catch(() => { if (live) setPosts([]); });
+      if (text.length >= POST_SEARCH_MIN) void run(api.searchPosts(text), (r) => setPosts(r?.posts ?? []));
       else setPosts([]);
     }, 300);
     return () => { live = false; clearTimeout(timer); };
@@ -84,7 +89,8 @@ export default function SearchScreen() {
         <Icon name="magnify" size={22} color={colors.textMuted} />
         <TextInput accessibilityLabel={t("searchPlaceholder")} autoFocus value={q} onChangeText={setQ} placeholder={t("searchPlaceholder")} placeholderTextColor={colors.textMuted} style={styles.input} />
       </View>
-      <SectionList
+      {failure ? <Text accessibilityRole="alert" style={styles.note}>{failure}</Text> : null}
+      <SectionList automaticallyAdjustKeyboardInsets
         sections={sections}
         keyboardShouldPersistTaps="handled"
         keyExtractor={(r) => (r.type === "event" ? `e:${r.event.id}` : r.type === "area" ? r.area.id : r.type === "person" ? `@${r.person.handle}` : r.type === "tag" ? `#${r.tag.tag}` : r.type === "business" ? `b:${r.business.handle}` : r.type === "post" ? `p:${r.post.id}` : r.code)}

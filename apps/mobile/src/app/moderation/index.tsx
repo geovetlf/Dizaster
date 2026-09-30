@@ -67,7 +67,7 @@ export default function ModerationScreen() {
         ))}
       </View>
       {shown === "queue" ? (
-        <FlatList
+        <FlatList automaticallyAdjustKeyboardInsets
           data={cases}
           keyExtractor={(c) => c.id}
           refreshControl={<RefreshControl refreshing={false} onRefresh={() => void load()} tintColor={colors.textMuted} />}
@@ -85,7 +85,7 @@ export default function ModerationScreen() {
           )}
         />
       ) : shown === "duplicates" ? (
-        <FlatList
+        <FlatList automaticallyAdjustKeyboardInsets
           data={duplicates}
           keyExtractor={(d) => d.id}
           refreshControl={<RefreshControl refreshing={false} onRefresh={() => void load()} tintColor={colors.textMuted} />}
@@ -93,7 +93,7 @@ export default function ModerationScreen() {
           renderItem={({ item }) => <DuplicateRow candidate={item} onDone={() => setDuplicates((prev) => prev.filter((d) => d.id !== item.id))} />}
         />
       ) : (
-        <FlatList
+        <FlatList automaticallyAdjustKeyboardInsets
           data={appeals}
           keyExtractor={(a) => a.id}
           onEndReached={() => void moreAppeals()}

@@ -41,7 +41,7 @@ export default function AdminSourcesScreen() {
 
   const ok = validReason(reason) && !busy;
   return (
-    <FlatList
+    <FlatList automaticallyAdjustKeyboardInsets
       style={styles.container}
       contentContainerStyle={styles.content}
       data={sources}

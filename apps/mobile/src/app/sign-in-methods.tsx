@@ -28,7 +28,7 @@ export default function SignInMethodsScreen() {
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+    <ScrollView automaticallyAdjustKeyboardInsets style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
       <Text style={styles.body}>{t("methodsHint")}</Text>
       {providers.filter((p) => p !== "DEV").map((p) => <Text key={p} style={styles.item}>✓ {t(`method_${p}` as "method_EMAIL")}</Text>)}
       {!providers.includes("EMAIL") ? (

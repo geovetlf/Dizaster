@@ -21,7 +21,7 @@ export default function MyModerationScreen() {
   useFocusEffect(load);
   if (state !== "ok" && notices.length === 0) return <LoadState state={state === "notFound" ? "failed" : state} onRetry={load} />;
   return (
-    <FlatList
+    <FlatList automaticallyAdjustKeyboardInsets
       style={styles.container}
       data={notices}
       ListEmptyComponent={<Text style={styles.empty}>{t("noModerationNotices")}</Text>}

@@ -48,7 +48,7 @@ export default function AdminCostScreen() {
   const heights = d ? barHeights(d.daily.map((x) => x.requests)) : [];
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" refreshControl={<RefreshControl refreshing={false} onRefresh={() => void load(days)} tintColor={colors.textMuted} />}>
+    <ScrollView automaticallyAdjustKeyboardInsets style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" refreshControl={<RefreshControl refreshing={false} onRefresh={() => void load(days)} tintColor={colors.textMuted} />}>
       <View style={styles.ranges}>
         {RANGES.map((r) => (
           <Pressable key={r} accessibilityRole="button" accessibilityState={{ selected: r === days }} style={[styles.range, r === days && styles.rangeOn]} onPress={() => setDays(r)}>

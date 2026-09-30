@@ -71,7 +71,7 @@ export default function BusinessEditScreen() {
   );
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+    <ScrollView automaticallyAdjustKeyboardInsets style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
       {/* El logo se pone una vez creado el negocio (ADR 0119). */}
       {editing && logoUrl !== undefined ? (
         <AvatarPicker name={f.name} url={logoUrl} square apply={async (id) => (await api.setBusinessLogo(handle!, id)).logoUrl} />

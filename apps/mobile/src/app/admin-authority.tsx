@@ -83,7 +83,7 @@ export default function AdminAuthorityScreen() {
   );
 
   return (
-    <FlatList
+    <FlatList automaticallyAdjustKeyboardInsets
       style={styles.container}
       contentContainerStyle={styles.content}
       data={list}
