@@ -26,6 +26,8 @@ export interface CreatePostInput {
   businessId?: string | null;
   /** Retraso de publicación (ADR 0099): antes de esta hora solo lo ve su autor. */
   visibleAfterMinutes?: number;
+  /** Id del cliente para reintentos idempotentes (ADR 0178). */
+  clientId?: string | null;
 }
 
 export interface FeedRow {
@@ -237,19 +239,38 @@ export class SocialService {
     const base = textFingerprintBase(input.text);
     const textHash = base ? createHash("sha256").update(base).digest("hex") : null;
     await tx.query(
-      `INSERT INTO social.posts (id, author_type, author_id, kind, author_visibility, text, category_code, public_point, text_hash, shared_post_id, lang, visible_after)
+      `INSERT INTO social.posts (id, author_type, author_id, kind, author_visibility, text, category_code, public_point, text_hash, shared_post_id, lang, visible_after, client_id)
        VALUES ($1, $9, $2, $3, $4, $5, $8,
                CASE WHEN $6::float8 IS NULL THEN NULL ELSE ST_SetSRID(ST_MakePoint($6, $7), 4326)::geography END, $10, $11, $12,
-               CASE WHEN $13::int > 0 THEN now() + make_interval(mins => $13::int) END)`,
+               CASE WHEN $13::int > 0 THEN now() + make_interval(mins => $13::int) END, $14)`,
       [id, input.businessId ?? input.authorProfileId, input.kind, input.businessId ? "PUBLIC" : input.authorVisibility, input.text,
         input.publicPoint?.lng ?? null, input.publicPoint?.lat ?? null, input.categoryCode ?? null, input.businessId ? "BUSINESS" : "PROFILE", textHash, input.sharedPostId ?? null,
         // Idioma detectado en el servidor, sin modelo externo (ADR 0091).
-        detectLanguage(input.text), input.visibleAfterMinutes ?? 0],
+        detectLanguage(input.text), input.visibleAfterMinutes ?? 0, input.clientId ?? null],
     );
     if (textHash) await this.detectDuplicateText(tx, textHash);
     // Un negocio publica su propio teléfono y correo a propósito: solo se revisan documentos y tarjetas.
     if (input.text) await this.detectPersonalData(tx, "POST", id, input.text, input.businessId ? ["ID_DOCUMENT", "PAYMENT_CARD"] : null);
     return id;
+  }
+
+  /**
+   * Post ya creado con ese id del cliente (ADR 0178), por la persona o uno de sus negocios. Devuelve lo mismo que la
+   * primera vez: evento enlazado, etiquetas y menciones.
+   */
+  async postByClientId(
+    q: Queryable, clientId: string, authorIds: readonly string[],
+  ): Promise<{ postId: string; eventId: string | null; tags: string[]; mentions: string[] } | null> {
+    const { rows } = await q.query<{ id: string; event_id: string | null; tags: string[]; mentions: string[] }>(
+      `SELECT p.id,
+              (SELECT l.event_id FROM social.post_event_links l WHERE l.post_id = p.id AND l.link_type <> 'REPORT' LIMIT 1) AS event_id,
+              coalesce((SELECT array_agg(t.normalized ORDER BY t.normalized) FROM social.post_tags pt JOIN social.tags t ON t.id = pt.tag_id WHERE pt.post_id = p.id), '{}') AS tags,
+              coalesce((SELECT array_agg(pr.handle ORDER BY pr.handle) FROM social.post_mentions m JOIN social.profiles pr ON pr.id = m.profile_id WHERE m.post_id = p.id), '{}') AS mentions
+         FROM social.posts p WHERE p.client_id = $1 AND p.author_id = ANY($2) AND p.deleted_at IS NULL`,
+      [clientId, authorIds],
+    );
+    const r = rows[0];
+    return r ? { postId: r.id, eventId: r.event_id, tags: r.tags, mentions: r.mentions } : null;
   }
 
   /**
@@ -893,8 +914,20 @@ export class SocialService {
     };
   }
 
-  async addComment(q: Queryable, postId: string, profileId: string, text: string, parentId?: string, perMinute = 10): Promise<CommentView> {
+  async addComment(
+    q: Queryable, postId: string, profileId: string, text: string, parentId?: string, perMinute = 10, clientId?: string,
+  ): Promise<CommentView> {
     await this.assertVisible(q, postId);
+    // Reintento con el mismo id del cliente (ADR 0178): devuelve el comentario ya creado, sin gastar cupo.
+    const replay = async () => {
+      if (!clientId) return null;
+      const { rows } = await q.query<{ id: string }>(
+        `SELECT id FROM social.comments WHERE author_profile_id = $1 AND client_id = $2 AND post_id = $3 AND deleted_at IS NULL`, [profileId, clientId, postId],
+      );
+      return rows[0] ? (await this.commentRows(q, postId, profileId, { onlyId: rows[0].id }))[0] ?? null : null;
+    };
+    const existing = await replay();
+    if (existing) return existing;
     const recent = await q.query<{ n: number }>(
       `SELECT count(*)::int AS n FROM social.comments WHERE author_profile_id = $1 AND created_at > now() - interval '1 minute'`,
       [profileId],
@@ -912,7 +945,17 @@ export class SocialService {
       parent = p.rows[0].root;
     }
     const id = newId();
-    await q.query(`INSERT INTO social.comments (id, post_id, author_profile_id, text, parent_comment_id) VALUES ($1, $2, $3, $4, $5)`, [id, postId, profileId, text, parent]);
+    const ins = await q.query(
+      `INSERT INTO social.comments (id, post_id, author_profile_id, text, parent_comment_id, client_id) VALUES ($1, $2, $3, $4, $5, $6)
+       ON CONFLICT (author_profile_id, client_id) WHERE client_id IS NOT NULL DO NOTHING`,
+      [id, postId, profileId, text, parent, clientId ?? null],
+    );
+    if (!ins.rowCount) {
+      // Otro envío con el mismo id llegó a la vez (o lo usó en otro post): se devuelve el suyo o se rechaza.
+      const other = await replay();
+      if (other) return other;
+      throw new DomainError("CLIENT_ID_REUSED", "Ese id ya se usó para otro comentario", 409);
+    }
     await this.detectPersonalData(q, "COMMENT", id, text, null);
     return (await this.commentRows(q, postId, profileId, { onlyId: id }))[0]!;
   }

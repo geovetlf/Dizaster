@@ -805,8 +805,9 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
 
   app.post("/v1/posts/:id/comments", async (req, reply) => {
     const session = requireSession(req);
-    const { text, parentId } = parse(CreateCommentRequest, req.body);
-    return reply.status(201).send(await c.social.addComment(c.db, parse(IdParam, req.params).id, session.profileId, text, parentId, (await c.trust.socialLimits(c.db, session.userId)).commentsPerMinute));
+    const { text, parentId, clientId } = parse(CreateCommentRequest, req.body);
+    const limits = await c.trust.socialLimits(c.db, session.userId);
+    return reply.status(201).send(await c.social.addComment(c.db, parse(IdParam, req.params).id, session.profileId, text, parentId, limits.commentsPerMinute, clientId));
   });
 
   // Comentarios: borrar el propio y reaccionar (ADR 0045).

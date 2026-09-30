@@ -148,8 +148,9 @@ export const api = {
     request<ReactionState>(`/v1/posts/${postId}/reactions/${kind}`, { method: on ? "PUT" : "DELETE" }),
   comments: (postId: string, cursor: string | null = null) =>
     request<{ comments: CommentView[]; nextCursor: string | null }>(`/v1/posts/${postId}/comments${pageQuery({ limit: COMMENTS_PAGE, cursor })}`),
-  addComment: (postId: string, text: string, parentId?: string) =>
-    request<CommentView>(`/v1/posts/${postId}/comments`, { method: "POST", body: JSON.stringify({ text, ...(parentId ? { parentId } : {}) }) }),
+  /** `clientId` (ADR 0178): el mismo en cada reintento del mismo borrador; así un corte no duplica el comentario. */
+  addComment: (postId: string, text: string, parentId?: string, clientId?: string) =>
+    request<CommentView>(`/v1/posts/${postId}/comments`, { method: "POST", body: JSON.stringify({ text, ...(parentId ? { parentId } : {}), ...(clientId ? { clientId } : {}) }) }),
   deleteComment: (commentId: string) => request<void>(`/v1/comments/${commentId}`, { method: "DELETE" }),
   setCommentReaction: (commentId: string, kind: "LIKE" | "SUPPORT" | "USEFUL", on: boolean) =>
     request<ReactionState>(`/v1/comments/${commentId}/reactions/${kind}`, { method: on ? "PUT" : "DELETE" }),

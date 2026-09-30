@@ -90,6 +90,8 @@ export const CreatePostRequest = z.object({
    * de su ámbito (exige `asBusiness` y `eventId`). Se destaca, pero no confirma ni desmiente: eso es la declaración.
    */
   official: z.boolean().default(false),
+  /** Id generado en el teléfono (UUIDv7, ADR 0178): reintentar con el mismo id devuelve el post ya creado. */
+  clientId: z.uuid().optional(),
 });
 export type CreatePostRequest = z.infer<typeof CreatePostRequest>;
 

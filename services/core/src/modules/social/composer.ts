@@ -34,10 +34,13 @@ export class PostComposer {
     const parsed = CreatePostRequest.safeParse(raw);
     if (!parsed.success) throw new DomainError("VALIDATION", parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; "));
     const req = parsed.data;
-    await this.checkHourlyQuota(session);
-
     // Publicar como negocio: solo quien lo administra, nunca de forma seudónima. El cupo por hora es de la persona.
     const businessId = await this.publisher(session, req);
+    // Reintento idempotente (ADR 0178): el mismo id del cliente devuelve el post ya creado, sin gastar cupo.
+    const replay = () => (req.clientId ? this.social.postByClientId(this.db, req.clientId, [businessId ?? profileId]) : Promise.resolve(null));
+    const existing = await replay();
+    if (existing) return existing;
+    await this.checkHourlyQuota(session);
     const media = await this.media.assertAttachable(this.db, profileId, req.mediaIds);
     if (media.filter((m) => m.kind === "VIDEO_RECORDED").length > 1) throw new DomainError("VALIDATION", "Solo un video por publicación");
 
@@ -53,9 +56,27 @@ export class PostComposer {
     // Actualización oficial (ADR 0153): la publica una institución sobre un evento concreto.
     if (req.official && (!req.asBusiness || !event)) throw new DomainError("VALIDATION", "Una actualización oficial se publica como institución y sobre un evento");
 
+    try {
+      return await this.insertPost(session, req, businessId, media, event);
+    } catch (err) {
+      // Dos envíos con el mismo id a la vez: el segundo choca con el índice único y devuelve el primero.
+      if ((err as { code?: string; constraint?: string }).constraint === "posts_client_id_uidx") {
+        const again = await replay();
+        if (again) return again;
+      }
+      throw err;
+    }
+  }
+
+  private async insertPost(
+    session: { userId: string; profileId: string }, req: CreatePostRequest, businessId: string | null,
+    media: Awaited<ReturnType<MediaService["assertAttachable"]>>, event: { id: string; categoryCode: string; sensitivity: string } | null,
+  ): Promise<{ postId: string; eventId: string | null; tags: string[]; mentions: string[] }> {
+    const { profileId } = session;
     return withTransaction(this.db, async (tx) => {
       const postId = await this.social.createPost(tx, {
         authorProfileId: profileId,
+        clientId: req.clientId ?? null,
         kind: req.official ? "OFFICIAL_UPDATE" : "STANDARD",
         text: req.text,
         authorVisibility: req.anonymityMode,

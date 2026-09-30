@@ -1,12 +1,13 @@
 import type { CommentView, FeedPost } from "@dizaster/contracts";
 import { useLocalSearchParams } from "expo-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Alert, FlatList, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { categoryName } from "../../components/feed-list";
 import { Avatar } from "../../components/avatar";
 import { Icon } from "../../components/icon";
 import { PostCard } from "../../components/post-card";
 import { api } from "../../lib/api";
+import { newId } from "../../lib/ids";
 import { lang, t } from "../../lib/i18n";
 import { canBlock } from "../../lib/moderation/logic";
 import { openContentMenu } from "../../lib/moderation/menu";
@@ -37,11 +38,14 @@ export default function PostCommentsScreen() {
     api.comments(id).then((r) => { setComments(r.comments); setNext(r.nextCursor ?? null); }).catch(() => setError(t("loadError")));
   }, [id]);
 
+  // Id del borrador (ADR 0178): se repite en los reintentos y cambia al enviarse bien.
+  const draftId = useRef(newId());
   async function send() {
     if (!id || !text.trim()) return;
     setBusy(true);
     try {
-      const c = await api.addComment(id, text.trim(), replyTo?.id);
+      const c = await api.addComment(id, text.trim(), replyTo?.id, draftId.current);
+      draftId.current = newId();
       setComments((prev) => appendPage(prev, [c]));
       setText("");
       setReplyTo(null);

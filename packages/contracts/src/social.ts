@@ -78,6 +78,8 @@ export const CreateCommentRequest = z.object({
   text: z.string().trim().min(1).max(1000),
   /** Responder a un comentario. Si ese ya es una respuesta, la nueva cuelga del mismo hilo (un nivel). */
   parentId: z.uuid().optional(),
+  /** Id generado en el teléfono (ADR 0178): reintentar con el mismo id devuelve el comentario ya creado. */
+  clientId: z.uuid().optional(),
 });
 
 export interface CommentView {

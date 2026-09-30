@@ -1,9 +1,10 @@
 import { POST_TEXT_MAX, detectPersonalData, extractMentions, extractTags, type BusinessView } from "@dizaster/contracts";
 import { router, useLocalSearchParams } from "expo-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
 import { MediaAttachments } from "../components/media-attachments";
 import { api } from "../lib/api";
+import { newId } from "../lib/ids";
 import { t } from "../lib/i18n";
 import { discardLocal } from "../lib/media/capture";
 import type { LocalMedia } from "../lib/media/local-media";
@@ -34,6 +35,8 @@ export default function ComposeScreen() {
   const [asBusiness, setAsBusiness] = useState<string | null>(params.asBusiness ?? null);
   useEffect(() => { api.myBusinesses().then((r) => setBusinesses(r.businesses)).catch(() => undefined); }, []);
 
+  // Id del borrador (ADR 0178): igual en cada reintento, así un corte de red nunca publica dos veces.
+  const clientId = useRef(newId()).current;
   const tags = extractTags(text);
   const mentions = extractMentions(text);
   const problem = sharing ? null : composeProblem(text, media);
@@ -55,7 +58,7 @@ export default function ComposeScreen() {
         if (!r.ok) throw new Error(r.error);
         mediaIds.push(r.mediaId);
       }
-      await api.createPost({ text: text.trim(), mediaIds, anonymityMode: pseudonymous && !asBusiness ? "PSEUDONYMOUS" : "PUBLIC", ...(asBusiness ? { asBusiness } : {}), ...(params.eventId ? { eventId: params.eventId } : {}), ...(official ? { official: true } : {}) });
+      await api.createPost({ text: text.trim(), mediaIds, anonymityMode: pseudonymous && !asBusiness ? "PSEUDONYMOUS" : "PUBLIC", ...(asBusiness ? { asBusiness } : {}), ...(params.eventId ? { eventId: params.eventId } : {}), ...(official ? { official: true } : {}), clientId });
       for (const m of media) discardLocal(m);
       router.back();
     } catch (e) {
