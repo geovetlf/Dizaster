@@ -8,6 +8,7 @@ import { hardwareId } from "../lib/device/hardware-id";
 import { t } from "../lib/i18n";
 import { useSession } from "../lib/session";
 import { colors, radius, space } from "../theme";
+import { appConfig } from "../lib/config/app-config";
 
 /**
  * Iniciar sesión (§5.1, D-11, ADR 0171). Correo con código de 6 dígitos; Apple y Google se agregan cuando el
@@ -23,7 +24,7 @@ export default function SignInScreen() {
   const [message, setMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    api.config().then((c) => setProviders(c.authProviders ?? null)).catch(() => setProviders(null));
+    appConfig().then((c) => setProviders(c.authProviders ?? null)).catch(() => setProviders(null));
   }, []);
 
   async function send() {

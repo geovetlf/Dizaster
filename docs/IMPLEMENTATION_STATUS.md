@@ -375,6 +375,7 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | 0182 | Particionado mensual preparado (rango por UUIDv7 con la PK actual), probado sobre copias; runbook para activarlo | ✅ |
 | Llamada de emergencia sin esperar al GPS (§8.1) | ✅ | ADR 0183: país por última posición/SIM/perfil/región al elegir categoría, fix con límite de 20 s y reintento, Abrir ajustes si falta permiso de ubicación o cámara |
 | Decisiones: sin señal de red, aceptaciones mínimas tras borrar, todo público en V1 | ✅ | ADR 0184 (propietario, 2026-09-30); migración 0088 |
+| Mapas offline reales (§11.3) | ✅ | ADR 0185: config remota persistida en el teléfono (sin caducidad), una sola petición compartida, mismo estilo oscuro para ver y descargar |
 | Licencias, auditoría, SBOM, Dependabot; respaldo con prueba de restauración en CI | ✅ | ADR 0070, `scripts/supply-chain.mjs`, `scripts/db-restore-check.mjs` |
 | Idioma de la app elegible en el perfil (es/en/pt/fr o del teléfono) | ✅ | ADR 0069, `app/language.tsx` |
 | Varias cuentas en un teléfono corroboran como una (clave seudónima del teléfono) | ✅ | ADR 0068, migración 0036 |
@@ -423,11 +424,10 @@ Revisión del Blueprint del 2026-09-30 (tras ADR 0171): completada con ADR 0172�
 Revisión del Blueprint del 2026-09-30 (tras ADR 0176): completada con ADR 0177–0182.
 
 Revisión del Blueprint del 2026-09-30 (tras ADR 0182), verificada contra el código, sin bloqueos:
-1. Mapas offline de verdad (§11.3): configuración remota guardada en el teléfono y paquetes descargados con el mismo estilo que se muestra.
-2. Canales de aviso en Android como en iOS (§5.10): alertas oficiales críticas separadas de las de la comunidad, con nombres traducidos.
-3. Latido del worker y `/health/ready` (§5.22, §13.1): detectar desde fuera que el worker o el outbox se detuvieron.
-4. Galería del evento con miniaturas (§12.1): la imagen grande solo al abrirla.
-5. Backups cifrados con clave pública y con retención (§13.1).
+1. Canales de aviso en Android como en iOS (§5.10): alertas oficiales críticas separadas de las de la comunidad, con nombres traducidos.
+2. Latido del worker y `/health/ready` (§5.22, §13.1): detectar desde fuera que el worker o el outbox se detuvieron.
+3. Galería del evento con miniaturas (§12.1): la imagen grande solo al abrirla.
+4. Backups cifrados con clave pública y con retención (§13.1).
 
 Bloqueadas o en espera:
 

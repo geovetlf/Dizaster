@@ -11,11 +11,17 @@ export interface MapProvider {
   maxZoom: number;
 }
 
+/**
+ * La app tiene un único tema oscuro (theme.ts): todos los mapas y las regiones descargadas usan el mismo estilo,
+ * así lo descargado es exactamente lo que se ve sin red (ADR 0185).
+ */
+export const APP_MAP_SCHEME = "dark" as const;
+
 /** Estilo mínimo sin red: si el proveedor falla, el mapa sigue mostrando eventos sobre un fondo liso. */
 export const OFFLINE_FALLBACK_STYLE = {
   version: 8 as const,
   sources: {},
-  layers: [{ id: "background", type: "background" as const, paint: { "background-color": "#e8eef2" } }],
+  layers: [{ id: "background", type: "background" as const, paint: { "background-color": "#1C232D" } }],
 };
 
 export function providerFromConfig(map: MapProviderConfig): MapProvider {

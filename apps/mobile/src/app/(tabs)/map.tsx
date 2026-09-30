@@ -15,8 +15,9 @@ import { cacheKeys, readThrough } from "../../lib/offline/read-cache";
 import { readCache } from "../../lib/offline/sqlite-cache";
 import { limitAmbientCache } from "../../lib/map/offline";
 import { lang, t } from "../../lib/i18n";
-import { OFFLINE_FALLBACK_STYLE, providerFromAppConfig, type MapProvider } from "../../lib/map/provider";
+import { APP_MAP_SCHEME, OFFLINE_FALLBACK_STYLE, providerFromAppConfig, type MapProvider } from "../../lib/map/provider";
 import { categoryCatalog, pickerCategories, useCategoryCatalogVersion } from "../../lib/category-store";
+import { appConfig } from "../../lib/config/app-config";
 
 
 /**
@@ -42,7 +43,7 @@ export default function MapScreen() {
   }, [target]);
 
   useEffect(() => {
-    api.config().then((c) => setProvider(providerFromAppConfig(c))).catch(() => setProvider(null));
+    appConfig().then((c) => setProvider(providerFromAppConfig(c))).catch(() => setProvider(null));
     void limitAmbientCache();
   }, []);
 
@@ -90,7 +91,7 @@ export default function MapScreen() {
     <View style={styles.container}>
       <Map
         style={styles.map}
-        mapStyle={provider ? provider.styleUrl("dark") : OFFLINE_FALLBACK_STYLE}
+        mapStyle={provider ? provider.styleUrl(APP_MAP_SCHEME) : OFFLINE_FALLBACK_STYLE}
         onRegionDidChange={onRegionDidChange}
         attribution
         logo={false}

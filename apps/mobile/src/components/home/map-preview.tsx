@@ -5,12 +5,13 @@ import { useEffect, useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { api } from "../../lib/api";
 import { t } from "../../lib/i18n";
-import { OFFLINE_FALLBACK_STYLE, providerFromAppConfig } from "../../lib/map/provider";
+import { APP_MAP_SCHEME, OFFLINE_FALLBACK_STYLE, providerFromAppConfig } from "../../lib/map/provider";
 import { categoryStyle } from "../../lib/ui/categories";
 import { isRtlNow } from "../../lib/ui/apply-direction";
 import { forwardChevron } from "../../lib/ui/direction";
 import { colors, radius, space } from "../../theme";
 import { Icon } from "../icon";
+import { appConfig } from "../../lib/config/app-config";
 
 const ZOOM = 11;
 // Área aproximada visible con zoom 11 en un recuadro de ~360×220 px.
@@ -23,7 +24,7 @@ export function MapPreview({ center, category, onLocate }: { center: { lat: numb
   const c = center ?? { lat: -12.0464, lng: -77.0428 };
 
   useEffect(() => {
-    api.config().then((cfg) => setStyleUrl(providerFromAppConfig(cfg)?.styleUrl("dark") ?? null)).catch(() => setStyleUrl(null));
+    appConfig().then((cfg) => setStyleUrl(providerFromAppConfig(cfg)?.styleUrl(APP_MAP_SCHEME) ?? null)).catch(() => setStyleUrl(null));
   }, []);
 
   useEffect(() => {

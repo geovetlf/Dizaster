@@ -1,12 +1,12 @@
 import { mediaAvailability } from "@dizaster/contracts";
 import { useEffect, useState } from "react";
 import { Image, Linking, Pressable, StyleSheet, Text, View } from "react-native";
-import { api } from "../lib/api";
 import { t, type MessageKey } from "../lib/i18n";
 import { CameraDeniedError, captureMedia, discardLocal, type CaptureKind, type CaptureSource } from "../lib/media/capture";
 import { checkLimits, type LocalMedia } from "../lib/media/local-media";
 import { colors } from "../theme";
 import { RedactEditor } from "./redact-editor";
+import { appConfig } from "../lib/config/app-config";
 
 export const MAX_MEDIA_PER_REPORT = 4;
 
@@ -26,7 +26,7 @@ export function MediaAttachments({ items, onChange, suggestRedaction = false, ca
   // Kill switches remotos (ADR 0082): sin red se muestran las opciones y el servidor decide al subir.
   const [avail, setAvail] = useState({ photo: true, video: true });
   useEffect(() => {
-    api.config().then((c) => setAvail(mediaAvailability(c.killSwitches))).catch(() => undefined);
+    appConfig().then((c) => setAvail(mediaAvailability(c.killSwitches))).catch(() => undefined);
   }, []);
 
   async function add(source: CaptureSource, kind: CaptureKind) {

@@ -1,17 +1,17 @@
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
 import { Linking, Pressable, StyleSheet, Text, View } from "react-native";
-import { api } from "../lib/api";
 import { appPlatform, appVersion } from "../lib/app-identity";
 import { updateRequirement } from "../lib/app-update";
 import { t } from "../lib/i18n";
 import { colors, radius, space } from "../theme";
+import { appConfig } from "../lib/config/app-config";
 
 /** Versión por debajo de la mínima (ADR 0164): `null` mientras no se sabe (se deja usar). */
 export function useUpdateRequirement(): { required: boolean; storeUrl: string | null } {
   const [req, setReq] = useState({ required: false, storeUrl: null as string | null });
   useEffect(() => {
-    api.config().then((c) => setReq(updateRequirement(c, appPlatform, appVersion))).catch(() => undefined);
+    appConfig().then((c) => setReq(updateRequirement(c, appPlatform, appVersion))).catch(() => undefined);
   }, []);
   return req;
 }

@@ -2,11 +2,11 @@ import type { AffectedAreaView } from "@dizaster/contracts";
 import { Camera, GeoJSONSource, Layer, Map } from "@maplibre/maplibre-react-native";
 import { useEffect, useMemo, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
-import { api } from "../lib/api";
 import { t } from "../lib/i18n";
 import { areaBounds } from "../lib/map/area";
-import { OFFLINE_FALLBACK_STYLE, providerFromAppConfig } from "../lib/map/provider";
+import { APP_MAP_SCHEME, OFFLINE_FALLBACK_STYLE, providerFromAppConfig } from "../lib/map/provider";
 import { colors, radius, space } from "../theme";
+import { appConfig } from "../lib/config/app-config";
 
 /**
  * Área oficial afectada en la ficha del evento (ADR 0144): contorno que dieron fuentes externas u oficiales y el
@@ -15,7 +15,7 @@ import { colors, radius, space } from "../theme";
 export function EventAreaMap({ area, point, color }: { area: AffectedAreaView; point: { lat: number; lng: number }; color: string }) {
   const [styleUrl, setStyleUrl] = useState<string | null>(null);
   useEffect(() => {
-    api.config().then((cfg) => setStyleUrl(providerFromAppConfig(cfg)?.styleUrl("dark") ?? null)).catch(() => setStyleUrl(null));
+    appConfig().then((cfg) => setStyleUrl(providerFromAppConfig(cfg)?.styleUrl(APP_MAP_SCHEME) ?? null)).catch(() => setStyleUrl(null));
   }, []);
   const bounds = useMemo(() => areaBounds(area, point), [area, point]);
   const shape = useMemo<GeoJSON.Feature>(() => ({ type: "Feature", geometry: area, properties: {} }), [area]);

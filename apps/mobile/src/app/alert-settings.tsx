@@ -12,7 +12,7 @@ import { enablePush, openSystemSettings, pushPermission } from "../lib/device/pu
 import { countryOf } from "../lib/geo/country";
 import { preferredCountry } from "../lib/geo/preferred-country";
 import { deleteZoneMap } from "../lib/map/offline";
-import { providerFromAppConfig } from "../lib/map/provider";
+import { APP_MAP_SCHEME, providerFromAppConfig } from "../lib/map/provider";
 import { t, type MessageKey } from "../lib/i18n";
 import { useSession } from "../lib/session";
 import { categoryStyle } from "../lib/ui/categories";
@@ -20,6 +20,7 @@ import { areaRow, formatKm } from "../lib/ui/format";
 import { useCoarseLocation } from "../lib/ui/use-coarse-location";
 import { colors, radius, space } from "../theme";
 import { categoryLabel, pickerCategories, useCategoryCatalogVersion } from "../lib/category-store";
+import { appConfig } from "../lib/config/app-config";
 
 const categoryName = categoryLabel;
 
@@ -45,8 +46,8 @@ export default function AlertSettingsScreen() {
 
   useEffect(() => {
     // Solo si el proveedor de mapa permite descargas por región (config remota).
-    api.config()
-      .then((c) => setOfflineStyle(c.map.kind !== "NONE" && c.map.offlineRegions ? providerFromAppConfig(c)?.styleUrl("light") ?? null : null))
+    appConfig()
+      .then((c) => setOfflineStyle(c.map.kind !== "NONE" && c.map.offlineRegions ? providerFromAppConfig(c)?.styleUrl(APP_MAP_SCHEME) ?? null : null))
       .catch(() => setOfflineStyle(null));
   }, []);
 

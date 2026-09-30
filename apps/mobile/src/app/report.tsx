@@ -15,7 +15,7 @@ import { FIX_TIMEOUT_MS, withTimeout } from "../lib/async/timeout";
 import { lang, locale, t, tCount, verificationLabel } from "../lib/i18n";
 import { formatInZone } from "../lib/ui/format";
 import { newId } from "../lib/ids";
-import { OFFLINE_FALLBACK_STYLE, providerFromAppConfig } from "../lib/map/provider";
+import { APP_MAP_SCHEME, OFFLINE_FALLBACK_STYLE, providerFromAppConfig } from "../lib/map/provider";
 import { toPresenceSignals } from "../lib/report/presence";
 import { signEvidence } from "../lib/report/evidence";
 import { signingSeed } from "../lib/device/signing-key";
@@ -27,6 +27,7 @@ import { colors } from "../theme";
 import { categoryIn, findCategory, reportCategories, useCategoryCatalogVersion } from "../lib/category-store";
 import { askSameEvent } from "../lib/report/same-event";
 import { UpdateRequired, useUpdateRequirement } from "../components/update-required";
+import { appConfig } from "../lib/config/app-config";
 
 
 type Phase = "category" | "locating" | "compose";
@@ -67,7 +68,7 @@ export default function ReportScreen() {
   }, []);
 
   useEffect(() => {
-    api.config().then((c) => setStyleUrl(providerFromAppConfig(c)?.styleUrl("light") ?? null)).catch(() => setStyleUrl(null));
+    appConfig().then((c) => setStyleUrl(providerFromAppConfig(c)?.styleUrl(APP_MAP_SCHEME) ?? null)).catch(() => setStyleUrl(null));
   }, []);
 
   async function choose(picked: CategoryConfig) {
