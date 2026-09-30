@@ -17,7 +17,7 @@ export type AlertMatch = z.infer<typeof AlertMatch>;
  * - MENTION: alguien te mencionó en un post (D-MENTION, ADR 0063). No es un EVENT: lleva al post.
  * - MODERATION: moderación actuó sobre tu contenido o tu cuenta, o decidió tu apelación (ADR 0141). Lleva a "mis avisos".
  */
-export const AlertKind = z.enum(["NEW_EVENT", "STATE_CHANGED", "SEVERITY_UP", "RESOLVED", "MENTION", "MODERATION"]);
+export const AlertKind = z.enum(["NEW_EVENT", "STATE_CHANGED", "SEVERITY_UP", "RESOLVED", "MENTION", "MODERATION", "OFFICIAL_UPDATE"]);
 export type AlertKind = z.infer<typeof AlertKind>;
 
 const minutes = z.number().int().min(0).max(1439);

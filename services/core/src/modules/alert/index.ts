@@ -35,6 +35,8 @@ import {
   MENTION_LIMITS,
   mentionText,
   moderationNoticeText,
+  officialUpdateText,
+  OFFICIAL_UPDATE_WINDOW_MINUTES,
   NOTIFIED_MODERATION_ACTIONS_EXCLUDED,
   type ModerationNoticeKind,
   alertText,
@@ -123,6 +125,7 @@ export class AlertService {
       if (!p.affectedUserId || p.reverses || NOTIFIED_MODERATION_ACTIONS_EXCLUDED.includes(p.action)) return;
       await this.moderationNotice(tx, p.affectedUserId, `MODERATION:${p.actionId}`, "ACTION");
     });
+    dispatcher.on("OfficialUpdatePosted", "alert.official-update", (e, tx) => this.officialUpdate(tx, e.payload).then(() => undefined));
     dispatcher.on("AppealDecided", "alert.appeal-notice", async (e, tx) => {
       await this.moderationNotice(tx, e.payload.appellantUserId, `APPEAL:${e.payload.appealId}`, e.payload.outcome);
     });
@@ -164,6 +167,48 @@ export class AlertService {
     );
     await publish(tx, "AlertTriggered", { alertId, eventId: null, kind: "MODERATION" }, { lane: "interactive" });
     return 1;
+  }
+
+  /**
+   * Actualización oficial (ADR 0157): avisa a quien sigue el evento y a quien ya recibió avisos de él, con sus
+   * preferencias (cambios de estado, eventos seguidos, silencio). Como mucho un aviso por evento cada
+   * `OFFICIAL_UPDATE_WINDOW_MINUTES`: una institución que publica seguido no genera una ráfaga. NO AI REQUIRED.
+   */
+  async officialUpdate(tx: Queryable, p: { postId: string; eventId: string; institutionName: string }): Promise<number> {
+    const snap = await this.events.alertSnapshot(tx, p.eventId);
+    if (!snap || snap.mergedIntoId || snap.publicationState !== "PUBLISHED") return 0;
+    const found = new Map<string, { userId: string; match: AlertMatch }>();
+    for (const f of await this.social.followersOf(tx, { eventId: snap.id, placeIds: [] })) found.set(f.profileId, { userId: f.userId, match: "FOLLOWED_EVENT" });
+    const prior = await tx.query<{ profile_id: string; user_id: string }>(
+      `SELECT DISTINCT n.profile_id, n.user_id FROM alert.notifications n JOIN alert.alerts a ON a.id = n.alert_id WHERE a.event_id = $1 AND a.kind <> 'OFFICIAL_UPDATE'`,
+      [snap.id],
+    );
+    for (const r of prior.rows) if (!found.has(r.profile_id)) found.set(r.profile_id, { userId: r.user_id, match: "PREVIOUSLY_ALERTED" });
+    if (found.size === 0) return 0;
+    const prefs = await this.prefsFor(tx, [...found.keys()]);
+    const recipients = [...found.entries()]
+      .map(([profileId, v]) => ({ profileId, ...v, prefs: prefs.get(profileId) ?? DEFAULT_PREFERENCES }))
+      .filter((r) => wants(r.prefs, "OFFICIAL_UPDATE", r.match, snap.severity));
+    if (recipients.length === 0) return 0;
+    const bucket = Math.floor(this.clock.now().getTime() / (OFFICIAL_UPDATE_WINDOW_MINUTES * 60_000));
+    const inserted = await tx.query<{ id: string }>(
+      `INSERT INTO alert.alerts (id, kind, dedup_key, event_id, post_id, critical) VALUES ($1, 'OFFICIAL_UPDATE', $2, $3, $4, false)
+       ON CONFLICT (dedup_key) DO NOTHING RETURNING id`,
+      [newId(), `OFFICIAL_UPDATE:${snap.id}:${bucket}`, snap.id, p.postId],
+    );
+    const alertId = inserted.rows[0]?.id;
+    if (!alertId) return 0;
+    const res = await tx.query(
+      `INSERT INTO alert.notifications (id, alert_id, profile_id, user_id, match, title, body)
+       SELECT id, $1, p, u, m, t, b FROM unnest($2::uuid[], $3::uuid[], $4::uuid[], $5::text[], $6::text[], $7::text[]) AS x(id, p, u, m, t, b)
+       ON CONFLICT (profile_id, alert_id) DO NOTHING`,
+      [
+        alertId, recipients.map(() => newId()), recipients.map((r) => r.profileId), recipients.map((r) => r.userId), recipients.map((r) => r.match),
+        recipients.map((r) => officialUpdateText(r.prefs.lang, p.institutionName).title), recipients.map((r) => officialUpdateText(r.prefs.lang, p.institutionName).body),
+      ],
+    );
+    if (res.rowCount) await publish(tx, "AlertTriggered", { alertId, eventId: snap.id, kind: "OFFICIAL_UPDATE" }, { lane: "interactive" });
+    return res.rowCount ?? 0;
   }
 
   // ───────────── Decidir ─────────────

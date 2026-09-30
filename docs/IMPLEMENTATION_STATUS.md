@@ -347,6 +347,7 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | 0154 | Preferencias de alerta por zona guardada: gravedad mínima y categorías por zona, y edición de zonas en la app | ✅ |
 | 0155 | Ítems externos en ERROR sin tumbar la corrida, compartidos fuera de la app contados por persona, seguidores al dividir | ✅ |
 | 0156 | "¿Es el mismo evento?" tras un adjunto ambiguo: pregunta al enviar y en Mis reportes; Sí confirma, No queda anotado a la espera de D2 | ✅ |
+| 0157 | Aviso push de actualizaciones oficiales a quien sigue el evento, con preferencias y como mucho uno cada 30 min por evento | ✅ |
 | Licencias, auditoría, SBOM, Dependabot; respaldo con prueba de restauración en CI | ✅ | ADR 0070, `scripts/supply-chain.mjs`, `scripts/db-restore-check.mjs` |
 | Idioma de la app elegible en el perfil (es/en/pt/fr o del teléfono) | ✅ | ADR 0069, `app/language.tsx` |
 | Varias cuentas en un teléfono corroboran como una (clave seudónima del teléfono) | ✅ | ADR 0068, migración 0036 |
@@ -386,7 +387,6 @@ Revisión del Blueprint del 2026-09-29 (tras ADR 0112): completada con ADR 0113�
 
 Revisión del Blueprint del 2026-09-29 (tras ADR 0148), verificada contra el código, sin bloqueos:
 
-1. Aviso push de actualizaciones oficiales a quienes siguen el evento (ADR 0153)
 
 
 Bloqueadas o en espera:

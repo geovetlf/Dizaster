@@ -201,6 +201,8 @@ export function alertText(
       return mentionText(lang, null);
     case "MODERATION":
       return moderationNoticeText(lang, "ACTION");
+    case "OFFICIAL_UPDATE":
+      return officialUpdateText(lang, null);
   }
 }
 
@@ -291,6 +293,22 @@ const MODERATION_TEXT: Record<Lang, Record<ModerationNoticeKind, { title: string
     REVERSED: { title: "Votre appel a été accepté", body: "La décision a été annulée. Touchez pour le détail." },
   },
 };
+
+/** Una actualización oficial avisa como mucho una vez por evento en esta ventana (el resto queda en el feed). */
+export const OFFICIAL_UPDATE_WINDOW_MINUTES = 30;
+
+const OFFICIAL_UPDATE_TEXT: Record<Lang, { title: (who: string | null) => string; body: string }> = {
+  es: { title: (w) => (w ? `${w} · Actualización oficial` : "Actualización oficial"), body: "Nueva actualización sobre un evento que sigues." },
+  en: { title: (w) => (w ? `${w} · Official update` : "Official update"), body: "New update on an event you follow." },
+  pt: { title: (w) => (w ? `${w} · Atualização oficial` : "Atualização oficial"), body: "Nova atualização sobre um evento que você segue." },
+  fr: { title: (w) => (w ? `${w} · Mise à jour officielle` : "Mise à jour officielle"), body: "Nouvelle mise à jour sur un événement que vous suivez." },
+};
+
+/** Texto del aviso de actualización oficial: el nombre público de la institución, nunca el texto del post. */
+export function officialUpdateText(lang: Lang, institution: string | null): { title: string; body: string } {
+  const t = OFFICIAL_UPDATE_TEXT[lang];
+  return { title: t.title(institution), body: t.body };
+}
 
 /** Texto del aviso de moderación. Nunca nombra a quien denunció ni copia el contenido. NO AI REQUIRED. */
 export function moderationNoticeText(lang: Lang, kind: ModerationNoticeKind): { title: string; body: string } {

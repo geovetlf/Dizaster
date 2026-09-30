@@ -68,6 +68,10 @@ export class PostComposer {
       for (const mediaId of await this.media.reuseSuspected(tx, media.map((m) => m.id))) await publish(tx, "MediaReuseDetected", { mediaId });
       for (const mediaId of await this.media.heldByBlocklist(tx, media.map((m) => m.id))) await publish(tx, "BlockedMediaMatched", { mediaId });
       if (event) await this.social.linkPostToEvent(tx, postId, event.id, req.official ? "UPDATE" : "MENTION");
+      if (event && req.official && req.asBusiness) {
+        const institution = await this.business.officialInfo(tx, req.asBusiness);
+        await publish(tx, "OfficialUpdatePosted", { postId, eventId: event.id, institutionName: institution?.name ?? req.asBusiness });
+      }
       const indexed = await this.social.indexPostText(tx, postId, profileId, req.text);
       return { postId, eventId: event?.id ?? null, ...indexed };
     });

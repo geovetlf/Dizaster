@@ -87,7 +87,8 @@ export default function AlertsScreen() {
           loading ? <ActivityIndicator color={colors.textMuted} style={styles.empty} /> : <Text style={styles.empty}>{error ? t("loadError") : t("noAlerts")}</Text>
         }
         renderItem={({ item }) => {
-          const s = item.categoryCode ? categoryStyle(item.categoryCode)
+          const s = item.kind === "OFFICIAL_UPDATE" ? { icon: "bullhorn-outline" as const, color: colors.link }
+            : item.categoryCode ? categoryStyle(item.categoryCode)
             : item.kind === "MODERATION" ? { icon: "shield-check-outline" as const, color: colors.link } : { icon: "at" as const, color: colors.accent };
           const note = deliveryNoteKey(item.delivery);
           return (

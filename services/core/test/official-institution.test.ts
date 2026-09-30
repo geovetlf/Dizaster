@@ -150,3 +150,28 @@ describe("actualizaciones oficiales (ADR 0153)", () => {
     expect((await post(owner, { text, official: true, eventId, asBusiness: "bomberos_pe" })).statusCode).toBe(403);
   });
 });
+
+describe("aviso de actualizaciones oficiales (ADR 0157)", () => {
+  it("avisa a quien sigue el evento con el nombre de la institución, una vez por ventana", async () => {
+    await setVerification("bomberos_pe", "INSTITUTIONAL_OFFICIAL");
+    await setScope("bomberos_pe", { categories: ["fire"], countries: ["PE"] });
+    const eventId = await fireEvent("vecino_aviso", { lat: -12.6, lng: -76.5 });
+    const fan = await createUser(t, "sigue_incendio");
+    const nadie = await createUser(t, "no_sigue");
+    expect((await t.app.inject({ method: "PUT", url: `/v1/follows/event/${eventId}`, headers: auth(fan) })).statusCode).toBe(200);
+    const post = (text: string) => t.app.inject({ method: "POST", url: "/v1/posts", headers: auth(owner), payload: { text, official: true, eventId, asBusiness: "bomberos_pe" } });
+    expect((await post("Controlado al 80 %.")).statusCode).toBe(201);
+    await t.c.dispatcher.drain();
+    const inbox = async (u: TestUser) => ((await t.app.inject({ url: "/v1/me/notifications", headers: auth(u) })).json() as { notifications: { kind: string; title: string; body: string; eventId: string | null }[] })
+      .notifications.filter((n) => n.kind === "OFFICIAL_UPDATE");
+    const got = await inbox(fan);
+    expect(got).toHaveLength(1);
+    expect(got[0]).toMatchObject({ title: "Cuerpo de Bomberos · Actualización oficial", eventId });
+    expect(got[0]!.body).not.toContain("80");
+    expect(await inbox(nadie)).toEqual([]);
+    // Otra actualización enseguida queda en el feed, sin otro aviso.
+    expect((await post("Controlado al 100 %.")).statusCode).toBe(201);
+    await t.c.dispatcher.drain();
+    expect(await inbox(fan)).toHaveLength(1);
+  });
+});
