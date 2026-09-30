@@ -506,8 +506,7 @@ Revisión del Blueprint del 2026-09-30 (tras ADR 0220): completada con ADR 0221�
 
 Revisión del Blueprint del 2026-09-30 (tras ADR 0228): completada con ADR 0229–0240 (privacidad de eventos cercanos, IA sin FALSE, auditoría, accesibilidad).
 
-Revisión del Blueprint del 2026-09-30 (tras ADR 0240), verificada contra el código, sin bloqueos:
-
+Revisión del Blueprint del 2026-09-30 (tras ADR 0240): completada con ADR 0241–0250 (alertas vencidas, ingesta robusta, worker aislado y transaccional, cola offline, retención, fusión, mapa offline).
 
 Bloqueadas o en espera:
 
