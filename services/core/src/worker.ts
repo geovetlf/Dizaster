@@ -114,6 +114,7 @@ function maintenanceLoop(): Promise<void> {
       log("retention.alerts", await c.alerts.applyRetention(c.env.NOTIFICATION_RETENTION_DAYS));
       log("retention.outbox", { deleted: await c.dispatcher.purgeProcessed(c.env.OUTBOX_RETENTION_DAYS) });
       log("retention.heartbeats", { deleted: await c.heartbeat.prune() });
+      log("retention.identity", await c.identity.applyRetention(c.db, c.clock.now()));
       log("retention.client_crashes", { deleted: await c.crashes.applyRetention(c.env.CLIENT_CRASH_RETENTION_DAYS) });
     }
     await sleep(5000);

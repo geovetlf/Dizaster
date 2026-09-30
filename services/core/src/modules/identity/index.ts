@@ -605,6 +605,16 @@ export class IdentityService {
     const { rows } = await q.query<{ id: string }>(`SELECT id FROM identity.users WHERE $1 = ANY(roles) AND status = 'ACTIVE'`, [role]);
     return rows.map((r) => r.id);
   }
+  /**
+   * Retención de identidad (ADR 0210, §13.2). Los códigos de acceso por correo solo sirven 1 h (límite por hora) y
+   * los fallos de MFA 15 min (bloqueo). Se borran a las 24 h. Lo llama el worker una vez al día.
+   */
+  async applyRetention(q: Queryable, now: Date): Promise<{ emailChallenges: number; mfaFailures: number }> {
+    const email = await q.query(`DELETE FROM identity.email_challenges WHERE created_at < $1::timestamptz - interval '24 hours'`, [now]);
+    const mfa = await q.query(`DELETE FROM identity.mfa_failures WHERE at < $1::timestamptz - interval '24 hours'`, [now]);
+    return { emailChallenges: email.rowCount ?? 0, mfaFailures: mfa.rowCount ?? 0 };
+  }
+
   // ───────────── Exportación de datos personales (ADR 0038) ─────────────
 
   /** Cuenta, dispositivos, sesiones y aceptaciones. Sin secretos: ni hashes de token ni tokens push. */
