@@ -115,7 +115,7 @@ export default function CaseScreen() {
         </Text>
       ))}
 
-      <TextInput value={reason} onChangeText={setReason} multiline maxLength={1000} placeholder={t("actionReason")} placeholderTextColor={colors.textMuted} style={styles.input} />
+      <TextInput accessibilityLabel={t("actionReason")} value={reason} onChangeText={setReason} multiline maxLength={1000} placeholder={t("actionReason")} placeholderTextColor={colors.textMuted} style={styles.input} />
       {error ? <Text style={styles.error}>{error}</Text> : null}
       {presence ? presenceLines(presence, t).map((l) => <Text key={l} style={styles.meta}>{l}</Text>) : null}
       <View style={styles.actions}>

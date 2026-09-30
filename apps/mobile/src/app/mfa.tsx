@@ -72,7 +72,7 @@ export default function MfaScreen() {
       ) : null}
       {status?.enrolled || enroll ? (
         <>
-          <TextInput
+          <TextInput accessibilityLabel={recoveryMode ? t("mfaRecoveryCode") : t("mfaCode")}
             value={code}
             onChangeText={(v) => setCode(recoveryMode ? v : cleanTotp(v))}
             keyboardType={recoveryMode ? "default" : "number-pad"}

@@ -46,7 +46,7 @@ function Notice({ notice, onChange }: { notice: ModerationNotice; onChange: (n: 
       ) : null}
       {open ? (
         <>
-          <TextInput value={text} onChangeText={setText} multiline maxLength={1000} placeholder={t("appealText")} placeholderTextColor={colors.textMuted} style={styles.input} />
+          <TextInput accessibilityLabel={t("appealText")} value={text} onChangeText={setText} multiline maxLength={1000} placeholder={t("appealText")} placeholderTextColor={colors.textMuted} style={styles.input} />
           {error ? <Text style={styles.error}>{error}</Text> : null}
           <Pressable accessibilityRole="button" disabled={!validReason(text)} style={[styles.button, !validReason(text) && styles.disabled]} onPress={() => void send()}>
             <Text style={styles.buttonText}>{t("appeal")}</Text>

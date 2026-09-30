@@ -82,7 +82,7 @@ export default function SearchScreen() {
     <View style={styles.container}>
       <View style={styles.box}>
         <Icon name="magnify" size={22} color={colors.textMuted} />
-        <TextInput autoFocus value={q} onChangeText={setQ} placeholder={t("searchPlaceholder")} placeholderTextColor={colors.textMuted} style={styles.input} />
+        <TextInput accessibilityLabel={t("searchPlaceholder")} autoFocus value={q} onChangeText={setQ} placeholder={t("searchPlaceholder")} placeholderTextColor={colors.textMuted} style={styles.input} />
       </View>
       <SectionList
         sections={sections}

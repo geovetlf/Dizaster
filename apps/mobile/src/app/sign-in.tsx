@@ -63,7 +63,7 @@ export default function SignInScreen() {
       <Text style={styles.body}>{t("signInBody")}</Text>
       {emailOff ? <Text style={styles.body}>{t("signInUnavailable")}</Text> : step === "email" ? (
         <>
-          <TextInput value={email} onChangeText={setEmail} autoCapitalize="none" autoComplete="email" keyboardType="email-address" textContentType="emailAddress"
+          <TextInput accessibilityLabel={t("signInEmail")} value={email} onChangeText={setEmail} autoCapitalize="none" autoComplete="email" keyboardType="email-address" textContentType="emailAddress"
             maxLength={254} placeholder={t("signInEmail")} placeholderTextColor={colors.textMuted} style={styles.input} />
           <Pressable accessibilityRole="button" disabled={busy} style={[styles.button, busy && styles.disabled]} onPress={() => void send()}>
             <Text style={styles.buttonText}>{t("signInSendCode")}</Text>
@@ -71,7 +71,7 @@ export default function SignInScreen() {
         </>
       ) : (
         <>
-          <TextInput value={code} onChangeText={setCode} keyboardType="number-pad" autoComplete="one-time-code" textContentType="oneTimeCode"
+          <TextInput accessibilityLabel={t("signInCodeLabel")} value={code} onChangeText={setCode} keyboardType="number-pad" autoComplete="one-time-code" textContentType="oneTimeCode"
             maxLength={9} placeholder="123456" placeholderTextColor={colors.textMuted} style={styles.input} />
           <Pressable accessibilityRole="button" disabled={busy} style={[styles.button, busy && styles.disabled]} onPress={() => void verify()}>
             <Text style={styles.buttonText}>{t("signInEnter")}</Text>

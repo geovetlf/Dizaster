@@ -57,9 +57,9 @@ export default function ProfileEditScreen() {
       <AvatarPicker name={me.displayName} url={me.avatarUrl} apply={async (id) => { const m = await api.setAvatar(id); forgetMe(); return m.avatarUrl; }} />
       <Text style={styles.label}>@{me.handle}</Text>
       <Text style={styles.label}>{t("displayName")}</Text>
-      <TextInput value={name} onChangeText={setName} maxLength={50} style={styles.input} placeholderTextColor={colors.textMuted} />
+      <TextInput accessibilityLabel={t("displayName")} value={name} onChangeText={setName} maxLength={50} style={styles.input} placeholderTextColor={colors.textMuted} />
       <Text style={styles.label}>{t("bio")}</Text>
-      <TextInput value={bio} onChangeText={setBio} maxLength={BIO_MAX} multiline style={[styles.input, styles.bio]}
+      <TextInput accessibilityLabel={t("bioPlaceholder")} value={bio} onChangeText={setBio} maxLength={BIO_MAX} multiline style={[styles.input, styles.bio]}
         placeholder={t("bioPlaceholder")} placeholderTextColor={colors.textMuted} />
       <Text style={styles.hint}>{bio.length}/{BIO_MAX} · {t("bioPublic")}</Text>
       <Text style={styles.label}>{t("units")}</Text>
@@ -91,7 +91,7 @@ export default function ProfileEditScreen() {
           </Pressable>
         ) : null}
       </View>
-      <TextInput value={countryQuery} onChangeText={setCountryQuery} placeholder={t("searchCountry")} placeholderTextColor={colors.textMuted}
+      <TextInput accessibilityLabel={t("searchCountry")} value={countryQuery} onChangeText={setCountryQuery} placeholder={t("searchCountry")} placeholderTextColor={colors.textMuted}
         style={[styles.input, styles.countrySearch]} autoCorrect={false} />
       <View style={styles.wrap}>
         {filterCountries(options, countryQuery, [regionOf(locale)]).filter((o) => o.code !== country).map((o) => (

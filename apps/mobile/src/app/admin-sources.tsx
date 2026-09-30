@@ -49,7 +49,7 @@ export default function AdminSourcesScreen() {
       ListHeaderComponent={
         <View style={{ gap: space.sm }}>
           {error ? <Text style={styles.error}>{error}</Text> : <Text style={styles.meta}>{t("sourcesHint")}</Text>}
-          <TextInput value={reason} onChangeText={setReason} maxLength={1000} placeholder={t("actionReason")} placeholderTextColor={colors.textMuted} style={styles.input} />
+          <TextInput accessibilityLabel={t("actionReason")} value={reason} onChangeText={setReason} maxLength={1000} placeholder={t("actionReason")} placeholderTextColor={colors.textMuted} style={styles.input} />
         </View>
       }
       renderItem={({ item: s }) => {

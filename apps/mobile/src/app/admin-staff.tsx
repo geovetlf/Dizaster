@@ -46,10 +46,10 @@ export default function AdminStaffScreen() {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
       {error ? <Text style={styles.error}>{error}</Text> : null}
-      <TextInput value={reason} onChangeText={setReason} maxLength={1000} placeholder={t("actionReason")} placeholderTextColor={colors.textMuted} style={styles.input} />
+      <TextInput accessibilityLabel={t("actionReason")} value={reason} onChangeText={setReason} maxLength={1000} placeholder={t("actionReason")} placeholderTextColor={colors.textMuted} style={styles.input} />
 
       <Text style={styles.section}>{t("roleGrantSection")}</Text>
-      <TextInput value={handle} onChangeText={setHandle} autoCapitalize="none" autoCorrect={false} maxLength={41} placeholder="@handle" placeholderTextColor={colors.textMuted} style={styles.input} />
+      <TextInput accessibilityLabel={t("staffHandle")} value={handle} onChangeText={setHandle} autoCapitalize="none" autoCorrect={false} maxLength={41} placeholder="@handle" placeholderTextColor={colors.textMuted} style={styles.input} />
       <View style={styles.chips}>
         {STAFF_ROLES.map((r) => (
           <Pressable key={r} accessibilityRole="button" accessibilityState={{ selected: role === r }} style={[styles.chip, role === r && styles.chipOn]} onPress={() => setRole(r)}>

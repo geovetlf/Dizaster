@@ -233,7 +233,7 @@ function Subscriptions({ subs, onChange }: { subs: CategorySubscription[]; onCha
               <Text style={styles.action}>{t("addSubscription")}</Text>
             </Pressable>
           ) : null}
-          <TextInput value={q} onChangeText={setQ} placeholder={t("chooseArea")} placeholderTextColor={colors.textMuted} style={styles.input} />
+          <TextInput accessibilityLabel={t("chooseArea")} value={q} onChangeText={setQ} placeholder={t("chooseArea")} placeholderTextColor={colors.textMuted} style={styles.input} />
           {areas.map((a) => {
             const r = areaRow(a);
             return (

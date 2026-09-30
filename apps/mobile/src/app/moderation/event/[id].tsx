@@ -75,12 +75,12 @@ export default function EventToolsScreen() {
       </Pressable>
       {merged ? <Text style={styles.meta}>{t("mergedInto")}</Text> : null}
 
-      <TextInput value={reason} onChangeText={setReason} multiline maxLength={1000} placeholder={t("actionReason")} placeholderTextColor={colors.textMuted} style={styles.input} />
+      <TextInput accessibilityLabel={t("actionReason")} value={reason} onChangeText={setReason} multiline maxLength={1000} placeholder={t("actionReason")} placeholderTextColor={colors.textMuted} style={styles.input} />
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
       {/* Notas internas (ADR 0147): solo moderación las ve; nunca salen en la línea de tiempo pública. */}
       <Text style={styles.section}>{t("moderatorNotes")}</Text>
-      <TextInput value={note} onChangeText={setNote} multiline maxLength={2000} placeholder={t("moderatorNoteHint")} placeholderTextColor={colors.textMuted} style={styles.input} />
+      <TextInput accessibilityLabel={t("moderatorNoteHint")} value={note} onChangeText={setNote} multiline maxLength={2000} placeholder={t("moderatorNoteHint")} placeholderTextColor={colors.textMuted} style={styles.input} />
       <Pressable accessibilityRole="button" accessibilityState={{ disabled: note.trim().length < 3 || busy }} disabled={note.trim().length < 3 || busy}
         style={[styles.button, (note.trim().length < 3 || busy) && styles.disabled]}
         onPress={() => void run(async () => { await api.addModeratorNote(event.id, note.trim()); setNote(""); })}>

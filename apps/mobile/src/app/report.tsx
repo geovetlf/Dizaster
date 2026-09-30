@@ -28,6 +28,7 @@ import { categoryIn, findCategory, reportCategories, useCategoryCatalogVersion }
 import { askSameEvent } from "../lib/report/same-event";
 import { UpdateRequired, useUpdateRequirement } from "../components/update-required";
 import { appConfig } from "../lib/config/app-config";
+import { useAnnounce } from "../lib/a11y/announce";
 import { betterFix, pinFollowsFix, pushRecent, WATCH_INTERVAL_MS, WATCH_MAX_MS, FIX_TARGET_ACCURACY_M } from "../lib/report/fix-refine";
 import { recoverPendingCapture, type CaptureKind, type CaptureSource } from "../lib/media/capture";
 import { draftWorthKeeping, type ReportDraft } from "../lib/report/draft";
@@ -65,6 +66,8 @@ export default function ReportScreen() {
   const capturing = useRef<ReportDraft["pendingCapture"]>(null);
   // Versión por debajo de la mínima (ADR 0164): no se envía; emergencias sigue a mano.
   const update = useUpdateRequirement();
+  // Lector de pantalla (ADR 0198): ubicación, envío, cola sin conexión y errores se anuncian.
+  useAnnounce(status);
 
   useEffect(() => {
     if (!deny) return;
@@ -369,7 +372,7 @@ export default function ReportScreen() {
 
       <MediaAttachments items={media} onChange={setMedia} suggestRedaction={category.sensitivity !== "NORMAL"} cameraOnly
         onCaptureStart={captureStart} onCaptureEnd={captureEnd} />
-      <TextInput style={styles.input} multiline maxLength={2000} value={text} onChangeText={setText} placeholder="…" placeholderTextColor={colors.textMuted} />
+      <TextInput accessibilityLabel={t("reportDescription")} style={styles.input} multiline maxLength={2000} value={text} onChangeText={setText} placeholder={t("reportDescription")} placeholderTextColor={colors.textMuted} />
       {detectPersonalData(text).length ? <Text style={[styles.note, styles.warn]}>{t("personalDataWarning")}</Text> : null}
       {category.forcePseudonymous ? (
         <Text style={styles.note}>{t("pseudonymousForced")}</Text>

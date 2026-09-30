@@ -34,10 +34,10 @@ export default function SignInMethodsScreen() {
       {!providers.includes("EMAIL") ? (
         <>
           <Text style={styles.section}>{t("methodAddEmail")}</Text>
-          <TextInput value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" maxLength={254}
+          <TextInput accessibilityLabel={t("signInEmail")} value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" maxLength={254}
             placeholder={t("signInEmail")} placeholderTextColor={colors.textMuted} style={styles.input} />
           {sent ? (
-            <TextInput value={code} onChangeText={setCode} keyboardType="number-pad" maxLength={9} placeholder="123456" placeholderTextColor={colors.textMuted} style={styles.input} />
+            <TextInput accessibilityLabel={t("signInCodeLabel")} value={code} onChangeText={setCode} keyboardType="number-pad" maxLength={9} placeholder="123456" placeholderTextColor={colors.textMuted} style={styles.input} />
           ) : null}
           <Pressable accessibilityRole="button" style={styles.button} onPress={() => void (sent ? link() : send())}>
             <Text style={styles.buttonText}>{t(sent ? "methodLink" : "signInSendCode")}</Text>

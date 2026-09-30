@@ -46,7 +46,7 @@ export default function FlagScreen() {
           <Text style={styles.rowText}>{t(`reason_${r}`)}</Text>
         </Pressable>
       ))}
-      <TextInput value={note} onChangeText={setNote} maxLength={500} multiline placeholder={t("flagNote")} placeholderTextColor={colors.textMuted} style={styles.input} />
+      <TextInput accessibilityLabel={t("flagNote")} value={note} onChangeText={setNote} maxLength={500} multiline placeholder={t("flagNote")} placeholderTextColor={colors.textMuted} style={styles.input} />
       {state === "error" ? <Text style={styles.error}>{t("loadError")}</Text> : null}
       <Pressable accessibilityRole="button" disabled={!reason || state === "sending"} style={[styles.button, (!reason || state === "sending") && styles.disabled]} onPress={() => void send()}>
         <Text style={styles.buttonText}>{t("flag")}</Text>

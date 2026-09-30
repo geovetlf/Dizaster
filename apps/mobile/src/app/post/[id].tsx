@@ -140,7 +140,7 @@ export default function PostCommentsScreen() {
         </Pressable>
       ) : null}
       <View style={styles.composer}>
-        <TextInput value={text} onChangeText={setText} maxLength={1000} multiline placeholder={t("writeComment")} placeholderTextColor={colors.textMuted} style={styles.input} />
+        <TextInput accessibilityLabel={t("writeComment")} value={text} onChangeText={setText} maxLength={1000} multiline placeholder={t("writeComment")} placeholderTextColor={colors.textMuted} style={styles.input} />
         <Pressable accessibilityRole="button" disabled={busy || !text.trim()} style={[styles.send, (busy || !text.trim()) && styles.disabled]} onPress={() => void send()}>
           <Text style={styles.sendText}>{t("publish")}</Text>
         </Pressable>

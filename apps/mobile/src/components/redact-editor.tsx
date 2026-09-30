@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Image, Modal, Pressable, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { t } from "../lib/i18n";
+import { useReduceMotion } from "../lib/a11y/announce";
 import { BOX_SIZES, toggleBoxAt, type BoxSize } from "../lib/media/redaction";
 import { colors, radius, space } from "../theme";
 
@@ -14,6 +15,7 @@ export function RedactEditor({ uri, width, height, boxes, onDone }: {
   uri: string; width: number | null; height: number | null; boxes: RedactionBox[]; onDone: (boxes: RedactionBox[] | null) => void;
 }) {
   const win = useWindowDimensions();
+  const reduceMotion = useReduceMotion();
   const [draft, setDraft] = useState<RedactionBox[]>(boxes);
   const [size, setSize] = useState<BoxSize>("M");
   const ratio = width && height ? width / height : 4 / 3;
@@ -21,7 +23,7 @@ export function RedactEditor({ uri, width, height, boxes, onDone }: {
   const viewH = viewW / ratio;
 
   return (
-    <Modal visible animationType="slide" onRequestClose={() => onDone(null)}>
+    <Modal visible animationType={reduceMotion ? "none" : "slide"} onRequestClose={() => onDone(null)}>
       <SafeAreaView style={styles.safe}>
         <Text style={styles.title}>{t("redactTitle")}</Text>
         <Text style={styles.note}>{t("redactHelp")}</Text>

@@ -3,6 +3,7 @@ import { useVideoPlayer, VideoView } from "expo-video";
 import { useState } from "react";
 import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { t } from "../lib/i18n";
+import { useReduceMotion } from "../lib/a11y/announce";
 import { duration, imageUri } from "../lib/ui/format";
 import { SensitiveCover } from "./sensitive-cover";
 
@@ -23,13 +24,14 @@ export function EventMedia({ media }: { media: MediaView[] }) {
 /** En la tira, la miniatura; la imagen grande solo se descarga al abrirla (ADR 0188, ahorra datos). */
 function Photo({ m }: { m: MediaView }) {
   const [open, setOpen] = useState(false);
+  const reduceMotion = useReduceMotion();
   return (
     <>
       <Pressable accessibilityRole="imagebutton" accessibilityLabel={t("viewPhoto")} onPress={() => setOpen(true)}>
         <Image source={{ uri: imageUri(m, "small") }} style={[styles.item, aspect(m)]} resizeMode="cover" accessibilityIgnoresInvertColors />
       </Pressable>
       {open ? (
-        <Modal visible animationType="fade" onRequestClose={() => setOpen(false)} supportedOrientations={["portrait", "landscape"]}>
+        <Modal visible animationType={reduceMotion ? "none" : "fade"} onRequestClose={() => setOpen(false)} supportedOrientations={["portrait", "landscape"]}>
           <View style={styles.viewer}>
             <Image source={{ uri: imageUri(m, "large") }} style={StyleSheet.absoluteFill} resizeMode="contain" accessibilityIgnoresInvertColors />
             <Pressable accessibilityRole="button" accessibilityLabel={t("close")} hitSlop={12} onPress={() => setOpen(false)} style={styles.closeBtn}>

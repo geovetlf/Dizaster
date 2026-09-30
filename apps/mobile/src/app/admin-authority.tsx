@@ -70,7 +70,7 @@ export default function AdminAuthorityScreen() {
   }
 
   const field = (key: keyof typeof form, placeholder: string, multiline = false) => (
-    <TextInput
+    <TextInput accessibilityLabel={placeholder}
       value={form[key]}
       onChangeText={(x) => setForm((f) => ({ ...f, [key]: x }))}
       placeholder={placeholder}
@@ -134,7 +134,7 @@ export default function AdminAuthorityScreen() {
                     {l.note ? `: ${l.note}` : ""}
                   </Text>
                 ))}
-                <TextInput value={note} onChangeText={setNote} placeholder={t("authorityNote")} placeholderTextColor={colors.textMuted} multiline style={[styles.input, styles.multiline]} />
+                <TextInput accessibilityLabel={t("authorityNote")} value={note} onChangeText={setNote} placeholder={t("authorityNote")} placeholderTextColor={colors.textMuted} multiline style={[styles.input, styles.multiline]} />
                 <View style={styles.chips}>
                   <Pressable accessibilityRole="button" style={styles.chip} onPress={() => step(null)}>
                     <Text style={styles.chipText}>{t("authorityAddNote")}</Text>

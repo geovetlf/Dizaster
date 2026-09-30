@@ -116,7 +116,7 @@ function DuplicateRow({ candidate, onDone }: { candidate: DuplicateCandidateView
             <Text style={styles.text} numberOfLines={1}>{i + 1}. {eventTitle(e, lang)} · {e.reportCount} · {timeAgo(e.firstSeenAt, lang)}</Text>
           </Pressable>
         ))}
-        <TextInput value={reason} onChangeText={setReason} maxLength={1000} placeholder={t("actionReason")} placeholderTextColor={colors.textMuted} style={styles.input} />
+        <TextInput accessibilityLabel={t("actionReason")} value={reason} onChangeText={setReason} maxLength={1000} placeholder={t("actionReason")} placeholderTextColor={colors.textMuted} style={styles.input} />
         {error ? <Text style={styles.error}>{error}</Text> : null}
         <View style={styles.buttons}>
           <Pressable accessibilityRole="button" disabled={!ok} style={[styles.button, !ok && styles.disabled]} onPress={() => void act(() => api.mergeEvents(a.id, [b.id], reason.trim()))}>
@@ -153,7 +153,7 @@ function AppealRow({ appeal, onDone }: { appeal: AppealView; onDone: () => void 
         <Text style={styles.meta}>{appeal.action.reason}</Text>
         {appeal.target?.text ? <Text style={styles.text} numberOfLines={3}>{appeal.target.text}</Text> : null}
         <Text style={styles.appealText}>“{appeal.text}”</Text>
-        <TextInput value={reason} onChangeText={setReason} maxLength={1000} placeholder={t("appealDecisionReason")} placeholderTextColor={colors.textMuted} style={styles.input} />
+        <TextInput accessibilityLabel={t("appealDecisionReason")} value={reason} onChangeText={setReason} maxLength={1000} placeholder={t("appealDecisionReason")} placeholderTextColor={colors.textMuted} style={styles.input} />
         {error ? <Text style={styles.error}>{error}</Text> : null}
         <View style={styles.buttons}>
           <Pressable accessibilityRole="button" disabled={!ok} style={[styles.button, !ok && styles.disabled]} onPress={() => void decide("UPHOLD")}>

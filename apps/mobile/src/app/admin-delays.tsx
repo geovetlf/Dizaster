@@ -51,7 +51,7 @@ export default function AdminDelaysScreen() {
               {v ? `${v.minutes} min${v.overridden ? ` · ${t("delayCatalog")} ${v.catalogMinutes} min` : ""}` : "…"}
             </Text>
             <View style={styles.editRow}>
-              <TextInput
+              <TextInput accessibilityLabel={t("delayMinutes")}
                 value={drafts[item.code] ?? ""}
                 onChangeText={(x) => setDrafts((prev) => ({ ...prev, [item.code]: x }))}
                 keyboardType="number-pad"

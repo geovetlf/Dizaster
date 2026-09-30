@@ -63,7 +63,7 @@ export default function AdminCostScreen() {
             <Text style={styles.sub}>DB {formatBytes(d.gauges.databaseBytes)} · Media {formatBytes(d.gauges.mediaStoredBytes)}</Text>
           </View>
 
-          <View style={styles.bars} accessibilityLabel="requests">
+          <View style={styles.bars} accessibilityLabel={t("costRequestsChart")}>
             {heights.map((h, i) => <View key={d.daily[i]!.day} style={[styles.bar, { height: 4 + h * 56 }]} />)}
           </View>
 
@@ -140,7 +140,7 @@ function BudgetEditor({ budget, onSaved }: { budget: BudgetView; onSaved: () => 
           </Pressable>
         ))}
       </View>
-      <TextInput value={text} onChangeText={setText} keyboardType="decimal-pad" placeholder="USD" placeholderTextColor={colors.textMuted} style={styles.input} />
+      <TextInput accessibilityLabel={t("budgetAmount")} value={text} onChangeText={setText} keyboardType="decimal-pad" placeholder="USD" placeholderTextColor={colors.textMuted} style={styles.input} />
       {error ? <Text style={styles.note}>{error}</Text> : null}
       <Pressable accessibilityRole="button" disabled={value === null} style={[styles.save, value === null && styles.disabled]} onPress={save}>
         <Text style={styles.rangeText}>{t("apply")}</Text>

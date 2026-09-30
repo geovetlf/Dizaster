@@ -71,7 +71,7 @@ export default function AgeCheckScreen() {
       <Text style={styles.title}>{t("ageTitle")}</Text>
       <Text style={styles.body}>{t("ageBody").replace("{age}", String(minAge))}</Text>
       <Text style={styles.label}>{t("ageYear")}</Text>
-      <TextInput value={year} onChangeText={(v) => setYear(v.replace(/\D/g, "").slice(0, 4))} keyboardType="number-pad" maxLength={4}
+      <TextInput accessibilityLabel={t("ageYear")} value={year} onChangeText={(v) => setYear(v.replace(/\D/g, "").slice(0, 4))} keyboardType="number-pad" maxLength={4}
         placeholder="1995" placeholderTextColor={colors.textMuted} style={styles.input} />
       <Text style={styles.label}>{t("ageMonth")}</Text>
       <View style={styles.months}>

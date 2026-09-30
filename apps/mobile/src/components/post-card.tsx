@@ -138,11 +138,11 @@ export function PostCard({ post, categoryName }: { post: FeedPost; categoryName:
       </View>
 
       <View style={styles.actions}>
-        <Pressable accessibilityRole="button" accessibilityState={{ selected: liked }} style={styles.action} onPress={() => void toggle("LIKE")}>
+        <Pressable accessibilityRole="button" accessibilityLabel={`${t("a11yLike")}, ${react.reactions.LIKE ?? 0}`} accessibilityState={{ selected: liked }} style={styles.action} onPress={() => void toggle("LIKE")}>
           <Icon name={liked ? "heart" : "heart-outline"} size={24} color={liked ? colors.like : colors.text} />
           <Text style={styles.count}>{react.reactions.LIKE ?? 0}</Text>
         </Pressable>
-        <Pressable accessibilityRole="button" style={styles.action} onPress={() => router.push(`/post/${post.id}`)}>
+        <Pressable accessibilityRole="button" accessibilityLabel={`${t("comments")}, ${post.commentCount}`} style={styles.action} onPress={() => router.push(`/post/${post.id}`)}>
           <Icon name="comment-outline" size={22} color={colors.text} />
           <Text style={styles.count}>{post.commentCount}</Text>
         </Pressable>
@@ -191,9 +191,9 @@ function SharedPost({ post, categoryName }: { post: FeedPost | null; categoryNam
 function MediaGrid({ media, onOpen }: { media: MediaView[]; onOpen: (() => void) | undefined }) {
   const { main, side, extra } = mediaLayout(media);
   if (!main) return null;
-  if (side.length === 0) return <Pressable accessibilityRole="button" disabled={!onOpen} onPress={onOpen}><Tile m={main} style={styles.single} /></Pressable>;
+  if (side.length === 0) return <Pressable accessibilityRole="button" accessibilityLabel={t("a11yOpenMedia")} disabled={!onOpen} onPress={onOpen}><Tile m={main} style={styles.single} /></Pressable>;
   return (
-    <Pressable accessibilityRole="button" disabled={!onOpen} onPress={onOpen} style={styles.grid}>
+    <Pressable accessibilityRole="button" accessibilityLabel={`${t("a11yOpenMedia")} (${media.length})`} disabled={!onOpen} onPress={onOpen} style={styles.grid}>
       <Tile m={main} style={styles.main} />
       <View style={styles.sideCol}>
         {side.map((m) => <Tile key={m.id} m={m} style={styles.side} small />)}

@@ -6,6 +6,7 @@ import { CameraDeniedError, captureMedia, discardLocal, type CaptureKind, type C
 import { checkLimits, type LocalMedia } from "../lib/media/local-media";
 import { colors } from "../theme";
 import { RedactEditor } from "./redact-editor";
+import { useAnnounce } from "../lib/a11y/announce";
 import { appConfig } from "../lib/config/app-config";
 
 export const MAX_MEDIA_PER_REPORT = 4;
@@ -26,6 +27,7 @@ export function MediaAttachments({ items, onChange, suggestRedaction = false, ca
   const [message, setMessage] = useState<string | null>(null);
   const [cameraDenied, setCameraDenied] = useState(false);
   const full = items.length >= MAX_MEDIA_PER_REPORT;
+  useAnnounce(message);
   // Kill switches remotos (ADR 0082): sin red se muestran las opciones y el servidor decide al subir.
   const [avail, setAvail] = useState({ photo: true, video: true });
   useEffect(() => {

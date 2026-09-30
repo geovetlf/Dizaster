@@ -85,7 +85,7 @@ export default function ZoneEditScreen() {
           </Pressable>
         ))}
       </View>
-      <TextInput value={name} onChangeText={setName} maxLength={40} placeholder={t("zoneName")} placeholderTextColor={colors.textMuted} style={styles.input} />
+      <TextInput accessibilityLabel={t("zoneName")} value={name} onChangeText={setName} maxLength={40} placeholder={t("zoneName")} placeholderTextColor={colors.textMuted} style={styles.input} />
 
       <Text style={styles.section}>{t("zoneRadius")}</Text>
       <View style={styles.chips}>
@@ -133,7 +133,7 @@ export default function ZoneEditScreen() {
             <Icon name="crosshairs-gps" size={22} color={colors.text} />
             <Text style={styles.label}>{t("zoneUseHere")}</Text>
           </Pressable>
-          <TextInput value={q} onChangeText={setQ} placeholder={t("chooseArea")} placeholderTextColor={colors.textMuted} style={styles.input} />
+          <TextInput accessibilityLabel={t("chooseArea")} value={q} onChangeText={setQ} placeholder={t("chooseArea")} placeholderTextColor={colors.textMuted} style={styles.input} />
           {areas.map((a) => {
             const r = areaRow(a);
             return (
