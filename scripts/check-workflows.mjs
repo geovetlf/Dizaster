@@ -25,6 +25,13 @@ for (const name of readdirSync(dir).filter((f) => /\.ya?ml$/.test(f))) {
     }
   }
 }
+// Imágenes base de los Dockerfile fijadas por digest (ADR 0273).
+for (const name of readdirSync("infra/docker").filter((f) => f.endsWith("Dockerfile"))) {
+  for (const [i, line] of readFileSync(join("infra/docker", name), "utf8").split("\n").entries()) {
+    const from = /^FROM\s+(\S+)/i.exec(line)?.[1];
+    if (from && !/@sha256:[0-9a-f]{64}$/.test(from)) problems.push(`infra/docker/${name}:${i + 1}: \`${from}\` no está fijada por digest`);
+  }
+}
 if (problems.length) {
   console.error(`Workflows sin endurecer (ADR 0264):\n${problems.map((p) => `  - ${p}`).join("\n")}`);
   process.exit(1);

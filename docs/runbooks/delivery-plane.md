@@ -44,6 +44,21 @@ y queda en la auditoría.
 - La base de datos no se revierte automáticamente: las migraciones son compatibles hacia atrás. Una restauración sigue
   `respaldo-y-restauracion.md` y la autoriza el propietario.
 
+## Desplegar, promover y volver atrás (ADR 0272)
+
+Todo es en seco hasta añadir `--execute` (y eso solo cuando existan los proyectos, D-18):
+
+```sh
+pnpm dzd config-check --env-file staging.env          # secretos como secret:<id>
+pnpm dzd deploy --env staging --digest sha256:… --project … --region … --image …/dizaster/core --url https://…
+pnpm dzd promote --digest sha256:… --project … --region … --image … --url https://…   # mismo digest que staging
+pnpm dzd rollback --env production --project … --region …                             # a la versión anterior
+pnpm dzd audit stats
+```
+
+El rollback solo mueve tráfico. Si la versión nueva incluyó una migración, ver
+`docs/runbooks/migracion-fallida.md`.
+
 ## Auditoría
 
 `dzd audit verify --log delivery-audit.jsonl` confirma que nadie cambió, borró ni reordenó entradas.

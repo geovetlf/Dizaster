@@ -1,5 +1,6 @@
 # Imagen única del backend: el mismo artefacto corre como API (server) o como worker.
-FROM node:22-bookworm-slim AS build
+# Imagen base fijada por digest (ADR 0273): Dependabot (docker) propone la actualización.
+FROM node:22-bookworm-slim@sha256:43ac6c60b8f89723f746e8a92ce91abd5017e627ce1ddfe4238355d3a30b772c AS build
 WORKDIR /repo
 RUN corepack enable
 COPY . .
@@ -10,7 +11,7 @@ RUN pnpm install --frozen-lockfile --filter @dizaster/core... \
  && find /out/node_modules -path '*geo-tz/data/*' ! -name 'timezones-1970.*' -delete \
  && cp -r data /data
 
-FROM node:22-bookworm-slim
+FROM node:22-bookworm-slim@sha256:43ac6c60b8f89723f746e8a92ce91abd5017e627ce1ddfe4238355d3a30b772c
 ENV NODE_ENV=production DATA_DIR=/data
 # La imagen solo ejecuta node: sin npm, npx, corepack ni yarn (npm trae dependencias con avisos HIGH, ADR 0267).
 RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack /opt/yarn-* \

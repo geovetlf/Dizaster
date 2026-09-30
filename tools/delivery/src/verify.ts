@@ -10,6 +10,11 @@ export const DEFAULT_CHECKS: Check[] = [
   { name: "vivo", path: "/health", status: 200, maxMs: 2000 },
   { name: "listo (worker y cola)", path: "/health/ready", status: 200, maxMs: 3000 },
   { name: "contrato OpenAPI", path: "/v1/openapi.json", status: 200, maxMs: 3000, bodyIncludes: "\"openapi\"" },
+  // Lecturas públicas del camino crítico (§20.14): configuración de la app, catálogo, mapa (PostGIS) y feed.
+  { name: "configuración de la app", path: "/v1/config", status: 200, maxMs: 2000, bodyIncludes: "\"apiVersion\":\"v1\"" },
+  { name: "catálogo de categorías", path: "/v1/reference/categories", status: 200, maxMs: 2000 },
+  { name: "mapa (consulta geográfica)", path: "/v1/events?bbox=-77.2,-12.2,-76.9,-11.9&zoom=10", status: 200, maxMs: 3000 },
+  { name: "feed público", path: "/v1/feed", status: 200, maxMs: 3000 },
 ];
 
 export type Fetcher = (url: string, init: { signal: AbortSignal }) => Promise<{ status: number; text(): Promise<string> }>;

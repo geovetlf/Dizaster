@@ -40,3 +40,5 @@ plan.json
 *.manifest.json
 image-digest.txt
 core.sbom.cdx.json
+delivery-releases.jsonl
+delivery-report.md

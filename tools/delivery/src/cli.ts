@@ -4,16 +4,23 @@
  * sin credenciales. GitHub Actions lo ejecuta; Claude y las personas también pueden ejecutarlo localmente.
  */
 import { execFileSync, spawnSync } from "node:child_process";
-import { readFileSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { sha256File, verifyManifest, type ArtifactManifest } from "./artifact.js";
 import { appendAudit, readLog, verifyLog, type Actor } from "./audit.js";
 import { decide, LEVELS, type Action } from "./autonomy.js";
+import { CloudRunTarget, type Runner } from "./cloudrun.js";
+import { costGate } from "./cost.js";
+import { rollbackTo, rollout } from "./deploy.js";
 import { diagnose } from "./diagnose.js";
 import { checkDocs } from "./docs.js";
 import { checkIamHcl, checkPlan, type TofuPlan } from "./iac.js";
 import { analyze, gitChanges, parseNameStatus, workspacePackages, type Change } from "./inspect.js";
 import { loadPolicy, outcomeFor, type Environment, type Outcome } from "./policy.js";
 import { planGates } from "./plan.js";
+import { appendRelease, lastServing, promotable, readReleases, rollbackCandidate } from "./releases.js";
+import { markdownReport } from "./report.js";
+import { deliveryStats } from "./stats.js";
 import { allOk, runChecks } from "./verify.js";
 
 const [cmd, ...rest] = process.argv.slice(2);
@@ -47,6 +54,27 @@ function impact() {
   const read = (p: string) => { try { return readFileSync(p, "utf8"); } catch { return ""; } };
   return { policy, changes: ch, impact: analyze(ch, policy, { pkgs: workspacePackages(), readFile: read, ref: flag("ref", process.env["GITHUB_REF"]) }) };
 }
+
+/**
+ * Ejecución real de gcloud solo con `--execute` (y solo cuando existan los proyectos, D-18). Por defecto, en seco:
+ * se imprime cada comando y no se toca la nube.
+ */
+function runner(): Runner {
+  if (!flags.has("execute")) return async (c, args) => { console.log(`[en seco] ${c} ${args.join(" ")}`); return ""; };
+  return async (c, args) => execFileSync(c, args, { encoding: "utf8", stdio: ["ignore", "pipe", "inherit"] });
+}
+
+/** La automatización respeta el nivel de autonomía; una persona que ejecuta el comando decide por sí misma. */
+function guard(action: Action, outcome: Outcome = "auto"): void {
+  const actor = flag("actor", "human");
+  if (actor === "human") return;
+  const d = decide(loadPolicy(flag("policy")).autonomyLevel, action, outcome);
+  if (!d.allowed) fail(`${action} no permitido para ${actor}: ${d.reason}`, 3);
+}
+
+const latestMigration = (): string | undefined => {
+  try { return readdirSync("services/core/migrations").filter((f) => f.endsWith(".sql")).sort().at(-1); } catch { return undefined; }
+};
 
 function fail(msg: string, code = 1): never {
   console.error(msg);
@@ -115,7 +143,12 @@ switch (cmd) {
   }
   case "audit": {
     const log = flag("log", "delivery-audit.jsonl")!;
-    if (rest[0] === "verify") {
+    if (rest[0] === "stats") {
+      const st = deliveryStats(readLog(log));
+      const pct = (x: number | null) => (x === null ? "—" : `${Math.round(x * 100)} %`);
+      out(st, () => [`Despliegues: ${st.deploys} (fallidos ${st.failedDeploys}, rollbacks ${st.rollbacks})`,
+        `Tasa de fallos: ${pct(st.changeFailureRate)} · por semana: ${st.deploysPerWeek?.toFixed(1) ?? "—"} · recuperación (mediana): ${st.medianRecoveryMinutes?.toFixed(0) ?? "—"} min`].join("\n"));
+    } else if (rest[0] === "verify") {
       const r = verifyLog(readLog(log));
       if (!r.ok) fail(`Auditoría alterada en la entrada ${r.index}: ${r.problem}`);
       console.log("auditoría íntegra");
@@ -178,7 +211,89 @@ switch (cmd) {
     if (missing.length) process.exit(1);
     break;
   }
+  case "report": {
+    const { policy, impact: im } = impact();
+    const md = markdownReport(im, planGates(im), { staging: outcomeFor(policy, im.risk, "staging"), production: outcomeFor(policy, im.risk, "production") });
+    if (flag("out")) writeFileSync(flag("out")!, md);
+    process.stdout.write(md);
+    break;
+  }
+  case "cost": {
+    const policy = loadPolicy(flag("policy"));
+    const resource = flag("resource") ?? fail("--resource es obligatorio");
+    const r = costGate(policy.cost, { [resource]: Number(flag("used", "0")) }, { resource, estimate: Number(flag("estimate", "0")) });
+    out(r, () => `${r.allowed ? "✓" : "✗"} ${r.reason}`);
+    if (!r.allowed) process.exit(1);
+    break;
+  }
+  case "config-check": {
+    // La validación es la del propio backend (loadEnv), en otro proceso: el Delivery Plane no importa el runtime.
+    const file = flag("env-file") ?? fail("--env-file es obligatorio");
+    const vars = Object.fromEntries(readFileSync(file, "utf8").split("\n").map((l) => l.trim()).filter((l) => l && !l.startsWith("#"))
+      .map((l) => { const i = l.indexOf("="); return [l.slice(0, i).trim(), l.slice(i + 1).trim()]; }));
+    // Un secreto se declara como `secret:<id>` (vive en Secret Manager): se comprueba que exista, no su valor.
+    const env = Object.fromEntries(Object.entries(vars).map(([k, v]) => [k, v.startsWith("secret:") ? `placeholder-${"x".repeat(40)}` : v]));
+    const r = spawnSync(process.execPath, [flag("checker", "services/core/dist/config-check-cli.js")!], { env: { PATH: process.env["PATH"], ...env }, encoding: "utf8" });
+    process.stdout.write(r.stdout ?? "");
+    if (r.status !== 0) fail(`Configuración rechazada: ${(r.stderr ?? "").trim()}`);
+    break;
+  }
+  case "deploy":
+  case "promote": {
+    const env = (cmd === "promote" ? "production" : flag("env", "staging")) as "staging" | "production";
+    const digest = flag("digest") ?? fail("--digest es obligatorio");
+    const service = flag("service", "api")!;
+    const releases = flag("releases", "delivery-releases.jsonl")!;
+    const history = readReleases(releases);
+    if (env === "production" && !promotable(history, service, digest)) fail("Solo se promueve a producción un digest ya desplegado y verificado en staging (§20.13).");
+    guard(env === "production" ? "promote-production" : "deploy-staging", flag("outcome", "auto") as Outcome);
+    const target = new CloudRunTarget({
+      project: flag("project") ?? fail("--project es obligatorio"), region: flag("region") ?? fail("--region es obligatorio"),
+      service, image: flag("image") ?? fail("--image es obligatorio (REGIÓN-docker.pkg.dev/PROYECTO/dizaster/core)"),
+    }, runner());
+    const url = flag("url");
+    const dry = !flags.has("execute");
+    const res = await rollout(target, digest, async (rev, stage) => {
+      if (dry) return [{ name: "en seco", ok: true, ms: 0, detail: "sin verificación" }];
+      const base = stage === "candidate" ? rev.url ?? url : url;
+      if (!base) return [{ name: "verificación", ok: false, ms: 0, detail: "sin URL (--url)" }];
+      return runChecks(base);
+    }, flag("percents", "10,100")!.split(",").map(Number));
+    const configSha = flag("config") ? createHash("sha256").update(readFileSync(flag("config")!)).digest("hex") : undefined;
+    appendRelease(releases, {
+      env, service, revision: res.revision, outcome: dry ? "dry-run" : res.outcome, previous: res.previous, configSha, migration: latestMigration(),
+      at: new Date().toISOString(), actor: flag("actor", "human")!,
+    });
+    appendAudit(flag("log", "delivery-audit.jsonl")!, {
+      actor: flag("actor", "human") as Actor, action: cmd, environment: env, artifactDigest: digest,
+      result: dry ? "ok" : res.outcome === "deployed" ? "ok" : res.outcome === "rolled-back" ? "rolled-back" : "failed",
+      details: { dryRun: dry, steps: res.steps },
+    });
+    out(res, () => [`${dry ? "[en seco] " : ""}${res.outcome}: ${res.revision.name} (${digest.slice(0, 19)}…)`,
+      ...res.steps.map((st) => `  ${st.ok ? "✓" : "✗"} ${st.stage}${st.failed.length ? ` — ${st.failed.join("; ")}` : ""}`)].join("\n"));
+    if (!dry && res.outcome !== "deployed") process.exit(1);
+    break;
+  }
+  case "rollback": {
+    const env = flag("env", "staging") as "staging" | "production";
+    const service = flag("service", "api")!;
+    const releases = flag("releases", "delivery-releases.jsonl")!;
+    const history = readReleases(releases);
+    guard(env === "production" ? "rollback-production" : "rollback-staging");
+    const to = flag("to") && flag("to") !== "previous"
+      ? history.filter((r) => r.env === env && r.service === service && r.outcome === "deployed" && r.revision.digest === flag("to")).at(-1) ?? fail("Ese digest no se desplegó en este entorno.")
+      : rollbackCandidate(history, env, service) ?? fail("No hay versión anterior registrada para volver.");
+    const target = new CloudRunTarget({
+      project: flag("project") ?? fail("--project es obligatorio"), region: flag("region") ?? fail("--region es obligatorio"), service, image: flag("image", "")!,
+    }, runner());
+    await rollbackTo(target, to.revision);
+    const serving = lastServing(history, env, service);
+    appendRelease(releases, { ...to, outcome: flags.has("execute") ? "rollback" : "dry-run", previous: serving?.revision ?? null, at: new Date().toISOString(), actor: flag("actor", "human")! });
+    appendAudit(flag("log", "delivery-audit.jsonl")!, { actor: flag("actor", "human") as Actor, action: "rollback", environment: env, artifactDigest: to.revision.digest, result: "ok", details: { dryRun: !flags.has("execute"), migration: to.migration } });
+    console.log(`${flags.has("execute") ? "" : "[en seco] "}tráfico al 100 % en ${to.revision.name} (${to.revision.digest.slice(0, 19)}…); esquema compatible hasta ${to.migration ?? "—"}`);
+    break;
+  }
   default:
-    console.log("uso: dzd <inspect|plan|policy|run-gates|autonomy|audit [verify]|artifact [verify]|verify|iac-check|diagnose|docs> [--json]");
+    console.log("uso: dzd <inspect|plan|policy|run-gates|autonomy|audit [verify]|artifact [verify]|verify|iac-check|diagnose|docs|report|cost|config-check|deploy|promote|rollback|audit stats> [--json]");
     if (cmd) process.exit(1);
 }

@@ -120,9 +120,12 @@ describe("Cloud Run (sin ejecutar: D-18)", () => {
 
 describe("verificación post-despliegue", () => {
   it("estado, latencia y contenido", async () => {
-    const fetcher: Fetcher = async (url) => ({ status: url.endsWith("/health/ready") ? 503 : 200, text: async () => "{\"openapi\":\"3.1.0\"}" });
+    const fetcher: Fetcher = async (url) => ({ status: url.endsWith("/health/ready") ? 503 : 200, text: async () => "{\"openapi\":\"3.1.0\",\"apiVersion\":\"v1\"}" });
     const r = await runChecks("http://x", undefined, fetcher);
-    expect(r.map((c) => c.ok)).toEqual([true, false, true]);
+    expect(r.map((c) => c.ok)).toEqual([true, false, true, true, true, true, true]);
+    // Si la respuesta no es la esperada, la comprobación falla aunque el estado sea 200.
+    const wrong = await runChecks("http://x", undefined, async () => ({ status: 200, text: async () => "<html>" }));
+    expect(wrong.filter((c) => !c.ok).map((c) => c.name)).toEqual(["contrato OpenAPI", "configuración de la app"]);
   });
 });
 
