@@ -2,7 +2,9 @@ import type { ModerationNotice } from "@dizaster/contracts";
 import { useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { LoadState } from "../components/load-state";
 import { api } from "../lib/api";
+import { classifyLoadError, type LoadErrorKind } from "../lib/errors/load-error";
 import { lang, t } from "../lib/i18n";
 import { validReason } from "../lib/moderation/logic";
 import { timeAgo } from "../lib/ui/format";
@@ -11,11 +13,18 @@ import { colors, radius, space } from "../theme";
 /** Transparencia: qué se hizo con mi contenido o mi cuenta, por qué, y apelación (la revisa otra persona). */
 export default function MyModerationScreen() {
   const [notices, setNotices] = useState<ModerationNotice[]>([]);
-  useFocusEffect(useCallback(() => { api.myModeration().then((r) => setNotices(r.notices)).catch(() => undefined); }, []));
+  // Cargando, error (con Reintentar) o lista (ADR 0233): un fallo de red nunca parece "no hay avisos".
+  const [state, setState] = useState<"loading" | LoadErrorKind | "ok">("loading");
+  const load = useCallback(() => {
+    api.myModeration().then((r) => { setNotices(r.notices); setState("ok"); }).catch((e) => setState(classifyLoadError(e)));
+  }, []);
+  useFocusEffect(load);
+  if (state !== "ok" && notices.length === 0) return <LoadState state={state === "notFound" ? "failed" : state} onRetry={load} />;
   return (
     <FlatList
       style={styles.container}
       data={notices}
+      ListEmptyComponent={<Text style={styles.empty}>{t("noModerationNotices")}</Text>}
       keyExtractor={(n) => n.action.id}
       renderItem={({ item }) => <Notice notice={item} onChange={(n) => setNotices((prev) => prev.map((x) => (x.action.id === n.action.id ? n : x)))} />}
     />
@@ -59,6 +68,7 @@ function Notice({ notice, onChange }: { notice: ModerationNotice; onChange: (n: 
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg, padding: space.lg },
+  empty: { color: colors.textMuted, textAlign: "center", marginTop: space.xl },
   card: { backgroundColor: colors.surface, borderRadius: radius.md, padding: space.lg, marginBottom: space.sm, gap: space.xs },
   title: { color: colors.text, fontWeight: "700" },
   reason: { color: colors.text },

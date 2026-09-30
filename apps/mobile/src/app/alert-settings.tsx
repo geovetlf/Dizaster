@@ -2,7 +2,7 @@ import { MAX_SAVED_ZONES, type AlertPreferences, type AreaSearchResult, type Cat
 import * as Location from "expo-location";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
+import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
 import { Icon } from "../components/icon";
 import { ZoneMapButton } from "../components/zone-map-button";
 import { cycle, zonePrefsSummary, QUIET_PRESETS, quietLabel, sameQuiet, zoneKindInfo, zoneTitle, type PermissionView } from "../lib/alerts/logic";
@@ -23,6 +23,11 @@ import { categoryLabel, pickerCategories, useCategoryCatalogVersion } from "../l
 import { appConfig } from "../lib/config/app-config";
 
 const categoryName = categoryLabel;
+
+/** Un cambio de alertas que no llegó al servidor nunca se da por hecho (ADR 0233). */
+function showError(e: unknown) {
+  Alert.alert(t("alertChangeFailed"), e instanceof Error && e.message ? e.message : t("loadError"));
+}
 
 const SEVERITIES = [1, 2, 3, 4, 5] as const;
 const PER_HOUR = [2, 4, 6, 10, 20] as const;
@@ -90,10 +95,15 @@ export default function AlertSettingsScreen() {
     if (on) await sendNearMe(true);
   }
 
+  /** Primero el servidor (ADR 0233): si falla, la zona sigue en pantalla y se dice por qué; su mapa offline no se borra. */
   async function removeZone(id: string) {
-    setZones(zones.filter((z) => z.id !== id));
+    try {
+      await api.removeZone(id);
+    } catch (e) {
+      return showError(e);
+    }
+    setZones((all) => all.filter((z) => z.id !== id));
     await deleteZoneMap(id).catch(() => undefined);
-    await api.removeZone(id).catch(() => undefined);
   }
 
   if (!prefs) {
@@ -185,16 +195,24 @@ function Subscriptions({ subs, onChange }: { subs: CategorySubscription[]; onCha
 
   async function add(areaId: string) {
     if (!category) return;
-    const created = await api.addAlertSubscription({ categoryCode: category, areaId }).catch(() => null);
-    if (!created) return;
+    let created: CategorySubscription;
+    try {
+      created = await api.addAlertSubscription({ categoryCode: category, areaId });
+    } catch (e) {
+      return showError(e);
+    }
     onChange([...subs.filter((s) => s.id !== created.id), created]);
     setCategory(null);
     setQ("");
   }
 
   async function remove(id: string) {
+    try {
+      await api.removeAlertSubscription(id);
+    } catch (e) {
+      return showError(e);
+    }
     onChange(subs.filter((s) => s.id !== id));
-    await api.removeAlertSubscription(id).catch(() => undefined);
   }
 
   return (

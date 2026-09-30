@@ -2,6 +2,7 @@ import { can, type AppealView, type CaseSummary, type DuplicateCandidateView } f
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 import { FlatList, Pressable, RefreshControl, StyleSheet, Text, TextInput, View } from "react-native";
+import { LoadState } from "../../components/load-state";
 import { api } from "../../lib/api";
 import { useRoles } from "../../lib/auth/roles";
 import { lang, t } from "../../lib/i18n";
@@ -17,6 +18,8 @@ export default function ModerationScreen() {
   const [appeals, setAppeals] = useState<AppealView[]>([]);
   const [duplicates, setDuplicates] = useState<DuplicateCandidateView[]>([]);
   const [loaded, setLoaded] = useState(false);
+  // Pestañas cuya carga falló (ADR 0233): se muestra error con Reintentar, nunca "no hay casos".
+  const [failed, setFailed] = useState<Record<"queue" | "appeals" | "duplicates", boolean>>({ queue: false, appeals: false, duplicates: false });
 
   // Cada rol ve sus pestañas (ADR 0101): verificación solo duplicados; moderación, todo.
   const roles = useRoles();
@@ -27,10 +30,11 @@ export default function ModerationScreen() {
 
   const load = useCallback(async () => {
     const [q, a, d] = await Promise.all([
-      moderates ? api.moderationQueue().catch(() => null) : null,
-      moderates ? api.appeals().catch(() => null) : null,
-      verifies ? api.duplicateQueue().catch(() => null) : null,
+      moderates ? api.moderationQueue().catch(() => undefined) : null,
+      moderates ? api.appeals().catch(() => undefined) : null,
+      verifies ? api.duplicateQueue().catch(() => undefined) : null,
     ]);
+    setFailed({ queue: q === undefined, appeals: a === undefined, duplicates: d === undefined });
     if (q) { setCases(q.cases); setCursor(q.nextCursor); }
     if (a) setAppeals(a.appeals);
     if (d) setDuplicates(d.candidates);
@@ -61,7 +65,7 @@ export default function ModerationScreen() {
           keyExtractor={(c) => c.id}
           refreshControl={<RefreshControl refreshing={false} onRefresh={() => void load()} tintColor={colors.textMuted} />}
           onEndReached={() => void more()}
-          ListEmptyComponent={loaded ? <Text style={styles.empty}>{t("noCases")}</Text> : null}
+          ListEmptyComponent={failed.queue ? <LoadState state="failed" onRetry={() => void load()} /> : loaded ? <Text style={styles.empty}>{t("noCases")}</Text> : null}
           renderItem={({ item }) => (
             <Pressable accessibilityRole="link" style={styles.row} onPress={() => router.push(`/moderation/${item.id}`)}>
               <View style={styles.priority}><Text style={styles.priorityText}>{Math.round(item.priority)}</Text></View>
@@ -78,14 +82,14 @@ export default function ModerationScreen() {
           data={duplicates}
           keyExtractor={(d) => d.id}
           refreshControl={<RefreshControl refreshing={false} onRefresh={() => void load()} tintColor={colors.textMuted} />}
-          ListEmptyComponent={loaded ? <Text style={styles.empty}>{t("noDuplicatePairs")}</Text> : null}
+          ListEmptyComponent={failed.duplicates ? <LoadState state="failed" onRetry={() => void load()} /> : loaded ? <Text style={styles.empty}>{t("noDuplicatePairs")}</Text> : null}
           renderItem={({ item }) => <DuplicateRow candidate={item} onDone={() => setDuplicates((prev) => prev.filter((d) => d.id !== item.id))} />}
         />
       ) : (
         <FlatList
           data={appeals}
           keyExtractor={(a) => a.id}
-          ListEmptyComponent={loaded ? <Text style={styles.empty}>{t("noAppeals")}</Text> : null}
+          ListEmptyComponent={failed.appeals ? <LoadState state="failed" onRetry={() => void load()} /> : loaded ? <Text style={styles.empty}>{t("noAppeals")}</Text> : null}
           renderItem={({ item }) => <AppealRow appeal={item} onDone={() => setAppeals((prev) => prev.filter((a) => a.id !== item.id))} />}
         />
       )}

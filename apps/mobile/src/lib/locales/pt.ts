@@ -137,6 +137,8 @@ export const pt: Record<MessageKey, string> = {
   errorLogTitle: "Erros recentes (só neste telefone)",
   errorLogClear: "Apagar registro",
   loadError: "Não foi possível carregar. Verifique sua conexão.",
+  noModerationNotices: "Não há ações de moderação na sua conta nem no seu conteúdo.",
+  alertChangeFailed: "A alteração não foi salva",
   notFoundTitle: "Isto não está mais disponível",
   notFoundBody: "O link não é válido ou o conteúdo foi apagado.",
   goHome: "Ir para o início",

@@ -137,6 +137,8 @@ export const fr: Record<MessageKey, string> = {
   errorLogTitle: "Erreurs récentes (uniquement sur ce téléphone)",
   errorLogClear: "Effacer le journal",
   loadError: "Chargement impossible. Vérifiez votre connexion.",
+  noModerationNotices: "Aucune action de modération sur ton compte ni ton contenu.",
+  alertChangeFailed: "La modification n'a pas été enregistrée",
   notFoundTitle: "Ce contenu n'est plus disponible",
   notFoundBody: "Le lien n'est pas valide ou le contenu a été supprimé.",
   goHome: "Aller à l'accueil",
