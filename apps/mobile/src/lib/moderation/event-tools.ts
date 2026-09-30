@@ -33,3 +33,9 @@ export function canSetNegative(
   if (to === "FALSE") return selectedEvidence > 0 && current.level !== "OFFICIALLY_CONFIRMED";
   return true;
 }
+
+/** Niveles a los que se puede subir la sensibilidad desde el actual (ADR 0179): nunca se baja. */
+export function raisableSensitivities(current: "NORMAL" | "SENSITIVE" | "HIGHLY_SENSITIVE"): ("SENSITIVE" | "HIGHLY_SENSITIVE")[] {
+  const order = ["NORMAL", "SENSITIVE", "HIGHLY_SENSITIVE"] as const;
+  return order.slice(order.indexOf(current) + 1) as ("SENSITIVE" | "HIGHLY_SENSITIVE")[];
+}

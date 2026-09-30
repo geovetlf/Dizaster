@@ -82,3 +82,12 @@ describe("canSetNegative (ADR 0096)", () => {
     expect(canSetNegative("NONE", { ...none, negativeState: "FALSE" }, 0)).toBe(true);
   });
 });
+
+describe("sensibilidad por contexto (ADR 0179)", () => {
+  it("solo ofrece subir", async () => {
+    const { raisableSensitivities } = await import("../src/lib/moderation/event-tools");
+    expect(raisableSensitivities("NORMAL")).toEqual(["SENSITIVE", "HIGHLY_SENSITIVE"]);
+    expect(raisableSensitivities("SENSITIVE")).toEqual(["HIGHLY_SENSITIVE"]);
+    expect(raisableSensitivities("HIGHLY_SENSITIVE")).toEqual([]);
+  });
+});

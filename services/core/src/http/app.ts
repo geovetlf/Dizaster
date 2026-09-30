@@ -5,7 +5,7 @@ import Fastify, { type FastifyInstance, type FastifyRequest } from "fastify";
 import { z } from "zod";
 import {
   BBox, CreateCommentRequest, DevicePlatform, MEDIA_UPLOAD_LIMITS, MergeEventsRequest, NegativeState, ReactionKind, CommentReactionKind, ConfirmAgeRequest, RegisterPushTokenRequest, RegisterSigningKeyRequest, RevertMergeRequest,
-  SplitEventRequest, SetEventStatusRequest, SetEventSeverityRequest, SetSourceStatusRequest, AcceptPoliciesRequest, type PolicyStatusResponse, ClientCrashReport, type ClientCrashesResponse, type AdminSourcesResponse, ChangeRoleRequest, type StaffResponse, OriginalAccessRequest, IdTokenSignInRequest, EmailStartRequest, EmailVerifyRequest, LinkIdentityRequest, AddModeratorNoteRequest, DismissDuplicateRequest, DATA_EXPORT_FORMAT, type AppConfig, type Attribution, type AttributionsResponse, type DataExport, type EmergencyNumbersResponse, type EventSearchResponse,
+  SplitEventRequest, SetEventStatusRequest, SetEventSeverityRequest, RaiseEventSensitivityRequest, SetSourceStatusRequest, AcceptPoliciesRequest, type PolicyStatusResponse, ClientCrashReport, type ClientCrashesResponse, type AdminSourcesResponse, ChangeRoleRequest, type StaffResponse, OriginalAccessRequest, IdTokenSignInRequest, EmailStartRequest, EmailVerifyRequest, LinkIdentityRequest, AddModeratorNoteRequest, DismissDuplicateRequest, DATA_EXPORT_FORMAT, type AppConfig, type Attribution, type AttributionsResponse, type DataExport, type EmergencyNumbersResponse, type EventSearchResponse,
 } from "@dizaster/contracts";
 import { LocalDiskStorage } from "../modules/media/index.js";
 import type { Container } from "../container.js";
@@ -1237,6 +1237,14 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
     const { id } = parse(IdParam, req.params);
     const b = parse(SetEventSeverityRequest, req.body);
     await withTransaction(c.db, (tx) => c.events.setSeverityOverride(tx, id, b.severity, session.userId, b.reason));
+    return c.events.moderatorDetail(c.db, id);
+  });
+  // Sensibilidad por contexto (ADR 0179): solo sube, con motivo y registro de solo inserción.
+  app.post("/v1/moderation/events/:id/sensitivity", async (req) => {
+    const session = await requireVerifier(req);
+    const { id } = parse(IdParam, req.params);
+    const b = parse(RaiseEventSensitivityRequest, req.body);
+    await withTransaction(c.db, (tx) => c.events.raiseSensitivity(tx, id, b.to, session.userId, b.reason));
     return c.events.moderatorDetail(c.db, id);
   });
   app.post("/v1/moderation/events/:id/negative-state", async (req) => {

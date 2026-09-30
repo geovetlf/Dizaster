@@ -1,3 +1,4 @@
+import { SENSITIVITY_ORDER } from "@dizaster/contracts";
 import type {
   EventStatus,
   CategoryConfig,
@@ -505,6 +506,34 @@ export class EventService {
   }
 
   /**
+   * Subir la sensibilidad por contexto (ADR 0179, Anexo A.5): p. ej. un incendio en un albergue. Solo sube. El punto
+   * público, su celda y el lugar contextual se recalculan desde el punto real con la nueva sensibilidad; los posts de
+   * reportes enlazados se vuelven a generalizar por el evento `EventSensitivityRaised`.
+   */
+  async raiseSensitivity(tx: Queryable, eventId: string, to: "SENSITIVE" | "HIGHLY_SENSITIVE", actor: string, reason: string): Promise<void> {
+    const ev = (await tx.query<{ sensitivity: Sensitivity; merged_into_id: string | null; lat: number; lng: number }>(
+      `SELECT sensitivity, merged_into_id, ST_Y(geom::geometry) AS lat, ST_X(geom::geometry) AS lng FROM event.events WHERE id = $1 FOR UPDATE`, [eventId],
+    )).rows[0];
+    if (!ev) throw notFound("Evento");
+    if (ev.merged_into_id) throw new DomainError("CONFLICT", "El evento está fusionado en otro", 409);
+    if (SENSITIVITY_ORDER.indexOf(to) <= SENSITIVITY_ORDER.indexOf(ev.sensitivity)) {
+      throw new DomainError("SENSITIVITY_NOT_RAISED", "La sensibilidad solo se puede subir", 409);
+    }
+    const pub = this.geo.generalize({ lat: ev.lat, lng: ev.lng }, to);
+    const place = await this.geo.contextFor(tx, pub.point, to);
+    await tx.query(
+      `UPDATE event.events SET sensitivity = $2, public_geom = ST_SetSRID(ST_MakePoint($3, $4), 4326)::geography, public_h3 = $5,
+              place = $6, region_id = $7, district_id = $8, updated_at = now() WHERE id = $1`,
+      [eventId, to, pub.point.lng, pub.point.lat, pub.cell, place ? JSON.stringify(place) : null, place?.region?.id ?? null, place?.district?.id ?? null],
+    );
+    await tx.query(
+      `INSERT INTO event.sensitivity_log (id, event_id, from_level, to_level, reason, actor) VALUES ($1, $2, $3, $4, $5, $6)`,
+      [newId(), eventId, ev.sensitivity, to, reason, actor],
+    );
+    await publish(tx, "EventSensitivityRaised", { eventId, from: ev.sensitivity, to });
+  }
+
+  /**
    * Retiro de un reporte (ADR 0037): su evidencia queda DETACHED (se conserva para auditoría pero deja de contar),
    * se recalculan geometría y contadores, y los consumidores reevalúan como con cualquier cambio de evidencia.
    */
@@ -871,10 +900,13 @@ export class EventService {
   }
 
   async moderatorDetail(q: Queryable, eventId: string): Promise<ModeratorEventDetail> {
-    const ev = (await q.query<{ merged_into_id: string | null; status: EventStatus; severity: number; severity_override: number | null }>(
-      `SELECT merged_into_id, status, severity, severity_override FROM event.events WHERE id = $1`, [eventId],
+    const ev = (await q.query<{ merged_into_id: string | null; status: EventStatus; severity: number; severity_override: number | null; sensitivity: Sensitivity }>(
+      `SELECT merged_into_id, status, severity, severity_override, sensitivity FROM event.events WHERE id = $1`, [eventId],
     )).rows[0];
     if (!ev) throw notFound("Evento");
+    const sensitivityChanges = await q.query<{ from_level: Sensitivity; to_level: Sensitivity; reason: string; created_at: Date }>(
+      `SELECT from_level, to_level, reason, created_at FROM event.sensitivity_log WHERE event_id = $1 ORDER BY created_at DESC LIMIT 20`, [eventId],
+    );
     const severityChanges = await q.query<{ from_severity: number; to_severity: number; override: number | null; reason: string; created_at: Date }>(
       `SELECT from_severity, to_severity, override, reason, created_at FROM event.severity_log WHERE event_id = $1 ORDER BY created_at DESC LIMIT 20`,
       [eventId],
@@ -909,6 +941,8 @@ export class EventService {
       severityChanges: severityChanges.rows.map((r) => ({
         from: r.from_severity, to: r.to_severity, override: r.override, reason: r.reason, at: r.created_at.toISOString(),
       })),
+      sensitivity: ev.sensitivity,
+      sensitivityChanges: sensitivityChanges.rows.map((r) => ({ from: r.from_level, to: r.to_level, reason: r.reason, at: r.created_at.toISOString() })),
       statusChanges: changes.rows.map((r) => ({ from: r.from_status, to: r.to_status, reason: r.reason, at: r.at.toISOString() })),
       notes: notes.rows.map((r) => ({ id: r.id, text: r.payload.text ?? "", byUserId: r.payload.byUserId ?? null, at: r.at.toISOString() })),
       evidence: evidence.rows.map((r) => ({

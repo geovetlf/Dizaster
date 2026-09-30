@@ -268,6 +268,9 @@ export interface ModeratorEventDetail {
   severity: number;
   severityOverride: number | null;
   severityChanges: EventSeverityChangeView[];
+  /** Sensibilidad vigente y sus subidas por contexto (ADR 0179). */
+  sensitivity: Sensitivity;
+  sensitivityChanges: { from: Sensitivity; to: Sensitivity; reason: string; at: string }[];
 }
 export interface EventSeverityChangeView { from: number; to: number; override: number | null; reason: string; at: string }
 export interface ModeratorNoteView { id: string; text: string; byUserId: string | null; at: string }
@@ -287,3 +290,11 @@ export const SetEventSeverityRequest = z.object({
   reason: z.string().trim().min(3).max(2000),
 });
 export type SetEventSeverityRequest = z.infer<typeof SetEventSeverityRequest>;
+
+/** Subir la sensibilidad de un evento por su contexto (ADR 0179): nunca se baja. */
+export const RaiseEventSensitivityRequest = z.object({
+  to: z.enum(["SENSITIVE", "HIGHLY_SENSITIVE"]),
+  reason: z.string().trim().min(3).max(2000),
+});
+export type RaiseEventSensitivityRequest = z.infer<typeof RaiseEventSensitivityRequest>;
+export const SENSITIVITY_ORDER = ["NORMAL", "SENSITIVE", "HIGHLY_SENSITIVE"] as const;

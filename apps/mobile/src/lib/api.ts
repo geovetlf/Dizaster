@@ -255,6 +255,9 @@ export const api = {
     request<void>(`/v1/admin/sources/${encodeURIComponent(key)}/status`, { method: "POST", body: JSON.stringify({ to, reason }) }),
   setEventSeverity: (id: string, severity: number | null, reason: string) =>
     request<ModeratorEventDetail>(`/v1/moderation/events/${id}/severity`, { method: "POST", body: JSON.stringify({ severity, reason }) }),
+  /** Solo sube (ADR 0179). */
+  raiseEventSensitivity: (id: string, to: "SENSITIVE" | "HIGHLY_SENSITIVE", reason: string) =>
+    request<ModeratorEventDetail>(`/v1/moderation/events/${id}/sensitivity`, { method: "POST", body: JSON.stringify({ to, reason }) }),
   splitEvent: (id: string, evidenceIds: string[], reason: string) =>
     request<{ eventId: string }>(`/v1/moderation/events/${id}/split`, { method: "POST", body: JSON.stringify({ evidenceIds, reason }) }),
   decideAppeal: (id: string, decision: "UPHOLD" | "REVERSE", reason: string) =>

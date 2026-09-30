@@ -61,6 +61,8 @@ export interface DomainEventMap {
   AppealDecided: { appealId: string; appellantUserId: string; outcome: "UPHELD" | "REVERSED" };
   /** La gravedad del evento cambió (ADR 0160): alertas y feed reevalúan. Puede bajar. */
   EventSeverityChanged: { eventId: string; from: number; to: number };
+  /** Moderación subió la sensibilidad (ADR 0179): lo publicado del evento se vuelve a generalizar. */
+  EventSensitivityRaised: { eventId: string; from: "NORMAL" | "SENSITIVE" | "HIGHLY_SENSITIVE"; to: "SENSITIVE" | "HIGHLY_SENSITIVE" };
   /** Actualización oficial de una institución sobre un evento (ADR 0153, 0157). */
   OfficialUpdatePosted: { postId: string; eventId: string; institutionName: string };
   /** Un presupuesto cruzó el 50, 80 o 100 % en su periodo. Al 100 % la función se degrada (CostGuard deniega). */

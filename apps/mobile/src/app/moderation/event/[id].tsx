@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { api } from "../../../lib/api";
 import { lang, t, type MessageKey } from "../../../lib/i18n";
-import { canSetNegative, canSplit, duplicateCandidates, toggle } from "../../../lib/moderation/event-tools";
+import { canSetNegative, canSplit, duplicateCandidates, raisableSensitivities, toggle } from "../../../lib/moderation/event-tools";
 import { validReason } from "../../../lib/moderation/logic";
 import { eventTitle, timeAgo } from "../../../lib/ui/format";
 import { colors, radius, space } from "../../../theme";
@@ -126,6 +126,21 @@ export default function EventToolsScreen() {
           </View>
           {detail.severityChanges.map((c) => (
             <Text key={c.at} style={styles.meta}>{timeAgo(c.at, lang)} · {c.from} → {c.to} · {c.reason}</Text>
+          ))}
+
+          <Text style={styles.section}>{t("sensitivitySection")}: {t(`sens_${detail.sensitivity}`)}</Text>
+          <Text style={styles.meta}>{t("sensitivityHint")}</Text>
+          <View style={styles.chips}>
+            {raisableSensitivities(detail.sensitivity).map((v) => (
+              <Pressable key={v} accessibilityRole="button" accessibilityState={{ disabled: !ok }} disabled={!ok}
+                style={[styles.button, !ok && styles.disabled]}
+                onPress={() => confirm(t("confirmSensitivity"), () => api.raiseEventSensitivity(event.id, v, reason.trim()))}>
+                <Text style={styles.buttonText}>{t(`sens_${v}`)}</Text>
+              </Pressable>
+            ))}
+          </View>
+          {detail.sensitivityChanges.map((c) => (
+            <Text key={c.at} style={styles.meta}>{timeAgo(c.at, lang)} · {t(`sens_${c.from}`)} → {t(`sens_${c.to}`)} · {c.reason}</Text>
           ))}
 
           {verification ? (

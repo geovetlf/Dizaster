@@ -369,6 +369,7 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | 0176 | Aceptación versionada de términos y políticas (mecanismo; textos bloqueados): registro de solo inserción, 428 al publicar si falta, pantalla en la app | ✅ |
 | 0177 | Reintento de push con error temporal (429, 5xx, red): 3 reintentos en menos de 2 min, luego FAILED | ✅ |
 | 0178 | Posts y comentarios idempotentes con id del cliente: un reintento devuelve lo ya creado | ✅ |
+| 0179 | Moderación sube la sensibilidad de un evento por su contexto: punto público, lugar y posts de reportes se generalizan más; nunca baja | ✅ |
 | Licencias, auditoría, SBOM, Dependabot; respaldo con prueba de restauración en CI | ✅ | ADR 0070, `scripts/supply-chain.mjs`, `scripts/db-restore-check.mjs` |
 | Idioma de la app elegible en el perfil (es/en/pt/fr o del teléfono) | ✅ | ADR 0069, `app/language.tsx` |
 | Varias cuentas en un teléfono corroboran como una (clave seudónima del teléfono) | ✅ | ADR 0068, migración 0036 |
@@ -415,10 +416,9 @@ Revisión del Blueprint del 2026-09-30 (tras ADR 0164): completada con ADR 0165�
 Revisión del Blueprint del 2026-09-30 (tras ADR 0171): completada con ADR 0172–0176.
 
 Revisión del Blueprint del 2026-09-30 (tras ADR 0176), verificada contra el código, sin bloqueos:
-1. Marcar un evento como sensible por contexto (§7 flags SENSITIVE, Anexo A.5): solo sube el nivel, auditado.
-2. La reputación del teléfono ajusta el peso de la evidencia (§8.2, §13.3), no solo el cupo.
-3. Pruebas de captura del medio en la evidencia de presencia (§7 `media_capture_proofs`, `capture_geo` privado).
-4. Preparación para particionar eventos y reportes por mes (§7.4, §14): decisión y prueba, sin partir aún.
+1. La reputación del teléfono ajusta el peso de la evidencia (§8.2, §13.3), no solo el cupo.
+2. Pruebas de captura del medio en la evidencia de presencia (§7 `media_capture_proofs`, `capture_geo` privado).
+3. Preparación para particionar eventos y reportes por mes (§7.4, §14): decisión y prueba, sin partir aún.
 
 Bloqueadas o en espera:
 

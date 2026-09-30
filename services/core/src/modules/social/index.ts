@@ -365,6 +365,24 @@ export class SocialService {
     if (ins.rowCount) await q.query(`UPDATE social.posts SET external_share_count = external_share_count + 1 WHERE id = $1`, [target]);
   }
 
+  /**
+   * Vuelve a generalizar el punto público de los posts de reportes de un evento (ADR 0179): moderación subió su
+   * sensibilidad. `generalize` recibe el punto ya publicado; generalizar lo generalizado nunca devuelve más detalle.
+   */
+  async regeneralizeReportPosts(tx: Queryable, eventId: string, generalize: (p: GeoPoint) => GeoPoint): Promise<number> {
+    const { rows } = await tx.query<{ id: string; lat: number; lng: number }>(
+      `SELECT p.id, ST_Y(p.public_point::geometry) AS lat, ST_X(p.public_point::geometry) AS lng
+         FROM social.posts p JOIN social.post_event_links l ON l.post_id = p.id
+        WHERE l.event_id = $1 AND l.link_type = 'REPORT' AND p.public_point IS NOT NULL`,
+      [eventId],
+    );
+    for (const r of rows) {
+      const g = generalize({ lat: r.lat, lng: r.lng });
+      await tx.query(`UPDATE social.posts SET public_point = ST_SetSRID(ST_MakePoint($2, $3), 4326)::geography, updated_at = now() WHERE id = $1`, [r.id, g.lng, g.lat]);
+    }
+    return rows.length;
+  }
+
   async linkPostToEvent(tx: Queryable, postId: string, eventId: string, linkType: "REPORT" | "MENTION" | "UPDATE"): Promise<void> {
     await tx.query(
       `INSERT INTO social.post_event_links (post_id, event_id, link_type) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`,
