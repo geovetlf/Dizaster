@@ -83,6 +83,8 @@ export interface FeedFilter {
 
 export type FollowType = "PROFILE" | "EVENT" | "PLACE" | "TAG" | "BUSINESS";
 const MAX_FOLLOWS = 2000;
+/** Tope de bloqueos (personas + negocios, ADR 0208): acota la lista y el filtro del feed, que los consulta en cada lectura. */
+export const MAX_BLOCKS = 2000;
 /** "Para ti" ordena lo reciente: fuera de esta ventana, el contenido se encuentra por lugar, evento o perfil. */
 export const FOR_YOU_WINDOW_DAYS = 30;
 
@@ -1067,6 +1069,7 @@ export class SocialService {
       await q.query(`DELETE FROM social.blocks WHERE blocker_profile_id = $1 AND blocked_profile_id = $2`, [blockerProfileId, blockedProfileId]);
       return;
     }
+    await this.assertBlockRoom(q, blockerProfileId, `SELECT 1 FROM social.blocks WHERE blocker_profile_id = $1 AND blocked_profile_id = $2`, blockedProfileId);
     await q.query(`INSERT INTO social.blocks (blocker_profile_id, blocked_profile_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`, [blockerProfileId, blockedProfileId]);
     await q.query(
       `DELETE FROM social.follows WHERE target_type = 'PROFILE'
@@ -1091,10 +1094,22 @@ export class SocialService {
       await q.query(`DELETE FROM social.business_blocks WHERE blocker_profile_id = $1 AND business_id = $2`, [blocker.profileId, biz.id]);
       return;
     }
+    await this.assertBlockRoom(q, blocker.profileId, `SELECT 1 FROM social.business_blocks WHERE blocker_profile_id = $1 AND business_id = $2`, biz.id);
     await q.query(`INSERT INTO social.business_blocks (blocker_profile_id, business_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`, [blocker.profileId, biz.id]);
     await q.query(`DELETE FROM social.follows WHERE follower_profile_id = $1 AND target_type = 'BUSINESS' AND target_id = $2`, [blocker.profileId, biz.id]);
   }
 
+  /** Volver a bloquear lo ya bloqueado nunca falla; algo nuevo con el tope alcanzado da 409 (ADR 0208). */
+  private async assertBlockRoom(q: Queryable, blockerProfileId: string, existsSql: string, targetId: string): Promise<void> {
+    if ((await q.query(existsSql, [blockerProfileId, targetId])).rowCount) return;
+    const { rows } = await q.query<{ n: number }>(
+      `SELECT (SELECT count(*) FROM social.blocks WHERE blocker_profile_id = $1) + (SELECT count(*) FROM social.business_blocks WHERE blocker_profile_id = $1) AS n`,
+      [blockerProfileId],
+    );
+    if (Number(rows[0]!.n) >= MAX_BLOCKS) throw new DomainError("LIMIT_REACHED", `Puedes bloquear hasta ${MAX_BLOCKS} perfiles o negocios`, 409);
+  }
+
+  /** Acotada por el tope de bloqueos (ADR 0208): nunca devuelve más de `MAX_BLOCKS`. */
   async blockedHandles(q: Queryable, blockerProfileId: string): Promise<string[]> {
     const { rows } = await q.query<{ handle: string }>(
       `SELECT handle FROM (
@@ -1102,8 +1117,8 @@ export class SocialService {
          UNION ALL
          SELECT bp.handle, bb.created_at FROM social.business_blocks bb JOIN social.business_profiles bp ON bp.id = bb.business_id
           WHERE bb.blocker_profile_id = $1 AND bp.deleted_at IS NULL
-       ) x ORDER BY created_at DESC`,
-      [blockerProfileId],
+       ) x ORDER BY created_at DESC LIMIT $2`,
+      [blockerProfileId, MAX_BLOCKS],
     );
     return rows.map((r) => r.handle);
   }
