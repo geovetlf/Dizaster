@@ -17,6 +17,11 @@ const Env = z.object({
   MAP_ATTRIBUTION: z.string().default("© OpenStreetMap contributors · MapLibre"),
   /** D-ARCHIVE (ADR 0061): días que un evento RESOLVED sigue en el mapa antes de pasar a ARCHIVED. */
   EVENT_ARCHIVE_AFTER_DAYS: z.coerce.number().int().min(1).max(365).default(7),
+  // Versión mínima de la app por plataforma y enlace a la tienda (ADR 0164). Vacío = sin mínimo / sin ficha aún.
+  MIN_APP_VERSION_ANDROID: z.string().regex(/^(\d+(\.\d+)*)?$/).default(""),
+  MIN_APP_VERSION_IOS: z.string().regex(/^(\d+(\.\d+)*)?$/).default(""),
+  STORE_URL_ANDROID: z.string().default(""),
+  STORE_URL_IOS: z.string().default(""),
   REPORTS_PER_HOUR_LIMIT: z.coerce.number().int().positive().default(10),
   /** Límite general por persona (o por IP sin sesión), por minuto (ADR 0047). */
   RATE_LIMIT_PER_MINUTE: z.coerce.number().int().positive().default(300),

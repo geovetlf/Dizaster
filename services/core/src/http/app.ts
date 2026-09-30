@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { MAP_WINDOW_HOURS, MEDIA_KILL_SWITCHES, MapWindow, MfaCodeRequest, MfaVerifyRequest, can, isStaff, type MfaStatus, type Permission } from "@dizaster/contracts";
+import { APP_PLATFORM_HEADER, APP_VERSION_HEADER, isBelowMinVersion, MAP_WINDOW_HOURS, MEDIA_KILL_SWITCHES, MapWindow, MfaCodeRequest, MfaVerifyRequest, can, isStaff, type MfaStatus, type Permission } from "@dizaster/contracts";
 import { isValidTile, tileBounds } from "@dizaster/geo-kit";
 import Fastify, { type FastifyInstance, type FastifyRequest } from "fastify";
 import { z } from "zod";
@@ -147,6 +147,17 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
   });
 
   // ───────────── Configuración remota (proveedor de mapa intercambiable, kill switches) ─────────────
+  /**
+   * Versión mínima (ADR 0164): solo al escribir reportes y posts, y solo si la app declara plataforma y versión.
+   * Sin cabeceras no se bloquea (nunca por falta de datos). 426 para que la app ofrezca actualizar y guarde lo pendiente.
+   */
+  const requireMinAppVersion = (req: FastifyRequest) => {
+    const platform = req.headers[APP_PLATFORM_HEADER];
+    const version = req.headers[APP_VERSION_HEADER];
+    if (typeof version !== "string" || (platform !== "android" && platform !== "ios")) return;
+    const min = platform === "android" ? c.env.MIN_APP_VERSION_ANDROID : c.env.MIN_APP_VERSION_IOS;
+    if (isBelowMinVersion(version, min)) throw new DomainError("APP_UPDATE_REQUIRED", "Actualiza la app para enviar", 426);
+  };
   app.get("/v1/config", async (_req, reply) => {
     const body: AppConfig = {
       apiVersion: "v1",
@@ -165,6 +176,10 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
       },
       limits: { maxVideoSeconds: 60, maxReportsPerHour: c.env.REPORTS_PER_HOUR_LIMIT },
       referenceVersions: { categories: c.ref.categories.version, emergencyNumbers: c.ref.emergency.version },
+      appUpdate: {
+        android: { minVersion: c.env.MIN_APP_VERSION_ANDROID || null, storeUrl: c.env.STORE_URL_ANDROID || null },
+        ios: { minVersion: c.env.MIN_APP_VERSION_IOS || null, storeUrl: c.env.STORE_URL_IOS || null },
+      },
     };
     reply.header("cache-control", "public, max-age=300");
     return body;
@@ -298,6 +313,7 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
   // ───────────── Reportes ciudadanos ─────────────
   app.post("/v1/reports", async (req, reply) => {
     const session = requireSession(req);
+    requireMinAppVersion(req);
     const result = await c.reports.submit(session, req.body);
     return reply.status(result.outcome === "REJECTED" ? 422 : 200).send(result);
   });
@@ -577,6 +593,7 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
   // ───────────── Publicaciones, etiquetas y menciones (ADR 0027) ─────────────
   app.post("/v1/posts", async (req, reply) => {
     const session = requireSession(req);
+    requireMinAppVersion(req);
     reply.status(201);
     return c.composer.create(session, req.body);
   });

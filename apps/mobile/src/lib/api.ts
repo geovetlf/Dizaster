@@ -1,6 +1,7 @@
 import type { AdminSourcesResponse, TransparencyReport, AuthorityRequestDetail, AuthorityRequestSummary, AuthorityRequestStatus, CreateAuthorityRequest, PublishDelayView, PresenceAccessEntry, DuplicateCandidateView, OfficialScopeView, MyReportView, MfaEnrollResponse, MfaStatus, PresenceReview, EventSourceView, EventStatus, MyProfile, UpdateProfileRequest, ReactionKind, ReactionState, DataExport, VerificationView, ModeratorEventDetail, SavedZone, SavedZoneInput, AppealView, CaseDetail, CaseSummary, CreateFlagRequest, ModerationActionType, ModerationNotice, CostDashboard, KillSwitchView, QualityReport, CreatePostRequest, TagView, BusinessView, SessionView, CreateBusinessRequest, UpdateBusinessRequest, AlertPreferences, CategorySubscription, CategorySubscriptionInput, NotificationsResponse, AppConfig, AttributionsResponse, AreaSearchResult, FollowTarget, MyFollows, ProfileSearchResult, ProfileView, CommentView, CreateUploadRequest, FeedPost, FeedResponse, FeedTab, CreateUploadResponse, DevicePlatform, MediaView, RegisterPushTokenRequest, EventMapResponse, EventDetail, EventSummary, NearbyEventsResponse, SubmitReportRequest, SubmitReportResponse, TimelineEntryView } from "@dizaster/contracts";
 import { mergeMapTiles, tilesForView } from "@dizaster/geo-kit";
 import { canRetryWithRefresh, singleFlight } from "./auth/refresh";
+import { appVersionHeaders } from "./app-identity";
 import { API_URL } from "./config";
 import { EtagCache } from "./http/etag-cache";
 import { isMfaError } from "./auth/mfa";
@@ -59,7 +60,7 @@ async function request<T>(path: string, init: RequestInit = {}, retried = false)
   const res = await fetch(`${API_URL}${path}`, {
     ...init,
     // Sin cuerpo no se declara JSON: el servidor rechaza un cuerpo JSON vacío (p. ej. DELETE o POST .../complete).
-    headers: { ...(init.body ? { "content-type": "application/json" } : {}), ...auth, ...(isGet ? etags.headers(path) : {}), ...(init.headers ?? {}) },
+    headers: { ...(init.body ? { "content-type": "application/json" } : {}), ...appVersionHeaders, ...auth, ...(isGet ? etags.headers(path) : {}), ...(init.headers ?? {}) },
   });
   if (canRetryWithRefresh(path, res.status, retried, refreshToken !== null) && (await renew())) return request<T>(path, init, true);
   if (res.status === 304 && isGet) {

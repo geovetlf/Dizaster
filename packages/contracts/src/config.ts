@@ -14,6 +14,9 @@ export const MapProviderConfig = z.object({
 });
 export type MapProviderConfig = z.infer<typeof MapProviderConfig>;
 
+export const PlatformUpdate = z.object({ minVersion: z.string().nullable(), storeUrl: z.string().nullable() });
+export type PlatformUpdate = z.infer<typeof PlatformUpdate>;
+
 export const AppConfig = z.object({
   apiVersion: z.literal("v1"),
   map: MapProviderConfig,
@@ -24,8 +27,36 @@ export const AppConfig = z.object({
     maxReportsPerHour: z.number().int(),
   }),
   referenceVersions: z.object({ categories: z.string(), emergencyNumbers: z.string() }),
+  /**
+   * Versión mínima por plataforma (ADR 0164). Por debajo, la app no envía reportes ni publica (emergencias siempre
+   * funciona) y ofrece actualizar. `null` = sin mínimo. `storeUrl` null mientras no haya ficha en la tienda.
+   */
+  appUpdate: z.object({ android: PlatformUpdate, ios: PlatformUpdate }).default({
+    android: { minVersion: null, storeUrl: null }, ios: { minVersion: null, storeUrl: null },
+  }),
 });
 export type AppConfig = z.infer<typeof AppConfig>;
+
+/** Cabeceras con las que la app declara su versión; el servidor las usa para exigir la mínima al escribir. */
+export const APP_VERSION_HEADER = "x-app-version";
+export const APP_PLATFORM_HEADER = "x-app-platform";
+
+/** Compara versiones "1.2.10" numéricamente por partes; lo que no es número cuenta como 0. NO AI REQUIRED. */
+export function compareAppVersions(a: string, b: string): number {
+  const pa = a.split(".").map((x) => Number.parseInt(x, 10) || 0);
+  const pb = b.split(".").map((x) => Number.parseInt(x, 10) || 0);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const d = (pa[i] ?? 0) - (pb[i] ?? 0);
+    if (d !== 0) return Math.sign(d);
+  }
+  return 0;
+}
+
+/** ¿Hay que actualizar? Sin versión conocida o sin mínimo, no: nunca se bloquea por falta de datos. */
+export function isBelowMinVersion(current: string | null | undefined, min: string | null | undefined): boolean {
+  if (!current || !min) return false;
+  return compareAppVersions(current, min) < 0;
+}
 
 /**
  * Atribución de datos de terceros (pantalla "Acerca de", Blueprint §11.3). ODbL exige mostrar "© OpenStreetMap

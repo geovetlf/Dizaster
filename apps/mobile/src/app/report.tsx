@@ -24,6 +24,7 @@ import { outcomeLines } from "../lib/report/outcome";
 import { colors } from "../theme";
 import { categoryIn, findCategory, reportCategories, useCategoryCatalogVersion } from "../lib/category-store";
 import { askSameEvent } from "../lib/report/same-event";
+import { UpdateRequired, useUpdateRequirement } from "../components/update-required";
 
 
 type Phase = "category" | "locating" | "compose";
@@ -49,6 +50,8 @@ export default function ReportScreen() {
   const [busy, setBusy] = useState(false);
   const [call, setCall] = useState<CallTarget>({ kind: "list" });
   const recent = useRef<Location.LocationObject[]>([]);
+  // Versión por debajo de la mínima (ADR 0164): no se envía; emergencias sigue a mano.
+  const update = useUpdateRequirement();
 
   useEffect(() => {
     if (!deny) return;
@@ -144,6 +147,8 @@ export default function ReportScreen() {
       setBusy(false);
     }
   }
+
+  if (update.required) return <UpdateRequired storeUrl={update.storeUrl} />;
 
   if (phase === "category" || !category) {
     return (

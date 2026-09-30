@@ -10,6 +10,7 @@ import type { LocalMedia } from "../lib/media/local-media";
 import { uploadMedia } from "../lib/media/upload";
 import { composeProblem } from "../lib/social/compose";
 import { colors, radius, space } from "../theme";
+import { UpdateRequired, useUpdateRequirement } from "../components/update-required";
 
 /**
  * Publicar sin reporte (D-03): opinión, apoyo o noticia, desde cualquier lugar. Si se abre desde un evento lo
@@ -28,6 +29,8 @@ export default function ComposeScreen() {
   const [status, setStatus] = useState<string | null>(null);
   // "Publicar como": yo o uno de mis negocios. Un negocio nunca publica de forma seudónima.
   const [businesses, setBusinesses] = useState<BusinessView[]>([]);
+  // Versión por debajo de la mínima (ADR 0164): no se envía; emergencias sigue a mano.
+  const update = useUpdateRequirement();
   const [asBusiness, setAsBusiness] = useState<string | null>(params.asBusiness ?? null);
   useEffect(() => { api.myBusinesses().then((r) => setBusinesses(r.businesses)).catch(() => undefined); }, []);
 
@@ -61,6 +64,8 @@ export default function ComposeScreen() {
       setBusy(false);
     }
   }
+
+  if (update.required) return <UpdateRequired storeUrl={update.storeUrl} />;
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
