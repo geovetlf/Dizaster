@@ -564,7 +564,7 @@ export class MediaService {
    * - subidas nunca completadas → DELETED y se borra lo que haya llegado;
    * - originales privados de media READY → se borran tras la retención (queda la variante pública saneada y el hash).
    */
-  async applyRetention(now: Date = this.clock.now()): Promise<{ abandoned: number; originalsDeleted: number }> {
+  async applyRetention(now: Date = this.clock.now(), batch = 500): Promise<{ abandoned: number; originalsDeleted: number }> {
     const abandoned = await this.db.query<{ id: string; storage_key_original: string }>(
       `SELECT id, storage_key_original FROM media.media WHERE state = 'PENDING_UPLOAD' AND upload_expires_at < $1::timestamptz - interval '1 hour' LIMIT 500`,
       [now],
@@ -574,21 +574,29 @@ export class MediaService {
       await this.storage.delete(posterKey(r.storage_key_original));
       await this.db.query(`UPDATE media.media SET state = 'DELETED', storage_key_original = NULL, updated_at = now() WHERE id = $1`, [r.id]);
     }
-    const expired = await this.db.query<{ id: string; storage_key_original: string }>(
-      `SELECT id, storage_key_original FROM media.media
-        WHERE state = 'READY' AND storage_key_original IS NOT NULL AND processed_at < $1::timestamptz - make_interval(days => $2) LIMIT 500`,
-      [now, this.limits.originalRetentionDays],
-    );
-    for (const r of expired.rows) {
-      await this.storage.delete(r.storage_key_original);
-      await this.db.query(
-        `UPDATE media.media SET storage_key_original = NULL, original_deleted_at = $2, updated_at = now() WHERE id = $1`,
-        [r.id, now],
+    // Originales vencidos en lotes hasta vaciar (ADR 0248), con tope de tiempo. Un fallo del almacenamiento corta la
+    // pasada (lo registra el worker) y se reintenta al día siguiente.
+    let originalsDeleted = 0;
+    const started = Date.now();
+    for (;;) {
+      const expired = await this.db.query<{ id: string; storage_key_original: string }>(
+        `SELECT id, storage_key_original FROM media.media
+          WHERE state = 'READY' AND storage_key_original IS NOT NULL AND processed_at < $1::timestamptz - make_interval(days => $2) LIMIT $3`,
+        [now, this.limits.originalRetentionDays, batch],
       );
+      for (const r of expired.rows) {
+        await this.storage.delete(r.storage_key_original);
+        await this.db.query(
+          `UPDATE media.media SET storage_key_original = NULL, original_deleted_at = $2, updated_at = now() WHERE id = $1`,
+          [r.id, now],
+        );
+      }
+      originalsDeleted += expired.rows.length;
+      if (expired.rows.length < batch || Date.now() - started > 5 * 60_000) break;
     }
     // El teléfono solo sirve para el cupo de 24 h (ADR 0207): no se guarda más de 2 días.
     await this.db.query(`UPDATE media.media SET phone_id = NULL WHERE phone_id IS NOT NULL AND created_at < $1::timestamptz - interval '2 days'`, [now]);
-    return { abandoned: abandoned.rows.length, originalsDeleted: expired.rows.length };
+    return { abandoned: abandoned.rows.length, originalsDeleted };
   }
 
   private async row(q: Queryable, id: string): Promise<MediaRow | null> {

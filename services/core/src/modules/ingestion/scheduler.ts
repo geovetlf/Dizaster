@@ -11,6 +11,11 @@ import type { IngestionService } from "./index.js";
 import type { StorageProvider } from "../media/index.js";
 
 /** Archivo del crudo de cada respuesta (ADR 0075). */
+/** Corridas de ingesta (ADR 0248): se guardan 90 días para calidad y diagnóstico; después solo ocupan espacio. */
+export const RUNS_RETENTION_DAYS = 90;
+/** Tope de tiempo de una pasada de retención por lotes: no bloquea el resto del mantenimiento. */
+export const RETENTION_TIME_BUDGET_MS = 5 * 60_000;
+
 export interface RawArchive {
   storage: StorageProvider;
   retentionDays: number;
@@ -191,26 +196,41 @@ export class IngestionScheduler {
     }
   }
 
-  /** Retención del crudo: borra los objetos que ninguna ejecución reciente usa y limpia sus referencias. */
-  async applyRawRetention(now: Date = this.clock.now()): Promise<{ deleted: number }> {
-    if (!this.raw) return { deleted: 0 };
-    const { rows } = await this.db.query<{ raw_ref: string }>(
-      `SELECT raw_ref FROM ingestion.runs WHERE raw_ref IS NOT NULL
-        GROUP BY raw_ref HAVING max(started_at) < $1::timestamptz - make_interval(days => $2) LIMIT 500`,
-      [now, this.raw.retentionDays],
-    );
+  /**
+   * Retención del crudo: borra los objetos que ninguna ejecución reciente usa y limpia sus referencias. En lotes hasta
+   * vaciar lo vencido (ADR 0248): una fuente cada minuto genera más de 500 crudos al día. Un lote sin ningún borrado
+   * (almacenamiento caído) corta la pasada; se reintenta mañana. Además purga las corridas viejas sin crudo.
+   */
+  async applyRawRetention(now: Date = this.clock.now(), batch = 500): Promise<{ deleted: number; runsPurged: number }> {
     let deleted = 0;
-    for (const { raw_ref } of rows) {
-      try {
-        await this.raw.storage.delete(raw_ref);
-      } catch {
-        continue; // se reintenta en la próxima pasada
+    if (this.raw) {
+      const started = Date.now();
+      for (;;) {
+        const { rows } = await this.db.query<{ raw_ref: string }>(
+          `SELECT raw_ref FROM ingestion.runs WHERE raw_ref IS NOT NULL
+            GROUP BY raw_ref HAVING max(started_at) < $1::timestamptz - make_interval(days => $2) LIMIT $3`,
+          [now, this.raw.retentionDays, batch],
+        );
+        let progress = 0;
+        for (const { raw_ref } of rows) {
+          try {
+            await this.raw.storage.delete(raw_ref);
+          } catch {
+            continue; // se reintenta en la próxima pasada
+          }
+          await this.db.query(`UPDATE ingestion.runs SET raw_ref = NULL WHERE raw_ref = $1`, [raw_ref]);
+          await this.db.query(`UPDATE ingestion.external_items SET raw_ref = NULL WHERE raw_ref = $1`, [raw_ref]);
+          progress++;
+        }
+        deleted += progress;
+        if (rows.length < batch || progress === 0 || Date.now() - started > RETENTION_TIME_BUDGET_MS) break;
       }
-      await this.db.query(`UPDATE ingestion.runs SET raw_ref = NULL WHERE raw_ref = $1`, [raw_ref]);
-      await this.db.query(`UPDATE ingestion.external_items SET raw_ref = NULL WHERE raw_ref = $1`, [raw_ref]);
-      deleted++;
     }
-    return { deleted };
+    const runs = await this.db.query(
+      `DELETE FROM ingestion.runs WHERE raw_ref IS NULL AND started_at < $1::timestamptz - make_interval(days => $2)`,
+      [now, RUNS_RETENTION_DAYS],
+    );
+    return { deleted, runsPurged: runs.rowCount ?? 0 };
   }
 
   /** Un ítem que falla por sí mismo queda en ERROR y no tumba el resto del documento (ADR 0155). */

@@ -41,9 +41,9 @@ describe("crudo de las fuentes", () => {
     expect((await t.app.inject({ url: `/v1/dev-storage/${key}` })).statusCode).toBe(404);
 
     // Aún dentro de la retención: nada se borra.
-    expect(await scheduler.applyRawRetention(new Date("2026-10-20T00:00:00Z"))).toEqual({ deleted: 0 });
+    expect(await scheduler.applyRawRetention(new Date("2026-10-20T00:00:00Z"))).toMatchObject({ deleted: 0 });
     now = new Date("2026-11-05T00:00:00Z");
-    expect(await scheduler.applyRawRetention(now)).toEqual({ deleted: 1 });
+    expect(await scheduler.applyRawRetention(now)).toMatchObject({ deleted: 1 });
     expect(await t.c.storage.stat(key)).toBeNull();
     const left = await t.c.db.query(`SELECT 1 FROM ingestion.external_items WHERE raw_ref IS NOT NULL
                                      UNION ALL SELECT 1 FROM ingestion.runs WHERE raw_ref IS NOT NULL`);
@@ -64,7 +64,24 @@ describe("crudo de las fuentes", () => {
 
   it("con retención 0 no se guarda nada", async () => {
     const env = await createTestContext({ env: { SOURCE_RAW_RETENTION_DAYS: "0" } });
-    expect(await env.c.ingestionScheduler.applyRawRetention()).toEqual({ deleted: 0 });
+    expect(await env.c.ingestionScheduler.applyRawRetention()).toMatchObject({ deleted: 0 });
+    await env.close();
+  });
+
+  it("borra en lotes hasta vaciar lo vencido y purga las corridas viejas sin crudo (ADR 0248)", async () => {
+    const env = await createTestContext();
+    const src = (await env.c.db.query<{ id: string }>(`SELECT id FROM ingestion.sources WHERE key = 'usgs-earthquakes'`)).rows[0]!.id;
+    const old = new Date("2026-01-01T00:00:00Z");
+    for (let i = 0; i < 7; i++) {
+      const key = `sources/raw/usgs-earthquakes/old-${i}.json.gz`;
+      await env.c.storage.put(key, Buffer.from("x"), "application/gzip");
+      await env.c.db.query(`INSERT INTO ingestion.runs (id, source_id, lane, started_at, status, trigger, raw_ref) VALUES (gen_random_uuid(), $1, 'NORMAL', $2, 'OK', 'POLL', $3)`, [src, old, key]);
+    }
+    await env.c.db.query(`INSERT INTO ingestion.runs (id, source_id, lane, started_at, status, trigger) VALUES (gen_random_uuid(), $1, 'NORMAL', $2, 'NOT_MODIFIED', 'POLL')`, [src, old]);
+    const r = await env.c.ingestionScheduler.applyRawRetention(new Date("2026-09-30T00:00:00Z"), 3);
+    expect(r.deleted).toBe(7);
+    expect(r.runsPurged).toBe(8);
+    expect((await env.c.db.query(`SELECT 1 FROM ingestion.runs`)).rowCount).toBe(0);
     await env.close();
   });
 });
