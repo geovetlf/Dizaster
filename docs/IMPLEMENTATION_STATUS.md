@@ -442,8 +442,9 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | Fusión conserva el historial de avisos (ADR 0249) | ✅ | §5.7, §5.10 |
 | Mapa offline desactualizado al cambiar zona o idioma (ADR 0250) | ✅ | §11.3 |
 | Disputa de moderación estable (ADR 0251) | ✅ | `negative_source`, migración 0099 |
-| Enlaces de posts en iOS (ADR 0253) | ✅ | AASA `/p/*`, prueba de paridad con Android |
 | Bloqueo en reacciones a comentarios y comentarios borrados sin texto (ADR 0252) | ✅ | BLOCKED; texto '-' |
+| Enlaces de posts en iOS (ADR 0253) | ✅ | AASA `/p/*`, prueba de paridad con Android |
+| Borrado completo de negocio (ADR 0254) | ✅ | `wipeBusinesses`, media y ediciones, en una transacción |
 | Licencias, auditoría, SBOM, Dependabot; respaldo con prueba de restauración en CI | ✅ | ADR 0070, `scripts/supply-chain.mjs`, `scripts/db-restore-check.mjs` |
 | Idioma de la app elegible en el perfil (es/en/pt/fr o del teléfono) | ✅ | ADR 0069, `app/language.tsx` |
 | Varias cuentas en un teléfono corroboran como una (clave seudónima del teléfono) | ✅ | ADR 0068, migración 0036 |
@@ -513,9 +514,8 @@ Revisión del Blueprint del 2026-09-30 (tras ADR 0240): completada con ADR 0241�
 
 Revisión del Blueprint del 2026-09-30 (tras ADR 0250), verificada contra el código, sin bloqueos:
 
-1. Borrar un negocio borra su media, ediciones y contacto, en una transacción (§13.2).
-2. Feed Cerca por ubicación del evento, no solo del post (§5.3).
-3. Completar la exportación de datos (§13.2).
+1. Feed Cerca por ubicación del evento, no solo del post (§5.3).
+2. Completar la exportación de datos (§13.2).
 
 Bloqueadas o en espera:
 

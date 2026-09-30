@@ -102,6 +102,30 @@ describe("foto de perfil y logo", () => {
     expect(feed.posts[0]!.author).toMatchObject({ avatarUrl: view.logoUrl });
   });
 
+  it("borrar el negocio borra su logo, la media y las ediciones de sus posts, y su contacto (ADR 0254)", async () => {
+    const carla = await createUser(t, "carla_kiosko");
+    const body = { handle: "kiosko_ana", name: "Kiosko Ana", category: "food", contactUrl: "https://kiosko.example" };
+    expect((await t.app.inject({ method: "POST", url: "/v1/businesses", headers: auth(carla), payload: body })).statusCode).toBe(201);
+    const logo = await upload(carla);
+    expect((await t.app.inject({ method: "PUT", url: "/v1/businesses/kiosko_ana/logo", headers: auth(carla), payload: { mediaId: logo } })).statusCode).toBe(200);
+    const photo = await upload(carla);
+    const created = await t.app.inject({ method: "POST", url: "/v1/posts", headers: auth(carla), payload: { text: "Abrimos hoy", asBusiness: "kiosko_ana", mediaIds: [photo] } });
+    expect(created.statusCode, created.body).toBe(201);
+    const postId = created.json().postId as string;
+    expect((await t.app.inject({ method: "PATCH", url: `/v1/posts/${postId}`, headers: auth(carla), payload: { text: "Abrimos hoy a las 9" } })).statusCode).toBe(200);
+
+    expect((await t.app.inject({ method: "DELETE", url: "/v1/businesses/kiosko_ana", headers: auth(beto) })).statusCode).toBe(404);
+    expect((await t.app.inject({ method: "DELETE", url: "/v1/businesses/kiosko_ana", headers: auth(carla) })).statusCode).toBe(204);
+    expect(await mediaState(logo)).toBe("DELETED");
+    expect(await mediaState(photo)).toBe("DELETED");
+    expect((await t.c.db.query(`SELECT 1 FROM social.post_edits WHERE post_id = $1`, [postId])).rowCount).toBe(0);
+    const b = (await t.c.db.query<{ contact_url: string | null; deleted: boolean }>(
+      `SELECT contact_url, deleted_at IS NOT NULL AS deleted FROM social.business_profiles WHERE handle = 'kiosko_ana'`,
+    )).rows[0]!;
+    expect(b).toEqual({ contact_url: null, deleted: true });
+    expect((await t.app.inject({ url: "/v1/businesses/kiosko_ana" })).statusCode).toBe(404);
+  });
+
   it("moderación quita la foto sin tocar la cuenta y queda registrado", async () => {
     const photo = await upload(beto);
     expect((await setAvatar(beto, photo)).statusCode).toBe(200);

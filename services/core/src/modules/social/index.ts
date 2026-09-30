@@ -4,6 +4,7 @@ import type { Queryable } from "../../platform/db.js";
 import { publish, type OutboxDispatcher } from "../../platform/outbox.js";
 import { DomainError, notFound } from "../../platform/errors.js";
 import { newId } from "../../platform/ids.js";
+import { wipeBusinesses } from "./business.js";
 
 /**
  * Social Engine: perfiles, posts, reacciones, comentarios y feed. Un REPORT siempre tiene un POST como cara
@@ -227,18 +228,9 @@ export class SocialService {
   }
 
   /** Borrado de cuenta: sus negocios desaparecen con sus posts (la tabla conserva el handle para que nadie lo suplante). */
-  async deleteBusinessesOf(q: Queryable, userId: string): Promise<void> {
-    const { rows } = await q.query<{ id: string }>(
-      `UPDATE social.business_profiles SET deleted_at = coalesce(deleted_at, now()), description = NULL, address_public = NULL,
-              contact_phone = NULL, contact_url = NULL, logo_media_id = NULL, logo_url = NULL, updated_at = now()
-        WHERE owner_user_id = $1 RETURNING id`,
-      [userId],
-    );
-    const ids = rows.map((r) => r.id);
-    if (ids.length === 0) return;
-    await q.query(`UPDATE social.posts SET text = NULL, deleted_at = coalesce(deleted_at, now()), updated_at = now() WHERE author_type = 'BUSINESS' AND author_id = ANY($1)`, [ids]);
-    await q.query(`DELETE FROM social.post_edits WHERE post_id IN (SELECT id FROM social.posts WHERE author_type = 'BUSINESS' AND author_id = ANY($1))`, [ids]);
-    await q.query(`DELETE FROM social.follows WHERE target_type = 'BUSINESS' AND target_id = ANY($1::text[])`, [ids]);
+  async deleteBusinessesOf(q: Queryable, userId: string): Promise<string[]> {
+    const { rows } = await q.query<{ id: string }>(`SELECT id FROM social.business_profiles WHERE owner_user_id = $1`, [userId]);
+    return wipeBusinesses(q, rows.map((r) => r.id));
   }
 
   async createProfile(tx: Queryable, input: { userId: string; handleHint: string }): Promise<{ id: string; handle: string }> {

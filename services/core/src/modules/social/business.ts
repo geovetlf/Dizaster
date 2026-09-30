@@ -72,15 +72,14 @@ export class BusinessService {
     return this.view(this.db, handle, owner);
   }
 
-  /** Borrar el negocio: sus posts y seguidores se van con él. El handle queda reservado. */
-  async delete(owner: { userId: string }, handle: string): Promise<string> {
-    const id = await this.ownedId(this.db, owner.userId, handle);
-    await this.db.query(`UPDATE social.business_profiles SET deleted_at = now(), logo_media_id = NULL, logo_url = NULL, updated_at = now() WHERE id = $1`, [id]);
-    await this.db.query(`UPDATE social.posts SET text = NULL, deleted_at = coalesce(deleted_at, now()) WHERE author_type = 'BUSINESS' AND author_id = $1`, [id]);
-    await this.db.query(`DELETE FROM social.follows WHERE target_type = 'BUSINESS' AND target_id = $1`, [id]);
-    await this.db.query(`DELETE FROM social.post_business_mentions WHERE business_id = $1`, [id]);
-    await this.db.query(`DELETE FROM social.business_blocks WHERE business_id = $1`, [id]);
-    return id;
+  /**
+   * Borrar el negocio (ADR 0254): sus posts, ediciones, contacto y seguidores se van con él, y quien llama purga
+   * la media devuelta (fotos de sus posts y logo) en la misma transacción. El handle queda reservado.
+   */
+  async delete(q: Queryable, owner: { userId: string }, handle: string): Promise<{ id: string; mediaIds: string[] }> {
+    const id = await this.ownedId(q, owner.userId, handle);
+    const mediaIds = await wipeBusinesses(q, [id]);
+    return { id, mediaIds };
   }
 
   /** Vista pública. Un negocio retirado por moderación solo lo ve quien lo administra. */
@@ -184,4 +183,31 @@ function parse<T extends z.ZodType>(schema: T, value: unknown): z.infer<T> {
   const r = schema.safeParse(value);
   if (!r.success) throw new DomainError("VALIDATION", r.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; "));
   return r.data;
+}
+
+/**
+ * Deja sin datos los negocios indicados (borrado propio o de la cuenta, §13.2) y devuelve la media que usaban.
+ * Solo toca el esquema `social`; purgar los archivos es tarea de quien llama.
+ */
+export async function wipeBusinesses(q: Queryable, ids: string[]): Promise<string[]> {
+  if (ids.length === 0) return [];
+  const logos = await q.query<{ logo_media_id: string | null }>(
+    `SELECT logo_media_id FROM social.business_profiles WHERE id = ANY($1) FOR UPDATE`, [ids],
+  );
+  await q.query(
+    `UPDATE social.business_profiles SET deleted_at = coalesce(deleted_at, now()), description = NULL, address_public = NULL,
+            contact_phone = NULL, contact_url = NULL, logo_media_id = NULL, logo_url = NULL, updated_at = now()
+      WHERE id = ANY($1)`,
+    [ids],
+  );
+  const posts = `(SELECT id FROM social.posts WHERE author_type = 'BUSINESS' AND author_id = ANY($1))`;
+  const media = await q.query<{ media_id: string }>(`SELECT media_id FROM social.post_media WHERE post_id IN ${posts}`, [ids]);
+  await q.query(`UPDATE social.posts SET text = NULL, public_point = NULL, deleted_at = coalesce(deleted_at, now()), updated_at = now() WHERE author_type = 'BUSINESS' AND author_id = ANY($1)`, [ids]);
+  await q.query(`DELETE FROM social.post_edits WHERE post_id IN ${posts}`, [ids]);
+  await q.query(`DELETE FROM social.post_tags WHERE post_id IN ${posts}`, [ids]);
+  await q.query(`DELETE FROM social.post_mentions WHERE post_id IN ${posts}`, [ids]);
+  await q.query(`DELETE FROM social.post_business_mentions WHERE business_id = ANY($1) OR post_id IN ${posts}`, [ids]);
+  await q.query(`DELETE FROM social.follows WHERE target_type = 'BUSINESS' AND target_id = ANY($1::text[])`, [ids]);
+  await q.query(`DELETE FROM social.business_blocks WHERE business_id = ANY($1)`, [ids]);
+  return [...new Set([...media.rows.map((m) => m.media_id), ...logos.rows.flatMap((l) => (l.logo_media_id ? [l.logo_media_id] : []))])];
 }

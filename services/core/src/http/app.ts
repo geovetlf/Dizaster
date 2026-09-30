@@ -780,7 +780,12 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
   });
   app.delete("/v1/businesses/:handle", async (req, reply) => {
     const session = requireSession(req);
-    await c.institutions.retire(c.db, [await c.business.delete(session, parse(HandleParam, req.params).handle)]);
+    const { handle } = parse(HandleParam, req.params);
+    await withTransaction(c.db, async (tx) => {
+      const { id, mediaIds } = await c.business.delete(tx, session, handle);
+      await c.media.purgeMedia(tx, mediaIds);
+      await c.institutions.retire(tx, [id]);
+    });
     return reply.status(204).send();
   });
   app.get("/v1/businesses/:handle/posts", async (req, reply) => {
