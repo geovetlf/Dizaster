@@ -14,7 +14,8 @@ import { OfflineNote } from "../../components/offline-note";
 import { cacheKeys, readThrough } from "../../lib/offline/read-cache";
 import { readCache } from "../../lib/offline/sqlite-cache";
 import { limitAmbientCache } from "../../lib/map/offline";
-import { lang, t, verificationLabel } from "../../lib/i18n";
+import { lang, t, tf, verificationLabel } from "../../lib/i18n";
+import { eventStatusLine, MAP_CIRCLE_RADIUS } from "../../lib/ui/event-status";
 import { useReduceMotion } from "../../lib/a11y/announce";
 import { APP_MAP_SCHEME, OFFLINE_FALLBACK_STYLE, providerFromAppConfig, type MapProvider } from "../../lib/map/provider";
 import { categoryCatalog, categoryLabel, pickerCategories, useCategoryCatalogVersion } from "../../lib/category-store";
@@ -127,7 +128,8 @@ export default function MapScreen() {
             type="circle"
             paint={{
               "circle-color": ["get", "color"],
-              "circle-radius": ["interpolate", ["linear"], ["get", "count"], 1, 7, 50, 22],
+              // Tamaño por reportes agrupados y gravedad (ADR 0222).
+              "circle-radius": MAP_CIRCLE_RADIUS as unknown as number,
               "circle-stroke-width": ["get", "strokeWidth"],
               "circle-stroke-color": ["get", "stroke"],
               "circle-opacity": ["get", "opacity"],
@@ -169,7 +171,7 @@ export default function MapScreen() {
             renderItem={({ item: e }) => (
               <Pressable accessibilityRole="button" style={styles.listRow} onPress={() => router.push(`/event/${e.id}`)}>
                 <Text style={styles.listTitle}>{e.title?.[lang] ?? e.title?.["es"] ?? categoryLabel(e.categoryCode)}</Text>
-                <Text style={styles.listMeta}>{[e.place?.label, verificationLabel(e.publicVerificationState)].filter(Boolean).join(" · ")}</Text>
+                <Text style={styles.listMeta}>{[e.place?.label, verificationLabel(e.publicVerificationState), eventStatusLine(e, t, tf)].filter(Boolean).join(" · ")}</Text>
               </Pressable>
             )}
           />

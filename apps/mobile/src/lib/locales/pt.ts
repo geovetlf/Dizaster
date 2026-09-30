@@ -594,6 +594,7 @@ export const pt: Record<MessageKey, string> = {
   st_MONITORING: "Em acompanhamento",
   st_RESOLVED: "Resolvido",
   st_ARCHIVED: "Arquivado",
+  severityOf: "Gravidade {n} de 5",
   confirmStatus: "Mudar o estado do evento? Ficará registrado com seu motivo.",
   severitySection: "Gravidade",
   sensitivitySection: "Sensibilidade",

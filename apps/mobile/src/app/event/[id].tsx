@@ -9,7 +9,8 @@ import { OfflineNote } from "../../components/offline-note";
 import { api } from "../../lib/api";
 import { cacheKeys, readThrough } from "../../lib/offline/read-cache";
 import { readCache } from "../../lib/offline/sqlite-cache";
-import { lang, t, tCount, VERIFICATION_LABEL, verificationLabel } from "../../lib/i18n";
+import { lang, t, tCount, tf, VERIFICATION_LABEL, verificationLabel } from "../../lib/i18n";
+import { eventStatusLine } from "../../lib/ui/event-status";
 import { eventTime, eventTitle, formatInZone, timeAgo } from "../../lib/ui/format";
 import { evidenceLine, explainLines, timelineLabel } from "../../lib/verification/explain";
 import { followablePlace } from "../../lib/social/place";
@@ -123,6 +124,8 @@ export default function EventScreen() {
         ))}
       </View>
       <Text style={[styles.badge, { backgroundColor: color }]}>{verificationLabel(event.publicVerificationState)}</Text>
+      {/* Estado del ciclo de vida y gravedad (ADR 0222): independientes de la verificación. */}
+      <Text style={styles.meta}>{eventStatusLine(event, t, tf)}</Text>
       <Text style={styles.meta}>
         {[
           ...evidenceCounts(event, tCount),
