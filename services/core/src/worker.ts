@@ -103,6 +103,8 @@ function maintenanceLoop(): Promise<void> {
       log("retention.media", await c.media.applyRetention());
       log("retention.source-raw", await c.ingestionScheduler.applyRawRetention());
       log("trust.standing.refresh", await c.trust.refreshStanding());
+      log("retention.alerts", await c.alerts.applyRetention(c.env.NOTIFICATION_RETENTION_DAYS));
+      log("retention.outbox", { deleted: await c.dispatcher.purgeProcessed(c.env.OUTBOX_RETENTION_DAYS) });
     }
     await sleep(5000);
     return 0;

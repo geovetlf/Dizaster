@@ -103,6 +103,23 @@ export class OutboxDispatcher {
     return { pending: r.pending, oldestPendingSeconds: r.oldest === null ? null : Math.round(r.oldest), failing: r.failing };
   }
 
+  /**
+   * Retención (§13.2, ADR 0165): borra lo ya procesado con más de `days` días. Lo pendiente nunca se toca. Los
+   * consumos se borran en cascada. Por lotes, para no bloquear la tabla.
+   */
+  async purgeProcessed(days: number, batch = 5000): Promise<number> {
+    let total = 0;
+    for (;;) {
+      const r = await this.db.query(
+        `DELETE FROM platform.outbox WHERE id IN (
+           SELECT id FROM platform.outbox WHERE processed_at IS NOT NULL AND processed_at < now() - make_interval(days => $1) LIMIT $2)`,
+        [days, batch],
+      );
+      total += r.rowCount ?? 0;
+      if ((r.rowCount ?? 0) < batch) return total;
+    }
+  }
+
   /** Procesa hasta vaciar la cola (tests y arranque). */
   async drain(): Promise<number> {
     let total = 0;

@@ -28,6 +28,9 @@ const Env = z.object({
   RATE_LIMIT_WRITES_PER_MINUTE: z.coerce.number().int().positive().default(60),
   /** Detrás de un CDN o balanceador: tomar la IP de X-Forwarded-For. Solo si ese proxy la fija. */
   TRUST_PROXY: z.enum(["true", "false"]).default("false").transform((v) => v === "true"),
+  // Retención de datos operativos (ADR 0165).
+  NOTIFICATION_RETENTION_DAYS: z.coerce.number().int().min(7).max(3650).default(90),
+  OUTBOX_RETENTION_DAYS: z.coerce.number().int().min(1).max(365).default(14),
   PRESENCE_RETENTION_DAYS: z.coerce.number().int().positive().default(30),
   /** Claves de cifrado por columna (ADR 0048): "kid:base64(32 bytes)", separadas por comas; la primera cifra. */
   FIELD_KEYS: z.string().optional(),

@@ -111,6 +111,19 @@ export class AlertService {
     private readonly clock: Clock,
   ) {}
 
+  /**
+   * Retención (§13.2, ADR 0165), NO AI REQUIRED. La última ubicación aproximada solo sirve 72 h para "cerca de mí":
+   * pasado eso se borra. El historial de avisos se guarda `notificationDays` días (lo leído o no). Las alertas en sí
+   * se conservan: su `dedup_key` evita repetir un aviso sobre un evento largo.
+   */
+  async applyRetention(notificationDays: number): Promise<{ lastLocations: number; notifications: number }> {
+    const loc = await this.db.query(`DELETE FROM alert.last_locations WHERE seen_at < now() - interval '72 hours'`);
+    const notif = await this.db.query(
+      `DELETE FROM alert.notifications WHERE created_at < now() - make_interval(days => $1) AND status <> 'PENDING'`, [notificationDays],
+    );
+    return { lastLocations: loc.rowCount ?? 0, notifications: notif.rowCount ?? 0 };
+  }
+
   registerHandlers(dispatcher: OutboxDispatcher): void {
     const run = (eventId: string, tx: Queryable) => this.evaluate(tx, eventId).then(() => undefined);
     dispatcher.on("EventCreated", "alert.evaluate.created", (e, tx) => run(e.payload.eventId, tx));
