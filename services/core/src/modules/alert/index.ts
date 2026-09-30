@@ -364,7 +364,7 @@ export class AlertService {
       if (!cur || MATCH_PRIORITY.indexOf(match) < MATCH_PRIORITY.indexOf(cur.match)) found.set(profileId, { userId, match });
     };
     // El distrito solo existe si el EVENT lo publica (HIGHLY_SENSITIVE no): seguirlo nunca revela más que el mapa.
-    const placeIds = [snap.regionId, snap.districtId].filter((x): x is string => !!x);
+    const placeIds = [snap.regionId, snap.cityId, snap.districtId].filter((x): x is string => !!x);
     // Área oficial afectada (ADR 0087): también avisa a quien sigue o se suscribió a un área que la alerta cubre,
     // aunque el punto del evento caiga fuera. Solo la dan fuentes externas/oficiales: no revela nada ciudadano.
     const areaJson = snap.affectedArea ? JSON.stringify(snap.affectedArea) : null;

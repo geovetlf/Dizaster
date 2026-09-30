@@ -63,7 +63,7 @@ export class FeedService {
       const s = (await this.events.publicStates(tx, [eventId])).get(eventId);
       if (!s) return;
       await this.social.upsertEventSignal(tx, {
-        eventId, severity: s.severity, publicState: s.publicVerificationState, regionId: s.regionId, districtId: s.districtId,
+        eventId, severity: s.severity, publicState: s.publicVerificationState, regionId: s.regionId, districtId: s.districtId, cityId: s.cityId,
       });
     };
     dispatcher.on("EventCreated", "feed.event-signals.created", (e, tx) => refresh(e.payload.eventId, tx));

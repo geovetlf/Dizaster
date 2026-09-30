@@ -956,21 +956,21 @@ export class EventService {
     ids: string[],
   ): Promise<Map<string, {
     publicVerificationState: PublicVerificationState; sensitivity: Sensitivity; place: ContextualLocation | null;
-    severity: number; regionId: string | null; districtId: string | null;
+    severity: number; regionId: string | null; districtId: string | null; cityId: string | null;
   }>> {
     if (ids.length === 0) return new Map();
     const { rows } = await q.query<{
       id: string; verification_level: VerificationLevel; negative_state: NegativeState; sensitivity: Sensitivity; place: ContextualLocation | null;
-      severity: number; region_id: string | null; district_id: string | null;
+      severity: number; region_id: string | null; district_id: string | null; city_id: string | null;
     }>(
-      `SELECT id, verification_level, negative_state, sensitivity, place, severity, region_id, district_id
+      `SELECT id, verification_level, negative_state, sensitivity, place, severity, region_id, district_id, city_id
          FROM event.events WHERE id = ANY($1) AND publication_state NOT IN ('HIDDEN','DELAYED')`,
       [ids],
     );
     return new Map(
       rows.map((r) => [r.id, {
         publicVerificationState: publicVerificationState(r.verification_level, r.negative_state), sensitivity: r.sensitivity, place: r.place,
-        severity: r.severity, regionId: r.region_id, districtId: r.district_id,
+        severity: r.severity, regionId: r.region_id, districtId: r.district_id, cityId: r.city_id,
       }]),
     );
   }
@@ -979,15 +979,16 @@ export class EventService {
   async alertSnapshot(q: Queryable, id: string): Promise<{
     id: string; categoryCode: string; severity: number; publicState: PublicVerificationState; publicationState: string;
     status: EventSummary["status"]; place: ContextualLocation | null; regionId: string | null; districtId: string | null;
-    countryCode: string | null; mergedIntoId: string | null; point: GeoPoint; affectedArea: AreaGeometry | null;
+    cityId: string | null; countryCode: string | null; mergedIntoId: string | null; point: GeoPoint; affectedArea: AreaGeometry | null;
   } | null> {
     const { rows } = await q.query<{
       id: string; category_code: string; severity: number; verification_level: VerificationLevel; negative_state: NegativeState;
       publication_state: string; status: EventSummary["status"]; place: ContextualLocation | null; region_id: string | null;
-      district_id: string | null; country_code: string | null; merged_into_id: string | null; lat: number; lng: number; area: unknown; hull: unknown;
+      district_id: string | null; city_id: string | null; country_code: string | null; merged_into_id: string | null; lat: number; lng: number;
+      area: unknown; hull: unknown;
     }>(
       `SELECT id, category_code, severity, verification_level, negative_state, publication_state, status, place,
-              region_id, district_id, country_code, merged_into_id,
+              region_id, district_id, city_id, country_code, merged_into_id,
               ST_Y(public_geom::geometry) AS lat, ST_X(public_geom::geometry) AS lng,
               ST_AsGeoJSON(affected_area, 5)::json AS area, ST_AsGeoJSON(ST_Multi(ST_ConvexHull(affected_area::geometry)), 5)::json AS hull
          FROM event.events WHERE id = $1`,
@@ -998,7 +999,7 @@ export class EventService {
     return {
       id: r.id, categoryCode: r.category_code, severity: r.severity, publicState: publicVerificationState(r.verification_level, r.negative_state),
       publicationState: r.publication_state, status: r.status, place: r.place, regionId: r.region_id, districtId: r.district_id,
-      countryCode: r.country_code?.trim() ?? null, mergedIntoId: r.merged_into_id, point: { lat: r.lat, lng: r.lng },
+      cityId: r.city_id, countryCode: r.country_code?.trim() ?? null, mergedIntoId: r.merged_into_id, point: { lat: r.lat, lng: r.lng },
       // Si la unión de áreas quedó demasiado compleja para el contrato, se usa su envolvente convexa.
       affectedArea: r.area ? AreaGeometry.safeParse(r.area).data ?? AreaGeometry.safeParse(r.hull).data ?? null : null,
     };
@@ -1131,7 +1132,7 @@ export class EventService {
       clauses.push(`(
         e.category_code = ANY(${p(codes)}) OR split_part(e.category_code, '.', 1) = ANY(${p(codes)})
         OR e.secondary_categories && ${p(codes)}::text[]
-        OR e.region_id = ANY(${p(place.areaIds)}) OR e.district_id = ANY(${p(place.areaIds)})
+        OR e.region_id = ANY(${p(place.areaIds)}) OR e.district_id = ANY(${p(place.areaIds)}) OR e.city_id = ANY(${p(place.areaIds)})
         OR e.country_code = ANY(${p(place.countries)})
         OR EXISTS (SELECT 1 FROM jsonb_each_text(coalesce(e.title, '{}')) t WHERE lower(t.value) LIKE ${p(like)})
       )`);
