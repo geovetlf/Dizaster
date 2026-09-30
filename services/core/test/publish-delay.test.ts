@@ -63,6 +63,34 @@ describe("retraso de publicación en HIGHLY_SENSITIVE (ADR 0099)", () => {
     expect((await t.c.db.query(`SELECT 1 FROM platform.outbox WHERE type = 'EventPublished' AND payload->>'eventId' = $1`, [eventId])).rowCount).toBe(1);
   });
 
+  it("mientras espera, nadie más lo comenta, reacciona, comparte ni recibe el aviso de mención (ADR 0257)", async () => {
+    const [ana, otro] = await Promise.all([createUser(t, "ana_espera"), createUser(t, "otro_espera")]);
+    const otroHandle = (await t.c.db.query<{ handle: string }>(`SELECT handle FROM social.profiles WHERE id = $1`, [otro.profileId])).rows[0]!.handle;
+    const r = await submit(t, ana, reportBody(ana, { category: "crime.violence", pin: offset(LIMA, 900), text: `Pelea en la esquina, cuidado @${otroHandle}` }));
+    const postId = r.body.postId!;
+    await t.c.dispatcher.drain();
+    const mentionAlerts = async () => (await t.c.db.query(
+      `SELECT 1 FROM alert.notifications n JOIN alert.alerts a ON a.id = n.alert_id WHERE n.profile_id = $1 AND a.actor_profile_id = $2`,
+      [otro.profileId, ana.profileId],
+    )).rowCount;
+    expect(await mentionAlerts()).toBe(0);
+    for (const [method, url, payload] of [
+      ["GET", `/v1/posts/${postId}/comments`, undefined], ["POST", `/v1/posts/${postId}/comments`, { text: "¿Dónde?" }],
+      ["PUT", `/v1/posts/${postId}/reactions/LIKE`, undefined], ["POST", `/v1/posts/${postId}/share`, {}],
+    ] as const) {
+      const res = await t.app.inject({ method, url, headers: auth(otro), ...(payload ? { payload } : {}) });
+      expect(res.statusCode, `${method} ${url}`).toBe(404);
+    }
+    // Su autor sí lo ve y lo comenta, como en el feed.
+    expect((await t.app.inject({ url: `/v1/posts/${postId}/comments`, headers: auth(ana) })).statusCode).toBe(200);
+
+    await t.c.db.query(`UPDATE social.posts SET visible_after = now() - interval '1 second' WHERE id = $1`, [postId]);
+    await t.c.db.query(`UPDATE platform.outbox SET available_at = now() WHERE type = 'UserMentioned' AND payload->>'postId' = $1`, [postId]);
+    await t.c.dispatcher.drain();
+    expect(await mentionAlerts()).toBe(1);
+    expect((await t.app.inject({ method: "PUT", url: `/v1/posts/${postId}/reactions/LIKE`, headers: auth(otro) })).statusCode).toBe(200);
+  });
+
   it("otras categorías no esperan", async () => {
     const u = await createUser(t, "sin_delay");
     const r = await submit(t, u, reportBody(u, { category: "accident.traffic", pin: offset(LIMA, -3000) }));

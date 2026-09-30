@@ -447,6 +447,9 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | Borrado completo de negocio (ADR 0254) | ✅ | `wipeBusinesses`, media y ediciones, en una transacción |
 | Feed Cerca por ubicación del evento (ADR 0255) | ✅ | `event_signals.public_point`, migración 0100 |
 | Exportación de datos completa (ADR 0256) | ✅ | edad, MFA, perfil, posts, respuestas de mismo evento |
+| Timeline sin ids de media (ADR 0258) | ✅ | solo `mediaCount` |
+| Índices por autor (ADR 0259) | ✅ | migración 0101 |
+| Retraso de publicación en interacciones y menciones (ADR 0257) | ✅ | `assertVisible`, `availableAt` en el outbox |
 | Licencias, auditoría, SBOM, Dependabot; respaldo con prueba de restauración en CI | ✅ | ADR 0070, `scripts/supply-chain.mjs`, `scripts/db-restore-check.mjs` |
 | Idioma de la app elegible en el perfil (es/en/pt/fr o del teléfono) | ✅ | ADR 0069, `app/language.tsx` |
 | Varias cuentas en un teléfono corroboran como una (clave seudónima del teléfono) | ✅ | ADR 0068, migración 0036 |
@@ -518,14 +521,11 @@ Revisión del Blueprint del 2026-09-30 (tras ADR 0250): completada con ADR 0251�
 
 Revisión del Blueprint del 2026-09-30 (tras ADR 0256), verificada contra el código, sin bloqueos:
 
-1. La línea de tiempo pública no expone ids de media (§13.3, §5.9).
-2. El retraso de publicación también en menciones, comentarios, reacciones y compartidos (§8.5).
-3. Moderación de bio y nombre de perfil (§13.3).
-4. Comentarios y bloqueos en transacción, sin carrera en el cupo (§4.2).
-5. Purgar sesiones rotadas y caducadas (§13.2, §7.4).
-6. La app muestra los fallos al bloquear, desbloquear, borrar o buscar (§13.3).
-7. En iOS el teclado no tapa los campos de texto (RF-01).
-8. Índices para cupos y borrado por autor en comentarios y reacciones (§7.4).
+1. Moderación de bio y nombre de perfil (§13.3).
+2. Comentarios y bloqueos en transacción, sin carrera en el cupo (§4.2).
+3. Purgar sesiones rotadas y caducadas (§13.2, §7.4).
+4. La app muestra los fallos al bloquear, desbloquear, borrar o buscar (§13.3).
+5. En iOS el teclado no tapa los campos de texto (RF-01).
 
 Bloqueadas o en espera:
 

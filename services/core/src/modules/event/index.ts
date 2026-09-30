@@ -1534,9 +1534,13 @@ export function nextPublication(
   return current;
 }
 
-/** Marcas internas (de qué reporte o fusión viene una foto) no salen en la timeline pública. */
+/**
+ * Marcas internas (de qué reporte o fusión viene una foto) no salen en la timeline pública. Tampoco los ids de media
+ * (ADR 0258): con un id se arma la URL pública de la foto, y la galería es la única que filtra lo pendiente de
+ * aprobación, lo moderado y lo retrasado. La timeline solo dice cuántas llegaron.
+ */
 function publicEntry(r: { id: string; type: TimelineEntryView["type"]; at: Date; payload: Record<string, unknown> }): TimelineEntryView {
-  const { reportId: _r, viaMerge: _m, ...payload } = r.payload;
+  const { reportId: _r, viaMerge: _m, mediaIds: _i, ...payload } = r.payload;
   return { id: r.id, type: r.type, at: r.at.toISOString(), payload };
 }
 

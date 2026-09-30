@@ -12,14 +12,17 @@ export async function publish<T extends DomainEventType>(
   tx: Queryable,
   type: T,
   payload: DomainEventMap[T],
-  opts: { lane?: OutboxLane; correlationId?: string | null } = {},
+  opts: { lane?: OutboxLane; correlationId?: string | null; availableAt?: Date | null } = {},
 ): Promise<string> {
   const id = newId();
   // Correlación y actor salen del contexto de la petición o del evento que se está procesando (ADR 0172).
   const ctx = currentContext();
+  // `availableAt`: no se procesa antes de esa hora (p. ej. un aviso que espera el retraso de publicación, ADR 0257).
   await tx.query(
-    `INSERT INTO platform.outbox (id, type, payload, lane, correlation_id, actor) VALUES ($1, $2, $3, $4, $5, $6)`,
-    [id, type, JSON.stringify(payload), opts.lane ?? "normal", opts.correlationId ?? ctx?.correlationId ?? null, ctx?.actor ?? "system"],
+    `INSERT INTO platform.outbox (id, type, payload, lane, correlation_id, actor, available_at)
+     VALUES ($1, $2, $3, $4, $5, $6, greatest(now(), coalesce($7::timestamptz, now())))`,
+    [id, type, JSON.stringify(payload), opts.lane ?? "normal", opts.correlationId ?? ctx?.correlationId ?? null, ctx?.actor ?? "system",
+      opts.availableAt ?? null],
   );
   return id;
 }

@@ -123,6 +123,9 @@ export const DUPLICATE_TEXT = { minAuthors: 3, windowHours: 24, maxPosts: 50 } a
 /** Dónde está un post para "Cerca" (ADR 0255): su punto público o, si no tiene, el punto público de su evento. */
 const POINT = "coalesce(p.public_point, s.public_point)";
 
+/** Ya pasó su retraso de publicación (ADR 0099): antes, solo su autor lo ve. */
+const VISIBLE_NOW = "(p.visible_after IS NULL OR p.visible_after <= now())";
+
 function rankSql(nearSql: string | null): string {
   const B = RANK_BOOST_HOURS;
   const state = Object.entries(B.state).map(([k, v]) => `WHEN '${k}' THEN ${v}`).join(" ");
@@ -326,7 +329,8 @@ export class SocialService {
     const { rows } = await q.query<{ id: string; category_code: string | null }>(
       `SELECT o.id, o.category_code
          FROM social.posts p JOIN social.posts o ON o.id = coalesce(p.shared_post_id, p.id)
-        WHERE p.id = $1 AND o.deleted_at IS NULL AND o.visibility = 'PUBLIC' AND o.moderation_state = 'VISIBLE'`,
+        WHERE p.id = $1 AND o.deleted_at IS NULL AND o.visibility = 'PUBLIC' AND o.moderation_state = 'VISIBLE'
+          AND (o.visible_after IS NULL OR o.visible_after <= now())`,
       [postId],
     );
     if (!rows[0]) throw notFound("Publicación");
@@ -375,7 +379,7 @@ export class SocialService {
   async recordExternalShare(q: Queryable, postId: string, profileId: string): Promise<void> {
     const { rows } = await q.query<{ id: string }>(
       `SELECT coalesce(o.id, p.id) AS id FROM social.posts p LEFT JOIN social.posts o ON o.id = p.shared_post_id AND o.deleted_at IS NULL
-        WHERE p.id = $1 AND p.deleted_at IS NULL AND p.moderation_state IN ('VISIBLE','LIMITED')`, [postId],
+        WHERE p.id = $1 AND p.deleted_at IS NULL AND p.moderation_state IN ('VISIBLE','LIMITED') AND ${VISIBLE_NOW}`, [postId],
     );
     const target = rows[0]?.id;
     if (!target) throw new DomainError("NOT_FOUND", "Publicación no encontrada", 404);
@@ -595,7 +599,10 @@ export class SocialService {
     )).rows;
     // Solo las menciones recién enlazadas: el Alert Engine decide si avisa (ADR 0063).
     if (mentioned.length > 0) {
-      await publish(tx, "UserMentioned", { postId, authorProfileId, profileIds: mentioned.map((m) => m.profile_id) }, { lane: "interactive" });
+      // Con retraso de publicación (ADR 0257) el aviso sale cuando el post se ve, no antes.
+      const delay = await tx.query<{ visible_after: Date | null }>(`SELECT visible_after FROM social.posts WHERE id = $1`, [postId]);
+      await publish(tx, "UserMentioned", { postId, authorProfileId, profileIds: mentioned.map((m) => m.profile_id) },
+        { lane: "interactive", availableAt: delay.rows[0]?.visible_after ?? null });
     }
     // Negocios (ADR 0054): el handle es único entre personas y negocios, así que no hay ambigüedad.
     const businesses = handles.length === 0 ? [] : (await tx.query<{ handle: string }>(
@@ -620,7 +627,7 @@ export class SocialService {
          FROM social.posts p
          LEFT JOIN social.profiles pr ON p.author_type = 'PROFILE' AND pr.id = p.author_id
          LEFT JOIN social.business_profiles bp ON p.author_type = 'BUSINESS' AND bp.id = p.author_id
-        WHERE p.id = $1 AND p.deleted_at IS NULL AND p.moderation_state = 'VISIBLE' AND p.visibility = 'PUBLIC'`,
+        WHERE p.id = $1 AND p.deleted_at IS NULL AND p.moderation_state = 'VISIBLE' AND p.visibility = 'PUBLIC' AND ${VISIBLE_NOW}`,
       [postId],
     );
     const post = rows[0];
@@ -640,7 +647,7 @@ export class SocialService {
     const { rows } = await q.query<{ display: string | null; posts: number; followers: number; followed: boolean }>(
       `SELECT (SELECT display FROM social.tags WHERE normalized = $1) AS display,
               (SELECT count(*) FROM social.post_tags pt JOIN social.tags t ON t.id = pt.tag_id JOIN social.posts p ON p.id = pt.post_id
-                WHERE t.normalized = $1 AND p.deleted_at IS NULL AND p.visibility = 'PUBLIC' AND p.moderation_state = 'VISIBLE')::int AS posts,
+                WHERE t.normalized = $1 AND p.deleted_at IS NULL AND p.visibility = 'PUBLIC' AND p.moderation_state = 'VISIBLE' AND ${VISIBLE_NOW})::int AS posts,
               (SELECT count(*) FROM social.follows f WHERE f.target_type = 'TAG' AND f.target_id = $1)::int AS followers,
               EXISTS (SELECT 1 FROM social.follows f WHERE f.target_type = 'TAG' AND f.target_id = $1 AND f.follower_profile_id = $2) AS followed`,
       [normalized, viewerProfileId],
@@ -827,7 +834,7 @@ export class SocialService {
               (SELECT count(*) FROM social.follows f WHERE f.target_type = 'PROFILE' AND f.target_id = pr.id::text)::int AS followers,
               (SELECT count(*) FROM social.follows f WHERE f.follower_profile_id = pr.id AND f.target_type = 'PROFILE')::int AS following,
               (SELECT count(*) FROM social.posts p WHERE p.author_type = 'PROFILE' AND p.author_id = pr.id AND p.author_visibility = 'PUBLIC' AND p.visibility = 'PUBLIC'
-                  AND p.deleted_at IS NULL AND p.moderation_state = 'VISIBLE')::int AS posts,
+                  AND p.deleted_at IS NULL AND p.moderation_state = 'VISIBLE' AND ${VISIBLE_NOW})::int AS posts,
               EXISTS (SELECT 1 FROM social.follows f WHERE f.follower_profile_id = $2 AND f.target_type = 'PROFILE' AND f.target_id = pr.id::text) AS followed,
               EXISTS (SELECT 1 FROM social.blocks b WHERE b.blocker_profile_id = $2 AND b.blocked_profile_id = pr.id) AS blocked
          FROM social.profiles pr WHERE lower(pr.handle) = lower($1) AND pr.deleted_at IS NULL`,
@@ -952,7 +959,7 @@ export class SocialService {
    * no publica evidencia ni toca la verificación.
    */
   async setReaction(q: Queryable, postId: string, profileId: string, kind: ReactionKind, on: boolean): Promise<ReactionState> {
-    await this.assertVisible(q, postId);
+    await this.assertVisible(q, postId, profileId);
     if (on) await this.assertCanInteract(q, postId, profileId);
     if (on && kind === "SEEN_TOO") {
       const linked = await q.query(`SELECT 1 FROM social.post_event_links WHERE post_id = $1 LIMIT 1`, [postId]);
@@ -976,7 +983,7 @@ export class SocialService {
   async addComment(
     q: Queryable, postId: string, profileId: string, text: string, parentId?: string, perMinute = 10, clientId?: string,
   ): Promise<CommentView> {
-    await this.assertVisible(q, postId);
+    await this.assertVisible(q, postId, profileId);
     await this.assertCanInteract(q, postId, profileId);
     // Reintento con el mismo id del cliente (ADR 0178): devuelve el comentario ya creado, sin gastar cupo.
     const replay = async () => {
@@ -1029,7 +1036,7 @@ export class SocialService {
     const r = ChronoPageQuery.safeParse(raw ?? {});
     if (!r.success) throw new DomainError("VALIDATION", r.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; "));
     const p = r.data;
-    await this.assertVisible(q, postId);
+    await this.assertVisible(q, postId, viewerProfileId);
     if (p.cursor) {
       const c = await q.query(`SELECT 1 FROM social.comments WHERE id = $1 AND post_id = $2`, [p.cursor, postId]);
       if (!c.rowCount) throw new DomainError("VALIDATION", "Cursor inválido");
@@ -1086,7 +1093,7 @@ export class SocialService {
       `SELECT post_id, author_profile_id FROM social.comments WHERE id = $1 AND deleted_at IS NULL AND moderation_state = 'VISIBLE'`, [commentId],
     );
     if (!c.rows[0]) throw notFound("Comentario");
-    await this.assertVisible(q, c.rows[0].post_id);
+    await this.assertVisible(q, c.rows[0].post_id, profileId);
     // Quien te bloqueó no reacciona a tus comentarios (ADR 0252, como en ADR 0221). Quitar una reacción siempre se puede.
     if (on && (await this.isBlockedBy(q, c.rows[0].author_profile_id, profileId))) throw blocked();
     if (on) {
@@ -1258,10 +1265,18 @@ export class SocialService {
     if (rowCount) throw blocked();
   }
 
-  private async assertVisible(q: Queryable, postId: string): Promise<void> {
+  /**
+   * Visible para interactuar: no borrado ni retirado, su negocio autor sigue en pie y, si tiene retraso de publicación
+   * (ADR 0099, 0257), ya venció, salvo para su autor, que lo ve desde el principio como en el feed.
+   */
+  private async assertVisible(q: Queryable, postId: string, viewerProfileId: string | null): Promise<void> {
     const { rowCount } = await q.query(
-      `SELECT 1 FROM social.posts WHERE id = $1 AND deleted_at IS NULL AND moderation_state IN ('VISIBLE','LIMITED')`,
-      [postId],
+      `SELECT 1 FROM social.posts p
+        WHERE p.id = $1 AND p.deleted_at IS NULL AND p.moderation_state IN ('VISIBLE','LIMITED')
+          AND (${VISIBLE_NOW} OR (p.author_type = 'PROFILE' AND p.author_id = $2))
+          AND (p.author_type = 'PROFILE' OR EXISTS (SELECT 1 FROM social.business_profiles bp
+                WHERE bp.id = p.author_id AND bp.deleted_at IS NULL AND bp.moderation_state = 'VISIBLE'))`,
+      [postId, viewerProfileId],
     );
     if (!rowCount) throw notFound("Post");
   }

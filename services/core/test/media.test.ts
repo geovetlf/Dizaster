@@ -223,6 +223,9 @@ describe("media en reportes y eventos", () => {
     expect(r.body.outcome).toBe("CREATED_EVENT");
     const timeline = (await t.app.inject({ url: `/v1/events/${r.body.eventId}/timeline` })).json().entries;
     expect(timeline.map((e: { type: string }) => e.type)).toContain("MEDIA_ADDED");
+    // ADR 0258: la timeline dice cuántas fotos llegaron, nunca sus ids (con un id se arma la URL pública).
+    expect(timeline.find((e: { type: string }) => e.type === "MEDIA_ADDED").payload).toEqual({ mediaCount: 1 });
+    expect(JSON.stringify(timeline)).not.toContain(id);
     const { media } = (await t.app.inject({ url: `/v1/events/${r.body.eventId}/media` })).json();
     expect(media).toHaveLength(1);
     expect(media[0]).toMatchObject({ id, kind: "IMAGE", capturedInApp: true });
