@@ -6,7 +6,7 @@ import { api } from "../../../lib/api";
 import { lang, t, type MessageKey } from "../../../lib/i18n";
 import { canSetNegative, canSplit, duplicateCandidates, raisableSensitivities, toggle } from "../../../lib/moderation/event-tools";
 import { validReason } from "../../../lib/moderation/logic";
-import { eventTitle, timeAgo } from "../../../lib/ui/format";
+import { distanceLabel, eventTitle, timeAgo } from "../../../lib/ui/format";
 import { colors, radius, space } from "../../../theme";
 
 const STATUSES: EventStatus[] = ["ACTIVE", "MONITORING", "RESOLVED", "ARCHIVED"];
@@ -169,7 +169,7 @@ export default function EventToolsScreen() {
             <View key={n.id} style={styles.row}>
               <View style={styles.rowText}>
                 <Text style={styles.rowTitle} numberOfLines={1}>{eventTitle(n, lang)}</Text>
-                <Text style={styles.meta}>{n.distanceBucket} · {n.reportCount} · {timeAgo(n.lastActivityAt, lang)}</Text>
+                <Text style={styles.meta}>{distanceLabel(n.distanceBucket, lang)} · {n.reportCount} · {timeAgo(n.lastActivityAt, lang)}</Text>
               </View>
               <Pressable accessibilityRole="button" disabled={!ok} style={[styles.button, !ok && styles.disabled]}
                 onPress={() => confirm(t("confirmMerge"), () => api.mergeEvents(event.id, [n.id], reason.trim()))}>

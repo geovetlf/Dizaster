@@ -3,6 +3,7 @@ import { t } from "../i18n";
 import { waitForProcessed } from "./avatar-ready";
 import { captureMedia, discardLocal } from "./capture";
 import { uploadMedia } from "./upload";
+import { uploadErrorText } from "./upload-errors";
 
 /**
  * Elegir una foto de la galería para el perfil o un negocio (ADR 0119): se re-codifica en el dispositivo (sin Exif),
@@ -13,7 +14,7 @@ export async function pickProcessedImage(): Promise<string | null> {
   if (!local) return null;
   try {
     const r = await uploadMedia(local);
-    if (!r.ok) throw new Error(r.error);
+    if (!r.ok) throw new Error(uploadErrorText(r.error, t));
     const ready = await waitForProcessed(
       async () => (await api.mediaState(r.mediaId)).state,
       (ms) => new Promise((resolve) => setTimeout(resolve, ms)),

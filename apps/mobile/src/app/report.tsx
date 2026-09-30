@@ -13,7 +13,7 @@ import { countryOf } from "../lib/geo/country";
 import { quickCountry } from "../lib/geo/device-country";
 import { FIX_TIMEOUT_MS, withTimeout } from "../lib/async/timeout";
 import { lang, locale, t, tCount, verificationLabel } from "../lib/i18n";
-import { formatInZone } from "../lib/ui/format";
+import { distanceLabel, formatInZone } from "../lib/ui/format";
 import { newId } from "../lib/ids";
 import { APP_MAP_SCHEME, OFFLINE_FALLBACK_STYLE, providerFromAppConfig } from "../lib/map/provider";
 import { pseudonymousByDefault } from "../lib/report/anonymity";
@@ -25,7 +25,7 @@ import { flushUntilSent, reportQueue } from "../lib/report/outbox";
 import { useSession } from "../lib/session";
 import { outcomeLines } from "../lib/report/outcome";
 import { colors } from "../theme";
-import { categoryIn, findCategory, reportCategories, useCategoryCatalogVersion } from "../lib/category-store";
+import { categoryIn, categoryLabel, findCategory, reportCategories, useCategoryCatalogVersion } from "../lib/category-store";
 import { askSameEvent } from "../lib/report/same-event";
 import { UpdateRequired, useUpdateRequirement } from "../components/update-required";
 import { appConfig } from "../lib/config/app-config";
@@ -365,8 +365,8 @@ export default function ReportScreen() {
           <Text style={styles.section}>{t("sameEvent")}</Text>
           {nearby.map((e) => (
             <Pressable key={e.id} accessibilityRole="button" style={[styles.nearbyRow, target === e.id && styles.nearbySelected]} onPress={() => setTarget(e.id)}>
-              <Text style={styles.rowText}>{e.title?.[lang] ?? e.title?.["es"] ?? e.categoryCode}</Text>
-              <Text style={styles.meta}>{e.distanceBucket} · {verificationLabel(e.publicVerificationState)} · {tCount(e.reportCount, "report_one", "reports")}</Text>
+              <Text style={styles.rowText}>{e.title?.[lang] ?? categoryLabel(e.categoryCode)}</Text>
+              <Text style={styles.meta}>{distanceLabel(e.distanceBucket, lang)} · {verificationLabel(e.publicVerificationState)} · {tCount(e.reportCount, "report_one", "reports")}</Text>
             </Pressable>
           ))}
           <Pressable accessibilityRole="button" style={[styles.nearbyRow, target === null && styles.nearbySelected]} onPress={() => setTarget(null)}>
