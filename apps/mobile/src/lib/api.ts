@@ -1,4 +1,4 @@
-import type { AdminSourcesResponse, OriginalAccessEntry, OriginalAccessGrant, ChangeRoleRequest, StaffResponse, TransparencyReport, AuthorityRequestDetail, AuthorityRequestSummary, AuthorityRequestStatus, CreateAuthorityRequest, PublishDelayView, PresenceAccessEntry, DuplicateCandidateView, OfficialScopeView, MyReportView, MfaEnrollResponse, MfaStatus, PresenceReview, EventSourceView, EventStatus, MyProfile, UpdateProfileRequest, ReactionKind, ReactionState, DataExport, VerificationView, ModeratorEventDetail, SavedZone, SavedZoneInput, AppealView, CaseDetail, CaseSummary, CreateFlagRequest, ModerationActionType, ModerationNotice, CostDashboard, KillSwitchView, QualityReport, CreatePostRequest, TagView, BusinessView, SessionView, CreateBusinessRequest, UpdateBusinessRequest, AlertPreferences, CategorySubscription, CategorySubscriptionInput, NotificationsResponse, AppConfig, AttributionsResponse, AreaSearchResult, FollowTarget, MyFollows, ProfileSearchResult, ProfileView, CommentView, CreateUploadRequest, FeedPost, FeedResponse, FeedTab, CreateUploadResponse, DevicePlatform, MediaView, RegisterPushTokenRequest, EventMapResponse, EventDetail, EventSummary, NearbyEventsResponse, SubmitReportRequest, SubmitReportResponse, TimelineEntryView } from "@dizaster/contracts";
+import type { ClientCrashReport, ClientCrashesResponse, AdminSourcesResponse, OriginalAccessEntry, OriginalAccessGrant, ChangeRoleRequest, StaffResponse, TransparencyReport, AuthorityRequestDetail, AuthorityRequestSummary, AuthorityRequestStatus, CreateAuthorityRequest, PublishDelayView, PresenceAccessEntry, DuplicateCandidateView, OfficialScopeView, MyReportView, MfaEnrollResponse, MfaStatus, PresenceReview, EventSourceView, EventStatus, MyProfile, UpdateProfileRequest, ReactionKind, ReactionState, DataExport, VerificationView, ModeratorEventDetail, SavedZone, SavedZoneInput, AppealView, CaseDetail, CaseSummary, CreateFlagRequest, ModerationActionType, ModerationNotice, CostDashboard, KillSwitchView, QualityReport, CreatePostRequest, TagView, BusinessView, SessionView, CreateBusinessRequest, UpdateBusinessRequest, AlertPreferences, CategorySubscription, CategorySubscriptionInput, NotificationsResponse, AppConfig, AttributionsResponse, AreaSearchResult, FollowTarget, MyFollows, ProfileSearchResult, ProfileView, CommentView, CreateUploadRequest, FeedPost, FeedResponse, FeedTab, CreateUploadResponse, DevicePlatform, MediaView, RegisterPushTokenRequest, EventMapResponse, EventDetail, EventSummary, NearbyEventsResponse, SubmitReportRequest, SubmitReportResponse, TimelineEntryView } from "@dizaster/contracts";
 import { mergeMapTiles, tilesForView } from "@dizaster/geo-kit";
 import { canRetryWithRefresh, singleFlight } from "./auth/refresh";
 import { appVersionHeaders } from "./app-identity";
@@ -50,7 +50,7 @@ const renew = singleFlight(async (): Promise<boolean> => {
  * Rutas que viajan sin sesión: las de autenticación y las teselas del mapa, que así la CDN puede compartir entre
  * todos (una petición con `Authorization` no se cachea en una CDN compartida, ADR 0078).
  */
-const NO_AUTH_PREFIXES = ["/v1/auth/", "/v1/events/tiles/"];
+const NO_AUTH_PREFIXES = ["/v1/auth/", "/v1/events/tiles/", "/v1/client-crashes"];
 
 /** GET condicionales con ETag (ADR 0084): un 304 reutiliza el cuerpo ya descargado. */
 const etags = new EtagCache();
@@ -79,6 +79,9 @@ async function request<T>(path: string, init: RequestInit = {}, retried = false)
 
 export const api = {
   config: () => request<AppConfig>("/v1/config"),
+  /** Fallos de la app (ADR 0173): sin sesión, ya redactados. */
+  clientCrashes: (entries: ClientCrashReport["entries"]) => request<void>("/v1/client-crashes", { method: "POST", body: JSON.stringify({ entries }) }),
+  adminClientCrashes: (days = 7) => request<ClientCrashesResponse>(`/v1/admin/client-crashes?days=${days}`),
   attributions: () => request<AttributionsResponse>("/v1/about/attributions"),
   devSignIn: (handle: string, platform: DevicePlatform, deviceId?: string | null, hardwareId?: string | null) =>
     request<TokenPair & { deviceId: string | null }>("/v1/auth/dev", {

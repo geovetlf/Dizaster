@@ -36,6 +36,8 @@ const Env = z.object({
   // Retención de datos operativos (ADR 0165).
   NOTIFICATION_RETENTION_DAYS: z.coerce.number().int().min(7).max(3650).default(90),
   OUTBOX_RETENTION_DAYS: z.coerce.number().int().min(1).max(365).default(14),
+  /** Fallos de la app (ADR 0173). */
+  CLIENT_CRASH_RETENTION_DAYS: z.coerce.number().int().min(1).max(365).default(30),
   PRESENCE_RETENTION_DAYS: z.coerce.number().int().positive().default(30),
   /** Claves de cifrado por columna (ADR 0048): "kid:base64(32 bytes)", separadas por comas; la primera cifra. */
   FIELD_KEYS: z.string().optional(),

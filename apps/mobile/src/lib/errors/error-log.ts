@@ -4,7 +4,7 @@
  * coordenadas. NO AI REQUIRED.
  */
 /** `requestId`: id de la petición fallida (ADR 0172), para buscarla en los registros del servidor. */
-export interface ErrorEntry { at: string; message: string; where: string | null; stack: string | null; requestId?: string }
+export interface ErrorEntry { at: string; message: string; where: string | null; stack: string | null; requestId?: string; sent?: boolean }
 
 const REQUEST_ID = /^[A-Za-z0-9-]{8,64}$/;
 
@@ -40,4 +40,15 @@ export function parseLog(raw: unknown): ErrorEntry[] {
   if (!Array.isArray(raw)) return [];
   return raw.filter((x): x is ErrorEntry => !!x && typeof x === "object" && typeof (x as ErrorEntry).at === "string" && typeof (x as ErrorEntry).message === "string")
     .slice(0, MAX_ERROR_ENTRIES);
+}
+
+/** Lo que aún no se envió al servidor (ADR 0173), en el formato del contrato: sin la marca local `sent`. */
+export function unsentEntries(log: readonly ErrorEntry[]) {
+  return log.filter((e) => !e.sent).map(({ sent: _s, ...e }) => ({ ...e, stack: e.stack ? e.stack.slice(0, 1500) : null, where: e.where ? e.where.slice(0, 200) : null }));
+}
+
+/** Marca como enviados los de esas fechas (el registro pudo cambiar mientras tanto). */
+export function markSent(log: readonly ErrorEntry[], sentAts: readonly string[]): ErrorEntry[] {
+  const set = new Set(sentAts);
+  return log.map((e) => (set.has(e.at) ? { ...e, sent: true } : e));
 }

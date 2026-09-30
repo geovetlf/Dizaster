@@ -27,3 +27,4 @@ export * from "./authority.js";
 export * from "./moderation-terms.js";
 export * from "./sources.js";
 export * from "./auth.js";
+export * from "./client-crashes.js";

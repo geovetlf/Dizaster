@@ -113,6 +113,8 @@ export const OPERATIONS: Record<string, Operation> = {
   "POST /v1/admin/authority-requests/:id/status": { summary: "Cambiar el estado de un requerimiento, con nota (admin)", body: C.ChangeAuthorityRequestStatus },
   "POST /v1/admin/authority-requests/:id/notes": { summary: "Agregar una nota al historial de un requerimiento (admin)", body: C.AddAuthorityRequestNote },
   "GET /v1/admin/transparency": { summary: "Informe de transparencia agregado (denuncias, casos, acciones, apelaciones; cifras 1–4 como \"<5\")", query: C.TransparencyQuery },
+  "POST /v1/client-crashes": { summary: "Informe de fallos de la app, anónimo y ya redactado", body: C.ClientCrashReport },
+  "GET /v1/admin/client-crashes": { summary: "Fallos de la app agrupados por huella" },
   "GET /v1/admin/sources": { summary: "Salud de las fuentes (estado, breaker, ejecuciones de 24 h)" },
   "POST /v1/admin/sources/:key/status": { summary: "Pausar o reanudar una fuente (auditado)", body: C.SetSourceStatusRequest },
   "GET /v1/admin/staff": { summary: "Personal con roles y últimos cambios de rol" },

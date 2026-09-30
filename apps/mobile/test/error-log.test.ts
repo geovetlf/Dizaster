@@ -29,4 +29,17 @@ describe("registro local de errores (ADR 0161)", () => {
     const bad = Object.assign(new Error("500"), { requestId: "<script>" });
     expect(toEntry(bad, null, new Date(0)).requestId).toBeUndefined();
   });
+
+  it("envía solo lo pendiente, en el formato del contrato, y lo marca (ADR 0173)", async () => {
+    const { markSent, unsentEntries } = await import("../src/lib/errors/error-log");
+    const { ClientCrashReport } = await import("@dizaster/contracts");
+    let log = appendEntry([], toEntry(new Error("uno"), "global", new Date(1000)));
+    log = appendEntry(log, toEntry(new Error("dos"), null, new Date(2000)));
+    const pending = unsentEntries(log);
+    expect(pending).toHaveLength(2);
+    expect(ClientCrashReport.safeParse({ entries: pending }).success).toBe(true);
+    log = markSent(log, [pending[1]!.at]);
+    expect(unsentEntries(log).map((e) => e.message)).toEqual(["Error: dos"]);
+    expect(parseLog(JSON.parse(JSON.stringify(log)))[1]!.sent).toBe(true);
+  });
 });

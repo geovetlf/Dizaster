@@ -2,7 +2,7 @@ import { router, Stack, type ErrorBoundaryProps } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useState } from "react";
 import { CrashScreen } from "../components/crash-screen";
-import { recordError } from "../lib/errors/error-store";
+import { recordError, sendPendingErrors, setCrashSender } from "../lib/errors/error-store";
 import { t } from "../lib/i18n";
 import { useNotificationRouting } from "../lib/alerts/notifications";
 import { refreshCategoryCatalog } from "../lib/category-store";
@@ -20,6 +20,9 @@ export function ErrorBoundary(props: ErrorBoundaryProps) {
   return <CrashScreen {...props} />;
 }
 
+// Los fallos se envían al servidor propio (ADR 0173), sin cuenta; lo pendiente sale al abrir la app.
+setCrashSender((entries) => api.clientCrashes(entries));
+
 // Errores fuera de React (promesas, callbacks nativos): se anotan en el registro local y siguen su curso normal.
 const errorUtils = (globalThis as { ErrorUtils?: { getGlobalHandler(): (e: unknown, fatal?: boolean) => void; setGlobalHandler(h: (e: unknown, fatal?: boolean) => void): void } }).ErrorUtils;
 if (errorUtils) {
@@ -32,7 +35,7 @@ if (errorUtils) {
 
 export default function RootLayout() {
   // Al abrir la app se comprueba si hay números de emergencia nuevos; así funcionan offline con la última versión.
-  useEffect(() => { void refreshEmergencyDataset(); void refreshCategoryCatalog(); }, []);
+  useEffect(() => { void refreshEmergencyDataset(); void refreshCategoryCatalog(); void sendPendingErrors(); }, []);
   // Cambiar el idioma vuelve a montar la navegación para que títulos y pantallas usen el nuevo (ADR 0069).
   const [langKey, setLangKey] = useState(0);
   useEffect(() => onLanguageChange(() => setLangKey((k) => k + 1)), []);
@@ -74,6 +77,7 @@ export default function RootLayout() {
         <Stack.Screen name="admin-authority" options={{ title: t("adminAuthority") }} />
         <Stack.Screen name="admin-transparency" options={{ title: t("adminTransparency") }} />
         <Stack.Screen name="admin-sources" options={{ title: t("adminSources") }} />
+        <Stack.Screen name="admin-crashes" options={{ title: t("adminCrashes") }} />
         <Stack.Screen name="admin-staff" options={{ title: t("adminStaff") }} />
         <Stack.Screen name="sign-in" options={{ title: t("signInTitle"), presentation: "modal" }} />
         <Stack.Screen name="sign-in-methods" options={{ title: t("signInMethods") }} />

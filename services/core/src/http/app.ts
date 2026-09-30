@@ -5,7 +5,7 @@ import Fastify, { type FastifyInstance, type FastifyRequest } from "fastify";
 import { z } from "zod";
 import {
   BBox, CreateCommentRequest, DevicePlatform, MEDIA_UPLOAD_LIMITS, MergeEventsRequest, NegativeState, ReactionKind, CommentReactionKind, ConfirmAgeRequest, RegisterPushTokenRequest, RegisterSigningKeyRequest, RevertMergeRequest,
-  SplitEventRequest, SetEventStatusRequest, SetEventSeverityRequest, SetSourceStatusRequest, type AdminSourcesResponse, ChangeRoleRequest, type StaffResponse, OriginalAccessRequest, IdTokenSignInRequest, EmailStartRequest, EmailVerifyRequest, LinkIdentityRequest, AddModeratorNoteRequest, DismissDuplicateRequest, DATA_EXPORT_FORMAT, type AppConfig, type Attribution, type AttributionsResponse, type DataExport, type EmergencyNumbersResponse, type EventSearchResponse,
+  SplitEventRequest, SetEventStatusRequest, SetEventSeverityRequest, SetSourceStatusRequest, ClientCrashReport, type ClientCrashesResponse, type AdminSourcesResponse, ChangeRoleRequest, type StaffResponse, OriginalAccessRequest, IdTokenSignInRequest, EmailStartRequest, EmailVerifyRequest, LinkIdentityRequest, AddModeratorNoteRequest, DismissDuplicateRequest, DATA_EXPORT_FORMAT, type AppConfig, type Attribution, type AttributionsResponse, type DataExport, type EmergencyNumbersResponse, type EventSearchResponse,
 } from "@dizaster/contracts";
 import { LocalDiskStorage } from "../modules/media/index.js";
 import type { Container } from "../container.js";
@@ -986,6 +986,18 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
     const b = parse(SetSourceStatusRequest, req.body);
     await c.ingestion.changeSourceStatus(req.params.key, b.to, b.reason, userId);
     return reply.status(204).send();
+  });
+  // Fallos de la app autoalojados (ADR 0173): sin sesión ni cuenta; el cupo general por IP limita el abuso.
+  app.post("/v1/client-crashes", async (req, reply) => {
+    const b = parse(ClientCrashReport, req.body);
+    await c.crashes.record(b.entries, req.headers[APP_PLATFORM_HEADER], req.headers[APP_VERSION_HEADER], c.clock.now());
+    return reply.status(204).send();
+  });
+  app.get<{ Querystring: { days?: string } }>("/v1/admin/client-crashes", async (req, reply): Promise<ClientCrashesResponse> => {
+    await requirePermission(req, "ops.view");
+    reply.header("cache-control", "no-store");
+    const days = Math.min(30, Math.max(1, Number(req.query.days ?? 7) || 7));
+    return c.crashes.summary(days);
   });
   // Personal y roles (ADR 0167): solo administración; cada alta y baja con motivo y registro de solo inserción.
   app.get("/v1/admin/staff", async (req, reply): Promise<StaffResponse> => {
