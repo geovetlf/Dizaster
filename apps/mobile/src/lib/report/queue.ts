@@ -74,11 +74,29 @@ export class ReportQueue {
     await this.storage.put({ ...rest, attempts: 0, media: (rest.media ?? []).map(({ failed: _f, ...m }) => m) });
   }
 
+  /**
+   * Descartados en esta sesión (ADR 0245): un envío en curso que ya tenía el ítem en memoria lo consulta antes de
+   * subir, enviar o volver a guardar, para no publicarlo ni resucitarlo después de que la persona lo descartó.
+   */
+  private readonly discarded = new Set<string>();
+
   /** La persona descarta un reporte: sale de la cola. Devuelve el ítem para borrar sus copias locales. */
   async discard(clientReportId: string): Promise<QueuedReport | null> {
+    this.discarded.add(clientReportId);
     const item = (await this.storage.all()).find((i) => i.clientReportId === clientReportId) ?? null;
     if (item) await this.storage.remove(clientReportId);
     return item;
+  }
+
+  /** Sigue en la cola: no descartado en esta sesión y todavía guardado (otro proceso pudo quitarlo). */
+  private async stillQueued(clientReportId: string): Promise<boolean> {
+    if (this.discarded.has(clientReportId)) return false;
+    return (await this.storage.all()).some((i) => i.clientReportId === clientReportId);
+  }
+
+  /** Guarda el progreso solo si el ítem no fue descartado mientras tanto. */
+  private async save(item: QueuedReport): Promise<void> {
+    if (!this.discarded.has(item.clientReportId)) await this.storage.put(item);
   }
 
   /**
@@ -102,17 +120,18 @@ export class ReportQueue {
       if (f.offline) {
         offline = true;
         failed++;
-        await this.storage.put({ ...it, lastError: f.error });
+        await this.save({ ...it, lastError: f.error });
       } else if (!f.retryable || it.attempts + 1 >= this.maxAttempts) {
         stuck++;
-        await this.storage.put({ ...it, attempts: it.attempts + 1, lastError: f.error, stuck: { reason: f.error, at: now().toISOString() } });
+        await this.save({ ...it, attempts: it.attempts + 1, lastError: f.error, stuck: { reason: f.error, at: now().toISOString() } });
       } else {
         failed++;
-        await this.storage.put({ ...it, attempts: it.attempts + 1, lastError: f.error });
+        await this.save({ ...it, attempts: it.attempts + 1, lastError: f.error });
       }
     };
     for (const queued of await this.pending()) {
       if (queued.stuck) { stuck++; continue; }
+      if (this.discarded.has(queued.clientReportId)) continue;
       let item = queued;
       const media = item.media ?? [];
       if (media.some((m) => !m.mediaId && !m.failed)) {
@@ -125,6 +144,8 @@ export class ReportQueue {
         }
         item = uploaded.item;
       }
+      // Justo antes de enviar: si la persona lo descartó durante la subida, no sale (§8.3, §13.2).
+      if (!(await this.stillQueued(item.clientReportId))) continue;
       const mediaIds = media.length ? (item.media ?? []).flatMap((m) => (m.mediaId ? [m.mediaId] : [])) : item.body.mediaIds;
       // La hora del reloj y "capturado offline" se fijan al enviar, no al capturar (§8.3).
       const res = await send(atSendTime({ ...item.body, mediaIds }, item.createdAt, now()));
@@ -152,7 +173,8 @@ export class ReportQueue {
       else if (!r.retryable) next[i] = { ...m, failed: r.error };
       else return { ok: false, item: { ...item, media: next }, error: r.error, ...(r.offline ? { offline: true } : {}) };
       // Progreso persistido: si la app se cierra, no se vuelve a subir lo ya subido.
-      await this.storage.put({ ...item, media: next });
+      if (this.discarded.has(item.clientReportId)) return { ok: false, item: { ...item, media: next }, error: "DISCARDED" };
+      await this.save({ ...item, media: next });
     }
     return { ok: true, item: { ...item, media: next } };
   }

@@ -39,6 +39,8 @@ export async function flushUntilSent(clientReportId: string): Promise<FlushResul
 /** Descartar un reporte sin enviar (decisión de la persona): sale de la cola y se borran sus copias locales. */
 export async function discardQueuedReport(clientReportId: string): Promise<void> {
   const item = await reportQueue.discard(clientReportId);
+  // Las copias locales se borran cuando termina el envío en curso, que ya no lo enviará (ADR 0245).
+  await inFlight?.catch(() => undefined);
   if (item) cleanUp(item);
 }
 
