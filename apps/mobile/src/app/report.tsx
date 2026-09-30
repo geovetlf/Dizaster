@@ -16,6 +16,7 @@ import { lang, locale, t, tCount, verificationLabel } from "../lib/i18n";
 import { formatInZone } from "../lib/ui/format";
 import { newId } from "../lib/ids";
 import { APP_MAP_SCHEME, OFFLINE_FALLBACK_STYLE, providerFromAppConfig } from "../lib/map/provider";
+import { pseudonymousByDefault } from "../lib/report/anonymity";
 import { toPresenceSignals } from "../lib/report/presence";
 import { signEvidence } from "../lib/report/evidence";
 import { signingSeed } from "../lib/device/signing-key";
@@ -121,7 +122,7 @@ export default function ReportScreen() {
       if (m) restored = [...restored, m];
     }
     setMedia(restored);
-    await choose(c);
+    await choose(c, true);
   }
 
   async function discardDraft(d: ReportDraft) {
@@ -151,9 +152,11 @@ export default function ReportScreen() {
     appConfig().then((c) => setStyleUrl(providerFromAppConfig(c)?.styleUrl(APP_MAP_SCHEME) ?? null)).catch(() => setStyleUrl(null));
   }, []);
 
-  async function choose(picked: CategoryConfig) {
+  /** `keepAnonymity`: al retomar un borrador se respeta lo que la persona eligió. */
+  async function choose(picked: CategoryConfig, keepAnonymity = false) {
     let c = picked;
     setCategory(c);
+    if (!keepAnonymity) setPseudonymous(pseudonymousByDefault(c.sensitivity));
     setPhase("locating");
     setStatus(t("locating"));
     setBlocked(null);
@@ -189,6 +192,8 @@ export default function ReportScreen() {
     }
     c = local;
     setCategory(c);
+    // La sensibilidad puede cambiar por país (ADR 0152): el valor por defecto sigue a la del lugar.
+    if (!keepAnonymity) setPseudonymous(pseudonymousByDefault(c.sensitivity));
     setFix(loc);
     setPin(here);
     setStatus(null);

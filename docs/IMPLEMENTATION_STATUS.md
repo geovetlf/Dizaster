@@ -424,6 +424,7 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | La IA tampoco sugiere FALSE (ADR 0231) | ✅ | servicio + CHECK `ai_never_false` |
 | Registros de estado, gravedad, división y fuentes inmutables (ADR 0232) | ✅ | migración 0097 |
 | Sin fallos silenciosos en alertas y moderación (ADR 0233) | ✅ | servidor primero, error con Reintentar |
+| Reportes sensibles seudónimos por defecto (ADR 0234) | ✅ | §13.2, D-05 |
 | Licencias, auditoría, SBOM, Dependabot; respaldo con prueba de restauración en CI | ✅ | ADR 0070, `scripts/supply-chain.mjs`, `scripts/db-restore-check.mjs` |
 | Idioma de la app elegible en el perfil (es/en/pt/fr o del teléfono) | ✅ | ADR 0069, `app/language.tsx` |
 | Varias cuentas en un teléfono corroboran como una (clave seudónima del teléfono) | ✅ | ADR 0068, migración 0036 |
@@ -489,13 +490,12 @@ Revisión del Blueprint del 2026-09-30 (tras ADR 0220): completada con ADR 0221�
 
 Revisión del Blueprint del 2026-09-30 (tras ADR 0228), verificada contra el código, sin bloqueos:
 
-1. Reportes sensibles seudónimos por defecto (§13.2).
-2. Borrar la cuenta de personal registra la baja de roles y respeta el último administrador.
-3. Auditoría de acciones por moderador y registro de originales paginado (§5.21, §13.1).
-4. Apelaciones paginadas y búsquedas por id (moderación).
-5. SOS, contador y botones pequeños con texto grande (accesibilidad).
-6. Cuentas suspendidas pueden borrar comentarios y retirar reportes.
-7. Cambios de administración y su registro en la misma transacción (auditoría).
+1. Borrar la cuenta de personal registra la baja de roles y respeta el último administrador.
+2. Auditoría de acciones por moderador y registro de originales paginado (§5.21, §13.1).
+3. Apelaciones paginadas y búsquedas por id (moderación).
+4. SOS, contador y botones pequeños con texto grande (accesibilidad).
+5. Cuentas suspendidas pueden borrar comentarios y retirar reportes.
+6. Cambios de administración y su registro en la misma transacción (auditoría).
 
 Bloqueadas o en espera:
 
