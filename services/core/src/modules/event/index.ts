@@ -1007,6 +1007,21 @@ export class EventService {
     return { ...toSummary(r), mergedIntoId: r.merged_into_id, publicationState: r.publication_state, affectedArea: r.area };
   }
 
+  /**
+   * Exportación de datos (ADR 0038, ADR 0256): mis respuestas a "¿Es el mismo evento?" (ADR 0156). Solo la respuesta,
+   * el reporte y la fecha: los candidatos y la puntuación son del sistema de deduplicación.
+   */
+  async exportData(q: Queryable, userId: string): Promise<Record<string, unknown[]>> {
+    const { rows } = await q.query(
+      `SELECT e.ref_id AS report_id, d.reporter_answer AS answer, d.answered_at
+         FROM event.dedup_reviews d JOIN event.evidence e ON e.id = d.evidence_id
+        WHERE e.contributor_user_id = $1 AND e.evidence_type = 'CITIZEN_REPORT' AND d.reporter_answer IS NOT NULL
+        ORDER BY d.answered_at DESC LIMIT 10000`,
+      [userId],
+    );
+    return { sameEventAnswers: rows };
+  }
+
   /** Estado público y sensibilidad de varios eventos (para componer feeds sin leer el esquema event desde fuera). */
   async publicStates(
     q: Queryable,

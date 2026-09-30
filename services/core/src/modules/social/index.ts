@@ -1270,13 +1270,14 @@ export class SocialService {
   /** Perfil, publicaciones, comentarios, reacciones, seguimientos, bloqueos y negocios propios. */
   async exportData(q: Queryable, who: { userId: string; profileId: string }): Promise<Record<string, unknown[]>> {
     const p = who.profileId;
-    const profile = await q.query(`SELECT id, handle, display_name, bio, home_country, locale, units, created_at FROM social.profiles WHERE id = $1`, [p]);
+    const profile = await q.query(`SELECT id, handle, display_name, bio, avatar_url, home_country, locale, units, mentions_from, created_at FROM social.profiles WHERE id = $1`, [p]);
     const businesses = await q.query(
       `SELECT id, handle, name, category, country, verification_status, description, address_public, contact_phone, contact_url, moderation_state, created_at, deleted_at
          FROM social.business_profiles WHERE owner_user_id = $1`, [who.userId],
     );
     const posts = await q.query(
-      `SELECT p.id, p.author_type, p.kind, p.author_visibility, p.text, p.category_code, p.moderation_state, p.created_at, p.deleted_at,
+      `SELECT p.id, p.author_type, p.kind, p.author_visibility, p.text, p.lang, p.category_code, p.shared_post_id, p.moderation_state,
+              p.created_at, p.edited_at, p.visible_after, p.deleted_at,
               ST_Y(p.public_point::geometry) AS public_lat, ST_X(p.public_point::geometry) AS public_lng,
               (SELECT coalesce(array_agg(m.media_id ORDER BY m.position), '{}') FROM social.post_media m WHERE m.post_id = p.id) AS media_ids,
               (SELECT coalesce(array_agg(l.event_id), '{}') FROM social.post_event_links l WHERE l.post_id = p.id) AS event_ids

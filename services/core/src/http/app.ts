@@ -556,7 +556,7 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
       sections: {
         identity: await c.identity.exportData(c.db, session.userId),
         social: await c.social.exportData(c.db, who),
-        reports: await c.reports.exportData(c.db, session.userId),
+        reports: { ...(await c.reports.exportData(c.db, session.userId)), ...(await c.events.exportData(c.db, session.userId)) },
         alerts: await c.alerts.exportData(c.db, session.profileId),
         moderation: await c.moderation.exportData(c.db, who),
         media: await c.media.exportData(c.db, session.profileId),

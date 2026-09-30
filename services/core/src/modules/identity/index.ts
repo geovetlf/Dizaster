@@ -636,7 +636,11 @@ export class IdentityService {
 
   /** Cuenta, dispositivos, sesiones y aceptaciones. Sin secretos: ni hashes de token ni tokens push. */
   async exportData(q: Queryable, userId: string): Promise<Record<string, unknown[]>> {
-    const account = await q.query(`SELECT id, status, roles, primary_locale, created_at FROM identity.users WHERE id = $1`, [userId]);
+    const account = await q.query(
+      `SELECT u.id, u.status, u.roles, u.primary_locale, u.age_confirmed_min, u.age_confirmed_at, u.created_at,
+              EXISTS (SELECT 1 FROM identity.mfa_totp m WHERE m.user_id = u.id AND m.confirmed_at IS NOT NULL) AS mfa_enabled
+         FROM identity.users u WHERE u.id = $1`, [userId],
+    );
     const logins = await q.query(`SELECT provider, verified_at, created_at FROM identity.auth_identities WHERE user_id = $1`, [userId]);
     const devices = await q.query(
       `SELECT id, platform, app_version, attestation_status, push_token IS NOT NULL AS push_enabled, created_at, last_seen_at

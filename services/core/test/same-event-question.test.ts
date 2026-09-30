@@ -40,5 +40,9 @@ describe("¿Es el mismo evento? (ADR 0156)", () => {
     expect(await review(third.reportId!)).toEqual({ status: "OPEN", reporter_answer: "DIFFERENT" });
     expect((await t.c.db.query(`SELECT event_id FROM report.reports WHERE id = $1`, [third.reportId])).rows[0]).toEqual({ event_id: first.eventId });
     expect((await answer(a!, first.reportId!, "SAME")).statusCode).toBe(409);
+
+    // Mi respuesta sale en mi exportación de datos (ADR 0256), sin candidatos ni puntuación.
+    const exported = (await t.app.inject({ url: "/v1/me/export", headers: auth(c!) })).json().sections.reports.sameEventAnswers;
+    expect(exported).toEqual([{ report_id: third.reportId, answer: "DIFFERENT", answered_at: expect.any(String) }]);
   });
 });

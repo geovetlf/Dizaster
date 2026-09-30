@@ -25,9 +25,13 @@ describe("exportar mis datos (ADR 0038)", () => {
     const body = res.json() as DataExport;
     expect(body.format).toBe("dizaster-export-1");
     const s = body.sections;
-    expect(s.identity["account"]![0]).toMatchObject({ id: yo.userId });
+    expect(s.identity["account"]![0]).toMatchObject({ id: yo.userId, mfa_enabled: false });
+    expect(s.identity["account"]![0]).toHaveProperty("age_confirmed_at");
     expect(s.identity["devices"]).toHaveLength(1);
-    expect(s.social["profile"]![0]).toMatchObject({ id: yo.profileId });
+    expect(s.social["profile"]![0]).toMatchObject({ id: yo.profileId, mentions_from: "EVERYONE" });
+    expect(s.social["profile"]![0]).toHaveProperty("avatar_url");
+    // ADR 0256: cuándo edité cada post, su idioma y, si fue un compartido, cuál.
+    expect((s.social["posts"] as { id: string; edited_at: string | null }[]).find((p) => p.id === mine.postId)).toMatchObject({ edited_at: expect.any(String), shared_post_id: null });
     expect((s.social["posts"] as { text: string | null }[]).map((p) => p.text).sort()).toEqual(["Mi post #Lima", "Sin agua desde ayer"]);
     expect(s.reports["reports"]![0]).toMatchObject({ id: rep.reportId, category_code: "infra.water_outage", presence_band: expect.any(String) });
     // ADR 0209: mis ediciones y mi historial de consentimiento.
