@@ -1,6 +1,6 @@
 # Estado de la implementación
 
-Actualizado: 2026-09-30 (hasta ADR 0281). Informe de preparación para producción: `docs/PRODUCTION_READINESS_REPORT.md`.
+Actualizado: 2026-09-30 (hasta ADR 0282). Informe de preparación para producción: `docs/PRODUCTION_READINESS_REPORT.md`.
 
 ## Etapa 1 — Fundación (hecha)
 
@@ -470,6 +470,7 @@ Actualizado: 2026-09-30 (hasta ADR 0281). Informe de preparación para producci�
 | Procedimiento de activación por bloqueo y correo de acceso en el idioma de la app (ADR 0279) | ✅ | `docs/runbooks/activacion-bloqueos.md` |
 | AI Core resiliente: 429, cortocircuito, prompts versionados, registro de modelos, evaluación y pistas de verificación asíncronas (ADR 0280, migración 0104) | ✅ | IA apagada de fábrica |
 | Motor de idiomas sin fugas del español (errores, moderación automática, accesibilidad) y textos regionales por país como datos (ADR 0281) | ✅ | `data/locales/ui-regional.json` vacío |
+| Destino local de entrega (Docker + proxy de tráfico), `dzd load`, k6 `infra/load/smoke.js`, 429 separados de 5xx en el SLO; ensayo completo con rollback (ADR 0282) | ✅ | sin nube |
 | Licencias, auditoría, SBOM, Dependabot; respaldo con prueba de restauración en CI | ✅ | ADR 0070, `scripts/supply-chain.mjs`, `scripts/db-restore-check.mjs` |
 | Idioma de la app elegible en el perfil (es/en/pt/fr o del teléfono) | ✅ | ADR 0069, `app/language.tsx` |
 | Varias cuentas en un teléfono corroboran como una (clave seudónima del teléfono) | ✅ | ADR 0068, migración 0036 |

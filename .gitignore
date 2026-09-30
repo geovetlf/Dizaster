@@ -45,3 +45,5 @@ image-digest.txt
 core.sbom.cdx.json
 delivery-releases.jsonl
 delivery-report.md
+.dzd/
+k6-summary.json

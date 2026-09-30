@@ -6,7 +6,7 @@ import type { Revision } from "./deploy.js";
  * qué configuración y qué migración tenía la versión anterior. JSONL append-only; en la nube vive junto a la auditoría.
  */
 export interface ReleaseRecord {
-  env: "staging" | "production";
+  env: "staging" | "production" | "local";
   service: string;
   revision: Revision;
   outcome: "deployed" | "rejected" | "rolled-back" | "rollback" | "dry-run";

@@ -17,6 +17,8 @@ export interface Observation {
   /** Fracción 0–1 de peticiones fallidas (5xx o red). */
   errorRate: number | null;
   serverErrors: number;
+  /** Respuestas 429: el límite por IP actuó (ADR 0282). Se informa aparte: no es un error del servidor. */
+  rateLimited?: number;
 }
 
 export interface SloResult { ok: boolean; findings: { check: string; ok: boolean; detail: string; enforced: boolean }[] }
@@ -35,19 +37,25 @@ export function fromSamples(samples: { ms: number; status: number }[]): Observat
     p95Ms: percentile(samples.map((s) => s.ms), 95),
     errorRate: samples.length ? errors / samples.length : null,
     serverErrors: errors,
+    rateLimited: samples.filter((s) => s.status === 429).length,
   };
 }
 
-/** Resumen de `k6 run --summary-export`. */
+/**
+ * Resumen de `k6 run --summary-export`. Con `infra/load/smoke.js` hay contadores propios `server_errors` (5xx o sin
+ * respuesta) y `rate_limited` (429); sin ellos, `http_req_failed` (que también cuenta 4xx) es la mejor aproximación.
+ */
 export function fromK6Summary(raw: unknown): Observation {
   const m = (raw as { metrics?: Record<string, Record<string, number>> }).metrics ?? {};
   const reqs = m["http_reqs"]?.["count"] ?? 0;
   const failedRate = m["http_req_failed"]?.["value"] ?? m["http_req_failed"]?.["rate"] ?? null;
+  const server = m["server_errors"]?.["count"];
   return {
     samples: reqs,
     p95Ms: m["http_req_duration"]?.["p(95)"] ?? null,
-    errorRate: failedRate,
-    serverErrors: failedRate === null ? 0 : Math.round(failedRate * reqs),
+    errorRate: server !== undefined && reqs ? server / reqs : failedRate,
+    serverErrors: server ?? (failedRate === null ? 0 : Math.round(failedRate * reqs)),
+    rateLimited: m["rate_limited"]?.["count"] ?? 0,
   };
 }
 
@@ -66,6 +74,10 @@ export function evaluateSlo(o: Observation, t: SloTargets, opts: { smoke?: boole
     const pct = `${(o.errorRate * 100).toFixed(2)} %`;
     if (t.maxErrorRate === null) findings.push({ check: "tasa de errores", ok: true, enforced: false, detail: `${pct} (sin objetivo decidido: solo se informa)` });
     else findings.push({ check: "tasa de errores", ok: o.errorRate <= t.maxErrorRate, enforced: true, detail: `${pct} (máx. ${(t.maxErrorRate * 100).toFixed(2)} %)` });
+  }
+  if (o.rateLimited) {
+    findings.push({ check: "límite por IP", ok: true, enforced: false,
+      detail: `${o.rateLimited} de ${o.samples} respuestas 429: la prueba chocó con RATE_LIMIT_PER_MINUTE y la latencia incluye respuestas limitadas` });
   }
   return { ok: findings.every((f) => f.ok || !f.enforced), findings };
 }

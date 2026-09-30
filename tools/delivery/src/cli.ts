@@ -11,11 +11,13 @@ import { appendAudit, readLog, verifyLog, type Actor } from "./audit.js";
 import { decide, isHuman, LEVELS, type Action } from "./autonomy.js";
 import { CloudRunTarget, type Runner } from "./cloudrun.js";
 import { costGate } from "./cost.js";
-import { rollbackTo, rollout } from "./deploy.js";
+import { rollbackTo, rollout, type DeployTarget } from "./deploy.js";
 import { diagnose } from "./diagnose.js";
 import { checkEnvironment } from "./envcheck.js";
 import { checkDocs } from "./docs.js";
 import { checkIamHcl, checkPlan, type TofuPlan } from "./iac.js";
+import { runLoad } from "./load.js";
+import { LocalDockerTarget, startProxy, waitHealthy } from "./local.js";
 import { analyze, gitChanges, parseNameStatus, workspacePackages, type Change } from "./inspect.js";
 import { loadPolicy, outcomeFor, type Environment, type Outcome } from "./policy.js";
 import { planGates } from "./plan.js";
@@ -108,6 +110,23 @@ function verifySignature(image: string, digest: string, env: string): void {
   const problems = checkVerifyOutput(r.stdout ?? "", digest);
   if (problems.length) fail(`Firma rechazada: ${problems.join("; ")}`);
   console.log(`✓ firma verificada para ${digest.slice(0, 19)}…`);
+}
+
+/**
+ * Destino según el entorno: `local` = Docker en esta máquina con el proxy de `dzd local-proxy` (ADR 0282); staging y
+ * production = Cloud Run. El destino local no toca la nube ni exige firma keyless (con `--key` sí la verifica).
+ */
+function targetFor(env: string, service: string, needImage: boolean): DeployTarget {
+  if (env === "local") {
+    return new LocalDockerTarget({
+      state: flag("state", ".dzd/local-state.json")!, image: flag("image", "")!, envFile: flag("env-file"),
+      basePort: Number(flag("base-port", "18080")), waitHealthy: flags.has("execute") ? (u) => waitHealthy(u) : undefined,
+    }, runner());
+  }
+  return new CloudRunTarget({
+    project: flag("project") ?? fail("--project es obligatorio"), region: flag("region") ?? fail("--region es obligatorio"), service,
+    image: needImage ? flag("image") ?? fail("--image es obligatorio (REGIÓN-docker.pkg.dev/PROYECTO/dizaster/core)") : flag("image", "")!,
+  }, runner());
 }
 
 function printSlo(r: SloResult): void {
@@ -339,19 +358,23 @@ switch (cmd) {
   }
   case "deploy":
   case "promote": {
-    const env = (cmd === "promote" ? "production" : flag("env", "staging")) as "staging" | "production";
+    const env = (cmd === "promote" ? "production" : flag("env", "staging")) as "staging" | "production" | "local";
+    if (!["staging", "production", "local"].includes(env)) fail("--env: staging, production o local");
     const digest = flag("digest") ?? fail("--digest es obligatorio");
     const service = flag("service", "api")!;
     const releases = flag("releases", "delivery-releases.jsonl")!;
     const history = readReleases(releases);
     if (env === "production" && !promotable(history, service, digest)) fail("Solo se promueve a producción un digest ya desplegado y verificado en staging (§20.13).");
-    guard(env === "production" ? "promote-production" : "deploy-staging", flag("outcome", "auto") as Outcome);
-    // Solo imágenes firmadas por CI (ADR 0277), en staging y en producción.
-    verifySignature(flag("image") ?? fail("--image es obligatorio (REGIÓN-docker.pkg.dev/PROYECTO/dizaster/core)"), digest, env);
-    const target = new CloudRunTarget({
-      project: flag("project") ?? fail("--project es obligatorio"), region: flag("region") ?? fail("--region es obligatorio"),
-      service, image: flag("image") ?? fail("--image es obligatorio (REGIÓN-docker.pkg.dev/PROYECTO/dizaster/core)"),
-    }, runner());
+    if (env === "local") {
+      // Ensayo en esta máquina: sin nube ni autonomía que decidir; la firma se verifica si se da una clave local.
+      if (flag("key")) verifySignature(flag("image") ?? fail("--image es obligatorio con --key"), digest, env);
+      else console.log("local: firma no exigida (staging y production sí la exigen)");
+    } else {
+      guard(env === "production" ? "promote-production" : "deploy-staging", flag("outcome", "auto") as Outcome);
+      // Solo imágenes firmadas por CI (ADR 0277), en staging y en producción.
+      verifySignature(flag("image") ?? fail("--image es obligatorio (REGIÓN-docker.pkg.dev/PROYECTO/dizaster/core)"), digest, env);
+    }
+    const target = targetFor(env, service, true);
     const url = flag("url");
     const dry = !flags.has("execute");
     const res = await rollout(target, digest, async (rev, stage) => {
@@ -366,7 +389,7 @@ switch (cmd) {
       at: new Date().toISOString(), actor: flag("actor", "human")!,
     });
     appendAudit(flag("log", "delivery-audit.jsonl")!, {
-      actor: flag("actor", "human") as Actor, action: cmd, environment: env, artifactDigest: digest,
+      actor: flag("actor", "human") as Actor, action: cmd, environment: env === "local" ? "development" : env, artifactDigest: digest,
       result: dry ? "ok" : res.outcome === "deployed" ? "ok" : res.outcome === "rolled-back" ? "rolled-back" : "failed",
       details: { dryRun: dry, steps: res.steps },
     });
@@ -376,25 +399,39 @@ switch (cmd) {
     break;
   }
   case "rollback": {
-    const env = flag("env", "staging") as "staging" | "production";
+    const env = flag("env", "staging") as "staging" | "production" | "local";
+    if (!["staging", "production", "local"].includes(env)) fail("--env: staging, production o local");
     const service = flag("service", "api")!;
     const releases = flag("releases", "delivery-releases.jsonl")!;
     const history = readReleases(releases);
-    guard(env === "production" ? "rollback-production" : "rollback-staging");
+    if (env !== "local") guard(env === "production" ? "rollback-production" : "rollback-staging");
     const to = flag("to") && flag("to") !== "previous"
       ? history.filter((r) => r.env === env && r.service === service && r.outcome === "deployed" && r.revision.digest === flag("to")).at(-1) ?? fail("Ese digest no se desplegó en este entorno.")
       : rollbackCandidate(history, env, service) ?? fail("No hay versión anterior registrada para volver.");
-    const target = new CloudRunTarget({
-      project: flag("project") ?? fail("--project es obligatorio"), region: flag("region") ?? fail("--region es obligatorio"), service, image: flag("image", "")!,
-    }, runner());
+    const target = targetFor(env, service, false);
     await rollbackTo(target, to.revision);
     const serving = lastServing(history, env, service);
     appendRelease(releases, { ...to, outcome: flags.has("execute") ? "rollback" : "dry-run", previous: serving?.revision ?? null, at: new Date().toISOString(), actor: flag("actor", "human")! });
-    appendAudit(flag("log", "delivery-audit.jsonl")!, { actor: flag("actor", "human") as Actor, action: "rollback", environment: env, artifactDigest: to.revision.digest, result: "ok", details: { dryRun: !flags.has("execute"), migration: to.migration } });
+    appendAudit(flag("log", "delivery-audit.jsonl")!, { actor: flag("actor", "human") as Actor, action: "rollback", environment: env === "local" ? "development" : env, artifactDigest: to.revision.digest, result: "ok", details: { dryRun: !flags.has("execute"), migration: to.migration } });
     console.log(`${flags.has("execute") ? "" : "[en seco] "}tráfico al 100 % en ${to.revision.name} (${to.revision.digest.slice(0, 19)}…); esquema compatible hasta ${to.migration ?? "—"}`);
     break;
   }
+  case "local-proxy": {
+    const port = Number(flag("port", "8088"));
+    startProxy(flag("state", ".dzd/local-state.json")!, port);
+    console.log(`proxy local en http://127.0.0.1:${port} (estado ${flag("state", ".dzd/local-state.json")})`);
+    break;
+  }
+  case "load": {
+    const url = flag("url") ?? fail("--url es obligatorio");
+    const samples = await runLoad({ url, requests: Number(flag("requests", "200")), concurrency: Number(flag("concurrency", "10")), paths: flag("paths")?.split(",") });
+    if (flag("out")) writeFileSync(flag("out")!, `${JSON.stringify(samples)}\n`);
+    const r = evaluateSlo(fromSamples(samples), loadPolicy(flag("policy")).slo, { smoke: true });
+    printSlo(r);
+    if (!r.ok) process.exit(1);
+    break;
+  }
   default:
-    console.log("uso: dzd <inspect|plan|policy|run-gates|autonomy|audit [verify|stats]|artifact [verify]|verify [--repeat N --slo]|slo|env-check|provenance [verify]|signature verify|iac-check|diagnose|docs|report|cost|config-check|deploy|promote|rollback> [--json]");
+    console.log("uso: dzd <inspect|plan|policy|run-gates|autonomy|audit [verify|stats]|artifact [verify]|verify [--repeat N --slo]|slo|env-check|provenance [verify]|signature verify|iac-check|diagnose|docs|report|cost|config-check|deploy|promote|rollback [--env local]|local-proxy|load> [--json]");
     if (cmd) process.exit(1);
 }
