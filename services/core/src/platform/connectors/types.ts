@@ -32,8 +32,17 @@ export interface AiResponse {
   model: string;
 }
 
-/** Adaptador de un proveedor de IA. Uno solo activo a la vez, elegido por configuración (AI_PROVIDER). */
+/**
+ * PROVIDER ADAPTER: adaptador de un proveedor o modelo de IA (ADR 0217). El AI ROUTER elige cuáles atienden cada
+ * capacidad (AI_ROUTES / AI_PROVIDER). Hablar con un proveedor nuevo = implementar esta interfaz y registrarlo en
+ * `AI_PROVIDER_FACTORIES`; la lógica de negocio no cambia.
+ */
 export interface AIProvider extends Connector {
+  /**
+   * Capacidades que atiende. Sin declarar: todas las de texto. Imagen, video, multimodal y embeddings requieren
+   * declararlas de forma explícita.
+   */
+  readonly capabilities?: readonly AiCapability[];
   /** Estimación previa (USD) para pedir permiso al CostGuard antes de llamar. */
   estimateUsd(req: AiRequest): number;
   complete(req: AiRequest, signal: AbortSignal): Promise<AiResponse>;

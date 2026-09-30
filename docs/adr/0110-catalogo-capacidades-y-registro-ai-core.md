@@ -2,6 +2,8 @@
 
 Estado: aceptada (2026-09-29). Aplica el mensaje "Master continuity / low-cost intelligence" del propietario.
 
+Nota: ADR 0217 renombra y amplía el catálogo a 13 capacidades y agrega el AI ROUTER.
+
 ## Contexto
 El AI CORE (ADR 0064) ya era el único punto de uso de IA: un proveedor, apagado por defecto, detrás del CostGuard,
 con minimización de datos y sin decidir estados. Faltaban: el catálogo de capacidades que pide el propietario (qué

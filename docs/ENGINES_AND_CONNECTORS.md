@@ -28,7 +28,7 @@ NO AI REQUIRED funciona sin IA por diseño, no por falta de integración.
 
 | Interfaz | Implementaciones hoy | Por defecto | Cómo se activa |
 |---|---|---|---|
-| `AIProvider` (vía `AiCore`) | `none`, `fixture` | `none` | `AI_PROVIDER`; uno de pago exige `COST_MODE=metered` + presupuesto `ai` |
+| `AIProvider` (vía `AiCore` → `AiRouter`) | `none`, `fixture` | `none` | `AI_PROVIDER` (por defecto) y `AI_ROUTES` (por capacidad, ADR 0217); uno de pago exige `COST_MODE=metered` + presupuesto `ai` |
 | `TranslationProvider` | `none` (la app muestra el original) | `none` | `TRANSLATION_PROVIDER` |
 | `SmsProvider` | `none`, `log` | `none` | `SMS_PROVIDER` |
 | `SpeechToTextProvider` / `TextToSpeechProvider` | `none` (la síntesis de voz del teléfono es gratis) | `none` | `STT_PROVIDER` / `TTS_PROVIDER` |
@@ -64,3 +64,42 @@ traducción y voz apagados; hay mocks (`fixture`, `log`) para desarrollo.
 | Video en vivo | Transmisión | `LiveStreamProvider` | No | Sí (futuro) | 0 hoy | Video grabado | ninguno | — |
 | Costos | No gastar sin permiso | CostGuard | NO AI REQUIRED | No | 0 | Función apagada al 100 % | Propio | Ninguno |
 | Resumen de evento | Texto breve | AI CORE (opcional) | Opcional | Opcional | 0 hoy | Línea de tiempo | none | Entrada minimizada |
+
+## Matriz de IA: ¿hace falta? (ADR 0217)
+
+Capas: DIZASTER → AI CORE (presupuesto, minimización, registro sin contenido) → AI ROUTER (qué proveedores atienden
+cada capacidad, en qué orden) → PROVIDER ADAPTER (uno por proveedor o modelo, sin agregadores) → MODELO. Todo apagado
+por defecto: sin rutas, sin claves, con presupuesto 0 o con el modelo caído, DIZASTER hace lo mismo con sus reglas.
+Ninguna capacidad está conectada hoy a NVIDIA, OpenAI, Gemini ni ningún otro proveedor.
+
+Orden de preferencia para resolver una función: lógica interna → código local → base de datos propia → datos
+abiertos → servicio externo gratuito → IA (último recurso).
+
+| FUNCIÓN | ¿NECESITA IA? | MOTIVO | ¿PUEDE SER DETERMINÍSTICA? | COSTO |
+|---|---|---|---|---|
+| Reportar, presencia y publicación | No | Reglas de presencia (geo-kit), catálogo de categorías y retrasos por país | Sí, completa | 0 |
+| Agrupar reportes en eventos / `DETECT_DUPLICATE` | No | H3, distancia, ventana por categoría, huella de texto y hash perceptual | Sí, completa | 0 |
+| Verificación y estados | No (la IA nunca confirma ni declara falso) | Reglas versionadas y fuentes registradas | Sí, completa | 0 |
+| Feed, "Para ti", búsqueda | No | PostgreSQL (texto, trigram, etiquetas), H3 y señales propias | Sí, completa | 0 |
+| Mapa, geolocalización, zonas | No | MapLibre, PostGIS, índice geográfico abierto | Sí, completa | 0 |
+| Números de emergencia | No | Registro propio por país y categoría | Sí, completa | 0 |
+| Notificaciones | No | Reglas de suscripción, cercanía y límites | Sí, completa | 0 (APNs/FCM gratis) |
+| Idiomas de la interfaz | No (prohibido usar IA) | Catálogos locales versionados (Language Engine, ADR 0216) | Sí, completa | 0 |
+| Detectar idioma de un texto | No | Detector local por frecuencias (ADR 0091) | Sí, completa | 0 |
+| `ANALYZE_REPORT` | No | Categoría elegida por la persona, presencia y reglas del catálogo | Sí, completa | 0 hoy |
+| `CLASSIFY_INCIDENT` | No | Categoría del reporte o mapeo de palabras de la fuente | Sí, completa | 0 hoy |
+| `EXTRACT_INCIDENT_DATA` | No | Formulario estructurado y CAP/JSON de las fuentes | Sí, completa | 0 hoy |
+| `SUMMARIZE_INCIDENT` | No | Título por categoría y lugar, timeline y conteos | Sí, completa | 0 hoy |
+| `OPERATIONAL_SUMMARY` | No | Conteos y métricas en PostgreSQL (tableros) | Sí, completa | 0 hoy |
+| `GENERATE_EMBEDDING` | No | Búsqueda por texto, etiquetas y H3 bastan en V1 | Sí, completa | 0 hoy |
+| `MODERATE_CONTENT` | No (triaje opcional) | Denuncias, reputación, detección local de datos personales, pHash y moderación humana | Parcial: las personas deciden lo dudoso | 0 hoy |
+| `SAFETY_CLASSIFICATION` | No | Categorías sensibles, retraso de publicación, listas de términos y moderación humana | Parcial | 0 hoy |
+| `TRANSLATE_TEXT` (solo contenido de personas) | Opcional | Sin proveedor se muestra el original con su idioma | Parcial: no hay traducción sin modelo | 0 hoy |
+| `ANALYZE_IMAGE` | Opcional | EXIF/GPS eliminados, pHash y revisión humana en categorías sensibles | Parcial | 0 hoy |
+| `ANALYZE_VIDEO` | Opcional | Límites de duración y tamaño, transcodificación, revisión humana | Parcial | 0 hoy |
+| `MULTIMODAL_REASONING` | Opcional | Cada señal por separado con reglas y revisión humana | Parcial | 0 hoy |
+
+Agregar un proveedor (A, B, C, NVIDIA, un modelo local o autoalojado): un adaptador `AIProvider` en
+`services/core/src/platform/connectors/`, su entrada en `AI_PROVIDER_FACTORIES`, presupuesto aprobado,
+`COST_MODE=metered` si cuesta y una ruta en `AI_ROUTES` (p. ej. `CLASSIFY_INCIDENT=local,proveedor-a`). Ningún
+módulo de negocio cambia. Imagen, video, multimodal y embeddings solo llegan a un adaptador que los declare.

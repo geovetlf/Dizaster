@@ -98,8 +98,10 @@ const Env = z.object({
   FCM_SERVICE_ACCOUNT_JSON: z.string().optional(),
   // Conectores (ADR 0064). Modo costo cero por defecto: ningún proveedor de pago arranca. Todo apagado salvo push.
   COST_MODE: z.enum(["zero", "metered"]).default("zero"),
-  /** Un solo proveedor de IA, opcional. "fixture" = respuestas fijas, sin red (desarrollo y pruebas). */
+  /** Proveedor de IA por defecto, opcional. "fixture" = respuestas fijas, sin red (desarrollo y pruebas). */
   AI_PROVIDER: z.enum(["none", "fixture"]).default("none"),
+  /** Rutas del AI ROUTER por capacidad (ADR 0217): "CLASSIFY_INCIDENT=fixture;*=none". Vacío = AI_PROVIDER para todas. */
+  AI_ROUTES: z.string().max(2000).default(""),
   AI_TIMEOUT_MS: z.coerce.number().int().min(500).max(60000).default(8000),
   TRANSLATION_PROVIDER: z.enum(["none"]).default("none"),
   SMS_PROVIDER: z.enum(["none", "log"]).default("none"),
@@ -132,7 +134,7 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): AppEnv {
   if (env.NODE_ENV === "production" && env.PUSH_DRIVER !== "live") {
     throw new Error("Producción requiere PUSH_DRIVER=live (APNs y FCM)");
   }
-  if (env.NODE_ENV === "production" && (env.AI_PROVIDER === "fixture" || env.SMS_PROVIDER === "log")) {
+  if (env.NODE_ENV === "production" && (env.AI_PROVIDER === "fixture" || /(^|[=,])\s*fixture\b/.test(env.AI_ROUTES) || env.SMS_PROVIDER === "log")) {
     throw new Error("AI_PROVIDER=fixture y SMS_PROVIDER=log son solo para desarrollo");
   }
   return env;

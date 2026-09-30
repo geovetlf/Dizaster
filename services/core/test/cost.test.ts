@@ -129,17 +129,17 @@ describe("Cost Optimization Layer", () => {
   it("el tablero muestra el uso de IA por capacidad y borrar la cuenta desvincula a la persona (ADR 0110)", async () => {
     const u = await createUser(t, "usa_ia");
     const base = { provider: "p1", model: "m1", fallback: false, latencyMs: 100, inputTokens: 10, outputTokens: 5, estimatedUsd: 0.002, subject: null };
-    await t.c.cost.recordAiCall({ ...base, capability: "SUMMARIZE", status: "OK", usd: 0.002, actorUserId: u.userId });
-    await t.c.cost.recordAiCall({ ...base, capability: "SUMMARIZE", status: "TIMEOUT", fallback: true, latencyMs: 300, inputTokens: 0, outputTokens: 0, usd: 0, actorUserId: u.userId });
-    await t.c.cost.recordAiCall({ ...base, capability: "MODERATE", status: "OK", usd: 0.001, actorUserId: null });
+    await t.c.cost.recordAiCall({ ...base, capability: "SUMMARIZE_INCIDENT", status: "OK", usd: 0.002, actorUserId: u.userId });
+    await t.c.cost.recordAiCall({ ...base, capability: "SUMMARIZE_INCIDENT", status: "TIMEOUT", fallback: true, latencyMs: 300, inputTokens: 0, outputTokens: 0, usd: 0, actorUserId: u.userId });
+    await t.c.cost.recordAiCall({ ...base, capability: "MODERATE_CONTENT", status: "OK", usd: 0.001, actorUserId: null });
     const ai = (await dashboard(1)).ai;
-    expect(ai.find((r) => r.capability === "SUMMARIZE")).toMatchObject({ provider: "p1", model: "m1", calls: 2, fallbacks: 1, inputTokens: 10, outputTokens: 5, usd: 0.002, avgLatencyMs: 200 });
-    expect(ai.find((r) => r.capability === "MODERATE")).toMatchObject({ calls: 1, usd: 0.001 });
+    expect(ai.find((r) => r.capability === "SUMMARIZE_INCIDENT")).toMatchObject({ provider: "p1", model: "m1", calls: 2, fallbacks: 1, inputTokens: 10, outputTokens: 5, usd: 0.002, avgLatencyMs: 200 });
+    expect(ai.find((r) => r.capability === "MODERATE_CONTENT")).toMatchObject({ calls: 1, usd: 0.001 });
 
     expect((await t.app.inject({ method: "DELETE", url: "/v1/me", headers: auth(u.token), payload: { confirm: "DELETE" } })).statusCode).toBeLessThan(300);
     await t.c.dispatcher.drain();
     const left = await t.c.db.query(`SELECT 1 FROM cost.ai_calls WHERE actor_user_id = $1`, [u.userId]);
     expect(left.rowCount).toBe(0);
-    expect((await dashboard(1)).ai.find((r) => r.capability === "SUMMARIZE")!.calls).toBe(2);
+    expect((await dashboard(1)).ai.find((r) => r.capability === "SUMMARIZE_INCIDENT")!.calls).toBe(2);
   });
 });
