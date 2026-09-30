@@ -1,8 +1,8 @@
 import { createHash } from "node:crypto";
-import type { AreaGeometry, CategoryCode, EventCandidate, EventSourceView, GeoPoint, LocalizedText } from "@dizaster/contracts";
+import { sourceHealth, type AdminSourceView, type AreaGeometry, type CategoryCode, type EventCandidate, type EventSourceView, type GeoPoint, type LocalizedText, type SourceStatus } from "@dizaster/contracts";
 import type { Db, Queryable } from "../../platform/db.js";
 import { withTransaction } from "../../platform/db.js";
-import { DomainError } from "../../platform/errors.js";
+import { DomainError, notFound } from "../../platform/errors.js";
 import { newId } from "../../platform/ids.js";
 import { publish, type OutboxDispatcher } from "../../platform/outbox.js";
 import type { EventService, ResolutionResult } from "../event/index.js";
@@ -94,6 +94,73 @@ export class IngestionService {
 
   async setSourceStatus(key: string, status: "ACTIVE" | "PAUSED" | "PLANNED" | "RESEARCH" | "RETIRED"): Promise<void> {
     await this.db.query(`UPDATE ingestion.sources SET status = $2, updated_at = now() WHERE key = $1`, [key, status]);
+  }
+
+  /** Salud de cada fuente para administración (ADR 0162): estado, breaker, últimas ejecuciones y último cambio. */
+  async adminSources(now: Date): Promise<AdminSourceView[]> {
+    const { rows } = await this.db.query<{
+      key: string; name: string; trust_tier: AdminSourceView["trustTier"]; status: SourceStatus; country_scope: string[]; urgent_capable: boolean;
+      consecutive_failures: number | null; open_until: Date | null; last_run_at: Date | null; last_ok_at: Date | null; last_error: string | null;
+      runs_ok: string; runs_failed: string; items_new: string;
+      change_from: SourceStatus | null; change_to: SourceStatus | null; change_reason: string | null; change_at: Date | null;
+    }>(
+      `SELECT s.key, s.name, s.trust_tier, s.status, s.country_scope, s.urgent_capable, st.consecutive_failures, st.open_until,
+              r.last_run_at, r.last_ok_at, r.runs_ok, r.runs_failed, r.items_new,
+              (SELECT error FROM ingestion.runs x WHERE x.source_id = s.id AND x.status = 'FAILED' ORDER BY started_at DESC LIMIT 1) AS last_error,
+              l.from_status AS change_from, l.to_status AS change_to, l.reason AS change_reason, l.at AS change_at
+         FROM ingestion.sources s
+         LEFT JOIN ingestion.source_state st ON st.source_id = s.id
+         LEFT JOIN LATERAL (
+           SELECT max(started_at) AS last_run_at,
+                  max(started_at) FILTER (WHERE status IN ('OK','NOT_MODIFIED')) AS last_ok_at,
+                  count(*) FILTER (WHERE status IN ('OK','NOT_MODIFIED') AND started_at > $1::timestamptz - interval '24 hours') AS runs_ok,
+                  count(*) FILTER (WHERE status = 'FAILED' AND started_at > $1::timestamptz - interval '24 hours') AS runs_failed,
+                  coalesce(sum(items_new) FILTER (WHERE started_at > $1::timestamptz - interval '24 hours'), 0) AS items_new
+             FROM ingestion.runs WHERE source_id = s.id) r ON true
+         LEFT JOIN LATERAL (SELECT from_status, to_status, reason, at FROM ingestion.source_status_log WHERE source_id = s.id ORDER BY at DESC LIMIT 1) l ON true
+        ORDER BY (s.status = 'ACTIVE') DESC, s.key`,
+      [now],
+    );
+    return rows.map((r) => {
+      const consecutiveFailures = r.consecutive_failures ?? 0;
+      return {
+        key: r.key, name: r.name, trustTier: r.trust_tier, status: r.status, countryScope: r.country_scope, urgentCapable: r.urgent_capable,
+        health: sourceHealth({ status: r.status, consecutiveFailures, breakerOpenUntil: r.open_until, lastRunAt: r.last_run_at }, now),
+        consecutiveFailures,
+        breakerOpenUntil: r.open_until && r.open_until > now ? r.open_until.toISOString() : null,
+        lastRunAt: r.last_run_at?.toISOString() ?? null,
+        lastOkAt: r.last_ok_at?.toISOString() ?? null,
+        // El error ya se guardó redactado (sin secretos); solo el último, recortado.
+        lastError: consecutiveFailures > 0 ? r.last_error?.slice(0, 300) ?? null : null,
+        runsOk: Number(r.runs_ok ?? 0), runsFailed: Number(r.runs_failed ?? 0), itemsNew: Number(r.items_new ?? 0),
+        lastStatusChange: r.change_from && r.change_to && r.change_at
+          ? { from: r.change_from, to: r.change_to, reason: r.change_reason ?? "", at: r.change_at.toISOString() }
+          : null,
+      };
+    });
+  }
+
+  /**
+   * Pausar o reanudar desde administración (ADR 0162), con motivo y registro. Solo ACTIVE ↔ PAUSED: activar una fuente
+   * que nunca corrió (PLANNED/RESEARCH) exige revisar sus términos y queda en la CLI del propietario. Reanudar cierra
+   * el breaker para que se consulte en el siguiente ciclo.
+   */
+  async changeSourceStatus(key: string, to: "ACTIVE" | "PAUSED", reason: string, actor: string): Promise<void> {
+    await withTransaction(this.db, async (tx) => {
+      const src = (await tx.query<{ id: string; status: SourceStatus }>(`SELECT id, status FROM ingestion.sources WHERE key = $1 FOR UPDATE`, [key])).rows[0];
+      if (!src) throw notFound("Fuente");
+      if (src.status === to) throw new DomainError("CONFLICT", "La fuente ya está en ese estado", 409);
+      const from = to === "ACTIVE" ? "PAUSED" : "ACTIVE";
+      if (src.status !== from) throw new DomainError("SOURCE_NOT_PAUSABLE", "Solo se pausa una fuente activa o se reanuda una pausada", 409);
+      await tx.query(`UPDATE ingestion.sources SET status = $2, updated_at = now() WHERE id = $1`, [src.id, to]);
+      if (to === "ACTIVE") {
+        await tx.query(`UPDATE ingestion.source_state SET open_until = NULL, consecutive_failures = 0, updated_at = now() WHERE source_id = $1`, [src.id]);
+      }
+      await tx.query(
+        `INSERT INTO ingestion.source_status_log (id, source_id, from_status, to_status, reason, actor) VALUES ($1, $2, $3, $4, $5, $6)`,
+        [newId(), src.id, src.status, to, reason, actor],
+      );
+    });
   }
 
   /**

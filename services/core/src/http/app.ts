@@ -5,7 +5,7 @@ import Fastify, { type FastifyInstance, type FastifyRequest } from "fastify";
 import { z } from "zod";
 import {
   BBox, CreateCommentRequest, DevicePlatform, MEDIA_UPLOAD_LIMITS, MergeEventsRequest, NegativeState, ReactionKind, CommentReactionKind, ConfirmAgeRequest, RegisterPushTokenRequest, RegisterSigningKeyRequest, RevertMergeRequest,
-  SplitEventRequest, SetEventStatusRequest, SetEventSeverityRequest, AddModeratorNoteRequest, DismissDuplicateRequest, DATA_EXPORT_FORMAT, type AppConfig, type Attribution, type AttributionsResponse, type DataExport, type EmergencyNumbersResponse, type EventSearchResponse,
+  SplitEventRequest, SetEventStatusRequest, SetEventSeverityRequest, SetSourceStatusRequest, type AdminSourcesResponse, AddModeratorNoteRequest, DismissDuplicateRequest, DATA_EXPORT_FORMAT, type AppConfig, type Attribution, type AttributionsResponse, type DataExport, type EmergencyNumbersResponse, type EventSearchResponse,
 } from "@dizaster/contracts";
 import { LocalDiskStorage } from "../modules/media/index.js";
 import type { Container } from "../container.js";
@@ -908,6 +908,18 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
   app.post<{ Params: { id: string } }>("/v1/admin/authority-requests/:id/notes", async (req) => {
     const { userId } = await requireAdmin(req);
     return c.authorityRequests.addNote(req.params.id, req.body, userId);
+  });
+  // Salud de fuentes y pausa/reanudación (ADR 0162): verla y cambiarla es de operación (cambiar, con motivo y auditado).
+  app.get("/v1/admin/sources", async (req, reply) => {
+    await requirePermission(req, "ops.view");
+    reply.header("cache-control", "no-store");
+    return { sources: await c.ingestion.adminSources(c.clock.now()) } satisfies AdminSourcesResponse;
+  });
+  app.post<{ Params: { key: string } }>("/v1/admin/sources/:key/status", async (req, reply) => {
+    const { userId } = await requirePermission(req, "ops.control");
+    const b = parse(SetSourceStatusRequest, req.body);
+    await c.ingestion.changeSourceStatus(req.params.key, b.to, b.reason, userId);
+    return reply.status(204).send();
   });
   app.get("/v1/admin/quality", async (req, reply) => {
     await requirePermission(req, "ops.view");
