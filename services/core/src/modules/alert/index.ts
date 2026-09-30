@@ -118,6 +118,8 @@ export class AlertService {
     dispatcher.on("EventEvidenceAdded", "alert.evaluate.evidence", (e, tx) => run(e.payload.eventId, tx));
     dispatcher.on("VerificationChanged", "alert.evaluate.verification", (e, tx) => run(e.payload.eventId, tx));
     dispatcher.on("EventLifecycleChanged", "alert.evaluate.lifecycle", (e, tx) => run(e.payload.eventId, tx));
+    // Gravedad recalculada (ADR 0160): si subió a alta avisa SEVERITY_UP; si bajó, solo actualiza el estado.
+    dispatcher.on("EventSeverityChanged", "alert.evaluate.severity", (e, tx) => run(e.payload.eventId, tx));
     dispatcher.on("UserMentioned", "alert.mention", (e, tx) => this.mention(tx, e.payload).then(() => undefined));
     // Avisos de moderación a la persona afectada (ADR 0141). Una reversión llega como decisión de apelación.
     dispatcher.on("ModerationActionTaken", "alert.moderation-notice", async (e, tx) => {

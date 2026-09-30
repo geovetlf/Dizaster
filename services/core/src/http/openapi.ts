@@ -148,6 +148,7 @@ export const OPERATIONS: Record<string, Operation> = {
   "POST /v1/moderation/duplicates/:id/dismiss": { summary: "Descartar un posible duplicado", body: C.DismissDuplicateRequest },
   "POST /v1/moderation/events/:id/split": { summary: "Separar un evento", body: C.SplitEventRequest },
   "POST /v1/moderation/events/:id/status": { summary: "Cambiar el ciclo de vida de un evento", body: C.SetEventStatusRequest },
+  "POST /v1/moderation/events/:id/severity": { summary: "Corregir la gravedad de un evento (null vuelve a la evidencia)", body: C.SetEventSeverityRequest },
   "POST /v1/moderation/events/:id/negative-state": { summary: "Marcar un evento en disputa o falso" },
 };
 

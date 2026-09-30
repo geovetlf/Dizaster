@@ -5,7 +5,7 @@ import Fastify, { type FastifyInstance, type FastifyRequest } from "fastify";
 import { z } from "zod";
 import {
   BBox, CreateCommentRequest, DevicePlatform, MEDIA_UPLOAD_LIMITS, MergeEventsRequest, NegativeState, ReactionKind, CommentReactionKind, ConfirmAgeRequest, RegisterPushTokenRequest, RegisterSigningKeyRequest, RevertMergeRequest,
-  SplitEventRequest, SetEventStatusRequest, AddModeratorNoteRequest, DismissDuplicateRequest, DATA_EXPORT_FORMAT, type AppConfig, type Attribution, type AttributionsResponse, type DataExport, type EmergencyNumbersResponse, type EventSearchResponse,
+  SplitEventRequest, SetEventStatusRequest, SetEventSeverityRequest, AddModeratorNoteRequest, DismissDuplicateRequest, DATA_EXPORT_FORMAT, type AppConfig, type Attribution, type AttributionsResponse, type DataExport, type EmergencyNumbersResponse, type EventSearchResponse,
 } from "@dizaster/contracts";
 import { LocalDiskStorage } from "../modules/media/index.js";
 import type { Container } from "../container.js";
@@ -1073,6 +1073,14 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
     const { id } = parse(IdParam, req.params);
     const b = parse(SetEventStatusRequest, req.body);
     await withTransaction(c.db, (tx) => c.events.setStatus(tx, id, b.to, session.userId, b.reason));
+    return c.events.moderatorDetail(c.db, id);
+  });
+  // Corrección auditada de la gravedad (ADR 0160); null la quita.
+  app.post("/v1/moderation/events/:id/severity", async (req) => {
+    const session = await requireVerifier(req);
+    const { id } = parse(IdParam, req.params);
+    const b = parse(SetEventSeverityRequest, req.body);
+    await withTransaction(c.db, (tx) => c.events.setSeverityOverride(tx, id, b.severity, session.userId, b.reason));
     return c.events.moderatorDetail(c.db, id);
   });
   app.post("/v1/moderation/events/:id/negative-state", async (req) => {

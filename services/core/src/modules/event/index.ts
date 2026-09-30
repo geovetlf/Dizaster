@@ -155,12 +155,17 @@ export class EventService {
   async resolveCandidate(tx: Queryable, c: EventCandidate): Promise<ResolutionResult> {
     const evidenceType = EVIDENCE_TYPE_BY_ORIGIN[c.origin];
     // Idempotencia: la misma pieza de evidencia nunca se procesa dos veces.
-    const already = await tx.query<{ id: string; event_id: string; match_confidence: MatchConfidence; match_score: number | null }>(
-      `SELECT id, event_id, match_confidence, match_score FROM event.evidence WHERE evidence_type = $1 AND ref_id = $2`,
+    const already = await tx.query<{ id: string; event_id: string; match_confidence: MatchConfidence; match_score: number | null; severity: number | null; status: string }>(
+      `SELECT id, event_id, match_confidence, match_score, severity, status FROM event.evidence WHERE evidence_type = $1 AND ref_id = $2`,
       [evidenceType, c.originRef.id],
     );
     if (already.rows[0]) {
       const a = already.rows[0];
+      // Una fuente que revisa su dato (p. ej. la magnitud) actualiza la gravedad de su evidencia (ADR 0160).
+      if (c.severityHint !== undefined && c.severityHint !== a.severity) {
+        await tx.query(`UPDATE event.evidence SET severity = $2 WHERE id = $1`, [a.id, c.severityHint]);
+        if (a.status === "ACTIVE") await this.recomputeSeverity(tx, a.event_id, "EVIDENCE");
+      }
       return { kind: "ATTACHED", eventId: a.event_id, evidenceId: a.id, confidence: a.match_confidence, score: a.match_score };
     }
 
@@ -328,13 +333,15 @@ export class EventService {
     await tx.query(
       `INSERT INTO event.evidence
          (id, event_id, evidence_type, ref_id, trust_tier, assertion, point, weight, presence_band,
-          contributor_user_id, contributor_device_id, match_score, match_confidence, added_by, observed_at, text_hash, category_code)
-       VALUES ($1, $2, $3, $4, $5, $6, ST_SetSRID(ST_MakePoint($7, $8), 4326)::geography, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)`,
+          contributor_user_id, contributor_device_id, match_score, match_confidence, added_by, observed_at, text_hash, category_code, severity)
+       VALUES ($1, $2, $3, $4, $5, $6, ST_SetSRID(ST_MakePoint($7, $8), 4326)::geography, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)`,
       [
         evidenceId, eventId, evidenceType, c.originRef.id, c.trustTier, assertion, c.point.lng, c.point.lat, c.weight,
         (c.metadata["presenceBand"] as string | undefined) ?? null, c.contributor?.userId ?? null, c.contributor?.deviceId ?? null,
         score, confidence, confidence === "USER_SELECTED" ? "USER" : "RULE", c.observedAt,
         (c.metadata["textHash"] as string | null | undefined) ?? null, c.categoryCode,
+        // Solo una fuente trae gravedad; lo que dice un ciudadano no la fija (ADR 0160).
+        c.trustTier === "CITIZEN" ? null : c.severityHint ?? null,
       ],
     );
     await this.recomputeAggregates(tx, eventId, c);
@@ -418,6 +425,7 @@ export class EventService {
         `UPDATE event.events SET last_activity_at = greatest(last_activity_at, $2), report_count = 0, source_count = 0, official_source_count = 0, updated_at = now() WHERE id = $1`,
         [eventId, c.observedAt],
       );
+      await this.recomputeSeverity(tx, eventId, "EVIDENCE");
       return;
     }
     const official = rows.filter((r) => r.trust_tier === "OFFICIAL").sort((a, b) => b.observed_at.getTime() - a.observed_at.getTime())[0];
@@ -436,16 +444,64 @@ export class EventService {
           public_geom = ST_SetSRID(ST_MakePoint($4, $5), 4326)::geography,
           public_h3 = $6, h3_r7 = $7, h3_r9 = $8,
           report_count = $9, source_count = $10,
-          severity = greatest(severity, $11), last_activity_at = greatest(last_activity_at, $12),
-          publication_state = $13, region_id = $14, district_id = $15, place = $16, official_source_count = $17, updated_at = now()
+          last_activity_at = greatest(last_activity_at, $11),
+          publication_state = $12, region_id = $13, district_id = $14, place = $15, official_source_count = $16, updated_at = now()
         WHERE id = $1`,
       [
         eventId, point.lng, point.lat, pub.point.lng, pub.point.lat, pub.cell, this.geo.h3(point, H3_RES.ZONE), this.geo.h3(point, H3_RES.DEDUP),
-        citizens.length, rows.length - citizens.length, c.severityHint ?? 1, c.observedAt, publication,
+        citizens.length, rows.length - citizens.length, c.observedAt, publication,
         place?.region?.id ?? null, place?.district?.id ?? null, place ? JSON.stringify(place) : null,
         rows.filter((r) => r.trust_tier === "OFFICIAL").length,
       ],
     );
+    await this.recomputeSeverity(tx, eventId, "EVIDENCE");
+  }
+
+  /**
+   * Gravedad desde la evidencia activa (ADR 0160), NO AI REQUIRED. Orden: corrección de moderación → la fuente
+   * OFICIAL más reciente que trae gravedad → la mayor de las demás fuentes → gravedad por defecto de la categoría.
+   * Puede bajar (una fuente que corrige su magnitud, una evidencia retirada). Si cambia, se publica
+   * `EventSeverityChanged` para que alertas y feed reevalúen.
+   */
+  async recomputeSeverity(tx: Queryable, eventId: string, cause: "EVIDENCE" | "MODERATION"): Promise<number | null> {
+    const ev = (await tx.query<{ severity: number; severity_override: number | null; category_code: string; country_code: string | null }>(
+      `SELECT severity, severity_override, category_code, country_code FROM event.events WHERE id = $1`, [eventId],
+    )).rows[0];
+    if (!ev) return null;
+    const { rows } = await tx.query<{ trust_tier: TrustTier; severity: number }>(
+      `SELECT trust_tier, severity FROM event.evidence
+        WHERE event_id = $1 AND status = 'ACTIVE' AND assertion = 'OCCURRING' AND severity IS NOT NULL
+        ORDER BY observed_at DESC, id`,
+      [eventId],
+    );
+    const next = severityFromEvidence(ev.severity_override, rows, this.ref.category(ev.category_code, ev.country_code)?.defaultSeverity ?? ev.severity);
+    if (next === ev.severity) return next;
+    await tx.query(`UPDATE event.events SET severity = $2, updated_at = now() WHERE id = $1`, [eventId, next]);
+    await this.addTimeline(tx, eventId, "SEVERITY_CHANGED", { from: ev.severity, to: next, cause });
+    await publish(tx, "EventSeverityChanged", { eventId, from: ev.severity, to: next }, { lane: next > ev.severity ? "urgent" : "normal" });
+    return next;
+  }
+
+  /** Corrección auditada de la gravedad por moderación (ADR 0160). `null` quita la corrección y vuelve a la evidencia. */
+  async setSeverityOverride(tx: Queryable, eventId: string, severity: number | null, actor: string, reason: string): Promise<number> {
+    const ev = (await tx.query<{ severity: number; severity_override: number | null; merged_into_id: string | null }>(
+      `SELECT severity, severity_override, merged_into_id FROM event.events WHERE id = $1 FOR UPDATE`, [eventId],
+    )).rows[0];
+    if (!ev) throw notFound("Evento");
+    if (ev.merged_into_id) throw new DomainError("CONFLICT", "El evento está fusionado en otro", 409);
+    if (ev.severity_override === severity) throw new DomainError("CONFLICT", "La gravedad ya tiene ese valor", 409);
+    await tx.query(
+      `UPDATE event.events SET severity_override = $2, severity_override_by = $3, severity_override_reason = $4,
+              severity_override_at = CASE WHEN $2::smallint IS NULL THEN NULL ELSE now() END, updated_at = now()
+        WHERE id = $1`,
+      [eventId, severity, severity === null ? null : actor, severity === null ? null : reason],
+    );
+    const next = (await this.recomputeSeverity(tx, eventId, "MODERATION")) ?? ev.severity;
+    await tx.query(
+      `INSERT INTO event.severity_log (id, event_id, from_severity, to_severity, override, reason, actor) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      [newId(), eventId, ev.severity, next, severity, reason, actor],
+    );
+    return next;
   }
 
   /**
@@ -699,7 +755,7 @@ export class EventService {
     // El área oficial del absorbido pasa al destino con su evidencia (ADR 0087, 0144).
     await this.recomputeArea(tx, targetId);
     await this.addFingerprint(tx, targetId, source.keywords, source.media_hashes);
-    await this.recomputeAggregates(tx, targetId, { observedAt: source.last_activity_at.toISOString(), severityHint: source.severity });
+    await this.recomputeAggregates(tx, targetId, { observedAt: source.last_activity_at.toISOString() });
     await tx.query(
       `INSERT INTO event.merge_log (id, target_event_id, merged_event_id, reason, actor, moved_evidence, score) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
       [mergeId, targetId, sourceId, reason, actor, moved.rows.map((r) => r.id), score],
@@ -815,8 +871,14 @@ export class EventService {
   }
 
   async moderatorDetail(q: Queryable, eventId: string): Promise<ModeratorEventDetail> {
-    const ev = (await q.query<{ merged_into_id: string | null; status: EventStatus }>(`SELECT merged_into_id, status FROM event.events WHERE id = $1`, [eventId])).rows[0];
+    const ev = (await q.query<{ merged_into_id: string | null; status: EventStatus; severity: number; severity_override: number | null }>(
+      `SELECT merged_into_id, status, severity, severity_override FROM event.events WHERE id = $1`, [eventId],
+    )).rows[0];
     if (!ev) throw notFound("Evento");
+    const severityChanges = await q.query<{ from_severity: number; to_severity: number; override: number | null; reason: string; created_at: Date }>(
+      `SELECT from_severity, to_severity, override, reason, created_at FROM event.severity_log WHERE event_id = $1 ORDER BY created_at DESC LIMIT 20`,
+      [eventId],
+    );
     const evidence = await q.query<{
       id: string; evidence_type: ModeratorEventDetail["evidence"][number]["evidenceType"]; trust_tier: TrustTier; assertion: "OCCURRING" | "NOT_OCCURRING";
       presence_band: string | null; match_confidence: string; observed_at: Date;
@@ -842,6 +904,11 @@ export class EventService {
       eventId,
       status: ev.status,
       mergedIntoId: ev.merged_into_id,
+      severity: ev.severity,
+      severityOverride: ev.severity_override,
+      severityChanges: severityChanges.rows.map((r) => ({
+        from: r.from_severity, to: r.to_severity, override: r.override, reason: r.reason, at: r.created_at.toISOString(),
+      })),
       statusChanges: changes.rows.map((r) => ({ from: r.from_status, to: r.to_status, reason: r.reason, at: r.at.toISOString() })),
       notes: notes.rows.map((r) => ({ id: r.id, text: r.payload.text ?? "", byUserId: r.payload.byUserId ?? null, at: r.at.toISOString() })),
       evidence: evidence.rows.map((r) => ({
@@ -1288,6 +1355,18 @@ export class EventService {
 export const AUTO_MERGE = { actor: "RULE:auto-merge", lookbackHours: 24, maxEventsPerRun: 200 } as const;
 
 /** Destino de una fusión automática: el de mayor nivel, luego el que tiene fuentes, luego el más antiguo. */
+/**
+ * Regla de gravedad (ADR 0160), NO AI REQUIRED. `evidence` viene ordenada de la más reciente a la más antigua.
+ * Corrección de moderación → oficial más reciente → mayor de las demás fuentes → valor por defecto.
+ */
+export function severityFromEvidence(override: number | null, evidence: { trust_tier: TrustTier; severity: number }[], fallback: number): number {
+  if (override !== null) return override;
+  const official = evidence.find((e) => e.trust_tier === "OFFICIAL");
+  if (official) return official.severity;
+  const others = evidence.filter((e) => e.trust_tier !== "CITIZEN").map((e) => e.severity);
+  return others.length ? Math.max(...others) : fallback;
+}
+
 export function mergeOrder<T extends { id: string; verification_level: VerificationLevel; sourced: boolean; first_seen_at: Date }>(a: T, b: T): [T, T] {
   const key = (e: T) => [VERIFICATION_LEVEL_RANK[e.verification_level] ?? 0, e.sourced ? 1 : 0, -e.first_seen_at.getTime()] as const;
   const [ka, kb] = [key(a), key(b)];

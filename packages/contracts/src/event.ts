@@ -26,6 +26,8 @@ export const TimelineEntryType = z.enum([
   "VERIFICATION_CHANGED",
   "NEGATIVE_STATE_CHANGED",
   "STATUS_CHANGED",
+  /** La gravedad cambió por la evidencia o por corrección de moderación (ADR 0160). */
+  "SEVERITY_CHANGED",
   "MEDIA_ADDED",
   "MERGED",
   "SPLIT",
@@ -262,7 +264,12 @@ export interface ModeratorEventDetail {
   statusChanges: EventStatusChangeView[];
   /** Notas de moderación en la línea de tiempo (ADR 0147): visibles solo para moderación, las más recientes primero. */
   notes: ModeratorNoteView[];
+  /** Gravedad vigente, la corrección de moderación si la hay y sus cambios auditados (ADR 0160). */
+  severity: number;
+  severityOverride: number | null;
+  severityChanges: EventSeverityChangeView[];
 }
+export interface EventSeverityChangeView { from: number; to: number; override: number | null; reason: string; at: string }
 export interface ModeratorNoteView { id: string; text: string; byUserId: string | null; at: string }
 export const AddModeratorNoteRequest = z.object({ text: z.string().trim().min(3).max(2000) });
 export type AddModeratorNoteRequest = z.infer<typeof AddModeratorNoteRequest>;
@@ -273,3 +280,10 @@ export const SetEventStatusRequest = z.object({
   reason: z.string().trim().min(3).max(2000),
 });
 export type SetEventStatusRequest = z.infer<typeof SetEventStatusRequest>;
+
+/** Corrección de gravedad por moderación (ADR 0160). `severity: null` la quita y vuelve a mandar la evidencia. */
+export const SetEventSeverityRequest = z.object({
+  severity: z.number().int().min(1).max(5).nullable(),
+  reason: z.string().trim().min(3).max(2000),
+});
+export type SetEventSeverityRequest = z.infer<typeof SetEventSeverityRequest>;

@@ -68,6 +68,9 @@ export class FeedService {
     };
     dispatcher.on("EventCreated", "feed.event-signals.created", (e, tx) => refresh(e.payload.eventId, tx));
     dispatcher.on("EventEvidenceAdded", "feed.event-signals.evidence", (e, tx) => refresh(e.payload.eventId, tx));
+    dispatcher.on("EventSeverityChanged", "feed.event-signals.severity", async (e, tx) => {
+      await this.social.upsertEventSignal(tx, { eventId: e.payload.eventId, severity: e.payload.to });
+    });
     // Resuelto o archivado: sus posts dejan de empujar en "Para ti" (ADR 0124).
     dispatcher.on("EventLifecycleChanged", "feed.event-signals.lifecycle", async (e, tx) => {
       await this.social.upsertEventSignal(tx, { eventId: e.payload.eventId, lifecycle: e.payload.to });

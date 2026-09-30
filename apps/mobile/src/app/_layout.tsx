@@ -1,6 +1,8 @@
-import { router, Stack } from "expo-router";
+import { router, Stack, type ErrorBoundaryProps } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useState } from "react";
+import { CrashScreen } from "../components/crash-screen";
+import { recordError } from "../lib/errors/error-store";
 import { t } from "../lib/i18n";
 import { useNotificationRouting } from "../lib/alerts/notifications";
 import { refreshCategoryCatalog } from "../lib/category-store";
@@ -12,6 +14,21 @@ import { SessionProvider, useSession } from "../lib/session";
 import { colors } from "../theme";
 
 const header = { headerStyle: { backgroundColor: colors.bg }, headerTintColor: colors.text, headerTitleAlign: "center" as const, contentStyle: { backgroundColor: colors.bg } };
+
+/** Error al dibujar cualquier pantalla (ADR 0161): pantalla propia que siempre deja llamar a emergencias. */
+export function ErrorBoundary(props: ErrorBoundaryProps) {
+  return <CrashScreen {...props} />;
+}
+
+// Errores fuera de React (promesas, callbacks nativos): se anotan en el registro local y siguen su curso normal.
+const errorUtils = (globalThis as { ErrorUtils?: { getGlobalHandler(): (e: unknown, fatal?: boolean) => void; setGlobalHandler(h: (e: unknown, fatal?: boolean) => void): void } }).ErrorUtils;
+if (errorUtils) {
+  const previous = errorUtils.getGlobalHandler();
+  errorUtils.setGlobalHandler((e, fatal) => {
+    recordError(e, fatal ? "global:fatal" : "global");
+    previous(e, fatal);
+  });
+}
 
 export default function RootLayout() {
   // Al abrir la app se comprueba si hay números de emergencia nuevos; así funcionan offline con la última versión.

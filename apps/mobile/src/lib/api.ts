@@ -225,6 +225,8 @@ export const api = {
     request<ModeratorEventDetail>(`/v1/moderation/events/${id}/notes`, { method: "POST", body: JSON.stringify({ text }) }),
   setEventStatus: (id: string, to: EventStatus, reason: string) =>
     request<ModeratorEventDetail>(`/v1/moderation/events/${id}/status`, { method: "POST", body: JSON.stringify({ to, reason }) }),
+  setEventSeverity: (id: string, severity: number | null, reason: string) =>
+    request<ModeratorEventDetail>(`/v1/moderation/events/${id}/severity`, { method: "POST", body: JSON.stringify({ severity, reason }) }),
   splitEvent: (id: string, evidenceIds: string[], reason: string) =>
     request<{ eventId: string }>(`/v1/moderation/events/${id}/split`, { method: "POST", body: JSON.stringify({ evidenceIds, reason }) }),
   decideAppeal: (id: string, decision: "UPHOLD" | "REVERSE", reason: string) =>

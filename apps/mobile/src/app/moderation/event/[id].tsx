@@ -109,6 +109,25 @@ export default function EventToolsScreen() {
             <Text key={c.at} style={styles.meta}>{timeAgo(c.at, lang)} · {t(`st_${c.from}`)} → {t(`st_${c.to}`)} · {c.reason}</Text>
           ))}
 
+          <Text style={styles.section}>
+            {t("severitySection")}: {detail.severity}/5{detail.severityOverride !== null ? ` · ${t("severityCorrected")}` : ""}
+          </Text>
+          <View style={styles.chips}>
+            {([null, 1, 2, 3, 4, 5] as const).map((v) => {
+              const current = detail.severityOverride === v;
+              return (
+                <Pressable key={v ?? "auto"} accessibilityRole="button" accessibilityState={{ selected: current, disabled: current || !ok }} disabled={current || !ok}
+                  style={[styles.button, current && styles.current, !current && !ok && styles.disabled]}
+                  onPress={() => confirm(t("confirmSeverity"), () => api.setEventSeverity(event.id, v, reason.trim()))}>
+                  <Text style={styles.buttonText}>{v === null ? t("severityAuto") : String(v)}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+          {detail.severityChanges.map((c) => (
+            <Text key={c.at} style={styles.meta}>{timeAgo(c.at, lang)} · {c.from} → {c.to} · {c.reason}</Text>
+          ))}
+
           {verification ? (
             <>
               <Text style={styles.section}>{t("negativeSection")}</Text>

@@ -59,6 +59,8 @@ export interface DomainEventMap {
   };
   /** Se decidió una apelación (ADR 0141): la persona recibe un aviso con el resultado. */
   AppealDecided: { appealId: string; appellantUserId: string; outcome: "UPHELD" | "REVERSED" };
+  /** La gravedad del evento cambió (ADR 0160): alertas y feed reevalúan. Puede bajar. */
+  EventSeverityChanged: { eventId: string; from: number; to: number };
   /** Actualización oficial de una institución sobre un evento (ADR 0153, 0157). */
   OfficialUpdatePosted: { postId: string; eventId: string; institutionName: string };
   /** Un presupuesto cruzó el 50, 80 o 100 % en su periodo. Al 100 % la función se degrada (CostGuard deniega). */

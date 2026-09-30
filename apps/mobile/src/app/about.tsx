@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { api } from "../lib/api";
 import { LIBRARIES, groupAttributions } from "../lib/about/libraries";
+import { clearErrorLog, readErrorLog } from "../lib/errors/error-store";
 import { t } from "../lib/i18n";
 import { colors, radius, space } from "../theme";
 
@@ -22,6 +23,8 @@ const TITLES: Record<AttributionKind, "aboutMap" | "aboutGeo" | "aboutTimezone" 
 export default function AboutScreen() {
   const [list, setList] = useState<Attribution[]>([]);
   useEffect(() => { api.attributions().then((r) => setList(r.attributions)).catch(() => undefined); }, []);
+  // Registro local de errores (ADR 0161): para contarlo a soporte; no sale del teléfono.
+  const [errors, setErrors] = useState(readErrorLog);
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -36,6 +39,15 @@ export default function AboutScreen() {
         <Text style={styles.heading}>{t("aboutSoftware")}</Text>
         {LIBRARIES.map((l) => <Item key={l.name} title={l.name} meta={l.license} url={l.url} />)}
       </View>
+      {errors.length ? (
+        <View style={styles.group}>
+          <Text style={styles.heading}>{t("errorLogTitle")}</Text>
+          {errors.slice(0, 5).map((e) => <Item key={e.at} title={e.message} meta={e.at.slice(0, 16).replace("T", " ")} url={null} />)}
+          <Pressable accessibilityRole="button" onPress={() => { clearErrorLog(); setErrors([]); }}>
+            <Text style={styles.clear}>{t("errorLogClear")}</Text>
+          </Pressable>
+        </View>
+      ) : null}
       <Text style={styles.version}>Dizaster {Application.nativeApplicationVersion ?? ""}</Text>
     </ScrollView>
   );
@@ -61,4 +73,5 @@ const styles = StyleSheet.create({
   link: { color: colors.accent },
   meta: { color: colors.textMuted, fontSize: 12, marginTop: 2 },
   version: { color: colors.textMuted, fontSize: 12, textAlign: "center" },
+  clear: { color: colors.accent, paddingVertical: 8 },
 });
