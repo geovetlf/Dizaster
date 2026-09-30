@@ -103,3 +103,18 @@ Agregar un proveedor (A, B, C, NVIDIA, un modelo local o autoalojado): un adapta
 `services/core/src/platform/connectors/`, su entrada en `AI_PROVIDER_FACTORIES`, presupuesto aprobado,
 `COST_MODE=metered` si cuesta y una ruta en `AI_ROUTES` (p. ej. `CLASSIFY_INCIDENT=local,proveedor-a`). Ningún
 módulo de negocio cambia. Imagen, video, multimodal y embeddings solo llegan a un adaptador que los declare.
+
+### Resiliencia, prompts, modelos y evaluación (ADR 0280)
+
+- **Límite de tasa y cortocircuito:** un adaptador informa un 429 con `AiProviderError("RATE_LIMITED", …, retryAfterMs)`.
+  El AI Core no vuelve a llamar a ese proveedor hasta que pasa la espera, y tras 3 fallos seguidos abre su
+  cortocircuito. Mientras tanto registra `CIRCUIT_OPEN` y prueba el siguiente de la ruta.
+- **Prompts versionados** (`prompts.ts`): id, versión y huella sha256. Cada llamada y cada sugerencia guardan
+  `id@versión`. Cambiar el texto sin subir la versión hace fallar las pruebas.
+- **Registro de modelos** (`models.ts`): con `COST_MODE=metered` solo se aceptan modelos registrados, activos y
+  declarados para la capacidad (`UNREGISTERED_MODEL` en otro caso).
+- **Evaluación** (`ai-eval.ts`): casos con expectativas verificables por código (JSON, campos permitidos, palabras
+  prohibidas, largo). Antes de activar un proveedor real, se corre contra él con presupuesto aprobado.
+- **Primer consumidor asíncrono:** la pista de verificación (`verification-hint@1`, `ANALYZE_REPORT`) se encola solo si
+  la capacidad está encendida. El worker la procesa fuera de toda transacción, con hechos agregados sin textos ni datos
+  de personas. Queda como sugerencia para moderación y nunca cambia el estado.

@@ -132,6 +132,7 @@ export function buildContainer(env: AppEnv, overrides: { db?: Db; clock?: Clock;
   // Conectores (ADR 0064): IA, traducción, SMS y voz detrás de interfaces; apagados por defecto, costo cero.
   cost.registerHandlers(dispatcher);
   const connectors = buildConnectors(env, cost, overrides.connectors, cost);
+  verification.attachAi(connectors.ai);
   const moderation = new ModerationService(db, social, identity, events, verification, trust, media);
   moderation.registerHandlers(dispatcher);
   const authorityRequests = new AuthorityRequestRegister(db, () => clock.now());

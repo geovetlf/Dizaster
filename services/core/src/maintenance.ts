@@ -53,6 +53,7 @@ export function dailyJobs(c: Container): Job[] {
     ["trust.standing.refresh", () => c.trust.refreshStanding()],
     ["retention.outbox", async () => ({ deleted: await c.dispatcher.purgeProcessed(c.env.OUTBOX_RETENTION_DAYS) })],
     ["retention.heartbeats", async () => ({ deleted: await c.heartbeat.prune() })],
+    ["retention.ai-jobs", async () => ({ deleted: await c.verification.purgeAiJobs() })],
     ["retention.client_crashes", async () => ({ deleted: await c.crashes.applyRetention(c.env.CLIENT_CRASH_RETENTION_DAYS) })],
   ];
 }

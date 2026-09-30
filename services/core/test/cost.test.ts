@@ -128,7 +128,7 @@ describe("Cost Optimization Layer", () => {
 
   it("el tablero muestra el uso de IA por capacidad y borrar la cuenta desvincula a la persona (ADR 0110)", async () => {
     const u = await createUser(t, "usa_ia");
-    const base = { provider: "p1", model: "m1", fallback: false, latencyMs: 100, inputTokens: 10, outputTokens: 5, estimatedUsd: 0.002, subject: null };
+    const base = { provider: "p1", model: "m1", fallback: false, latencyMs: 100, inputTokens: 10, outputTokens: 5, estimatedUsd: 0.002, subject: null, promptId: null, promptVersion: null };
     await t.c.cost.recordAiCall({ ...base, capability: "SUMMARIZE_INCIDENT", status: "OK", usd: 0.002, actorUserId: u.userId });
     await t.c.cost.recordAiCall({ ...base, capability: "SUMMARIZE_INCIDENT", status: "TIMEOUT", fallback: true, latencyMs: 300, inputTokens: 0, outputTokens: 0, usd: 0, actorUserId: u.userId });
     await t.c.cost.recordAiCall({ ...base, capability: "MODERATE_CONTENT", status: "OK", usd: 0.001, actorUserId: null });

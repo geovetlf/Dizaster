@@ -6,6 +6,8 @@ import {
   type VerificationLevel,
   type VerificationView,
 } from "@dizaster/contracts";
+import type { AiCore } from "../../platform/connectors/ai-core.js";
+import { VERIFICATION_HINT } from "../../platform/connectors/prompts.js";
 import type { Db, Queryable } from "../../platform/db.js";
 import { withTransaction } from "../../platform/db.js";
 import { DomainError, notFound } from "../../platform/errors.js";
@@ -17,6 +19,21 @@ import type { IngestionService } from "../ingestion/index.js";
 import type { ReferenceData } from "../reference/index.js";
 
 export const VERIFICATION_RULES_VERSION = "verification-4";
+
+/** Intentos de una pista de IA ante fallos transitorios (tiempo, error, 429, cortocircuito) antes de darla por fallida. */
+export const AI_HINT_MAX_ATTEMPTS = 3;
+const AI_HINT_LEVELS = ["UNVERIFIED", "COMMUNITY_CORROBORATED", "EXTERNALLY_CORROBORATED"] as const;
+
+/** Salida del prompt verification-hint: JSON estricto. Cualquier otra cosa (incluido OFFICIALLY_CONFIRMED) se descarta. */
+export function parseHint(text: string): { suggestedLevel: (typeof AI_HINT_LEVELS)[number] | null; rationale: string } | null {
+  let v: unknown;
+  try { v = JSON.parse(text); } catch { return null; }
+  if (!v || typeof v !== "object" || Array.isArray(v)) return null;
+  const o = v as { suggestedLevel?: unknown; rationale?: unknown };
+  if (typeof o.rationale !== "string" || o.rationale.length === 0) return null;
+  if (o.suggestedLevel !== null && !(AI_HINT_LEVELS as readonly unknown[]).includes(o.suggestedLevel)) return null;
+  return { suggestedLevel: (o.suggestedLevel ?? null) as (typeof AI_HINT_LEVELS)[number] | null, rationale: o.rationale.slice(0, 280) };
+}
 
 /** Parámetros anti-abuso de la versión de reglas. El peso de cada persona lo da Trust (ADR 0023). */
 const RULES = {
@@ -55,7 +72,24 @@ export class VerificationService {
     private readonly trust: TrustService,
   ) {}
 
+  /**
+   * AI CORE opcional (ADR 0280). Se conecta después de construir los conectores (dependen del módulo de costo). Sin él,
+   * o con la capacidad apagada, no se encola nada: la verificación por reglas no cambia.
+   */
+  private ai: AiCore | null = null;
+  attachAi(ai: AiCore): void { this.ai = ai; }
+
   registerHandlers(dispatcher: OutboxDispatcher): void {
+    // Pista de IA para moderación: solo una fila por evento, dentro de la misma transacción; la IA corre después en el
+    // worker, fuera de cualquier transacción, y nunca cambia el estado de verificación.
+    dispatcher.on("EventEvidenceAdded", "verification.ai-hint", async (e, tx) => {
+      if (!this.ai?.available(VERIFICATION_HINT.capability)) return;
+      await tx.query(
+        `INSERT INTO verification.ai_jobs (event_id) VALUES ($1)
+         ON CONFLICT (event_id) DO UPDATE SET status = 'PENDING', attempts = 0, last_reason = NULL, requested_at = now(), updated_at = now()`,
+        [e.payload.eventId],
+      );
+    });
     dispatcher.on("EventCreated", "verification.init", async (e, tx) => {
       await tx.query(
         `INSERT INTO verification.state (event_id, level, negative_state, rule_set_version) VALUES ($1, 'UNVERIFIED', 'NONE', $2)
@@ -227,7 +261,69 @@ export class VerificationService {
   }
 
   /** La IA puede sugerir; la sugerencia se guarda y NO cambia ningún estado. Nunca OFFICIALLY_CONFIRMED ni FALSE (ADR 0231). */
-  async recordAiSuggestion(input: { eventId: string; task: string; suggestedLevel?: VerificationLevel; suggestedNegative?: NegativeState; rationale: string; provider: string; model: string }): Promise<void> {
+  /**
+   * Procesa pistas pendientes (worker, ADR 0280). Entrada: solo hechos agregados del evento (categoría, país, conteos
+   * por confianza, presencia y afirmación, nivel por reglas); ningún texto ni identificador de personas. Cualquier
+   * fallo de la IA deja el trabajo como reintentable o fallido; nunca lanza ni toca el estado de verificación.
+   */
+  async processAiHints(limit = 20): Promise<{ done: number; retry: number; failed: number }> {
+    const out = { done: 0, retry: 0, failed: 0 };
+    const ai = this.ai;
+    if (!ai?.available(VERIFICATION_HINT.capability)) return out;
+    const { rows } = await this.db.query<{ event_id: string; attempts: number }>(
+      `SELECT event_id, attempts FROM verification.ai_jobs WHERE status = 'PENDING' ORDER BY requested_at LIMIT $1`, [limit],
+    );
+    for (const job of rows) {
+      let status: "DONE" | "PENDING" | "FAILED";
+      let reason: string | null = null;
+      try {
+        const facts = await this.hintFacts(job.event_id);
+        const res = await ai.run(VERIFICATION_HINT.capability, VERIFICATION_HINT, JSON.stringify(facts), { subject: { type: "EVENT", id: job.event_id } });
+        if (res.ok) {
+          const hint = parseHint(res.text);
+          if (!hint) { status = "FAILED"; reason = "INVALID_OUTPUT"; }
+          else {
+            if (hint.suggestedLevel) {
+              await this.recordAiSuggestion({ eventId: job.event_id, task: "verification-hint", suggestedLevel: hint.suggestedLevel, rationale: hint.rationale, provider: res.provider, model: res.model, prompt: `${VERIFICATION_HINT.id}@${VERIFICATION_HINT.version}` });
+            }
+            status = "DONE";
+          }
+        } else {
+          reason = res.reason;
+          const transient = res.reason === "TIMEOUT" || res.reason === "ERROR" || res.reason === "RATE_LIMITED" || res.reason === "CIRCUIT_OPEN";
+          status = transient && job.attempts + 1 < AI_HINT_MAX_ATTEMPTS ? "PENDING" : "FAILED";
+        }
+      } catch (e) {
+        status = "FAILED";
+        reason = e instanceof DomainError ? e.code : "ERROR";
+      }
+      await this.db.query(
+        `UPDATE verification.ai_jobs SET status = $2, attempts = attempts + 1, last_reason = $3, updated_at = now() WHERE event_id = $1`,
+        [job.event_id, status, reason],
+      ).catch(() => undefined);
+      if (status === "DONE") out.done++; else if (status === "PENDING") out.retry++; else out.failed++;
+    }
+    return out;
+  }
+
+  /** Borra trabajos cerrados viejos (no contienen datos de personas; solo ocupan espacio). */
+  async purgeAiJobs(olderThanDays = 30): Promise<number> {
+    const r = await this.db.query(`DELETE FROM verification.ai_jobs WHERE status <> 'PENDING' AND updated_at < now() - make_interval(days => $1)`, [olderThanDays]);
+    return r.rowCount ?? 0;
+  }
+
+  private async hintFacts(eventId: string): Promise<Record<string, unknown>> {
+    const data = await this.events.evidenceForVerification(this.db, eventId);
+    const counts: Record<string, number> = {};
+    for (const e of data.evidence) {
+      const k = [e.trustTier, e.assertion, e.presenceBand ?? "NA"].join("|");
+      counts[k] = (counts[k] ?? 0) + 1;
+    }
+    const level = (await this.db.query<{ level: string }>(`SELECT level FROM verification.state WHERE event_id = $1`, [eventId])).rows[0]?.level ?? "UNVERIFIED";
+    return { category: data.categoryCode, country: data.countryCode, ruleLevel: level, evidence: counts };
+  }
+
+  async recordAiSuggestion(input: { eventId: string; task: string; suggestedLevel?: VerificationLevel; suggestedNegative?: NegativeState; rationale: string; provider: string; model: string; prompt?: string }): Promise<void> {
     if (input.suggestedLevel === "OFFICIALLY_CONFIRMED") {
       throw new DomainError("AI_CANNOT_CONFIRM", "La IA no puede proponer OFFICIALLY_CONFIRMED");
     }
@@ -235,9 +331,9 @@ export class VerificationService {
       throw new DomainError("AI_CANNOT_CONFIRM", "La IA no puede proponer FALSE");
     }
     await this.db.query(
-      `INSERT INTO verification.ai_suggestions (id, event_id, task, suggested_level, suggested_negative, rationale, provider, model)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-      [newId(), input.eventId, input.task, input.suggestedLevel ?? null, input.suggestedNegative ?? null, input.rationale, input.provider, input.model],
+      `INSERT INTO verification.ai_suggestions (id, event_id, task, suggested_level, suggested_negative, rationale, provider, model, prompt)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+      [newId(), input.eventId, input.task, input.suggestedLevel ?? null, input.suggestedNegative ?? null, input.rationale, input.provider, input.model, input.prompt ?? null],
     );
   }
 

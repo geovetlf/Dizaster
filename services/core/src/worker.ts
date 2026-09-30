@@ -84,12 +84,19 @@ function maintenanceLoop(): Promise<void> {
   let lastDaily = 0;
   let lastHourly = 0;
   let lastOpsCheck = 0;
+  let lastAi = 0;
   return forever("maintenance", async () => {
     // Alertas operativas (ADR 0130): SLO y cola de eventos; avisa solo al cambiar de estado.
     if (Date.now() - lastOpsCheck > 5 * 60_000) {
       lastOpsCheck = Date.now();
       const changed = await c.quality.checkOperational().catch((e: Error) => { warn("ops.check", e); return []; });
       for (const t of changed) console.warn(JSON.stringify({ msg: "ops.alert", ...t }));
+    }
+    // Pistas de IA para moderación (ADR 0280): solo si alguna ruta de IA está encendida; nunca en el camino crítico.
+    if (c.connectors.ai.enabled && Date.now() - lastAi > 60_000) {
+      lastAi = Date.now();
+      const r = await c.verification.processAiHints().catch((e: Error) => { warn("ai.hints", e); return null; });
+      if (r && r.done + r.retry + r.failed > 0) log("ai.hints", r);
     }
     if (Date.now() - lastHourly > 3600_000) {
       lastHourly = Date.now();

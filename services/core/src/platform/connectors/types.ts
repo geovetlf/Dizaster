@@ -24,6 +24,17 @@ export interface AiRequest {
   maxOutputTokens: number;
 }
 
+/**
+ * Error tipado de un adaptador (ADR 0280). `RATE_LIMITED` (p. ej. HTTP 429) hace que el AI CORE deje de llamar a ese
+ * proveedor durante `retryAfterMs` (o la espera del cortocircuito) y pruebe el siguiente de la ruta.
+ */
+export class AiProviderError extends Error {
+  constructor(readonly kind: "RATE_LIMITED" | "ERROR", message: string, readonly retryAfterMs?: number) {
+    super(message);
+    this.name = "AiProviderError";
+  }
+}
+
 export interface AiResponse {
   text: string;
   usage: { inputTokens: number; outputTokens: number };

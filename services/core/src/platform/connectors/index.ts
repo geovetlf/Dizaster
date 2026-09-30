@@ -5,7 +5,10 @@ import { FixtureAIProvider, LogSmsProvider, NoAIProvider, NoEmbeddings, NoEmerge
 import type { AIProvider, Connector, EmbeddingProvider, EmergencyDataProvider, SmsProvider, SpeechToTextProvider, TextToSpeechProvider, TranslationProvider, VisionProvider } from "./types.js";
 
 export * from "./types.js";
-export { AI_BUDGET_KEY, AiCore, minimizeForAi, type AiCallEntry, type AiCallSink, type AiFailure, type AiOutcome, type AiRunOptions } from "./ai-core.js";
+export { AI_BUDGET_KEY, AiCore, minimizeForAi, type AiCallEntry, type AiCallSink, type AiCoreOptions, type AiFailure, type AiOutcome, type AiRunOptions } from "./ai-core.js";
+export { checkOutput, runEval, type EvalCase, type EvalReport, type EvalResult } from "./ai-eval.js";
+export { AI_MODELS, findModel, modelAccepted, type ModelSpec } from "./models.js";
+export { checkPromptRegistry, EVENT_SUMMARY, PROMPTS, promptFingerprint, promptKey, VERIFICATION_HINT, type PromptTemplate } from "./prompts.js";
 export { AI_CAPABILITIES, AI_CAPABILITY_ALIASES, AI_CAPABILITY_INFO, canonicalCapability, type AiCapability, type AiCapabilityInfo } from "./capabilities.js";
 export { AiRouter, parseAiRoutes, supports } from "./router.js";
 
@@ -75,7 +78,11 @@ export function buildConnectors(cfg: ConnectorConfig, cost: CostGuard, overrides
     if (paid.length) throw new Error(`COST_MODE=zero no permite proveedores de pago: ${paid.join(", ")}`);
   }
   const { translation, sms, stt, tts, vision, embeddings, emergencyData } = chosen;
-  return { translation, sms, stt, tts, vision, embeddings, emergencyData, ai: new AiCore(router, cost, { timeoutMs: cfg.AI_TIMEOUT_MS, maxInputChars: 4000 }, aiLog) };
+  return { translation, sms, stt, tts, vision, embeddings, emergencyData, ai: new AiCore(router, cost, {
+    timeoutMs: cfg.AI_TIMEOUT_MS, maxInputChars: 4000,
+    // Con proveedores reales (de pago) solo se aceptan modelos registrados (ADR 0280).
+    enforceModelRegistry: cfg.COST_MODE === "metered",
+  }, aiLog) };
 }
 
 /** Qué hay activo (para /v1/config de administración y el reporte de costos). Sin secretos. */

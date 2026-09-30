@@ -120,10 +120,10 @@ export class CostService implements CostGuard, UsageSink, AiCallSink {
   async recordAiCall(e: AiCallEntry): Promise<void> {
     await this.db.query(
       `INSERT INTO cost.ai_calls (id, capability, provider, model, status, fallback, latency_ms, input_tokens, output_tokens, estimated_usd, usd,
-                                 subject_type, subject_id, actor_user_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
+                                 subject_type, subject_id, actor_user_id, prompt_id, prompt_version)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)`,
       [newId(), e.capability, e.provider, e.model, e.status, e.fallback, e.latencyMs, e.inputTokens, e.outputTokens, e.estimatedUsd, e.usd,
-        e.subject?.type ?? null, e.subject?.id ?? null, e.actorUserId],
+        e.subject?.type ?? null, e.subject?.id ?? null, e.actorUserId, e.promptId ?? null, e.promptVersion ?? null],
     );
   }
 
