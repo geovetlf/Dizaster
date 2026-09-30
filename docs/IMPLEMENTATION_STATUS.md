@@ -379,6 +379,7 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | Canales de notificación Android como iOS (§5.10) | ✅ | ADR 0186: canal propio para oficiales graves (importancia máxima) y canal general, nombres traducidos, FCM channel_id según critical |
 | Latido del worker y /health/ready (§5.22, §13.1) | ✅ | ADR 0187: latido por rol e instancia, /health/ready con worker y outbox (503 con códigos), healthchecks de API y worker en imagen y compose |
 | Galería del evento con miniaturas (§12.1) | ✅ | ADR 0188: miniatura en la tira y visor a pantalla completa con la variante grande solo al tocar |
+| Respaldos cifrados con clave pública y retención (§13.1) | ✅ | ADR 0189: pg_dump por tubería a age (nunca en claro), obligatorio en producción, restore-check con sha256 y descifrado, retención N últimos + semanales |
 | Licencias, auditoría, SBOM, Dependabot; respaldo con prueba de restauración en CI | ✅ | ADR 0070, `scripts/supply-chain.mjs`, `scripts/db-restore-check.mjs` |
 | Idioma de la app elegible en el perfil (es/en/pt/fr o del teléfono) | ✅ | ADR 0069, `app/language.tsx` |
 | Varias cuentas en un teléfono corroboran como una (clave seudónima del teléfono) | ✅ | ADR 0068, migración 0036 |
@@ -427,7 +428,6 @@ Revisión del Blueprint del 2026-09-30 (tras ADR 0171): completada con ADR 0172�
 Revisión del Blueprint del 2026-09-30 (tras ADR 0176): completada con ADR 0177–0182.
 
 Revisión del Blueprint del 2026-09-30 (tras ADR 0182), verificada contra el código, sin bloqueos:
-1. Backups cifrados con clave pública y con retención (§13.1).
 
 Bloqueadas o en espera:
 

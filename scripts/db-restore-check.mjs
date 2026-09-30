@@ -2,11 +2,13 @@
 // Prueba de restauración (ADR 0070): un respaldo solo vale si se puede restaurar.
 // 1. pg_dump de DATABASE_URL  2. restaura en una base temporal nueva  3. compara filas por tabla y la última migración
 // 4. borra SOLO la base temporal que creó. Nunca escribe en la base de origen.
-// Uso: DATABASE_URL=postgres://… node scripts/db-restore-check.mjs [respaldo.dump]
+// Respaldo cifrado (ADR 0189): `respaldo.dump.age` + AGE_IDENTITY_FILE (clave privada de quien restaura). Si hay
+// `.sha256` al lado, se comprueba antes de nada.
+// Uso: DATABASE_URL=postgres://… [AGE_IDENTITY_FILE=clave.txt] node scripts/db-restore-check.mjs [respaldo.dump[.age]]
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 
 const source = process.env.DATABASE_URL;
 if (!source) { console.error("Falta DATABASE_URL"); process.exit(2); }
@@ -17,7 +19,8 @@ const tempName = `dizaster_restore_check_${Date.now()}`;
 const adminUrl = new URL(source); adminUrl.pathname = "/postgres";
 const tempUrl = new URL(source); tempUrl.pathname = `/${tempName}`;
 const work = mkdtempSync(join(tmpdir(), "dz-restore-"));
-const dump = process.argv[2] ?? join(work, "check.dump");
+const given = process.argv[2];
+let dump = given ?? join(work, "check.dump");
 
 const COUNTS = `SELECT string_agg(format('%s.%s=%s', schemaname, relname, n), ',' ORDER BY schemaname, relname) FROM (
   SELECT table_schema AS schemaname, table_name AS relname,
@@ -28,7 +31,19 @@ const COUNTS = `SELECT string_agg(format('%s.%s=%s', schemaname, relname, n), ',
 
 let created = false;
 try {
-  if (!process.argv[2]) run("pg_dump", ["--format=custom", "--no-owner", "--no-privileges", `--file=${dump}`, source]);
+  if (!given) run("pg_dump", ["--format=custom", "--no-owner", "--no-privileges", `--file=${dump}`, source]);
+  if (given && existsSync(`${given}.sha256`)) {
+    const expected = readFileSync(`${given}.sha256`, "utf8").trim().split(/\s+/)[0];
+    const actual = run("sha256sum", [given]).split(/\s+/)[0];
+    if (expected !== actual) throw new Error(`sha256 no coincide para ${basename(given)}`);
+    console.log("sha256 verificado.");
+  }
+  if (given?.endsWith(".age")) {
+    const identity = process.env.AGE_IDENTITY_FILE;
+    if (!identity) throw new Error("Respaldo cifrado: falta AGE_IDENTITY_FILE (clave privada age de quien restaura)");
+    dump = join(work, "decrypted.dump");
+    run("age", ["-d", "-i", identity, "-o", dump, given]);
+  }
   psql(adminUrl.href, `CREATE DATABASE ${tempName}`);
   created = true;
   run("pg_restore", ["--no-owner", "--no-privileges", "--exit-on-error", `--dbname=${tempUrl.href}`, dump]);
