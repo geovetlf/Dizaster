@@ -136,7 +136,8 @@ export class IngestionScheduler {
     private readonly normalLanePaused: () => Promise<boolean> = async () => false,
   ) {}
 
-  async tick(): Promise<RunSummary[]> {
+  /** `lanes`: el worker urgente pide solo URGENT y el normal solo NORMAL (ADR 0159); por defecto, ambos. */
+  async tick(lanes: readonly Lane[] = ["URGENT", "NORMAL"]): Promise<RunSummary[]> {
     const now = this.clock.now();
     const { rows } = await this.db.query<SourceRow>(
       `SELECT s.id, s.key, s.adapter, s.config, s.schedule_normal, s.urgent_capable, s.urgent_poll_seconds,
@@ -151,10 +152,10 @@ export class IngestionScheduler {
     for (const s of rows) {
       if (!FEED_ADAPTERS.has(s.adapter)) continue;
       if (s.open_until && s.open_until > now) continue;
-      if (s.urgent_capable && s.urgent_poll_seconds && (!s.last_urgent_run_at || now.getTime() - s.last_urgent_run_at.getTime() >= s.urgent_poll_seconds * 1000)) {
+      if (lanes.includes("URGENT") && s.urgent_capable && s.urgent_poll_seconds && (!s.last_urgent_run_at || now.getTime() - s.last_urgent_run_at.getTime() >= s.urgent_poll_seconds * 1000)) {
         due.push({ s, lane: "URGENT" });
       }
-      if (!normalPaused && (!s.last_normal_run_at || s.last_normal_run_at < lastScheduledAt(s.schedule_normal ?? "0 5 * * *", now))) {
+      if (lanes.includes("NORMAL") && !normalPaused && (!s.last_normal_run_at || s.last_normal_run_at < lastScheduledAt(s.schedule_normal ?? "0 5 * * *", now))) {
         due.push({ s, lane: "NORMAL" });
       }
     }

@@ -4,6 +4,8 @@ const Env = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   PORT: z.coerce.number().int().default(8080),
   DATABASE_URL: z.string().min(1),
+  /** Roles de este proceso worker (ADR 0159): "urgent", "normal", "maintenance", separados por comas. */
+  WORKER_ROLES: z.string().default("urgent,normal,maintenance"),
   AUTH_JWT_SECRET: z.string().min(32),
   DEV_AUTH_ENABLED: z
     .enum(["true", "false"])
