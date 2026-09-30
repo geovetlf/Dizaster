@@ -63,8 +63,9 @@ export function devicePrefsPatch(
 }
 
 /** Aclaración que se muestra en el historial cuando una alerta no sonó. */
-export function deliveryNoteKey(status: NotificationStatus): "deliveryQuiet" | "deliveryRateLimit" | "deliveryNoDevice" | "deliveryFailed" | null {
+export function deliveryNoteKey(status: NotificationStatus): "deliveryQuiet" | "deliveryRateLimit" | "deliveryNoDevice" | "deliveryFailed" | "deliveryExpired" | null {
   switch (status) {
+    case "EXPIRED": return "deliveryExpired";
     case "SILENT_QUIET_HOURS": return "deliveryQuiet";
     case "SILENT_RATE_LIMIT": return "deliveryRateLimit";
     case "NO_DEVICE": return "deliveryNoDevice";
@@ -114,4 +115,12 @@ export function zonePrefsSummary(z: { minSeverity: number; categories: readonly 
     ...(z.categories.length ? [z.categories.map(categoryName).join(", ")] : []),
   ];
   return parts.length ? parts.join(" · ") : null;
+}
+
+/** Etiquetas CAP de una alerta en el historial (ADR 0174): oficial y vencida. */
+export function alertTags(n: { origin: "OFFICIAL" | "SYSTEM"; expiresAt: string | null }, now: Date): ("alertOfficial" | "alertExpired")[] {
+  const tags: ("alertOfficial" | "alertExpired")[] = [];
+  if (n.origin === "OFFICIAL") tags.push("alertOfficial");
+  if (n.expiresAt && Date.parse(n.expiresAt) <= now.getTime()) tags.push("alertExpired");
+  return tags;
 }

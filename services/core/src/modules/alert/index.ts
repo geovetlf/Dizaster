@@ -14,6 +14,7 @@ import {
   type Lang,
   type CategorySubscription,
   type NotificationStatus,
+  type AlertOrigin,
   type NotificationView,
   type NotificationsResponse,
 } from "@dizaster/contracts";
@@ -27,6 +28,7 @@ import { publish, type OutboxDispatcher } from "../../platform/outbox.js";
 import type { EventService } from "../event/index.js";
 import type { GeoService } from "../geo/index.js";
 import type { IdentityService, PushTarget } from "../identity/index.js";
+import type { IngestionService } from "../ingestion/index.js";
 import type { ReferenceData } from "../reference/index.js";
 import type { SocialService } from "../social/index.js";
 import {
@@ -109,7 +111,14 @@ export class AlertService {
     private readonly geo: GeoService,
     private readonly push: PushSender,
     private readonly clock: Clock,
+    private readonly ingestion: Pick<IngestionService, "officialAlertSource">,
+    private readonly opts: { ttlHours: number } = { ttlHours: 24 },
   ) {}
+
+  /** Plazo por defecto de una alerta sin `expires` de la fuente (ADR 0174). */
+  private defaultExpiry(): Date {
+    return new Date(this.clock.now().getTime() + this.opts.ttlHours * 3_600_000);
+  }
 
   /**
    * Retención (§13.2, ADR 0165), NO AI REQUIRED. La última ubicación aproximada solo sirve 72 h para "cerca de mí":
@@ -207,9 +216,10 @@ export class AlertService {
     if (recipients.length === 0) return 0;
     const bucket = Math.floor(this.clock.now().getTime() / (OFFICIAL_UPDATE_WINDOW_MINUTES * 60_000));
     const inserted = await tx.query<{ id: string }>(
-      `INSERT INTO alert.alerts (id, kind, dedup_key, event_id, post_id, critical) VALUES ($1, 'OFFICIAL_UPDATE', $2, $3, $4, false)
+      `INSERT INTO alert.alerts (id, kind, dedup_key, event_id, post_id, critical, origin, expires_at)
+       VALUES ($1, 'OFFICIAL_UPDATE', $2, $3, $4, false, 'OFFICIAL', $5)
        ON CONFLICT (dedup_key) DO NOTHING RETURNING id`,
-      [newId(), `OFFICIAL_UPDATE:${snap.id}:${bucket}`, snap.id, p.postId],
+      [newId(), `OFFICIAL_UPDATE:${snap.id}:${bucket}`, snap.id, p.postId, this.defaultExpiry()],
     );
     const alertId = inserted.rows[0]?.id;
     if (!alertId) return 0;
@@ -250,13 +260,20 @@ export class AlertService {
       [eventId, snap.publicState, snap.severity, snap.status, decisions.some((d) => d.kind === "NEW_EVENT")],
     );
 
+    // Campos CAP (ADR 0174): OFFICIAL solo con confirmación oficial; vence cuando lo dice la fuente o al plazo por defecto.
+    const official = decisions.length && snap.publicState === "OFFICIALLY_CONFIRMED" ? await this.ingestion.officialAlertSource(tx, eventId) : null;
+    const origin = snap.publicState === "OFFICIALLY_CONFIRMED" ? "OFFICIAL" : "SYSTEM";
+    const sourceEnd = official?.endsAt ? new Date(official.endsAt) : null;
+    const expiresAt = sourceEnd && sourceEnd > this.clock.now() ? sourceEnd : this.defaultExpiry();
+
     let created = 0;
     for (const d of decisions) {
       const alertId = newId();
       const ins = await tx.query(
-        `INSERT INTO alert.alerts (id, event_id, kind, dedup_key, category_code, severity, public_state, place_label, critical)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) ON CONFLICT (dedup_key) DO NOTHING`,
-        [alertId, eventId, d.kind, d.dedupKey, snap.categoryCode, snap.severity, snap.publicState, snap.place?.label ?? null, d.critical],
+        `INSERT INTO alert.alerts (id, event_id, kind, dedup_key, category_code, severity, public_state, place_label, critical, origin, expires_at, cap_ref)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) ON CONFLICT (dedup_key) DO NOTHING`,
+        [alertId, eventId, d.kind, d.dedupKey, snap.categoryCode, snap.severity, snap.publicState, snap.place?.label ?? null, d.critical,
+          origin, expiresAt, official?.capRef ?? null],
       );
       if (!ins.rowCount) continue;
       created++;
@@ -416,14 +433,15 @@ export class AlertService {
     const now = this.clock.now();
     const units: { ids: string[]; status: NotificationStatus; messages: PushMessage[] }[] = [];
     const counts: Record<NotificationStatus, number> = {
-      PENDING: 0, SENT: 0, GROUPED: 0, SILENT_RATE_LIMIT: 0, SILENT_QUIET_HOURS: 0, NO_DEVICE: 0, FAILED: 0,
+      PENDING: 0, SENT: 0, GROUPED: 0, SILENT_RATE_LIMIT: 0, SILENT_QUIET_HOURS: 0, NO_DEVICE: 0, FAILED: 0, EXPIRED: 0,
     };
 
     await withTransaction(this.db, async (tx) => {
       const { rows } = await tx.query<{
         id: string; profile_id: string; user_id: string; title: string; body: string; event_id: string | null; post_id: string | null; critical: boolean;
+        expires_at: Date | null;
       }>(
-        `SELECT n.id, n.profile_id, n.user_id, n.title, n.body, a.event_id, a.post_id, a.critical
+        `SELECT n.id, n.profile_id, n.user_id, n.title, n.body, a.event_id, a.post_id, a.critical, a.expires_at
            FROM alert.notifications n JOIN alert.alerts a ON a.id = n.alert_id
           WHERE n.status = 'PENDING'
           ORDER BY a.critical DESC, n.created_at, n.id
@@ -458,6 +476,9 @@ export class AlertService {
         const set = (list: typeof items, s: NotificationStatus, groupId: string | null = null) =>
           list.forEach((r) => status.set(r.id, { status: s, groupId, pushed: s === "SENT" || s === "GROUPED" }));
 
+        // Vencida antes de salir (cola atrasada): queda en el historial sin sonar (ADR 0174).
+        set(items.filter((r) => r.expires_at !== null && r.expires_at <= now), "EXPIRED");
+        items = items.filter((r) => r.expires_at === null || r.expires_at > now);
         if (inQuietHours(now, p)) {
           set(items.filter((r) => !r.critical), "SILENT_QUIET_HOURS");
           items = items.filter((r) => r.critical);
@@ -536,8 +557,10 @@ export class AlertService {
     const { rows } = await q.query<{
       id: string; kind: AlertKind; match: AlertMatch; event_id: string | null; post_id: string | null; category_code: string | null;
       title: string; body: string; created_at: Date; read_at: Date | null; status: NotificationStatus;
+      origin: AlertOrigin; expires_at: Date | null; cap_ref: string | null;
     }>(
-      `SELECT n.id, a.kind, n.match, a.event_id, a.post_id, a.category_code, n.title, n.body, n.created_at, n.read_at, n.status
+      `SELECT n.id, a.kind, n.match, a.event_id, a.post_id, a.category_code, n.title, n.body, n.created_at, n.read_at, n.status,
+              a.origin, a.expires_at, a.cap_ref
          FROM alert.notifications n JOIN alert.alerts a ON a.id = n.alert_id
         WHERE n.profile_id = $1 ${cursor}
         ORDER BY n.created_at DESC, n.id DESC LIMIT $2`,
@@ -549,6 +572,7 @@ export class AlertService {
     const notifications: NotificationView[] = rows.map((r) => ({
       id: r.id, kind: r.kind, match: r.match, eventId: r.event_id, postId: r.post_id, categoryCode: r.category_code, title: r.title, body: r.body,
       url: subjectUrl(r), createdAt: r.created_at.toISOString(), readAt: r.read_at?.toISOString() ?? null, delivery: r.status,
+      origin: r.origin, expiresAt: r.expires_at?.toISOString() ?? null, capRef: r.cap_ref,
     }));
     const last = rows[rows.length - 1];
     return {

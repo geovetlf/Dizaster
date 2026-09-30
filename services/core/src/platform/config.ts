@@ -36,6 +36,8 @@ const Env = z.object({
   // Retención de datos operativos (ADR 0165).
   NOTIFICATION_RETENTION_DAYS: z.coerce.number().int().min(7).max(3650).default(90),
   OUTBOX_RETENTION_DAYS: z.coerce.number().int().min(1).max(365).default(14),
+  /** Plazo de una alerta sin `expires` de la fuente (ADR 0174). */
+  ALERT_DEFAULT_TTL_HOURS: z.coerce.number().int().min(1).max(720).default(24),
   /** Fallos de la app (ADR 0173). */
   CLIENT_CRASH_RETENTION_DAYS: z.coerce.number().int().min(1).max(365).default(30),
   PRESENCE_RETENTION_DAYS: z.coerce.number().int().positive().default(30),

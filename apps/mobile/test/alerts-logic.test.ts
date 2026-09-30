@@ -54,6 +54,7 @@ describe("historial", () => {
     expect(deliveryNoteKey("SENT")).toBeNull();
     expect(deliveryNoteKey("GROUPED")).toBeNull();
     expect(deliveryNoteKey("SILENT_QUIET_HOURS")).toBe("deliveryQuiet");
+    expect(deliveryNoteKey("EXPIRED")).toBe("deliveryExpired");
     expect(deliveryNoteKey("SILENT_RATE_LIMIT")).toBe("deliveryRateLimit");
     expect(badgeText(0)).toBeNull();
     expect(badgeText(7)).toBe("7");
@@ -93,5 +94,15 @@ describe("preferencias por zona (ADR 0154)", () => {
     expect(zonePrefsSummary({ minSeverity: 1, categories: [] }, name)).toBeNull();
     expect(zonePrefsSummary({ minSeverity: 3, categories: ["fire"] }, name)).toBe("≥ 3/5 · Incendios");
     expect(zonePrefsSummary({ minSeverity: 1, categories: ["accident", "fire"] }, name)).toBe("Accidentes, Incendios");
+  });
+});
+
+describe("etiquetas CAP (ADR 0174)", () => {
+  it("marca lo oficial y lo vencido", async () => {
+    const { alertTags } = await import("../src/lib/alerts/logic");
+    const now = new Date("2026-09-30T12:00:00Z");
+    expect(alertTags({ origin: "OFFICIAL", expiresAt: "2026-09-30T13:00:00Z" }, now)).toEqual(["alertOfficial"]);
+    expect(alertTags({ origin: "SYSTEM", expiresAt: "2026-09-30T11:00:00Z" }, now)).toEqual(["alertExpired"]);
+    expect(alertTags({ origin: "SYSTEM", expiresAt: null }, now)).toEqual([]);
   });
 });

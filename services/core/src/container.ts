@@ -112,7 +112,7 @@ export function buildContainer(env: AppEnv, overrides: { db?: Db; clock?: Clock;
   verification.registerHandlers(dispatcher);
   media.registerHandlers(dispatcher);
   feed.registerHandlers(dispatcher);
-  const alerts = new AlertService(db, ref, events, social, identity, geo, overrides.push ?? buildPush(env, clock), clock);
+  const alerts = new AlertService(db, ref, events, social, identity, geo, overrides.push ?? buildPush(env, clock), clock, ingestion, { ttlHours: env.ALERT_DEFAULT_TTL_HOURS });
   alerts.registerHandlers(dispatcher);
   social.registerHandlers(dispatcher);
   reports.registerHandlers(dispatcher);

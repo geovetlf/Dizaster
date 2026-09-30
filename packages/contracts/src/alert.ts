@@ -63,7 +63,9 @@ export interface CategorySubscription {
   minSeverity: number;
 }
 
-export type NotificationStatus = "PENDING" | "SENT" | "GROUPED" | "SILENT_RATE_LIMIT" | "SILENT_QUIET_HOURS" | "NO_DEVICE" | "FAILED";
+export type NotificationStatus = "PENDING" | "SENT" | "GROUPED" | "SILENT_RATE_LIMIT" | "SILENT_QUIET_HOURS" | "NO_DEVICE" | "FAILED" | "EXPIRED";
+/** Origen de la alerta (CAP, ADR 0174): OFFICIAL solo con confirmación de una fuente oficial registrada o su institución. */
+export type AlertOrigin = "OFFICIAL" | "SYSTEM";
 
 /**
  * Entrada del historial. Solo datos públicos del EVENT: nunca autoría ni ubicación de quien reportó. Una mención
@@ -84,6 +86,11 @@ export interface NotificationView {
   readAt: string | null;
   /** Si hubo aviso push o quedó solo en el historial (límite por hora, horas de silencio…). */
   delivery: NotificationStatus;
+  origin: AlertOrigin;
+  /** Hasta cuándo vale (CAP `expires` de la fuente oficial o el plazo por defecto). `null`: no vence. */
+  expiresAt: string | null;
+  /** "<fuente>:<identificador CAP>" cuando la confirmación vino de una alerta CAP. */
+  capRef: string | null;
 }
 
 export interface NotificationsResponse {

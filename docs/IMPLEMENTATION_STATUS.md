@@ -364,6 +364,7 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | 0171 | Pantalla "Entrar" con correo y código, arranque sin acceso de desarrollo, vincular métodos; emergencias sin cuenta | ✅ |
 | 0172 | Correlación de extremo a extremo (`x-request-id`) y actor en cada evento de dominio; los consumidores heredan la correlación | ✅ |
 | 0173 | Fallos de la app autoalojados: envío anónimo y redactado, agrupados por huella para operación, retención 30 días | ✅ |
+| 0174 | Alertas con origen (oficial/sistema), vencimiento y referencia CAP; lo vencido antes de salir no suena | ✅ |
 | Licencias, auditoría, SBOM, Dependabot; respaldo con prueba de restauración en CI | ✅ | ADR 0070, `scripts/supply-chain.mjs`, `scripts/db-restore-check.mjs` |
 | Idioma de la app elegible en el perfil (es/en/pt/fr o del teléfono) | ✅ | ADR 0069, `app/language.tsx` |
 | Varias cuentas en un teléfono corroboran como una (clave seudónima del teléfono) | ✅ | ADR 0068, migración 0036 |
@@ -408,9 +409,8 @@ Revisión del Blueprint del 2026-09-30 (tras ADR 0157): completada con ADR 0158�
 Revisión del Blueprint del 2026-09-30 (tras ADR 0164): completada con ADR 0165–0171.
 
 Revisión del Blueprint del 2026-09-30 (tras ADR 0171), verificada contra el código, sin bloqueos:
-1. Campos CAP en las alertas: origen, vencimiento y referencia CAP.
-2. `event.events.city_id` para filtrar y agrupar eventos por ciudad.
-3. Aceptación versionada de términos y políticas (solo el mecanismo; los textos legales siguen bloqueados).
+1. `event.events.city_id` para filtrar y agrupar eventos por ciudad.
+2. Aceptación versionada de términos y políticas (solo el mecanismo; los textos legales siguen bloqueados).
 
 Bloqueadas o en espera:
 

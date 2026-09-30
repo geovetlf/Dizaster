@@ -4,7 +4,7 @@ import { useCallback, useState } from "react";
 import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from "react-native";
 import { Icon } from "../components/icon";
 import { OfflineNote } from "../components/offline-note";
-import { deliveryNoteKey, routeForNotificationUrl } from "../lib/alerts/logic";
+import { alertTags, deliveryNoteKey, routeForNotificationUrl } from "../lib/alerts/logic";
 import { reportUnread } from "../lib/alerts/notifications";
 import { api } from "../lib/api";
 import { cacheKeys, readThrough } from "../lib/offline/read-cache";
@@ -100,6 +100,7 @@ export default function AlertsScreen() {
                 <Text style={styles.meta}>
                   {timeAgo(item.createdAt, lang)}
                   {note ? ` · ${t(note)}` : ""}
+                  {alertTags(item, new Date()).map((k) => ` · ${t(k)}`).join("")}
                 </Text>
               </View>
               {!item.readAt ? <View style={styles.dot} /> : null}

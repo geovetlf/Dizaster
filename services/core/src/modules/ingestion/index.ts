@@ -97,6 +97,23 @@ export class IngestionService {
   }
 
   /** Salud de cada fuente para administración (ADR 0162): estado, breaker, últimas ejecuciones y último cambio. */
+  /**
+   * Fuente oficial vigente que sostiene un evento (ADR 0174): la más reciente, no retirada. `capRef` solo si su
+   * formato es CAP: "<clave de la fuente>:<identificador CAP>". Para el origen, vencimiento y referencia de la alerta.
+   */
+  async officialAlertSource(q: Queryable, eventId: string): Promise<{ sourceKey: string; capRef: string | null; endsAt: string | null } | null> {
+    const { rows } = await q.query<{ key: string; adapter: string; external_id: string; ends_at: Date | null }>(
+      `SELECT s.key, s.adapter, i.external_id, i.ends_at
+         FROM ingestion.external_items i JOIN ingestion.sources s ON s.id = i.source_id
+        WHERE i.event_id = $1 AND s.trust_tier = 'OFFICIAL' AND i.assertion = 'OCCURRING' AND i.withdrawn_at IS NULL
+        ORDER BY i.published_at DESC NULLS LAST, i.fetched_at DESC LIMIT 1`,
+      [eventId],
+    );
+    const r = rows[0];
+    if (!r) return null;
+    return { sourceKey: r.key, capRef: r.adapter.startsWith("cap") ? `${r.key}:${r.external_id}` : null, endsAt: r.ends_at?.toISOString() ?? null };
+  }
+
   async adminSources(now: Date): Promise<AdminSourceView[]> {
     const { rows } = await this.db.query<{
       key: string; name: string; trust_tier: AdminSourceView["trustTier"]; status: SourceStatus; country_scope: string[]; urgent_capable: boolean;
