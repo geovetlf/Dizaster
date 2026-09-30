@@ -75,6 +75,20 @@ describe("subida directa firmada", () => {
     expect((await state(u, huge)).rejectionReason).toContain("Resolución");
   });
 
+  it("video: solo códecs que se reproducen sin transcodificar (ADR 0163)", async () => {
+    const u = await createUser(t, "media_codec");
+    const avc = await uploadReady(u, makeMp4(), { kind: "VIDEO_RECORDED", mime: "video/mp4", durationMs: 24_000 });
+    expect(await state(u, avc)).toMatchObject({ state: "READY" });
+    expect((await t.c.db.query(`SELECT codec FROM media.media WHERE id = $1`, [avc])).rows[0]).toEqual({ codec: "avc1" });
+    const hevc = await uploadReady(u, makeMp4({ codec: "hvc1" }), { kind: "VIDEO_RECORDED", mime: "video/quicktime", durationMs: 24_000 });
+    expect(await state(u, hevc)).toMatchObject({ state: "READY" });
+    for (const codec of ["mp4v", "av01", "encv", null]) {
+      const id = await uploadReady(u, makeMp4({ codec }), { kind: "VIDEO_RECORDED", mime: "video/mp4", durationMs: 24_000 });
+      expect(await state(u, id)).toMatchObject({ state: "REJECTED" });
+      expect((await state(u, id)).rejectionReason).toContain("Códec de video no admitido");
+    }
+  });
+
   it("video con póster del teléfono: miniatura saneada, hash perceptual y sin original del póster", async () => {
     const u = await createUser(t, "media_poster");
     const file = makeMp4();

@@ -38,7 +38,7 @@ async function* readChunks(file: File): AsyncGenerator<Uint8Array> {
  * Captura o elige una foto o un video (mismo flujo en Android e iOS):
  * - foto: se re-codifica a JPEG con el lado mayor ≤ 1920 px. Re-codificar aplica la orientación a los píxeles
  *   y descarta Exif (incluido el GPS) ya en el dispositivo; el servidor lo vuelve a comprobar.
- * - video: máximo 60 s y calidad 720p en la captura.
+ * - video: máximo 60 s y calidad 720p en la captura; en iOS, H.264 también al elegir de la galería.
  * Devuelve null si el usuario cancela o no concede el permiso.
  */
 export async function captureMedia(source: CaptureSource, kind: CaptureKind): Promise<LocalMedia | null> {
@@ -49,6 +49,8 @@ export async function captureMedia(source: CaptureSource, kind: CaptureKind): Pr
     allowsMultipleSelection: false,
     videoMaxDuration: VIDEO_MAX_SECONDS,
     videoQuality: ImagePicker.UIImagePickerControllerQualityType.IFrame1280x720,
+    // iOS: un video elegido de la galería (a menudo HEVC) se exporta a H.264 720p en el teléfono (ADR 0163).
+    videoExportPreset: ImagePicker.VideoExportPreset.H264_1280x720,
   };
   if (source === "camera") {
     const perm = await ImagePicker.requestCameraPermissionsAsync();

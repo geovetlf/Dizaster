@@ -16,7 +16,7 @@ import { DomainError, notFound } from "../../platform/errors.js";
 import { newId } from "../../platform/ids.js";
 import { publish, type OutboxDispatcher } from "../../platform/outbox.js";
 import { NEAR_DUPLICATE_BITS, phashBands, renderImage } from "./images.js";
-import { familyOfMime, MalformedMediaError, sanitize, sniffFamily, videoInfo } from "./sanitize.js";
+import { ACCEPTED_VIDEO_CODECS, familyOfMime, MalformedMediaError, sanitize, sniffFamily, videoInfo } from "./sanitize.js";
 import type { StorageProvider } from "./storage/types.js";
 
 export type { StorageProvider } from "./storage/types.js";
@@ -241,14 +241,16 @@ export class MediaService {
         if (err instanceof MalformedMediaError) return this.reject(tx, mediaId, `Video ilegible: ${err.message}`);
         throw err;
       }
+      // Sin transcodificar (§12.1, ADR 0163): lo que no se pueda reproducir tal cual en Android e iOS no se publica.
+      if (!info.codec || !ACCEPTED_VIDEO_CODECS.has(info.codec)) return this.reject(tx, mediaId, `Códec de video no admitido: ${info.codec ?? "sin pista de video"}`);
       const maxMs = MEDIA_UPLOAD_LIMITS.VIDEO_RECORDED.maxDurationMs + VIDEO_DURATION_TOLERANCE_MS;
       if (info.durationMs <= 0 || info.durationMs > maxMs) return this.reject(tx, mediaId, `Duración real ${info.durationMs} ms fuera del límite`);
       if (info.width !== null && info.height !== null && Math.max(info.width, info.height) > MAX_VIDEO_SIDE_PX) {
         return this.reject(tx, mediaId, `Resolución ${info.width}×${info.height} por encima del máximo`);
       }
       await tx.query(
-        `UPDATE media.media SET duration_ms = $2, width = coalesce($3, width), height = coalesce($4, height) WHERE id = $1`,
-        [mediaId, info.durationMs, info.width, info.height],
+        `UPDATE media.media SET duration_ms = $2, width = coalesce($3, width), height = coalesce($4, height), codec = $5 WHERE id = $1`,
+        [mediaId, info.durationMs, info.width, info.height, info.codec],
       );
       await variant(PUBLIC_VARIANT, `public/${mediaId}.${EXT[row.mime] ?? "bin"}`, result.data, row.mime);
       if (row.poster_sha256) await this.processPoster(tx, row, variant);

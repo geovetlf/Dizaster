@@ -353,6 +353,7 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | 0160 | Gravedad del evento desde su evidencia activa (puede bajar) + corrección auditada de moderación | ✅ |
 | 0161 | Pantalla de error global con números de emergencia locales + registro local de errores redactado | ✅ |
 | 0162 | Salud de fuentes y pausa/reanudación auditada desde la app de administración | ✅ |
+| 0163 | Códec de video leído del archivo: H.264/HEVC se publican sin transcodificar, el resto se rechaza; iOS exporta a H.264 | ✅ |
 | Licencias, auditoría, SBOM, Dependabot; respaldo con prueba de restauración en CI | ✅ | ADR 0070, `scripts/supply-chain.mjs`, `scripts/db-restore-check.mjs` |
 | Idioma de la app elegible en el perfil (es/en/pt/fr o del teléfono) | ✅ | ADR 0069, `app/language.tsx` |
 | Varias cuentas en un teléfono corroboran como una (clave seudónima del teléfono) | ✅ | ADR 0068, migración 0036 |
@@ -394,8 +395,7 @@ Revisión del Blueprint del 2026-09-29 (tras ADR 0148): completada con ADR 0149�
 
 Revisión del Blueprint del 2026-09-30 (tras ADR 0157), verificada contra el código, sin bloqueos:
 
-1. Códec de video verificado en el servidor (H.264), sin transcodificar (§5.9, §12.1)
-2. Versión mínima de la app por plataforma en /v1/config (§6.3)
+1. Versión mínima de la app por plataforma en /v1/config (§6.3)
 
 Bloqueadas o en espera:
 

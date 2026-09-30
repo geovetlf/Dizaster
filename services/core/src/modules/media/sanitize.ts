@@ -132,7 +132,14 @@ export function topLevelBoxes(data: Uint8Array): Box[] {
 
 // ───────────── Duración y tamaño reales del video (ADR 0071) ─────────────
 
-export interface VideoInfo { durationMs: number; width: number | null; height: number | null }
+export interface VideoInfo { durationMs: number; width: number | null; height: number | null; codec: string | null }
+
+/**
+ * Códecs de video admitidos sin transcodificar (§12.1, ADR 0163). H.264 es el formato de V1; HEVC se admite porque
+ * iOS y muchos Android lo graban por defecto y ambos lo decodifican por hardware: rechazarlo perdería evidencia.
+ * Cualquier otro (MPEG-4 Part 2, AV1, VP9, cifrado…) se rechaza.
+ */
+export const ACCEPTED_VIDEO_CODECS: ReadonlySet<string> = new Set(["avc1", "avc3", "hvc1", "hev1"]);
 
 /** Cajas hijas dentro de [from, to). Mismas reglas que las de primer nivel. */
 function childBoxes(data: Uint8Array, from: number, to: number): Box[] {
@@ -159,11 +166,13 @@ export function videoInfo(data: Uint8Array): VideoInfo {
   if (!timescale) throw new MalformedMediaError("Video sin escala de tiempo");
   let width: number | null = null;
   let height: number | null = null;
+  let codec: string | null = null;
   for (const trak of kids.filter((b) => b.type === "trak")) {
     const parts = childBoxes(data, trak.start + trak.header, trak.end);
     const mdia = parts.find((b) => b.type === "mdia");
     const hdlr = mdia ? childBoxes(data, mdia.start + mdia.header, mdia.end).find((b) => b.type === "hdlr") : undefined;
     if (!hdlr || hdlr.start + hdlr.header + 12 > hdlr.end || ascii(data, hdlr.start + hdlr.header + 8, hdlr.start + hdlr.header + 12) !== "vide") continue;
+    codec = mdia ? sampleEntryType(data, mdia) : null;
     const tkhd = parts.find((b) => b.type === "tkhd");
     if (!tkhd || tkhd.end - 8 < tkhd.start + tkhd.header) continue;
     // Ancho y alto: los últimos 8 bytes de tkhd, en punto fijo 16.16.
@@ -171,7 +180,18 @@ export function videoInfo(data: Uint8Array): VideoInfo {
     height = view.getUint32(tkhd.end - 4) >>> 16;
     break;
   }
-  return { durationMs: Math.round((duration / timescale) * 1000), width, height };
+  return { durationMs: Math.round((duration / timescale) * 1000), width, height, codec };
+}
+
+/** Tipo de la primera entrada de `mdia/minf/stbl/stsd` (el fourcc del códec: avc1, hvc1…). */
+function sampleEntryType(data: Uint8Array, mdia: Box): string | null {
+  const minf = childBoxes(data, mdia.start + mdia.header, mdia.end).find((b) => b.type === "minf");
+  const stbl = minf ? childBoxes(data, minf.start + minf.header, minf.end).find((b) => b.type === "stbl") : undefined;
+  const stsd = stbl ? childBoxes(data, stbl.start + stbl.header, stbl.end).find((b) => b.type === "stsd") : undefined;
+  // stsd: versión y flags (4 bytes), número de entradas (4) y luego las entradas, cada una con cabecera de caja.
+  const first = stsd ? stsd.start + stsd.header + 8 : 0;
+  if (!stsd || first + 8 > stsd.end || readU32(data, stsd.start + stsd.header + 4) < 1) return null;
+  return ascii(data, first + 4, first + 8);
 }
 
 // ───────────── utilidades ─────────────
