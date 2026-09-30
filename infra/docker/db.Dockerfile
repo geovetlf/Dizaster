@@ -1,5 +1,5 @@
 # PostgreSQL 16 + PostGIS + H3 (todas open source). Misma base para desarrollo, CI y el primer despliegue.
-FROM postgis/postgis:16-3.4@sha256:44126d872ac91993766c341e369c539e8196614321765d36a6f1bab0419a5fa5
+FROM postgis/postgis:17-3.5@sha256:01a6a70e41e6c4467c8f55f6063555ed72db2d6662cd0d571040d42eadaeb6f6
 RUN apt-get update \
  && apt-get install -y --no-install-recommends postgresql-16-h3 \
  && rm -rf /var/lib/apt/lists/*
