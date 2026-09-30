@@ -12,3 +12,15 @@ storage = {
   bucket          = "<bucket de media>"
   public_base_url = "<URL pública de media>"
 }
+backup = {
+  project_id     = "<proyecto de respaldos, idealmente distinto>"
+  location       = "<ubicación>"
+  bucket_name    = "<nombre único del bucket>"
+  retention_days = <días: decisión del propietario>
+}
+alert_email = "<correo de guardia>"
+billing = {
+  account        = "<cuenta de facturación>"
+  currency_code  = "<moneda de la cuenta>"
+  monthly_amount = <presupuesto mensual: decisión del propietario>
+}

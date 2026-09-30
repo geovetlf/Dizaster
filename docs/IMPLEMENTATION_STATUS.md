@@ -463,6 +463,7 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | `dzd` deploy/promote/rollback en seco, config-check, cost, métricas e informe (ADR 0272) | ✅ | `--execute` espera D-18 |
 | Migrador con candado y checksum, runbook de migración fallida, imágenes base por digest (ADR 0273) | ✅ | `test/migrate-runner.test.ts` |
 | Donaciones: enlaces a organizaciones verificadas (D-15, ADR 0274) | ✅ | directorio vacío hasta que el propietario lo cargue |
+| OpenTofu: `dz-ci`, respaldos, vigilancia externa y presupuesto (ADR 0275) | ✅ | validado; aplicar espera D-18 |
 | Licencias, auditoría, SBOM, Dependabot; respaldo con prueba de restauración en CI | ✅ | ADR 0070, `scripts/supply-chain.mjs`, `scripts/db-restore-check.mjs` |
 | Idioma de la app elegible en el perfil (es/en/pt/fr o del teléfono) | ✅ | ADR 0069, `app/language.tsx` |
 | Varias cuentas en un teléfono corroboran como una (clave seudónima del teléfono) | ✅ | ADR 0068, migración 0036 |

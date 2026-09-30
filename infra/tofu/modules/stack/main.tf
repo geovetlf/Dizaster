@@ -22,6 +22,24 @@ variable "storage" {
   })
   description = "Almacenamiento S3-compatible de media (GCS por XML/HMAC o R2: decisión de costo, ADR 0261)."
 }
+variable "backup" {
+  type = object({
+    project_id     = string
+    location       = string
+    bucket_name    = string
+    retention_days = number
+  })
+  description = "Dónde y cuánto se guardan los respaldos (idealmente otro proyecto). Decisión del propietario."
+}
+variable "alert_email" { type = string }
+variable "billing" {
+  type = object({
+    account        = string
+    currency_code  = string
+    monthly_amount = number
+  })
+  description = "Cuenta de facturación y presupuesto mensual del entorno (D-18)."
+}
 variable "extra_env" {
   type        = map(string)
   description = "Configuración no secreta (APNS_TEAM_ID, APNS_KEY_ID, APNS_BUNDLE_ID, STORE_URL_*, MAP_*, …)."
@@ -66,6 +84,7 @@ module "wif" {
   project_id             = var.project_id
   github_repository      = var.github_repository
   github_environment     = var.environment
+  ci_service_account     = "projects/${var.project_id}/serviceAccounts/${local.sa["dz-ci"]}"
   deploy_service_account = "projects/${var.project_id}/serviceAccounts/${local.sa["dz-deploy"]}"
 }
 
@@ -73,7 +92,7 @@ module "registry" {
   source        = "../artifact-registry"
   project_id    = var.project_id
   region        = var.region
-  pusher_member = local.member["dz-deploy"]
+  pusher_member = local.member["dz-ci"]
 }
 
 module "secrets" {
@@ -121,7 +140,38 @@ module "migrate" {
   secret_env      = { DATABASE_URL = module.secrets.ids["database-url"] }
 }
 
+data "google_project" "this" {
+  project_id = var.project_id
+}
+
+module "backups" {
+  source         = "../backups"
+  project_id     = var.backup.project_id
+  location       = var.backup.location
+  bucket_name    = var.backup.bucket_name
+  retention_days = var.backup.retention_days
+  writer_member  = local.member["dz-backup"]
+}
+
+module "monitoring" {
+  source      = "../monitoring"
+  project_id  = var.project_id
+  api_host    = trimsuffix(trimprefix(var.public_api_url, "https://"), "/")
+  alert_email = var.alert_email
+}
+
+module "budget" {
+  source          = "../budget"
+  billing_account = var.billing.account
+  project_number  = data.google_project.this.number
+  environment     = var.environment
+  monthly_amount  = var.billing.monthly_amount
+  currency_code   = var.billing.currency_code
+}
+
 output "api_uri" { value = module.api.uri }
 output "registry" { value = module.registry.repository }
 output "wif_provider" { value = module.wif.provider_name }
 output "deploy_service_account" { value = local.sa["dz-deploy"] }
+output "ci_service_account" { value = local.sa["dz-ci"] }
+output "backup_bucket" { value = module.backups.bucket }

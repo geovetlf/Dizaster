@@ -5,8 +5,11 @@ facturación, D-23 base de staging). CI solo corre `tofu fmt`, `tofu validate`, 
 
 | Módulo | Qué crea |
 | --- | --- |
-| `project-base` | APIs y cuentas `dz-deploy`, `dz-run-api`, `dz-run-worker`, `dz-migrate`; IAM mínimo |
-| `github-wif` | pool y proveedor OIDC de GitHub limitado al repositorio y al entorno; sin claves JSON |
+| `project-base` | APIs y cuentas `dz-ci`, `dz-deploy`, `dz-run-api`, `dz-run-worker`, `dz-migrate`, `dz-backup`; IAM mínimo |
+| `github-wif` | pool y proveedor OIDC de GitHub limitado al repositorio: `dz-ci` desde `main`, `dz-deploy` desde el entorno |
+| `backups` | bucket de respaldos (otro proyecto si se quiere), versionado, retención, `dz-backup` solo escribe |
+| `monitoring` | chequeo externo de `/health` y alerta por correo |
+| `budget` | presupuesto mensual con avisos al 50, 90 y 100 % |
 | `artifact-registry` | repositorio Docker con etiquetas inmutables y limpieza de versiones viejas |
 | `secrets` | contenedores de Secret Manager, sin valores; lectura solo para identidades de ejecución |
 | `cloud-run-api` | API pública (imagen por digest, probes `/health`, escala sin valores por defecto) |

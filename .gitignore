@@ -15,7 +15,10 @@ apps/mobile/android/
 *.whl
 infra/maps/out/
 sbom.cdx.json
-backups/
+/backups/
+dizaster-*.dump
+dizaster-*.dump.age
+dizaster-*.dump.sha256
 
 # Credenciales de firma y de proveedores: nunca van al repo (se guardan en EAS o en el gestor de secretos).
 *.jks

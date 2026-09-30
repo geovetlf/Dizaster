@@ -38,6 +38,24 @@ variable "storage" {
     public_base_url = string
   })
 }
+variable "backup" {
+  type = object({
+    project_id     = string
+    location       = string
+    bucket_name    = string
+    retention_days = number
+  })
+  description = "Dónde y cuánto se guardan los respaldos (idealmente otro proyecto). Decisión del propietario."
+}
+variable "alert_email" { type = string }
+variable "billing" {
+  type = object({
+    account        = string
+    currency_code  = string
+    monthly_amount = number
+  })
+  description = "Cuenta de facturación y presupuesto mensual del entorno (D-18)."
+}
 variable "extra_env" {
   type    = map(string)
   default = {}
@@ -56,9 +74,14 @@ module "stack" {
   public_api_url    = var.public_api_url
   storage           = var.storage
   extra_env         = var.extra_env
+  backup            = var.backup
+  alert_email       = var.alert_email
+  billing           = var.billing
 }
 
 output "api_uri" { value = module.stack.api_uri }
 output "registry" { value = module.stack.registry }
 output "wif_provider" { value = module.stack.wif_provider }
 output "deploy_service_account" { value = module.stack.deploy_service_account }
+output "ci_service_account" { value = module.stack.ci_service_account }
+output "backup_bucket" { value = module.stack.backup_bucket }

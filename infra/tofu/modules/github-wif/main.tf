@@ -14,6 +14,10 @@ variable "github_environment" {
   type        = string
   description = "Entorno de GitHub con permiso para desplegar (staging o production)."
 }
+variable "ci_service_account" {
+  type        = string
+  description = "Cuenta que sube imágenes; la toman solo los jobs de la rama main."
+}
 variable "deploy_service_account" {
   type        = string
   description = "Nombre completo (projects/…/serviceAccounts/…) de la cuenta que se puede tomar."
@@ -48,6 +52,13 @@ resource "google_service_account_iam_member" "deploy" {
   service_account_id = var.deploy_service_account
   role               = "roles/iam.workloadIdentityUser"
   member             = "principal://iam.googleapis.com/${google_iam_workload_identity_pool.github.name}/subject/repo:${var.github_repository}:environment:${var.github_environment}"
+}
+
+# Sujeto de un job sin `environment:` en main: repo:OWNER/REPO:ref:refs/heads/main. Solo sube imágenes.
+resource "google_service_account_iam_member" "ci" {
+  service_account_id = var.ci_service_account
+  role               = "roles/iam.workloadIdentityUser"
+  member             = "principal://iam.googleapis.com/${google_iam_workload_identity_pool.github.name}/subject/repo:${var.github_repository}:ref:refs/heads/main"
 }
 
 output "provider_name" { value = google_iam_workload_identity_pool_provider.github.name }

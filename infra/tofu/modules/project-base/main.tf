@@ -17,9 +17,13 @@ locals {
     "iam.googleapis.com",
     "iamcredentials.googleapis.com",
     "sts.googleapis.com",
+    "monitoring.googleapis.com",
+    "billingbudgets.googleapis.com",
   ]
-  # Cuentas de ejecución y despliegue. dz-ci (push de imágenes) vive en el módulo artifact-registry.
+  # Cuentas de ejecución, CI, despliegue y respaldo (ADR 0261, 0275). Cada una hace una sola cosa.
   accounts = {
+    "dz-ci"         = "Sube imágenes al registro desde main (${var.environment})"
+    "dz-backup"     = "Escribe respaldos; no puede borrarlos"
     "dz-deploy"     = "Despliega revisiones de Cloud Run (${var.environment})"
     "dz-run-api"    = "Identidad de ejecución de la API"
     "dz-run-worker" = "Identidad de ejecución del worker"
