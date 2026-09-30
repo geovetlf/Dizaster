@@ -1,6 +1,6 @@
 # Estado de la implementación
 
-Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
+Actualizado: 2026-09-30 (hasta ADR 0276). Informe de preparación para producción: `docs/PRODUCTION_READINESS_REPORT.md`.
 
 ## Etapa 1 — Fundación (hecha)
 
@@ -13,7 +13,7 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | Report Engine (presencia en servidor, degradación a post, offline, idempotencia, límites) | ✅ | `services/core/src/modules/report` |
 | Event Engine (candidato común, deduplicación, geometría agregada, timeline, mapa por clusters) | ✅ | `services/core/src/modules/event` |
 | Verification Engine (4 niveles + DISPUTED/FALSE, reglas anti-abuso, IA solo sugiere) | ✅ | `services/core/src/modules/verification` |
-| Ingestión: registro de fuentes, entrada común NORMAL/URGENT, idempotencia | ✅ (sin adapters reales) | `services/core/src/modules/ingestion` |
+| Ingestión: registro de fuentes, entrada común NORMAL/URGENT, idempotencia | ✅ (adapters reales en ADR posteriores; fuentes activas en `data/source-registry/sources.json`) | `services/core/src/modules/ingestion` |
 | Identidad: sesiones JWT, dispositivos, login de desarrollo | ✅ parcial | `services/core/src/modules/identity` |
 | App móvil: mapa desacoplado, reportar con GPS del sistema, cola offline SQLite, emergencia offline, pantalla de evento, deep links | ✅ | `apps/mobile` |
 | Datos: 43 categorías con configuración por país, números de emergencia (pendientes de verificación), fuentes candidatas | ✅ | `data/` |
@@ -170,7 +170,7 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | Diálogos de permisos de iOS en los 4 idiomas | ✅ | `app.config.ts` (`locales`), `scripts/check-native.mjs` |
 | Categorías y números de emergencia en los 4 idiomas | ✅ | `data/categories`, `data/emergency-numbers` |
 | Avisos push en el idioma de cada persona | ✅ | `alert/rules.ts` |
-| Revisión nativa de portugués y francés | ⏳ | ver "Requiere acción humana" |
+| Revisión nativa de portugués y francés | ⏳ | ver "Bloqueadas o en espera" |
 
 ## Etapa 14 — Miniaturas y hash perceptual (hecha)
 
@@ -464,6 +464,7 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | Migrador con candado y checksum, runbook de migración fallida, imágenes base por digest (ADR 0273) | ✅ | `test/migrate-runner.test.ts` |
 | Donaciones: enlaces a organizaciones verificadas (D-15, ADR 0274) | ✅ | directorio vacío hasta que el propietario lo cargue |
 | OpenTofu: `dz-ci`, respaldos, vigilancia externa y presupuesto (ADR 0275) | ✅ | validado; aplicar espera D-18 |
+| Auditoría completa e informe de preparación para producción (ADR 0276) | ✅ | `docs/PRODUCTION_READINESS_REPORT.md` |
 | Licencias, auditoría, SBOM, Dependabot; respaldo con prueba de restauración en CI | ✅ | ADR 0070, `scripts/supply-chain.mjs`, `scripts/db-restore-check.mjs` |
 | Idioma de la app elegible en el perfil (es/en/pt/fr o del teléfono) | ✅ | ADR 0069, `app/language.tsx` |
 | Varias cuentas en un teléfono corroboran como una (clave seudónima del teléfono) | ✅ | ADR 0068, migración 0036 |
@@ -533,10 +534,9 @@ Revisión del Blueprint del 2026-09-30 (tras ADR 0240): completada con ADR 0241�
 
 Revisión del Blueprint del 2026-09-30 (tras ADR 0250): completada con ADR 0251–0256 (disputas de moderación estables, bloqueo en reacciones a comentarios, enlaces de posts en iOS, borrado de negocio, Cerca por evento, exportación completa). La propuesta de quitar el aviso de mención en posts seudónimos se descartó: ADR 0063 sigue vigente.
 
-Revisión del Blueprint del 2026-09-30 (tras ADR 0256), verificada contra el código, sin bloqueos:
+Revisión del Blueprint del 2026-09-30 (tras ADR 0256): completada con ADR 0257–0276 (retraso de publicación en interacciones, bio moderada, plano de entrega propio, cupos sin carrera, purga de sesiones, fallos visibles, teclado, donaciones D-15). Auditoría completa Blueprint → ADR → código: `docs/PRODUCTION_READINESS_REPORT.md`.
 
-
-Plano de entrega (Blueprint §20, ADR 0260–0273). Nivel de autonomía actual: 2 sin GitHub. Marca de bloqueo: BLOCKED_BY_OWNER.
+Plano de entrega (Blueprint §20, ADR 0260–0275). Ojo con los nombres: las fases D0–D3 del plano de entrega no son las decisiones pendientes D1–D3 de producto de más abajo. Nivel de autonomía actual: 2 sin GitHub. Marca de bloqueo: BLOCKED_BY_OWNER.
 
 - Fase D0 — sin credenciales:
   - ✅ CI endurecido (ADR 0264) y CLI `dzd` con políticas, impacto, plan de gates, autonomía, auditoría encadenada, manifiesto de artefactos, verificación, rollback gradual, revisión de IaC, diagnóstico y documentación (ADR 0265).
@@ -560,4 +560,14 @@ Bloqueadas o en espera:
 - **PENDING DECISION** — D-17 fronteras en disputa: sin implementar; falta criterio del propietario (y revisión legal antes de abrir más países).
 - **PENDING DECISION** — Uso sin cuenta (ADR 0171): hoy se puede cerrar "Entrar" y seguir en solo lectura; falta decidir si V1 lo permite o exige cuenta.
 - **PENDING DECISION** — Avisos sociales (comentarios en mis posts, respuestas a mis comentarios): el Blueprint no los pide de forma explícita y §5.3 exige evitar la fatiga de notificaciones; falta decidir si V1 los tiene, apagados o encendidos por defecto, y con qué límite diario.
+- **BLOCKED_BY_CREDENTIALS** — Envío real de push: clave APNs `.p8` (Apple Developer, US$99/año) y cuenta de servicio de Firebase del propietario. Producción exige `PUSH_DRIVER=live`.
+- **BLOCKED_BY_CREDENTIALS** — Atestación real (App Attest / Play Integrity, §8.2, §13.1): solo existe el verificador de desarrollo y el backend no arranca en producción sin uno real (`container.ts`). Necesita el primer build de desarrollo (EXPO_TOKEN) y las cuentas de Apple y Google para obtener y verificar atestaciones reales (ADR 0129).
+- **BLOCKED_BY_OWNER** — Correo de inicio de sesión: `EMAIL_PROVIDER` solo admite `none` y `log`; falta que el propietario elija proveedor (ADR 0170). Con esa elección se escribe el adapter.
+- **BLOCKED_BY_LEGAL** — Detección de CSAM por hashes (§13.3): falta proveedor y procedimiento legal de reporte (ADR 0145).
+- **BLOCKED_BY_LEGAL** — Textos legales (términos, privacidad): `data/legal/documents.json` sin versiones hasta tener asesoría (ADR 0176).
+- **BLOCKED_BY_OWNER** — Fuentes oficiales del piloto (IGP, INDECI, SENAMHI): en investigación, sin adapter; falta validar feeds y términos de uso con el propietario. Hoy solo confirman los perfiles institucionales (ADR 0095).
+- **BLOCKED_BY_OWNER** — Revisión nativa de los textos en portugués y francés.
+- **BLOCKED_BY_OWNER** — Organizaciones para donar (ADR 0274): el directorio está vacío hasta que el propietario verifique y cargue cada una.
+- **BLOCKED_BY_OWNER** — Repositorio de GitHub de Dizaster (D-20 decidida, repositorio aún no creado): protección de `main`, entornos, firma cosign, informe en PR.
+- **BLOCKED_BY_BILLING** — Proyectos de Google Cloud, facturación y presupuesto (D-18); base de staging (D-23); plan de GitHub (D-24). Hasta entonces `dzd deploy/promote/rollback` solo corren en seco y `infra/tofu` no se aplica.
 - **BLOQUEADA** — Contacto del cliente de ingesta (§9.3): el User-Agent dice "contacto pendiente"; falta el correo o URL de contacto del propietario.

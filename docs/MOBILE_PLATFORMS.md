@@ -17,7 +17,7 @@ La evaluación y la decisión están en [ADR 0013](adr/0013-plataformas-moviles-
 | Identidad del dispositivo en almacén seguro | ✅ Keystore | ✅ Keychain | Solo en el dispositivo, sin copia de seguridad |
 | Token push nativo | ✅ FCM | ✅ APNs | Permiso pedido en contexto, no al abrir |
 | Alertas: historial, ajustes, deep link al EVENT, permiso bloqueado → Ajustes | ✅ canal "alerts" | ✅ `time-sensitive` solo oficial grave | ADR 0018 |
-| Cámara, fotos, video | ⏳ etapa 3 | ⏳ etapa 3 | Permisos ya declarados en ambas |
+| Cámara, fotos, video | ✅ (video 720p: ⏳ primer build de desarrollo) | ✅ | Etapa 3; paridad de 720p en Android pendiente de EXPO_TOKEN |
 | Atestación del dispositivo | ⏳ | ⏳ | Play Integrity / App Attest, mismo contrato |
 
 Cualquier diferencia futura entre plataformas se anota aquí antes de implementarla.
