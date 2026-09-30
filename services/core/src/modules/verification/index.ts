@@ -28,7 +28,7 @@ const RULES = {
   undisputeFactor: 2,
 };
 
-interface StateRow { level: VerificationLevel; negative_state: NegativeState }
+interface StateRow { level: VerificationLevel; negative_state: NegativeState; negative_source?: "RULE" | "MODERATOR" }
 
 interface Computation {
   level: VerificationLevel;
@@ -73,13 +73,14 @@ export class VerificationService {
       `INSERT INTO verification.state (event_id, level, negative_state, rule_set_version) VALUES ($1, 'UNVERIFIED', 'NONE', $2) ON CONFLICT DO NOTHING`,
       [eventId, VERIFICATION_RULES_VERSION],
     );
-    const current = (await tx.query<StateRow>(`SELECT level, negative_state FROM verification.state WHERE event_id = $1 FOR UPDATE`, [eventId])).rows[0]!;
+    const current = (await tx.query<StateRow>(`SELECT level, negative_state, negative_source FROM verification.state WHERE event_id = $1 FOR UPDATE`, [eventId])).rows[0]!;
     const c = await this.compute(tx, eventId, current);
 
     const levelChanged = c.level !== current.level;
     const negativeChanged = c.negative !== current.negative_state;
     await tx.query(
-      `UPDATE verification.state SET level = $2, negative_state = $3, rule_set_version = $4, explanation = $5, evaluated_at = now() WHERE event_id = $1`,
+      `UPDATE verification.state SET level = $2, negative_state = $3, rule_set_version = $4, explanation = $5, evaluated_at = now(),
+         negative_source = CASE WHEN negative_state IS DISTINCT FROM $3 THEN 'RULE' ELSE negative_source END WHERE event_id = $1`,
       [eventId, c.level, c.negative, VERIFICATION_RULES_VERSION, JSON.stringify(c.explanation)],
     );
     if (!levelChanged && !negativeChanged) return;
@@ -144,6 +145,9 @@ export class VerificationService {
       negative = "FALSE"; // solo moderación puede revertir un FALSE
     } else if (officialConfirm.length > 0) {
       negative = "NONE"; // una confirmación oficial prevalece sobre una disputa ciudadana
+    } else if (current.negative_source === "MODERATOR") {
+      // Lo decidió moderación (ADR 0251): la siguiente evidencia ciudadana o externa no lo deshace.
+      negative = current.negative_state;
     } else if (externalDeny.length > 0) {
       negative = "DISPUTED";
       ruleId = "external-denial";
@@ -212,7 +216,7 @@ export class VerificationService {
         throw new DomainError("CONFLICT_WITH_OFFICIAL", "Un evento confirmado oficialmente solo puede desmentirse con una fuente oficial registrada", 409);
       }
       if (current.negative_state === input.to) return;
-      await tx.query(`UPDATE verification.state SET negative_state = $2, evaluated_at = now() WHERE event_id = $1`, [input.eventId, input.to]);
+      await tx.query(`UPDATE verification.state SET negative_state = $2, negative_source = 'MODERATOR', evaluated_at = now() WHERE event_id = $1`, [input.eventId, input.to]);
       await tx.query(
         `INSERT INTO verification.transitions (id, event_id, from_level, to_level, from_negative, to_negative, cause, evidence_ids, actor, reason)
          VALUES ($1, $2, $3, $3, $4, $5, 'MODERATOR', $6, $7, $8)`,

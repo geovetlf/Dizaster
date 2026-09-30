@@ -441,6 +441,7 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | Retención en lotes y purga de corridas (ADR 0248) | ✅ | §12, §13.2 |
 | Fusión conserva el historial de avisos (ADR 0249) | ✅ | §5.7, §5.10 |
 | Mapa offline desactualizado al cambiar zona o idioma (ADR 0250) | ✅ | §11.3 |
+| Disputa de moderación estable (ADR 0251) | ✅ | `negative_source`, migración 0099 |
 | Licencias, auditoría, SBOM, Dependabot; respaldo con prueba de restauración en CI | ✅ | ADR 0070, `scripts/supply-chain.mjs`, `scripts/db-restore-check.mjs` |
 | Idioma de la app elegible en el perfil (es/en/pt/fr o del teléfono) | ✅ | ADR 0069, `app/language.tsx` |
 | Varias cuentas en un teléfono corroboran como una (clave seudónima del teléfono) | ✅ | ADR 0068, migración 0036 |
@@ -507,6 +508,16 @@ Revisión del Blueprint del 2026-09-30 (tras ADR 0220): completada con ADR 0221�
 Revisión del Blueprint del 2026-09-30 (tras ADR 0228): completada con ADR 0229–0240 (privacidad de eventos cercanos, IA sin FALSE, auditoría, accesibilidad).
 
 Revisión del Blueprint del 2026-09-30 (tras ADR 0240): completada con ADR 0241–0250 (alertas vencidas, ingesta robusta, worker aislado y transaccional, cola offline, retención, fusión, mapa offline).
+
+Revisión del Blueprint del 2026-09-30 (tras ADR 0250), verificada contra el código, sin bloqueos:
+
+1. Menciones en posts seudónimos: solo texto, sin enlace ni aviso (§13.2).
+2. Bloqueo también en reacciones a comentarios (§13.3).
+3. Vaciar el texto al borrar un comentario propio (§13.2).
+4. Borrar un negocio borra su media, ediciones y contacto, en una transacción (§13.2).
+5. Añadir /p/* a apple-app-site-association (enlaces compartidos en iOS).
+6. Feed Cerca por ubicación del evento, no solo del post (§5.3).
+7. Completar la exportación de datos (§13.2).
 
 Bloqueadas o en espera:
 
