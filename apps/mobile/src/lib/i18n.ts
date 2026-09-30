@@ -1,6 +1,7 @@
 import { formatMessage, resolveLocale, type Lang } from "@dizaster/contracts";
 import { fr } from "./locales/fr";
 import { pt } from "./locales/pt";
+import { regionalText, type RegionalOverrides } from "./locales/regional";
 import { setFormatLocale } from "./ui/format";
 import { pluralCategory } from "./ui/plural";
 
@@ -252,6 +253,10 @@ const base = {
     action_DISMISS: "Descartar",
     pseudonymousAuthor: "Autoría seudónima",
     ruleActor: "Automático",
+    ruleReason_LIMIT: "Limitado automáticamente porque varias personas lo denunciaron. Un moderador lo revisará.",
+    ruleReason_HIDE: "Oculto automáticamente porque varias personas lo denunciaron. Un moderador lo revisará.",
+    ruleReason_OTHER: "Acción automática por una regla de la comunidad. Un moderador la revisará.",
+    costKillSwitchA11y: "Función de pago {feature}",
     appealDecisionReason: "Motivo de la decisión",
     upholdAppeal: "Mantener",
     reverseAppeal: "Revertir",
@@ -1066,6 +1071,10 @@ const base = {
     action_DISMISS: "Dismiss",
     pseudonymousAuthor: "Pseudonymous author",
     ruleActor: "Automatic",
+    ruleReason_LIMIT: "Automatically limited because several people reported it. A moderator will review it.",
+    ruleReason_HIDE: "Automatically hidden because several people reported it. A moderator will review it.",
+    ruleReason_OTHER: "Automatic action under a community rule. A moderator will review it.",
+    costKillSwitchA11y: "Paid feature {feature}",
     appealDecisionReason: "Reason for the decision",
     upholdAppeal: "Uphold",
     reverseAppeal: "Reverse",
@@ -1659,7 +1668,10 @@ export function setLang(next: Lang): void {
   appLocale = r.locale;
   setFormatLocale(appLocale);
 }
-export const t = (key: MessageKey): string => catalogs[lang][key];
+// eslint-disable-next-line @typescript-eslint/no-require-imports -- JSON versionado en /data, copiado al bundle (offline)
+const regional = require("../reference-data/ui-regional.json") as RegionalOverrides;
+/** Texto del idioma de la app, con el ajuste regional del país si existe ("es-PE", ADR 0281). */
+export const t = (key: MessageKey): string => regionalText(regional, appLocale, key) ?? catalogs[lang][key];
 
 /**
  * Texto con variables y plurales del idioma (ADR 0216): `tf("trDays", { n: 7 })` sobre "{n} días" o sobre

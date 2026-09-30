@@ -4,8 +4,8 @@ import type { MessageKey } from "../i18n";
 /**
  * Códigos de error del servidor que la app traduce (ADR 0105). El servidor responde `{ error, message }` con el
  * mensaje en español; en español se muestra tal cual (es el más preciso: "Puedes administrar hasta 3 negocios"),
- * en otro idioma se muestra la traducción del código y, si el código no está aquí, el mensaje del servidor.
- * NO AI REQUIRED.
+ * en otro idioma se muestra la traducción del código y, si el código no está aquí, la del estado HTTP: nunca el
+ * mensaje en español (ADR 0281). NO AI REQUIRED.
  */
 export const SERVER_ERROR_KEYS: Readonly<Record<string, MessageKey>> = {
   RATE_LIMITED: "errRateLimited",
@@ -100,8 +100,17 @@ export function serverErrorMessage(
   const code = typeof body?.error === "string" ? body.error : null;
   const key = code ? SERVER_ERROR_KEYS[code] : undefined;
   if (key) return translate(key);
-  if (message) return message;
-  if (status === 429) return translate("errRateLimited");
-  if (status >= 500) return translate("errInternal");
-  return `HTTP ${status}`;
+  if (message && lang === "es") return message;
+  const byStatus = STATUS_KEYS[status] ?? (status >= 500 ? "errInternal" : status >= 400 ? "errValidation" : undefined);
+  return byStatus ? translate(byStatus) : `HTTP ${status}`;
 }
+
+/** Estado HTTP → texto, para códigos que la app todavía no conoce (ADR 0281). */
+const STATUS_KEYS: Readonly<Record<number, MessageKey>> = {
+  401: "errUnauthenticated",
+  403: "errForbidden",
+  404: "errNotFound",
+  409: "errConflict",
+  429: "errRateLimited",
+  503: "errOverloaded",
+};

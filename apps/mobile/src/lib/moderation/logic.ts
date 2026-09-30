@@ -1,4 +1,5 @@
-import type { FlagReason, FlagTargetType, ModerationActionType, PresenceReview } from "@dizaster/contracts";
+import type { FlagReason, FlagTargetType, Lang, ModerationActionType, ModerationActionView, PresenceReview } from "@dizaster/contracts";
+import type { MessageKey } from "../i18n";
 
 /** Motivos en el orden en que se muestran: primero los que ponen en riesgo a personas. */
 export const FLAG_REASONS: FlagReason[] = ["PRIVACY", "VIOLENCE", "HARASSMENT", "ILLEGAL", "FALSE_INFO", "SPAM", "OTHER"];
@@ -52,4 +53,14 @@ export function presenceLines(v: PresenceReview, t: (k: "presenceBandLine" | "pr
   // Pruebas de captura (ADR 0181): cada medio de cámara y cuánto antes del reporte se tomó.
   for (const m of v.mediaCaptureProofs) lines.push(fill(t("presenceMediaProof"), { kind: m.kind, s: m.secondsBeforeReport }));
   return lines;
+}
+
+/**
+ * Motivo de una acción de moderación en el idioma de quien lo lee (ADR 0281). El motivo de un moderador es texto
+ * libre y se muestra tal cual. El de una regla automática lo escribe el servidor en español (con el número de
+ * denuncias): en español se muestra así; en otro idioma, el texto traducido de la regla.
+ */
+export function actionReasonText(a: Pick<ModerationActionView, "actor" | "action" | "reason">, lang: Lang, t: (k: MessageKey) => string): string {
+  if (a.actor !== "RULE" || lang === "es") return a.reason;
+  return t(a.action === "LIMIT" ? "ruleReason_LIMIT" : a.action === "HIDE" ? "ruleReason_HIDE" : "ruleReason_OTHER");
 }

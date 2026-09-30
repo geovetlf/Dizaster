@@ -1,6 +1,6 @@
 # Estado de la implementación
 
-Actualizado: 2026-09-30 (hasta ADR 0280). Informe de preparación para producción: `docs/PRODUCTION_READINESS_REPORT.md`.
+Actualizado: 2026-09-30 (hasta ADR 0281). Informe de preparación para producción: `docs/PRODUCTION_READINESS_REPORT.md`.
 
 ## Etapa 1 — Fundación (hecha)
 
@@ -469,6 +469,7 @@ Actualizado: 2026-09-30 (hasta ADR 0280). Informe de preparación para producci�
 | OpenTofu: base de datos (Cloud SQL, VM propia o externa), bucket de media, bucket de estado y `tofu test` sin nube (ADR 0278) | ✅ | aplicar: D-23 y D-18 |
 | Procedimiento de activación por bloqueo y correo de acceso en el idioma de la app (ADR 0279) | ✅ | `docs/runbooks/activacion-bloqueos.md` |
 | AI Core resiliente: 429, cortocircuito, prompts versionados, registro de modelos, evaluación y pistas de verificación asíncronas (ADR 0280, migración 0104) | ✅ | IA apagada de fábrica |
+| Motor de idiomas sin fugas del español (errores, moderación automática, accesibilidad) y textos regionales por país como datos (ADR 0281) | ✅ | `data/locales/ui-regional.json` vacío |
 | Licencias, auditoría, SBOM, Dependabot; respaldo con prueba de restauración en CI | ✅ | ADR 0070, `scripts/supply-chain.mjs`, `scripts/db-restore-check.mjs` |
 | Idioma de la app elegible en el perfil (es/en/pt/fr o del teléfono) | ✅ | ADR 0069, `app/language.tsx` |
 | Varias cuentas en un teléfono corroboran como una (clave seudónima del teléfono) | ✅ | ADR 0068, migración 0036 |
@@ -572,6 +573,8 @@ Bloqueadas o en espera:
 - **BLOCKED_BY_LEGAL** — Textos legales (términos, privacidad): `data/legal/documents.json` sin versiones hasta tener asesoría (ADR 0176).
 - **BLOCKED_BY_OWNER** — Fuentes oficiales del piloto (IGP, INDECI, SENAMHI): en investigación, sin adapter; falta validar feeds y términos de uso con el propietario. Hoy solo confirman los perfiles institucionales (ADR 0095).
 - **BLOCKED_BY_OWNER** — Revisión nativa de los textos en portugués y francés.
+- **BLOCKED_BY_OWNER** — Quechua y aimara (idiomas de Perú en `country-config.json`): falta una traducción nativa revisada de la interfaz; no se genera con IA (ADR 0216, 0281). Hasta entonces se usa el español.
+- **BLOCKED_BY_OWNER** — Textos regionales por país (ADR 0281): el mecanismo existe y `data/locales/ui-regional.json` está vacío hasta que alguien con uso local proponga ajustes.
 - **BLOCKED_BY_OWNER** — Organizaciones para donar (ADR 0274): el directorio está vacío hasta que el propietario verifique y cargue cada una.
 - **Repositorio oficial**: https://github.com/geovetlf/Dizaster (creado por el propietario el 2026-09-30). Pendiente: reglas de `main` y etiquetas (`.github/rulesets/`), entornos `staging` y `production` y variables de Actions (`scripts/github-bootstrap.mjs`), con autorización del propietario.
 - **BLOCKED_BY_BILLING** — Proyectos de Google Cloud, facturación y presupuesto (D-18); base de staging (D-23); plan de GitHub (D-24). Hasta entonces `dzd deploy/promote/rollback` solo corren en seco y `infra/tofu` no se aplica.

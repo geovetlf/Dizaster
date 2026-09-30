@@ -15,11 +15,17 @@ describe("errores del servidor", () => {
     expect(serverErrorMessage({ error: "RATE_LIMITED", message: "x" }, 429, "fr", tr)).toBe("[errRateLimited]");
   });
 
-  it("un código desconocido cae al mensaje del servidor y, sin mensaje, al estado HTTP", () => {
-    expect(serverErrorMessage({ error: "SOME_FUTURE_CODE", message: "No se puede" }, 409, "pt", tr)).toBe("No se puede");
+  it("un código desconocido nunca muestra el mensaje en español fuera del español: cae al estado HTTP (ADR 0281)", () => {
+    expect(serverErrorMessage({ error: "SOME_FUTURE_CODE", message: "No se puede" }, 409, "pt", tr)).toBe("[errConflict]");
+    expect(serverErrorMessage({ error: "SOME_FUTURE_CODE", message: "No se puede" }, 409, "es", tr)).toBe("No se puede");
+    expect(serverErrorMessage({ message: "Falta algo" }, 404, "fr", tr)).toBe("[errNotFound]");
+    expect(serverErrorMessage({ message: "x" }, 401, "en", tr)).toBe("[errUnauthenticated]");
+    expect(serverErrorMessage({ message: "x" }, 403, "en", tr)).toBe("[errForbidden]");
+    expect(serverErrorMessage({ message: "x" }, 503, "en", tr)).toBe("[errOverloaded]");
     expect(serverErrorMessage({}, 429, "en", tr)).toBe("[errRateLimited]");
     expect(serverErrorMessage(null, 502, "es", tr)).toBe("[errInternal]");
-    expect(serverErrorMessage({ message: "  " }, 418, "en", tr)).toBe("HTTP 418");
+    expect(serverErrorMessage({ message: "  " }, 418, "en", tr)).toBe("[errValidation]");
+    expect(serverErrorMessage(null, 302, "en", tr)).toBe("HTTP 302");
   });
 
   it("todas las claves del mapa existen en el catálogo", async () => {

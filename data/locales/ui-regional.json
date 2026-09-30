@@ -1,0 +1,5 @@
+{
+  "version": "ui-regional-2026.09.1",
+  "notes": "Textos de la interfaz que cambian por país dentro de un mismo idioma (ADR 0281). Clave: locale BCP 47 idioma-REGIÓN ('es-PE'); valor: { clave del catálogo: texto }. Vacío a propósito: nada se inventa; lo llena quien conoce el uso local. Solo se aceptan claves que existen en el catálogo y con las mismas variables {x} que el texto base.",
+  "overrides": {}
+}

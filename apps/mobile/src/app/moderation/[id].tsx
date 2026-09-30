@@ -5,7 +5,7 @@ import { Alert, Image, Linking, Pressable, ScrollView, StyleSheet, Text, TextInp
 import { api } from "../../lib/api";
 import { API_URL } from "../../lib/config";
 import { lang, t } from "../../lib/i18n";
-import { actionsFor, isSevere, presenceLines, reasonSummary, validReason } from "../../lib/moderation/logic";
+import { actionReasonText, actionsFor, isSevere, presenceLines, reasonSummary, validReason } from "../../lib/moderation/logic";
 import { timeAgo } from "../../lib/ui/format";
 import { colors, radius, space } from "../../theme";
 
@@ -111,7 +111,7 @@ export default function CaseScreen() {
       {c.actions.length ? <Text style={styles.section}>{t("timeline")}</Text> : null}
       {c.actions.map((a) => (
         <Text key={a.id} style={styles.meta}>
-          {timeAgo(a.createdAt, lang)} · {t(`action_${a.action}`)}{a.actor === "RULE" ? ` (${t("ruleActor")})` : ""} · {a.reason}
+          {timeAgo(a.createdAt, lang)} · {t(`action_${a.action}`)}{a.actor === "RULE" ? ` (${t("ruleActor")})` : ""} · {actionReasonText(a, lang, t)}
         </Text>
       ))}
 

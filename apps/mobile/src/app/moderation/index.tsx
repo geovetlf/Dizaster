@@ -6,7 +6,7 @@ import { LoadState } from "../../components/load-state";
 import { api } from "../../lib/api";
 import { useRoles } from "../../lib/auth/roles";
 import { lang, t } from "../../lib/i18n";
-import { reasonSummary, validReason } from "../../lib/moderation/logic";
+import { actionReasonText, reasonSummary, validReason } from "../../lib/moderation/logic";
 import { eventTitle, timeAgo } from "../../lib/ui/format";
 import { colors, radius, space } from "../../theme";
 
@@ -162,7 +162,7 @@ function AppealRow({ appeal, onDone }: { appeal: AppealView; onDone: () => void 
     <View style={styles.row}>
       <View style={styles.body}>
         <Text style={styles.kind}>{t(`action_${appeal.action.action}`)} · {appeal.action.targetType}</Text>
-        <Text style={styles.meta}>{appeal.action.reason}</Text>
+        <Text style={styles.meta}>{actionReasonText(appeal.action, lang, t)}</Text>
         {appeal.target?.text ? <Text style={styles.text} numberOfLines={3}>{appeal.target.text}</Text> : null}
         <Text style={styles.appealText}>“{appeal.text}”</Text>
         <TextInput accessibilityLabel={t("appealDecisionReason")} value={reason} onChangeText={setReason} maxLength={1000} placeholder={t("appealDecisionReason")} placeholderTextColor={colors.textMuted} style={styles.input} />

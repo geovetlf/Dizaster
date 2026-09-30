@@ -7,7 +7,7 @@ import { useRoles } from "../lib/auth/roles";
 import { parseUsd } from "../lib/admin/admin-tools";
 import { validReason } from "../lib/admin/sources-format";
 import { barHeights, budgetTone, formatBytes, formatUnits, formatUsd, moduleRows } from "../lib/admin/cost-format";
-import { lang, t } from "../lib/i18n";
+import { lang, t, tf } from "../lib/i18n";
 import { colors, radius, space } from "../theme";
 
 const RANGES = [7, 30, 90] as const;
@@ -111,7 +111,7 @@ export default function AdminCostScreen() {
                 <Text style={styles.rowText}>{k.feature}</Text>
                 {k.reason ? <Text style={styles.value}>{k.reason}</Text> : null}
               </View>
-              <Switch value={!k.killed} disabled={!reasonOk} accessibilityLabel={k.feature} onValueChange={(on) => void toggle(k.feature, !on)} trackColor={{ true: colors.accent, false: colors.border }} />
+              <Switch value={!k.killed} disabled={!reasonOk} accessibilityLabel={tf("costKillSwitchA11y", { feature: k.feature })} onValueChange={(on) => void toggle(k.feature, !on)} trackColor={{ true: colors.accent, false: colors.border }} />
             </View>
           ))}
           <Text style={styles.note}>{t("costEstimateNote")} ({d.pricesVersion})</Text>

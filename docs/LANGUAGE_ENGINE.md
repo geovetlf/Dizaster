@@ -23,6 +23,7 @@ Principios:
 | Datos localizados | `localizedText(texts, lang)` | Nombres de categorías, números de emergencia, títulos de eventos: busca en la cadena de respaldo del idioma. |
 | Textos de la app | `apps/mobile/src/lib/i18n.ts` (es, en) y `apps/mobile/src/lib/locales/*.ts` | Catálogos `Record<MessageKey, string>`: TypeScript no compila si falta una clave. |
 | Textos del servidor | `services/core/src/modules/alert/rules.ts` | Avisos push, avisos de moderación, alertas de operación: tablas `Record<Lang, …>`. |
+| Textos regionales | `data/locales/ui-regional.json` y `apps/mobile/src/lib/locales/regional.ts` | Ajuste de un texto para un país dentro de un idioma ("es-PE"), validado contra el catálogo (ADR 0281). Vacío hasta tener uso local real. |
 | Configuración por país | `data/countries/country-config.json` | `defaultLocale`, `languages`, `timezones`, `units`, `currency`, nombres de niveles administrativos. |
 | Dirección | `apps/mobile/src/lib/ui/direction.ts` | Sigue al idioma de la app, no al del teléfono; los idiomas del registro mandan. |
 
@@ -58,4 +59,11 @@ Ninguna regla de negocio cambia. No hace falta migración.
 
 - `packages/contracts/test/language-engine.test.ts`: registro, plurales CLDR, respaldo, resolución, mensajes, formatos.
 - `apps/mobile/test/language-engine.test.ts`: completitud de los catálogos (vacíos, variables, plurales).
+- `apps/mobile/test/language-regional.test.ts`: textos regionales y motivos de moderación automática (ADR 0281).
+
+## Nunca en español fuera del español (ADR 0281)
+
+- Error con código desconocido: se traduce por estado HTTP; el mensaje del servidor solo se muestra en español.
+- Motivo de una regla automática de moderación: texto del catálogo; el motivo de un moderador es texto libre y va tal cual.
+- El texto libre de las personas (posts, comentarios, motivos) nunca se traduce solo: eso sería `TRANSLATE_TEXT`, apagado.
 - `services/core/test/language-engine.test.ts`: idioma de avisos, respaldo de valores desconocidos, datos por país.
