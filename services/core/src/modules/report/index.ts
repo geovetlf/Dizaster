@@ -6,6 +6,7 @@ import {
   type MyReportView,
   type PresenceAccessEntry,
   type PresenceReview,
+  type MediaCaptureProof,
   type PresenceRejectionReason,
   type ReportAssertion,
   type SubmitReportResponse,
@@ -200,7 +201,7 @@ export class ReportService {
           downgraded ? "DOWNGRADED" : "ACCEPTED", anonymity, JSON.stringify(result), attachable.map((m) => m.id), evidenceSignature,
         ],
       );
-      await this.storePresenceEvidence(tx, reportId, req, presence, attestation, receivedAt);
+      await this.storePresenceEvidence(tx, reportId, req, presence, attestation, receivedAt, mediaProofs);
       if (downgraded) {
         await publish(tx, "ReportDowngradedToPost", { postId, reasons: result.outcome === "DOWNGRADED_TO_POST" ? result.reasons : [] });
       }
@@ -216,15 +217,23 @@ export class ReportService {
     presence: ReturnType<typeof computePresence>,
     attestation: string,
     receivedAt: Date,
+    mediaProofs: readonly { mediaId: string; kind: string; capturedAt: Date; serverSeenAt: Date }[] = [],
   ): Promise<void> {
     const fixPoint = { lat: req.presence.fix.lat, lng: req.presence.fix.lng };
+    // Pruebas de captura (ADR 0181): cuánto antes del reporte se tomó cada medio y cuándo lo vio el servidor.
+    const reportAt = Date.parse(req.capturedAt);
+    const proofs: MediaCaptureProof[] = mediaProofs.map((m) => ({
+      mediaId: m.mediaId, kind: m.kind, capturedAt: m.capturedAt.toISOString(), serverSeenAt: m.serverSeenAt.toISOString(),
+      secondsBeforeReport: Math.round((reportAt - m.capturedAt.getTime()) / 1000),
+    }));
     await tx.query(
       `INSERT INTO report.presence_evidence
-         (report_id, device_fix_enc, fix_h3_r7, fix_to_pin_m, mock_location, attestation_verdict, reasons, score_breakdown, rule_version, expires_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::timestamptz + make_interval(days => $11))`,
+         (report_id, device_fix_enc, fix_h3_r7, fix_to_pin_m, mock_location, attestation_verdict, reasons, score_breakdown, rule_version, expires_at,
+          media_capture_proofs)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::timestamptz + make_interval(days => $11), $12)`,
       [
         reportId, this.d.cipher.encrypt(JSON.stringify(req.presence.fix), reportId), h3(fixPoint, H3_RES.ZONE), presence.fixToPinM, req.presence.mockLocation, attestation,
-        presence.reasons, JSON.stringify(presence.breakdown), presence.ruleVersion, receivedAt, this.d.limits.presenceRetentionDays,
+        presence.reasons, JSON.stringify(presence.breakdown), presence.ruleVersion, receivedAt, this.d.limits.presenceRetentionDays, JSON.stringify(proofs),
       ],
     );
   }
@@ -312,10 +321,10 @@ export class ReportService {
       const { rows } = await tx.query<{
         presence_band: string; presence_score: number; fix_to_pin_m: number; mock_location: boolean | null; attestation_verdict: PresenceReview["attestationVerdict"];
         reasons: string[]; score_breakdown: Record<string, unknown>; rule_version: string; device_fix: PresenceReview["deviceFix"]; device_fix_enc: string | null;
-        expires_at: Date; generalized_at: Date | null; prior: number;
+        expires_at: Date; generalized_at: Date | null; prior: number; media_capture_proofs: MediaCaptureProof[];
       }>(
         `SELECT r.presence_band, r.presence_score, p.fix_to_pin_m, p.mock_location, p.attestation_verdict, p.reasons, p.score_breakdown,
-                p.rule_version, p.device_fix, p.device_fix_enc, p.expires_at, p.generalized_at,
+                p.rule_version, p.device_fix, p.device_fix_enc, p.expires_at, p.generalized_at, p.media_capture_proofs,
                 (SELECT count(*)::int FROM report.presence_access_log l WHERE l.report_id = r.id) AS prior
            FROM report.reports r JOIN report.presence_evidence p ON p.report_id = r.id WHERE r.id = $1`,
         [reportId],
@@ -331,6 +340,7 @@ export class ReportService {
         reportId, presenceBand: r.presence_band, presenceScore: r.presence_score, fixToPinM: r.fix_to_pin_m, mockLocation: r.mock_location,
         attestationVerdict: r.attestation_verdict, reasons: r.reasons, scoreBreakdown: r.score_breakdown, ruleVersion: r.rule_version, deviceFix,
         preciseExpiresAt: r.expires_at.toISOString(), generalizedAt: r.generalized_at?.toISOString() ?? null, priorAccesses: r.prior,
+        mediaCaptureProofs: r.media_capture_proofs,
       };
     });
   }

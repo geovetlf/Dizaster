@@ -207,6 +207,7 @@ export const pt: Record<MessageKey, string> = {
   presencePrecise: "Localização do telefone: {lat}, {lng} (apagada em {until})",
   presenceGeneralized: "A localização precisa já foi apagada; resta só a área aproximada.",
   presencePrior: "Consultada {n} vezes antes.",
+  presenceMediaProof: "{kind} da câmera, tirada {s} s antes do relato",
   apply: "Aplicar",
   action_HIDE: "Ocultar",
   action_REMOVE: "Remover",

@@ -469,14 +469,14 @@ export class MediaService {
    * Pruebas de captura para la presencia (ADR 0073): de la media ya validada por `assertAttachable`, la que la app
    * capturó con su cámara, con la hora declarada y la hora en que el servidor vio la subida.
    */
-  async inAppCaptures(q: Queryable, ownerProfileId: string, mediaIds: string[]): Promise<{ capturedAt: Date; serverSeenAt: Date }[]> {
+  async inAppCaptures(q: Queryable, ownerProfileId: string, mediaIds: string[]): Promise<{ mediaId: string; kind: string; capturedAt: Date; serverSeenAt: Date }[]> {
     if (mediaIds.length === 0) return [];
-    const { rows } = await q.query<{ captured_at: Date; created_at: Date }>(
-      `SELECT captured_at, created_at FROM media.media
-        WHERE id = ANY($1) AND owner_profile_id = $2 AND captured_in_app AND captured_at IS NOT NULL`,
+    const { rows } = await q.query<{ id: string; kind: string; captured_at: Date; created_at: Date }>(
+      `SELECT id, kind, captured_at, created_at FROM media.media
+        WHERE id = ANY($1) AND owner_profile_id = $2 AND captured_in_app AND captured_at IS NOT NULL ORDER BY captured_at, id`,
       [mediaIds, ownerProfileId],
     );
-    return rows.map((r) => ({ capturedAt: r.captured_at, serverSeenAt: r.created_at }));
+    return rows.map((r) => ({ mediaId: r.id, kind: r.kind, capturedAt: r.captured_at, serverSeenAt: r.created_at }));
   }
 
   /**

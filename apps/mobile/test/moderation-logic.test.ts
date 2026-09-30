@@ -51,11 +51,12 @@ describe("herramientas de evento (fusionar y dividir)", () => {
 describe("presenceLines (ADR 0089)", () => {
   const tr = (k: string) => ({
     presenceBandLine: "{band} {score} {distance}m {attestation}", presencePrecise: "{lat},{lng} hasta {until}",
-    presenceGeneralized: "generalizada", presencePrior: "antes {n}",
+    presenceGeneralized: "generalizada", presencePrior: "antes {n}", presenceMediaProof: "{kind} -{s}s",
   })[k]!;
   const base = {
     reportId: "r", presenceBand: "HIGH", presenceScore: 0.8734, fixToPinM: 12.4, mockLocation: false, attestationVerdict: "GENUINE" as const,
     reasons: [], scoreBreakdown: {}, ruleVersion: "p1", preciseExpiresAt: "2026-10-29T00:00:00Z", generalizedAt: null, priorAccesses: 0,
+    mediaCaptureProofs: [] as { mediaId: string; kind: string; capturedAt: string; serverSeenAt: string; secondsBeforeReport: number }[],
   };
   it("con ubicación precisa y sin accesos previos", () => {
     expect(presenceLines({ ...base, deviceFix: { lat: -12.046412345, lng: -77.04281 } }, tr as never)).toEqual([
@@ -66,6 +67,10 @@ describe("presenceLines (ADR 0089)", () => {
     expect(presenceLines({ ...base, deviceFix: null, mockLocation: true, reasons: ["LOW_ACCURACY"], priorAccesses: 2 }, tr as never)).toEqual([
       "HIGH 0.87 12m GENUINE", "MOCK_LOCATION", "LOW_ACCURACY", "generalizada", "antes 2",
     ]);
+  });
+  it("con pruebas de captura (ADR 0181)", () => {
+    const proof = { mediaId: "m", kind: "IMAGE", capturedAt: "x", serverSeenAt: "y", secondsBeforeReport: 30 };
+    expect(presenceLines({ ...base, deviceFix: null, mediaCaptureProofs: [proof] }, tr as never).at(-1)).toBe("IMAGE -30s");
   });
 });
 

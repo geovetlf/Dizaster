@@ -36,7 +36,7 @@ export function reasonSummary(reasons: Partial<Record<FlagReason, number>>, labe
  * Evidencia de presencia en líneas para la pantalla del caso (ADR 0089). La ubicación precisa se muestra con 5
  * decimales (~1 m) solo si aún existe. NO AI REQUIRED.
  */
-export function presenceLines(v: PresenceReview, t: (k: "presenceBandLine" | "presencePrecise" | "presenceGeneralized" | "presencePrior") => string): string[] {
+export function presenceLines(v: PresenceReview, t: (k: "presenceBandLine" | "presencePrecise" | "presenceGeneralized" | "presencePrior" | "presenceMediaProof") => string): string[] {
   const fill = (s: string, p: Record<string, string | number>) => s.replace(/\{(\w+)\}/g, (_, k: string) => String(p[k] ?? ""));
   const lines = [
     fill(t("presenceBandLine"), {
@@ -49,5 +49,7 @@ export function presenceLines(v: PresenceReview, t: (k: "presenceBandLine" | "pr
     ? fill(t("presencePrecise"), { lat: v.deviceFix.lat.toFixed(5), lng: v.deviceFix.lng.toFixed(5), until: v.preciseExpiresAt.slice(0, 10) })
     : t("presenceGeneralized"));
   if (v.priorAccesses > 0) lines.push(fill(t("presencePrior"), { n: v.priorAccesses }));
+  // Pruebas de captura (ADR 0181): cada medio de cámara y cuánto antes del reporte se tomó.
+  for (const m of v.mediaCaptureProofs) lines.push(fill(t("presenceMediaProof"), { kind: m.kind, s: m.secondsBeforeReport }));
   return lines;
 }

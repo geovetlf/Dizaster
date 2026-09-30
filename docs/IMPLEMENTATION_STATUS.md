@@ -371,6 +371,7 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | 0178 | Posts y comentarios idempotentes con id del cliente: un reintento devuelve lo ya creado | ✅ |
 | 0179 | Moderación sube la sensibilidad de un evento por su contexto: punto público, lugar y posts de reportes se generalizan más; nunca baja | ✅ |
 | 0180 | La reputación del teléfono (cuenta suspendida o manipulación repetida) baja el peso de su evidencia a LOW | ✅ |
+| 0181 | Pruebas de captura del medio (qué foto/video y cuánto antes del reporte) en la evidencia de presencia privada; sin ubicación por medio | ✅ |
 | Licencias, auditoría, SBOM, Dependabot; respaldo con prueba de restauración en CI | ✅ | ADR 0070, `scripts/supply-chain.mjs`, `scripts/db-restore-check.mjs` |
 | Idioma de la app elegible en el perfil (es/en/pt/fr o del teléfono) | ✅ | ADR 0069, `app/language.tsx` |
 | Varias cuentas en un teléfono corroboran como una (clave seudónima del teléfono) | ✅ | ADR 0068, migración 0036 |
@@ -417,8 +418,7 @@ Revisión del Blueprint del 2026-09-30 (tras ADR 0164): completada con ADR 0165�
 Revisión del Blueprint del 2026-09-30 (tras ADR 0171): completada con ADR 0172–0176.
 
 Revisión del Blueprint del 2026-09-30 (tras ADR 0176), verificada contra el código, sin bloqueos:
-1. Pruebas de captura del medio en la evidencia de presencia (§7 `media_capture_proofs`, `capture_geo` privado).
-2. Preparación para particionar eventos y reportes por mes (§7.4, §14): decisión y prueba, sin partir aún.
+1. Preparación para particionar eventos y reportes por mes (§7.4, §14): decisión y prueba, sin partir aún.
 
 Bloqueadas o en espera:
 

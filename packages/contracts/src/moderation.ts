@@ -136,6 +136,18 @@ export interface PresenceReview {
   generalizedAt: string | null;
   /** Veces que moderación ya la consultó (sin decir quién). */
   priorAccesses: number;
+  /** Media de cámara del reporte y sus horas (ADR 0181). */
+  mediaCaptureProofs: MediaCaptureProof[];
+}
+
+export interface MediaCaptureProof {
+  mediaId: string;
+  kind: string;
+  capturedAt: string;
+  /** Cuándo vio el servidor la subida. */
+  serverSeenAt: string;
+  /** Segundos entre la captura del medio y la del reporte (negativo: después). */
+  secondsBeforeReport: number;
 }
 
 export interface PresenceAccessEntry {
