@@ -53,7 +53,7 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | Media en reportes, timeline `MEDIA_ADDED` y galería pública del evento | ✅ | `GET /v1/events/:id/media` |
 | Retención de originales y limpieza de subidas abandonadas | ✅ | worker diario |
 | App: foto, video y galería con compresión; subida en la cola offline; reenvío automático al volver a la app | ✅ | `apps/mobile/src/lib/media`, `src/lib/report/outbox.ts` |
-| Miniaturas, hash perceptual, difuminado de rostros | ⏳ | ADR 0014 (pendiente) |
+| Miniaturas, hash perceptual, difuminado de rostros | ✅ | ADR 0014, 0042 (difuminado), 0188 (miniaturas en galería) |
 
 ## Etapa 4 — Interfaz según la referencia y feed social (hecha)
 
@@ -77,9 +77,9 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | `resolveAdmin` / ubicación contextual del EVENT desde su punto público, con detalle según sensibilidad | ✅ | `GeoService.contextFor`, `event.events.place` |
 | Lugar en `EventSummary.place` y `FeedPost.place`; tarjeta "Hace 12 min • Miraflores, Lima" | ✅ | `apps/mobile/src/components/post-card.tsx` |
 | Búsqueda de lugares sin geocodificador comercial (`GET /v1/geo/areas`) y mapa encuadrado en el lugar | ✅ | `apps/mobile/src/app/search.tsx`, `(tabs)/map.tsx` |
-| Atribución de datasets (`GET /v1/geo/datasets`) | ✅ API · ⏳ pantalla "Acerca de" | |
+| Atribución de datasets (`GET /v1/geo/datasets`) | ✅ | API + pantalla "Acerca de" (`about.tsx`) |
 | 8 distritos de Perú sin polígono en la fuente (p. ej. Santa Anita, La Punta) y nombres sin tildes | ⚠️ | Se muestra la ciudad; ver ADR 0016 |
-| Zonas horarias por polígono (países con varias) | ⏳ | timezone-boundary-builder |
+| Zonas horarias por polígono (países con varias) | ✅ | `geo-tz` (polígonos de timezone-boundary-builder) |
 
 ## Etapa 6 — Seguir y orden del feed (hecha)
 
@@ -91,7 +91,7 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | Proyección de señales de eventos vía outbox (sin leer el esquema event) | ✅ | `social.event_signals` |
 | Perfil público, búsqueda de personas, "Mi perfil público" | ✅ | `apps/mobile/src/app/u/[handle].tsx`, `search.tsx` |
 | Seguir evento y lugar desde la pantalla del evento | ✅ | `apps/mobile/src/app/event/[id].tsx` |
-| Seguir negocios y etiquetas | ⏳ | modelo listo (`target_type`) |
+| Seguir negocios y etiquetas | ✅ | `FollowType` BUSINESS/TAG en feed; pantallas `b/[handle]` y `tag/` |
 
 ## Etapa 7 — Alertas push (hecha)
 
@@ -117,7 +117,7 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | Uso medido por módulo, volcado en lote cada minuto | ✅ | `platform/metrics.ts`, `cost.usage_daily` |
 | Tablero: costo total, por módulo, diario y por 1.000 usuarios activos | ✅ | `GET /v1/admin/cost`, `pnpm cost:report`, pantalla "Costos" (admin) |
 | Precios de referencia versionados como datos | ✅ | `data/cost/prices.json` |
-| Avisar a administradores por push al cruzar un umbral | ⏳ | hoy va al log del worker |
+| Avisar a administradores por push al cruzar un umbral | ✅ | `budgetAlertText` conectado en `container.ts` |
 
 ## Etapa 9 — Moderación y bloqueos (hecha)
 
@@ -129,7 +129,7 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | Transparencia y apelaciones revisadas por otra persona | ✅ | `/v1/me/moderation`, `/v1/moderation/appeals` |
 | Bloquear personas (requisito de las tiendas) | ✅ | `social.blocks`, `/v1/blocks/:handle` |
 | App: denunciar, bloquear, avisos y herramientas de moderación, iOS y Android | ✅ | `apps/mobile/src/app/flag.tsx`, `moderation/`, `my-moderation.tsx` |
-| Difuminado de rostros y matrículas (D-08) | ⏳ | etapa de media |
+| Difuminado de rostros y matrículas (D-08) | ✅ | ADR 0042 (marcado manual en app, difuminado en servidor) |
 
 ## Etapa 10 — Seguridad de cuenta (hecha)
 
@@ -140,7 +140,7 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | Borrar la cuenta desde la app (App Store y Google Play) | ✅ | `DELETE /v1/me`, evento `AccountDeleted` |
 | Cada módulo borra o anonimiza lo suyo (perfil, posts, media en el almacenamiento, alertas, presencia generalizada) | ✅ | handlers `AccountDeleted` en social, report, media, alert |
 | App: renovación automática (una a la vez), refresh en Keychain/Keystore, pantalla de borrado con confirmación, iOS y Android | ✅ | `apps/mobile/src/lib/auth/refresh.ts`, `session.tsx`, `app/delete-account.tsx` |
-| Ver y cerrar sesiones de otros dispositivos | ⏳ | las familias ya existen; falta la pantalla |
+| Ver y cerrar sesiones de otros dispositivos | ✅ | pantalla `sessions.tsx` |
 
 ## Etapa 11 — Zonas guardadas y "cerca de mí" (hecha)
 
@@ -180,7 +180,7 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | Hash perceptual (pHash) con búsqueda por bandas indexadas | ✅ | `media.media.phash`, `phash_bands` |
 | Foto reciclada de otra persona → caso de moderación con señal de sistema | ✅ | `MediaReuseDetected`, `ModerationService.systemFlag` |
 | App: miniaturas en el mosaico del feed | ✅ | `components/post-card.tsx` |
-| Póster de video, `sim_media` en deduplicación, difuminado (D-08) | ⏳ | siguientes iteraciones |
+| Póster de video, `sim_media` en deduplicación, difuminado (D-08) | ✅ | póster `_poster`; hashes perceptuales en deduplicación (`mediaHashes`); ADR 0042 |
 
 ## Etapa 15 — Métricas de calidad y avisos a administración (hecha)
 
@@ -201,7 +201,7 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | Menciones a perfiles existentes, respetando bloqueos | ✅ | `social.post_mentions`, `FeedPost.mentions` |
 | Borrar un post propio (texto, etiquetas y media) | ✅ | `DELETE /v1/posts/:id`, `MediaService.purgeMedia` |
 | App: redactar, `#` y `@` tocables, pantalla de etiqueta, etiquetas en búsqueda, iOS y Android | ✅ | `app/compose.tsx`, `app/tag/[tag].tsx`, `components/rich-text.tsx` |
-| Aviso push por mención | ⏳ | decisión de producto (hoy solo se avisa de EVENTs) |
+| Aviso push por mención | ✅ | alertas MENTION (decisión del dueño 2026-09-29) |
 
 ## Etapa 17 — Perfiles de negocio (hecha)
 
@@ -446,7 +446,7 @@ propietario del 2026-09-30: sin señal de red, aceptaciones mínimas tras borrar
 Revisión del Blueprint del 2026-09-30 (tras ADR 0189): completada con ADR 0190–0196 (video 720p en Android queda
 BLOQUEADO hasta el primer build de desarrollo).
 
-Revisión del Blueprint del 2026-09-30 (tras ADR 0196), verificada contra el código, sin bloqueos:
+Revisión del Blueprint del 2026-09-30 (tras ADR 0196): completada con ADR 0197–0202 (la tabla de estado también se corrigió: 9 filas ⏳ ya estaban hechas).
 
 Bloqueadas o en espera:
 
