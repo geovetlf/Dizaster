@@ -16,7 +16,7 @@ describe("errores del servidor", () => {
   });
 
   it("un código desconocido cae al mensaje del servidor y, sin mensaje, al estado HTTP", () => {
-    expect(serverErrorMessage({ error: "SPLIT_WOULD_EMPTY", message: "No se puede" }, 409, "pt", tr)).toBe("No se puede");
+    expect(serverErrorMessage({ error: "SOME_FUTURE_CODE", message: "No se puede" }, 409, "pt", tr)).toBe("No se puede");
     expect(serverErrorMessage({}, 429, "en", tr)).toBe("[errRateLimited]");
     expect(serverErrorMessage(null, 502, "es", tr)).toBe("[errInternal]");
     expect(serverErrorMessage({ message: "  " }, 418, "en", tr)).toBe("HTTP 418");
