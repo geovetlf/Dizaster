@@ -863,7 +863,9 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
       throw new DomainError("FEATURE_DISABLED", "Los videos están pausados por ahora; puedes adjuntar fotos", 503);
     }
     const dailyBytes = await c.trust.uploadBytesQuota(c.db, session.userId, c.env.MEDIA_DAILY_UPLOAD_MB);
-    return reply.status(201).send(await c.media.createUpload(session.profileId, req.body, dailyBytes));
+    // ADR 0207: el cupo se comparte entre las cuentas del mismo teléfono.
+    const phoneId = await c.identity.sessionPhone(c.db, session.userId, session.sessionId);
+    return reply.status(201).send(await c.media.createUpload(session.profileId, req.body, dailyBytes, phoneId));
   });
 
   app.post("/v1/media/:id/complete", async (req) => {

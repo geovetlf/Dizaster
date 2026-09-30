@@ -132,23 +132,27 @@ export class MediaService {
 
   /**
    * `dailyBytes` (ADR 0072): tope de bytes subidos en 24 h por la cuenta, ya ajustado por reputación. Cuenta lo
-   * pedido que no fue rechazado, incluida esta subida.
+   * pedido que no fue rechazado, incluida esta subida. `phoneId` (ADR 0207): los cupos por hora y por día se
+   * comparten entre todas las cuentas del mismo teléfono.
    */
-  async createUpload(ownerProfileId: string, body: unknown, dailyBytes: number = Number.POSITIVE_INFINITY): Promise<CreateUploadResponse> {
+  async createUpload(ownerProfileId: string, body: unknown, dailyBytes: number = Number.POSITIVE_INFINITY, phoneId: string | null = null): Promise<CreateUploadResponse> {
     const parsed = CreateUploadRequest.safeParse(body);
     if (!parsed.success) throw new DomainError("INVALID_UPLOAD", parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; "));
     const req = parsed.data;
 
     const recent = await this.db.query<{ n: string }>(
-      `SELECT count(*) AS n FROM media.media WHERE owner_profile_id = $1 AND created_at > now() - interval '1 hour'`,
-      [ownerProfileId],
+      `SELECT greatest(count(*) FILTER (WHERE owner_profile_id = $1), count(*) FILTER (WHERE phone_id = $2)) AS n
+         FROM media.media WHERE (owner_profile_id = $1 OR phone_id = $2) AND created_at > now() - interval '1 hour'`,
+      [ownerProfileId, phoneId],
     );
     if (Number(recent.rows[0]!.n) >= this.limits.uploadsPerHour) throw new DomainError("RATE_LIMITED", "Demasiadas subidas en la última hora", 429);
     if (Number.isFinite(dailyBytes)) {
       const day = await this.db.query<{ b: string }>(
-        `SELECT coalesce(sum(bytes + coalesce(poster_bytes, 0)), 0) AS b FROM media.media
-          WHERE owner_profile_id = $1 AND created_at > now() - interval '24 hours' AND state NOT IN ('REJECTED', 'DELETED')`,
-        [ownerProfileId],
+        `SELECT greatest(coalesce(sum(bytes + coalesce(poster_bytes, 0)) FILTER (WHERE owner_profile_id = $1), 0),
+                         coalesce(sum(bytes + coalesce(poster_bytes, 0)) FILTER (WHERE phone_id = $2), 0)) AS b
+           FROM media.media
+          WHERE (owner_profile_id = $1 OR phone_id = $2) AND created_at > now() - interval '24 hours' AND state NOT IN ('REJECTED', 'DELETED')`,
+        [ownerProfileId, phoneId],
       );
       if (Number(day.rows[0]!.b) + req.sizeBytes + (req.poster?.sizeBytes ?? 0) > dailyBytes) {
         throw new DomainError("DAILY_UPLOAD_QUOTA", "Llegaste al máximo de datos subidos en 24 horas", 429);
@@ -166,10 +170,10 @@ export class MediaService {
       : null;
     await this.db.query(
       `INSERT INTO media.media (id, owner_profile_id, kind, state, delivery, captured_in_app, captured_at, duration_ms, width, height,
-                                bytes, mime, sha256, storage_key_original, upload_expires_at, poster_bytes, poster_sha256, content_warning, redactions)
-       VALUES ($1, $2, $3, 'PENDING_UPLOAD', 'FILE', $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)`,
+                                bytes, mime, sha256, storage_key_original, upload_expires_at, poster_bytes, poster_sha256, content_warning, redactions, phone_id)
+       VALUES ($1, $2, $3, 'PENDING_UPLOAD', 'FILE', $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)`,
       [id, ownerProfileId, req.kind, req.capturedInApp, req.capturedAt ?? null, req.durationMs ?? null, req.width ?? null, req.height ?? null,
-        req.sizeBytes, req.mime, req.sha256, key, expiresAt, req.poster?.sizeBytes ?? null, req.poster?.sha256 ?? null, req.graphic ? "GRAPHIC" : null, JSON.stringify(req.redactions)],
+        req.sizeBytes, req.mime, req.sha256, key, expiresAt, req.poster?.sizeBytes ?? null, req.poster?.sha256 ?? null, req.graphic ? "GRAPHIC" : null, JSON.stringify(req.redactions), phoneId],
     );
     return { mediaId: id, upload, ...(posterUpload ? { posterUpload } : {}), expiresAt: expiresAt.toISOString() };
   }
@@ -574,6 +578,8 @@ export class MediaService {
         [r.id, now],
       );
     }
+    // El teléfono solo sirve para el cupo de 24 h (ADR 0207): no se guarda más de 2 días.
+    await this.db.query(`UPDATE media.media SET phone_id = NULL WHERE phone_id IS NOT NULL AND created_at < $1::timestamptz - interval '2 days'`, [now]);
     return { abandoned: abandoned.rows.length, originalsDeleted: expired.rows.length };
   }
 

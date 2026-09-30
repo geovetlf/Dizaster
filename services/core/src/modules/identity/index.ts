@@ -410,6 +410,20 @@ export class IdentityService {
     return rows[0] ? { createdAt: rows[0].created_at, replacedAt: rows[0].replaced_at } : null;
   }
 
+  /**
+   * Teléfono de la sesión (ADR 0207): el dispositivo con el que se inició esta sesión, resuelto a su `phoneId`
+   * (ADR 0068). Null si el token es anterior a los ids de sesión o la sesión no registró dispositivo.
+   */
+  async sessionPhone(q: Queryable, userId: string, sessionId: string | undefined): Promise<string | null> {
+    if (!sessionId) return null;
+    const { rows } = await q.query<{ device_id: string }>(
+      `SELECT device_id FROM identity.sessions WHERE family_id = $1 AND user_id = $2 AND device_id IS NOT NULL ORDER BY created_at DESC LIMIT 1`,
+      [sessionId, userId],
+    );
+    const deviceId = rows[0]?.device_id;
+    return deviceId ? ((await this.ownedDevice(q, userId, deviceId))?.phoneId ?? null) : null;
+  }
+
   async ownedDevice(q: Queryable, userId: string, deviceId: string): Promise<{ id: string; platform: DevicePlatform; phoneId: string } | null> {
     // phoneId: el primer registro de este mismo teléfono, sea de la cuenta que sea (ADR 0068). Sin clave, el propio.
     const { rows } = await q.query<{ id: string; platform: DevicePlatform; phone_id: string }>(
