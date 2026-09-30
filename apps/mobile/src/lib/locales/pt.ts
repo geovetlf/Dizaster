@@ -117,6 +117,7 @@ export const pt: Record<MessageKey, string> = {
   viewOriginal: "Ver original (com motivo)",
   originalLogTitle: "Originais de fotos e vídeos vistos pela moderação",
   close: "Fechar",
+  viewPhoto: "Ver foto completa",
   cameraOnlyHint: "Um relato só aceita fotos ou vídeos feitos agora com a câmera. Para compartilhar da galeria, publique um post.",
   errCameraOnly: "Um relato só aceita fotos ou vídeos feitos com a câmera do app.",
   updateRequiredTitle: "Atualize o app",

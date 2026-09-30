@@ -1,9 +1,9 @@
 import type { MediaView } from "@dizaster/contracts";
 import { useVideoPlayer, VideoView } from "expo-video";
 import { useState } from "react";
-import { Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { t } from "../lib/i18n";
-import { duration } from "../lib/ui/format";
+import { duration, imageUri } from "../lib/ui/format";
 import { SensitiveCover } from "./sensitive-cover";
 
 /** Galería pública de un evento: solo variantes saneadas que el servidor ya aprobó para mostrar. */
@@ -20,8 +20,26 @@ export function EventMedia({ media }: { media: MediaView[] }) {
   );
 }
 
+/** En la tira, la miniatura; la imagen grande solo se descarga al abrirla (ADR 0188, ahorra datos). */
 function Photo({ m }: { m: MediaView }) {
-  return <Image source={{ uri: m.url }} style={[styles.item, aspect(m)]} resizeMode="cover" accessibilityIgnoresInvertColors />;
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <Pressable accessibilityRole="imagebutton" accessibilityLabel={t("viewPhoto")} onPress={() => setOpen(true)}>
+        <Image source={{ uri: imageUri(m, "small") }} style={[styles.item, aspect(m)]} resizeMode="cover" accessibilityIgnoresInvertColors />
+      </Pressable>
+      {open ? (
+        <Modal visible animationType="fade" onRequestClose={() => setOpen(false)} supportedOrientations={["portrait", "landscape"]}>
+          <View style={styles.viewer}>
+            <Image source={{ uri: imageUri(m, "large") }} style={StyleSheet.absoluteFill} resizeMode="contain" accessibilityIgnoresInvertColors />
+            <Pressable accessibilityRole="button" accessibilityLabel={t("close")} hitSlop={12} onPress={() => setOpen(false)} style={styles.closeBtn}>
+              <Text style={styles.closeText}>✕</Text>
+            </Pressable>
+          </View>
+        </Modal>
+      ) : null}
+    </>
+  );
 }
 
 /** Se muestra el póster y el video solo se carga al tocar: ahorra datos móviles (cost-first). */
@@ -56,5 +74,8 @@ const styles = StyleSheet.create({
   video: { alignItems: "center", justifyContent: "center", backgroundColor: "#11161D" },
   play: { width: 48, height: 48, borderRadius: 24, backgroundColor: "#000000AA", alignItems: "center", justifyContent: "center" },
   playText: { color: "#FFFFFF", fontSize: 20 },
+  viewer: { flex: 1, backgroundColor: "#000000" },
+  closeBtn: { position: "absolute", top: 48, end: 16, width: 40, height: 40, borderRadius: 20, backgroundColor: "#000000AA", alignItems: "center", justifyContent: "center" },
+  closeText: { color: "#FFFFFF", fontSize: 18 },
   duration: { position: "absolute", end: 8, bottom: 8, color: "#FFFFFF", backgroundColor: "#000000AA", paddingHorizontal: 6, borderRadius: 4, fontSize: 12 },
 });
