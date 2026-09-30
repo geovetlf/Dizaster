@@ -1,5 +1,5 @@
 {
- "version": "emergency-2026.09.2",
+ "version": "emergency-2026.09.3",
  "numbers": [
   {
    "country": "PE",
@@ -12,9 +12,9 @@
     "pt": "Polícia Nacional do Peru",
     "fr": "Police nationale du Pérou"
    },
-   "source": "Pendiente de contrastar con fuente oficial peruana (gob.pe)",
-   "verification": "NEEDS_VERIFICATION",
-   "verifiedAt": null
+   "source": "PRONATEL (MTC), 'Central 911' (2023-02-20): https://www.pronatel.gob.pe/central911/informacion_911_20022023.pdf ; MIMP, directorio de emergencias: https://www.mimp.gob.pe/intranet/ogrh/Directorio_telefonico_en_casos_de_emergencias.pdf",
+   "verification": "VERIFIED",
+   "verifiedAt": "2026-09-30"
   },
   {
    "country": "PE",
@@ -27,9 +27,9 @@
     "pt": "Bombeiros",
     "fr": "Pompiers"
    },
-   "source": "Pendiente de contrastar con fuente oficial peruana (gob.pe)",
-   "verification": "NEEDS_VERIFICATION",
-   "verifiedAt": null
+   "source": "PRONATEL (MTC), 'Central 911' (2023-02-20): https://www.pronatel.gob.pe/central911/informacion_911_20022023.pdf ; MIMP, directorio de emergencias: https://www.mimp.gob.pe/intranet/ogrh/Directorio_telefonico_en_casos_de_emergencias.pdf",
+   "verification": "VERIFIED",
+   "verifiedAt": "2026-09-30"
   },
   {
    "country": "PE",
@@ -42,9 +42,9 @@
     "pt": "SAMU (ambulâncias)",
     "fr": "SAMU (ambulances)"
    },
-   "source": "Pendiente de contrastar con fuente oficial peruana (gob.pe)",
-   "verification": "NEEDS_VERIFICATION",
-   "verifiedAt": null
+   "source": "PRONATEL (MTC), 'Central 911' (2023-02-20): https://www.pronatel.gob.pe/central911/informacion_911_20022023.pdf ; MIMP, directorio de emergencias: https://www.mimp.gob.pe/intranet/ogrh/Directorio_telefonico_en_casos_de_emergencias.pdf",
+   "verification": "VERIFIED",
+   "verifiedAt": "2026-09-30"
   },
   {
    "country": "PE",
@@ -57,7 +57,7 @@
     "pt": "Defesa Civil",
     "fr": "Défense civile"
    },
-   "source": "Pendiente de contrastar con fuente oficial peruana (gob.pe)",
+   "source": "Sin confirmar: la página de contacto de INDECI (portal.indeci.gob.pe/contactenos) no lista 115; gob.pe no accesible desde el entorno de trabajo",
    "verification": "NEEDS_VERIFICATION",
    "verifiedAt": null
   },
@@ -72,9 +72,9 @@
     "pt": "Linha 100 (violência familiar e sexual)",
     "fr": "Ligne 100 (violences familiales et sexuelles)"
    },
-   "source": "Pendiente de contrastar con fuente oficial peruana (gob.pe)",
-   "verification": "NEEDS_VERIFICATION",
-   "verifiedAt": null
+   "source": "PRONATEL (MTC), 'Central 911' (2023-02-20), Línea 100 del Programa Aurora (MIMP): https://www.pronatel.gob.pe/central911/informacion_911_20022023.pdf",
+   "verification": "VERIFIED",
+   "verifiedAt": "2026-09-30"
   },
   {
    "country": "ES",

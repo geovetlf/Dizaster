@@ -386,6 +386,7 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | Etiquetas del mapa en tu idioma (§6.1) | ✅ | ADR 0193: estilos por idioma (es/en/pt/fr) sobre las mismas teselas y {lang} en la URL del estilo |
 | Decodificación de media aislada (§13.1) | ✅ | ADR 0194: proceso hijo sin entorno ni red, tiempo máximo por archivo, heap acotado, reciclado; un fallo solo rechaza ese archivo |
 | Ubicación simulada en iOS (§8.2, paridad) | ✅ | ADR 0195: parche mínimo de expo-location con isSimulatedBySoftware (iOS 15+), prueba que detecta si se pierde al actualizar |
+| Números de emergencia de Perú verificados (§5.11, C-06) | ✅ | ADR 0196: 105, 116, 106 y 100 contrastados con PRONATEL y MIMP (gob.pe); 115 sin confirmar; resto de países pendiente |
 | Licencias, auditoría, SBOM, Dependabot; respaldo con prueba de restauración en CI | ✅ | ADR 0070, `scripts/supply-chain.mjs`, `scripts/db-restore-check.mjs` |
 | Idioma de la app elegible en el perfil (es/en/pt/fr o del teléfono) | ✅ | ADR 0069, `app/language.tsx` |
 | Varias cuentas en un teléfono corroboran como una (clave seudónima del teléfono) | ✅ | ADR 0068, migración 0036 |
@@ -437,11 +438,10 @@ Revisión del Blueprint del 2026-09-30 (tras ADR 0182): completada con ADR 0183�
 propietario del 2026-09-30: sin señal de red, aceptaciones mínimas tras borrar la cuenta, todo público en V1).
 
 Revisión del Blueprint del 2026-09-30 (tras ADR 0189), verificada contra el código, sin bloqueos:
-1. Video 720p también en Android (§12.1, paridad).
-2. Números de emergencia verificados contra fuentes oficiales, empezando por Perú (§5.11, C-06).
 
 Bloqueadas o en espera:
 
+- **BLOQUEADA** — Video 720p también en Android (§12.1, paridad): necesita transcodificar en el teléfono (módulo local con Media3 Transformer, Apache-2.0, sin coste). Es código nativo nuevo que no se puede compilar ni probar aquí (sin SDK de Android); se hace con el primer build de desarrollo (EXPO_TOKEN). Mientras tanto el límite de 60 MB acota el coste.
 - **EN ESPERA** — D1: días de retención de la ubicación precisa en categorías sensibles (§2 C-07).
 - **EN ESPERA** — D3: qué se muestra de la reputación en el perfil público (§5.2 vs §13.3).
 - **PENDING DECISION** — D2 (parte de ADR 0156): la respuesta "No, es otro" se guarda en `event.dedup_reviews.reporter_answer`; falta decidir si divide el evento, va a la cola de duplicados u otra cosa. Nada se mueve hasta entonces.

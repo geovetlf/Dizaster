@@ -82,10 +82,11 @@ describe("cola offline", () => {
 });
 
 describe("emergencia offline", () => {
-  it("Perú devuelve sus números y avisa de que falta verificación oficial", () => {
+  it("Perú devuelve sus números, ya contrastados con fuentes oficiales (ADR 0196)", () => {
     const r = lookupEmergency(dataset, "PE");
     expect(r.numbers.map((n) => n.number)).toEqual(expect.arrayContaining(["105", "116", "106"]));
-    expect(r.unverified).toBe(true);
+    expect(r.unverified).toBe(false);
+    expect(lookupEmergency(dataset, "BR").unverified).toBe(true);
     expect(r.fallbackToGsm112).toBe(false);
   });
   it("país sin datos cae al 112 GSM con advertencia", () => {
