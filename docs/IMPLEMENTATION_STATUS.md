@@ -454,8 +454,7 @@ BLOQUEADO hasta el primer build de desarrollo).
 
 Revisión del Blueprint del 2026-09-30 (tras ADR 0196): completada con ADR 0197–0202 (la tabla de estado también se corrigió: 9 filas ⏳ ya estaban hechas).
 
-Revisión del Blueprint del 2026-09-30 (tras ADR 0202), verificada contra el código, sin bloqueos:
-
+Revisión del Blueprint del 2026-09-30 (tras ADR 0202): completada con ADR 0203–0208.
 
 Bloqueadas o en espera:
 
