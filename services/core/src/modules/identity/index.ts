@@ -607,7 +607,7 @@ export class IdentityService {
   }
   // ───────────── Exportación de datos personales (ADR 0038) ─────────────
 
-  /** Cuenta, dispositivos y sesiones. Sin secretos: ni hashes de token ni tokens push. */
+  /** Cuenta, dispositivos, sesiones y aceptaciones. Sin secretos: ni hashes de token ni tokens push. */
   async exportData(q: Queryable, userId: string): Promise<Record<string, unknown[]>> {
     const account = await q.query(`SELECT id, status, roles, primary_locale, created_at FROM identity.users WHERE id = $1`, [userId]);
     const logins = await q.query(`SELECT provider, verified_at, created_at FROM identity.auth_identities WHERE user_id = $1`, [userId]);
@@ -618,7 +618,11 @@ export class IdentityService {
     const sessions = await q.query(
       `SELECT id, device_id, created_at, expires_at, revoked_at, revoke_reason FROM identity.sessions WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1000`, [userId],
     );
-    return { account: account.rows, logins: logins.rows, devices: devices.rows, sessions: sessions.rows };
+    // Historial de consentimiento (ADR 0209): qué documento y versión acepté, cuándo y desde qué plataforma.
+    const policyAcceptances = await q.query(
+      `SELECT kind, version, platform, app_version, accepted_at FROM identity.policy_acceptances WHERE user_id = $1 ORDER BY accepted_at`, [userId],
+    );
+    return { account: account.rows, logins: logins.rows, devices: devices.rows, sessions: sessions.rows, policyAcceptances: policyAcceptances.rows };
   }
 }
 

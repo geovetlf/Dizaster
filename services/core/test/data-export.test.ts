@@ -11,7 +11,9 @@ describe("exportar mis datos (ADR 0038)", () => {
     const [yo, otra] = await Promise.all([createUser(t, "exporta"), createUser(t, "ajena")]);
     const auth = { authorization: `Bearer ${yo.token}` };
     const rep = (await submit(t, yo, reportBody(yo, { category: "infra.water_outage", pin: offset(LIMA, 3000), text: "Sin agua desde ayer" }))).body;
-    await t.app.inject({ method: "POST", url: "/v1/posts", headers: auth, payload: { text: "Mi post #Lima" } });
+    const mine = (await t.app.inject({ method: "POST", url: "/v1/posts", headers: auth, payload: { text: "Mi post primero" } })).json() as { postId: string };
+    expect((await t.app.inject({ method: "PATCH", url: `/v1/posts/${mine.postId}`, headers: auth, payload: { text: "Mi post #Lima" } })).statusCode).toBe(200);
+    await t.c.db.query(`INSERT INTO identity.policy_acceptances (id, user_id, kind, version) VALUES (gen_random_uuid(), $1, 'TERMS', '2026-10')`, [yo.userId]);
     await t.app.inject({ method: "POST", url: "/v1/posts", headers: { authorization: `Bearer ${otra.token}` }, payload: { text: "Post de otra persona" } });
     await t.app.inject({ method: "POST", url: "/v1/flags", headers: { authorization: `Bearer ${otra.token}` }, payload: { targetType: "POST", targetId: rep.postId, reason: "SPAM" } });
     await t.c.dispatcher.drain();
@@ -28,6 +30,9 @@ describe("exportar mis datos (ADR 0038)", () => {
     expect(s.social["profile"]![0]).toMatchObject({ id: yo.profileId });
     expect((s.social["posts"] as { text: string | null }[]).map((p) => p.text).sort()).toEqual(["Mi post #Lima", "Sin agua desde ayer"]);
     expect(s.reports["reports"]![0]).toMatchObject({ id: rep.reportId, category_code: "infra.water_outage", presence_band: expect.any(String) });
+    // ADR 0209: mis ediciones y mi historial de consentimiento.
+    expect(s.social["postEdits"]).toEqual([expect.objectContaining({ post_id: mine.postId, previous_text: "Mi post primero" })]);
+    expect(s.identity["policyAcceptances"]).toEqual([expect.objectContaining({ kind: "TERMS", version: "2026-10" })]);
     // Quién denunció mi contenido nunca sale; mis propias denuncias sí.
     expect(s.moderation["flagsISent"]).toEqual([]);
 

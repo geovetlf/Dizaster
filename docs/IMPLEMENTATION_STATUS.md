@@ -399,6 +399,7 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | Cuarentena del outbox (§4.2, §6.2, §5.22) | ✅ | ADR 0206: tras 15 intentos a cuarentena; alerta outbox_dead; pnpm outbox dead/replay |
 | Cupo de subidas por teléfono (§5.18, §12.2) | ✅ | ADR 0207: cupos por hora y MB/día compartidos entre cuentas del mismo teléfono; phone_id se vacía a los 2 días |
 | Tope de bloqueos y lista acotada (§13.1) | ✅ | ADR 0208: máx. 2000 personas + negocios (409 LIMIT_REACHED), /v1/me/blocks con LIMIT |
+| Historial de ediciones en borrado y exportación; consentimiento exportado (§13.2) | ✅ | ADR 0209: post_edits se borra con el post o la cuenta; export incluye postEdits y policyAcceptances |
 | Licencias, auditoría, SBOM, Dependabot; respaldo con prueba de restauración en CI | ✅ | ADR 0070, `scripts/supply-chain.mjs`, `scripts/db-restore-check.mjs` |
 | Idioma de la app elegible en el perfil (es/en/pt/fr o del teléfono) | ✅ | ADR 0069, `app/language.tsx` |
 | Varias cuentas en un teléfono corroboran como una (clave seudónima del teléfono) | ✅ | ADR 0068, migración 0036 |
@@ -455,6 +456,13 @@ BLOQUEADO hasta el primer build de desarrollo).
 Revisión del Blueprint del 2026-09-30 (tras ADR 0196): completada con ADR 0197–0202 (la tabla de estado también se corrigió: 9 filas ⏳ ya estaban hechas).
 
 Revisión del Blueprint del 2026-09-30 (tras ADR 0202): completada con ADR 0203–0208.
+
+Revisión del Blueprint del 2026-09-30 (tras ADR 0208), verificada contra el código, sin bloqueos:
+
+1. Borrar la cuenta limpia el teléfono (§13.2, §5.1): cola de reportes (con GPS), borrador y su media, registro de errores.
+2. Cerrar sesión en este dispositivo (§5.1): `api.logout` existe pero ninguna pantalla lo usa.
+3. Enlaces rotos y contenido borrado con pantallas propias (§5.x enlaces): pantalla "no encontrado" traducida, reintento y carga.
+4. Retención de datos de identidad (§13.2): códigos de email y fallos de MFA viejos no se borran nunca.
 
 Bloqueadas o en espera:
 

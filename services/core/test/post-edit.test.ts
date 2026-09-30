@@ -63,4 +63,22 @@ describe("editar posts (ADR 0136)", () => {
     const detail = (await t.app.inject({ url: `/v1/moderation/cases/${caseId}`, headers: { authorization: `Bearer ${token}` } })).json() as CaseDetail;
     expect(detail.edits).toMatchObject([{ previousText: "Versión uno" }]);
   });
+
+  it("borrar el post borra también su historial de ediciones (ADR 0209)", async () => {
+    const id = await create(ana, "Texto que luego cambio");
+    expect((await edit(ana, id, "Texto nuevo")).statusCode).toBe(200);
+    const count = async () => (await t.c.db.query<{ n: number }>(`SELECT count(*)::int AS n FROM social.post_edits WHERE post_id = $1`, [id])).rows[0]!.n;
+    expect(await count()).toBe(1);
+    expect((await t.app.inject({ method: "DELETE", url: `/v1/posts/${id}`, headers: auth(ana) })).statusCode).toBe(204);
+    expect(await count()).toBe(0);
+  });
+
+  it("borrar la cuenta borra el historial de ediciones de sus posts (ADR 0209)", async () => {
+    const cata = await createUser(t, "cata_edita");
+    const id = await create(cata, "Algo que edité");
+    expect((await edit(cata, id, "Algo editado")).statusCode).toBe(200);
+    await t.c.social.anonymizeProfile(t.c.db, cata.profileId);
+    const { rows } = await t.c.db.query<{ n: number }>(`SELECT count(*)::int AS n FROM social.post_edits WHERE post_id = $1`, [id]);
+    expect(rows[0]!.n).toBe(0);
+  });
 });

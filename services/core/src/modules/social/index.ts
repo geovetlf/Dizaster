@@ -196,6 +196,12 @@ export class SocialService {
         WHERE author_type = 'PROFILE' AND author_id = $1`,
       [profileId],
     );
+    // El historial de ediciones guarda textos anteriores (ADR 0209): se borra con el post.
+    await q.query(
+      `DELETE FROM social.post_edits WHERE editor_profile_id = $1
+          OR post_id IN (SELECT id FROM social.posts WHERE author_type = 'PROFILE' AND author_id = $1)`,
+      [profileId],
+    );
     await q.query(`UPDATE social.comments SET text = '-', deleted_at = COALESCE(deleted_at, now()) WHERE author_profile_id = $1`, [profileId]);
     await q.query(`DELETE FROM social.reactions WHERE profile_id = $1`, [profileId]);
     await q.query(`DELETE FROM social.external_shares WHERE profile_id = $1`, [profileId]);
@@ -217,6 +223,7 @@ export class SocialService {
     const ids = rows.map((r) => r.id);
     if (ids.length === 0) return;
     await q.query(`UPDATE social.posts SET text = NULL, deleted_at = coalesce(deleted_at, now()), updated_at = now() WHERE author_type = 'BUSINESS' AND author_id = ANY($1)`, [ids]);
+    await q.query(`DELETE FROM social.post_edits WHERE post_id IN (SELECT id FROM social.posts WHERE author_type = 'BUSINESS' AND author_id = ANY($1))`, [ids]);
     await q.query(`DELETE FROM social.follows WHERE target_type = 'BUSINESS' AND target_id = ANY($1::text[])`, [ids]);
   }
 
@@ -714,6 +721,7 @@ export class SocialService {
     if (!r || r.deleted || !r.mine) throw notFound("Post");
     if (r.kind === "REPORT" && !opts.withdrawReport) throw new DomainError("REPORT_POST", "Un reporte no se borra desde aquí: forma parte de la evidencia de un evento", 409);
     await q.query(`UPDATE social.posts SET text = NULL, public_point = NULL, deleted_at = now(), updated_at = now() WHERE id = $1`, [postId]);
+    await q.query(`DELETE FROM social.post_edits WHERE post_id = $1`, [postId]);
     await q.query(`DELETE FROM social.post_tags WHERE post_id = $1`, [postId]);
     await q.query(`DELETE FROM social.post_mentions WHERE post_id = $1`, [postId]);
     await q.query(`DELETE FROM social.post_business_mentions WHERE post_id = $1`, [postId]);
@@ -1231,7 +1239,12 @@ export class SocialService {
        UNION ALL
        SELECT bp.handle, bb.created_at FROM social.business_blocks bb JOIN social.business_profiles bp ON bp.id = bb.business_id WHERE bb.blocker_profile_id = $1`, [p],
     );
+    // Mis ediciones (ADR 0209): el texto anterior de mis propios posts.
+    const postEdits = await q.query(
+      `SELECT post_id, previous_text, edited_at FROM social.post_edits WHERE editor_profile_id = $1 ORDER BY edited_at DESC LIMIT 10000`, [p],
+    );
     return {
+      postEdits: postEdits.rows,
       profile: profile.rows, businesses: businesses.rows, posts: posts.rows, comments: comments.rows,
       reactions: reactions.rows, commentReactions: commentReactions.rows, follows: follows.rows, blocks: blocks.rows, externalShares: externalShares.rows,
     };
