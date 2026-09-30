@@ -1,4 +1,5 @@
 import {
+  localizedText,
   CASE_CLAIM_MINUTES,
   TransparencyQuery,
   transparencyCount,
@@ -574,7 +575,7 @@ export class ModerationService {
   private async preview(q: Queryable, type: FlagTargetType, id: string): Promise<ModerationTargetPreview> {
     if (type === "EVENT") {
       const e = await this.events.getEvent(q, id);
-      const title = e.title ? (e.title["es"] ?? Object.values(e.title)[0] ?? null) : null;
+      const title = localizedText(e.title, "es");
       return { type, id, text: title, authorHandle: null, state: e.publicVerificationState, categoryCode: e.categoryCode };
     }
     const t = await this.social.moderationTarget(q, type, id);

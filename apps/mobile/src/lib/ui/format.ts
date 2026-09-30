@@ -1,10 +1,10 @@
-import type { AreaSearchResult, BBox, FeedPost, Lang, MediaView, Units } from "@dizaster/contracts";
+import { formatDateTime, formatTimeAgo, LANGUAGES, type AreaSearchResult, type BBox, type FeedPost, type Lang, type MediaView, type Units } from "@dizaster/contracts";
 
-const WORDS: Record<Lang, { now: string; ago: (x: string) => string; over: (distance: string) => string; within: (distance: string) => string }> = {
-  es: { now: "Ahora", ago: (x) => `Hace ${x}`, over: (d) => `a más de ${d}`, within: (d) => `a menos de ${d}` },
-  en: { now: "Now", ago: (x) => `${x} ago`, over: (d) => `over ${d} away`, within: (d) => `within ${d}` },
-  pt: { now: "Agora", ago: (x) => `Há ${x}`, over: (d) => `a mais de ${d}`, within: (d) => `a menos de ${d}` },
-  fr: { now: "À l'instant", ago: (x) => `Il y a ${x}`, over: (d) => `à plus de ${d}`, within: (d) => `à moins de ${d}` },
+const WORDS: Record<Lang, { over: (distance: string) => string; within: (distance: string) => string }> = {
+  es: { over: (d) => `a más de ${d}`, within: (d) => `a menos de ${d}` },
+  en: { over: (d) => `over ${d} away`, within: (d) => `within ${d}` },
+  pt: { over: (d) => `a mais de ${d}`, within: (d) => `a menos de ${d}` },
+  fr: { over: (d) => `à plus de ${d}`, within: (d) => `à moins de ${d}` },
 };
 
 let units: Units = "metric";
@@ -18,12 +18,17 @@ export function formatKm(km: number, u: Units = units): string {
   return `${mi < 10 ? Math.round(mi * 10) / 10 : Math.round(mi)} mi`;
 }
 
-/** "Hace 12 min", "Hace 3 h", "Hace 2 d". */
+/** "Hace 12 min", "Hace 3 h", "Hace 2 d" (Language Engine, ADR 0216). */
 export function timeAgo(iso: string, lang: Lang, now = new Date()): string {
-  const s = Math.max(0, Math.round((now.getTime() - new Date(iso).getTime()) / 1000));
-  if (s < 60) return WORDS[lang].now;
-  const [n, unit] = s < 3600 ? [Math.floor(s / 60), "min"] : s < 86_400 ? [Math.floor(s / 3600), "h"] : [Math.floor(s / 86_400), lang === "fr" ? "j" : "d"];
-  return WORDS[lang].ago(`${n} ${unit}`);
+  return formatTimeAgo((now.getTime() - new Date(iso).getTime()) / 1000, lang);
+}
+
+let regionalLocale: string | null = null;
+/** Locale de formatos de la app (idioma + región, p. ej. "es-PE"); lo fija i18n al resolver el idioma. */
+export function setFormatLocale(l: string | null) { regionalLocale = l; }
+/** Locale para fechas y números en `lang`: el resuelto si es del mismo idioma, si no el por defecto del idioma. */
+export function localeFor(lang: Lang): string {
+  return regionalLocale && regionalLocale.split("-")[0] === lang ? regionalLocale : LANGUAGES[lang].defaultLocale;
 }
 
 /** "a menos de 2 km" a partir del tramo que da el servidor ("<2km"). */
@@ -101,11 +106,7 @@ export function formatInZone(iso: string, lang: Lang, timeZone: string | undefin
   const opts: Intl.DateTimeFormatOptions = style === "time"
     ? { hour: "2-digit", minute: "2-digit" }
     : { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" };
-  try {
-    return new Date(iso).toLocaleString(lang === "pt" ? "pt-BR" : lang, timeZone ? { ...opts, timeZone } : opts);
-  } catch {
-    return null;
-  }
+  return formatDateTime(iso, localeFor(lang), timeZone ? { ...opts, timeZone } : opts);
 }
 
 /**

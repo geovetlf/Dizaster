@@ -508,7 +508,7 @@ export const pt: Record<MessageKey, string> = {
   deleteAccount: "Excluir minha conta",
   signOut: "Sair neste telefone",
   signOutConfirm: "O que sua conta salvou neste telefone será apagado. Sua conta e suas publicações continuam iguais.",
-  signOutPending: "Você tem {n} relatos não enviados: serão descartados.",
+  signOutPending: "{n, plural, one {Você tem # relato não enviado: será descartado.} other {Você tem # relatos não enviados: serão descartados.}}",
   deleteAccountIntro: "Isso não pode ser desfeito. Ao excluir sua conta:",
   deleteAccountPoint1: "Seu perfil desaparece e suas publicações, comentários e curtidas são removidos.",
   deleteAccountPoint2: "Suas fotos e vídeos, seus alertas, regiões e itens seguidos são apagados.",

@@ -1,4 +1,4 @@
-import { langFromLocale, SUPPORTED_LANGS, type Lang } from "@dizaster/contracts";
+import { LANGUAGES, resolveLocale, SUPPORTED_LANGS, type Lang } from "@dizaster/contracts";
 
 /** Idioma elegido en el perfil (ADR 0069). "system" = el del teléfono. */
 export type LanguagePref = Lang | "system";
@@ -6,10 +6,11 @@ export type LanguagePref = Lang | "system";
 export const LANGUAGE_OPTIONS: readonly LanguagePref[] = ["system", ...SUPPORTED_LANGS];
 
 /** Cada idioma se nombra en sí mismo: quien no entiende el idioma actual encuentra el suyo. */
-export const LANGUAGE_NAMES: Record<Lang, string> = { es: "Español", en: "English", pt: "Português", fr: "Français" };
+export const LANGUAGE_NAMES = Object.fromEntries(SUPPORTED_LANGS.map((l) => [l, LANGUAGES[l].nativeName])) as Record<Lang, string>;
 
+/** Elección manual → idioma del teléfono → respaldo global (Language Engine, ADR 0216). */
 export function resolveLang(pref: LanguagePref, deviceLocale: string | null | undefined): Lang {
-  return pref === "system" ? langFromLocale(deviceLocale) : pref;
+  return resolveLocale({ pref, deviceLocales: [deviceLocale] }).lang;
 }
 
 /** Lo guardado puede venir de una versión con otros idiomas: cualquier cosa desconocida es "system". */

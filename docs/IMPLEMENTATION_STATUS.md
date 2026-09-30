@@ -406,6 +406,7 @@ Actualizado: 2026-09-29 (etapa 4: interfaz y feed)
 | Corroboración desde teléfonos distintos (§8.2, §10.2) | ✅ | ADR 0213: publicar un evento pendiente cuenta una vez por persona y por teléfono |
 | Personal suspendido sin poderes; conflicto de interés (§13.1, §13.3) | ✅ | ADR 0214: roles solo con cuenta activa; nadie modera ni decide apelaciones sobre lo propio |
 | Evento en seguimiento vuelve a activo; inactividad por país (§5.7, §10.1) | ✅ | ADR 0215: actividad nueva reactiva MONITORING con entrada en timeline; ventanas con ajuste por país |
+| DIZASTER Language Engine: registro único de idiomas, locale regional, plurales ICU, formatos, respaldo (§5.15) | ✅ | ADR 0216: extiende el i18n existente; `docs/LANGUAGE_ENGINE.md`; BD sin lista de idiomas (0092); pruebas de completitud |
 | Licencias, auditoría, SBOM, Dependabot; respaldo con prueba de restauración en CI | ✅ | ADR 0070, `scripts/supply-chain.mjs`, `scripts/db-restore-check.mjs` |
 | Idioma de la app elegible en el perfil (es/en/pt/fr o del teléfono) | ✅ | ADR 0069, `app/language.tsx` |
 | Varias cuentas en un teléfono corroboran como una (clave seudónima del teléfono) | ✅ | ADR 0068, migración 0036 |

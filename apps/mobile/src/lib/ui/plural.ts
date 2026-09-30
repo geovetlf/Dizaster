@@ -1,13 +1,10 @@
-import type { Lang } from "@dizaster/contracts";
+import { pluralCategory as cldrPlural, type Lang } from "@dizaster/contracts";
 
 /**
- * Categoría plural CLDR para los idiomas de la app (ADR 0079), sin depender de `Intl.PluralRules` (no está en todos
- * los motores de JS del teléfono). Solo cantidades enteras, que es lo que se cuenta en la interfaz.
- * - es, en: "one" solo para 1.
- * - pt (Brasil) y fr: "one" para 0 y 1 ("0 relato", "0 signalement").
+ * Plural de dos formas para `tCount` (ADR 0079): "one" o "other". La regla CLDR de cada idioma vive en el registro
+ * del Language Engine (`@dizaster/contracts`, ADR 0216), igual en la app y en el servidor; aquí "many" (un millón
+ * en es/pt/fr) usa la forma plural. Para mensajes con más formas, `tf` con `{n, plural, ...}`.
  */
 export function pluralCategory(n: number, lang: Lang): "one" | "other" {
-  const i = Math.floor(Math.abs(n));
-  if (lang === "pt" || lang === "fr") return i === 0 || i === 1 ? "one" : "other";
-  return n === 1 ? "one" : "other";
+  return cldrPlural(lang, n) === "one" ? "one" : "other";
 }

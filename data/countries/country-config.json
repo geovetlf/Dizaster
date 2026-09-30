@@ -19,7 +19,7 @@
         "America/Lima"
       ],
       "units": "metric",
-      "callingCode": "+51",
+      "callingCode": "+51", "currency": "PEN",
       "notes": "Primer país piloto (aprobado 2026-09-29). Toda configuración específica vive aquí como datos: el código no conoce a Perú.",
       "geo": {
         "cityLevel": 2,

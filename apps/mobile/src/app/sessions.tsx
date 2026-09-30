@@ -4,7 +4,7 @@ import { useCallback, useState } from "react";
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Icon } from "../components/icon";
 import { api } from "../lib/api";
-import { locale, t } from "../lib/i18n";
+import { appLocale, t } from "../lib/i18n";
 import { colors, radius, space } from "../theme";
 
 /**
@@ -16,7 +16,7 @@ export default function SessionsScreen() {
   const load = useCallback(() => { api.sessions().then((r) => setList(r.sessions)).catch(() => setList([])); }, []);
   useFocusEffect(load);
 
-  const date = (iso: string) => new Date(iso).toLocaleDateString(locale, { day: "numeric", month: "short", year: "numeric" });
+  const date = (iso: string) => new Date(iso).toLocaleDateString(appLocale, { day: "numeric", month: "short", year: "numeric" });
 
   function close(s: SessionView) {
     Alert.alert(t("closeSession"), t("closeSessionConfirm"), [

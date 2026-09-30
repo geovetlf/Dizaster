@@ -24,6 +24,8 @@ export interface CountryConfigEntry {
   timezones: string[];
   units: "metric" | "imperial";
   callingCode: string;
+  /** Moneda local (ISO 4217) para formatos regionales (Language Engine, ADR 0216). */
+  currency?: string;
   /** Qué nivel del índice administrativo abierto es "ciudad" y cuál "distrito" en este país (sin él: ciudad por cercanía). */
   /** Edad mínima si el país exige más que la global (D-13). */
   minAge?: number;

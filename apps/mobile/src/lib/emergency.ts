@@ -1,4 +1,4 @@
-import { compareDatasetVersions, directEmergencyNumber, type EmergencyDataset, type EmergencyNumber } from "@dizaster/contracts";
+import { baseLanguage, compareDatasetVersions, directEmergencyNumber, isSupportedLang, localizedText, type EmergencyDataset, type EmergencyNumber } from "@dizaster/contracts";
 
 export interface EmergencyLookup {
   country: string | null;
@@ -26,9 +26,10 @@ export function lookupEmergency(dataset: EmergencyDataset, country: string | nul
   };
 }
 
+/** Nombre del servicio: locale exacto ("es-PE"), su idioma y luego la cadena de respaldo del Language Engine. */
 export function label(n: EmergencyNumber, locale: string): string {
-  const lang = locale.split("-")[0] ?? "es";
-  return n.label[locale] ?? n.label[lang] ?? n.label["es"] ?? n.label["en"] ?? n.service;
+  const base = baseLanguage(locale);
+  return n.label[locale] ?? n.label[base] ?? localizedText(n.label, isSupportedLang(base) ? base : "es") ?? n.service;
 }
 
 /** Se queda con el dataset más nuevo entre el empaquetado y el descargado (una app actualizada puede traer uno más reciente). */

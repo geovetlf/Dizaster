@@ -4,7 +4,7 @@ import { useCallback, useState } from "react";
 import { Pressable, ScrollView, Share, StyleSheet, Text, View } from "react-native";
 import { formatCount, formatHours, sortedActions, sortedCounts, transparencyText, type TransparencyLabels } from "../lib/admin/transparency-format";
 import { api } from "../lib/api";
-import { t, type MessageKey } from "../lib/i18n";
+import { t, tf, type MessageKey } from "../lib/i18n";
 import { colors, radius, space } from "../theme";
 
 const PERIODS = [30, 90, 365] as const;
@@ -52,7 +52,7 @@ export default function AdminTransparencyScreen() {
         {PERIODS.map((d) => (
           <Pressable key={d} accessibilityRole="button" accessibilityState={{ selected: d === days }}
             style={[styles.chip, d === days && styles.chipOn]} onPress={() => setDays(d)}>
-            <Text style={styles.chipText}>{t("trDays").replace("{n}", String(d))}</Text>
+            <Text style={styles.chipText}>{tf("trDays", { n: d })}</Text>
           </Pressable>
         ))}
       </View>

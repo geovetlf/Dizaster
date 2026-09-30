@@ -1,4 +1,7 @@
 import {
+  GLOBAL_FALLBACK,
+  isSupportedLang,
+  localizedText,
   AlertPreferences,
   ApproximateLocationRequest,
   CategorySubscriptionInput,
@@ -85,7 +88,8 @@ const toPrefs = (r: PrefRow | undefined): AlertPreferences =>
         nearMe: r.near_me, categories: r.categories,
         statusChanges: r.status_changes, mentions: r.mentions, minSeverity: r.min_severity, maxPerHour: r.max_per_hour,
         quietHours: r.quiet_start === null || r.quiet_end === null ? null : { start: r.quiet_start, end: r.quiet_end },
-        timezone: r.timezone, lang: r.lang,
+        // Un idioma guardado que esta versión no conoce cae al respaldo global (Language Engine, ADR 0216).
+        timezone: r.timezone, lang: isSupportedLang(r.lang) ? r.lang : GLOBAL_FALLBACK[0]!,
       }
     : DEFAULT_PREFERENCES;
 
@@ -284,7 +288,7 @@ export class AlertService {
       if (recipients.length === 0) continue;
       const text = (lang: Lang) =>
         alertText(lang, {
-          kind: d.kind, category: category?.names[lang] ?? category?.names["es"] ?? snap.categoryCode, place: snap.place?.label ?? null,
+          kind: d.kind, category: localizedText(category?.names, lang) ?? snap.categoryCode, place: snap.place?.label ?? null,
           state: snap.publicState, severity: snap.severity,
         });
       const texts = Object.fromEntries(SUPPORTED_LANGS.map((l) => [l, text(l)])) as Record<Lang, ReturnType<typeof text>>;

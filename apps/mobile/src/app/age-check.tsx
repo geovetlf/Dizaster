@@ -6,7 +6,7 @@ import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-
 import { isAgeBlocked, setAgeBlocked } from "../lib/account/age-gate";
 import { api } from "../lib/api";
 import { countryOf } from "../lib/geo/country";
-import { t } from "../lib/i18n";
+import { t, tf } from "../lib/i18n";
 import { colors, radius, space } from "../theme";
 
 /**
@@ -54,7 +54,7 @@ export default function AgeCheckScreen() {
   if (blocked) {
     return (
       <View style={[styles.container, styles.content]}>
-        <Text style={styles.title}>{t("ageBlockedTitle").replace("{age}", String(minAge))}</Text>
+        <Text style={styles.title}>{tf("ageBlockedTitle", { age: minAge })}</Text>
         <Text style={styles.body}>{t("ageBlockedBody")}</Text>
         <Pressable accessibilityRole="button" style={styles.primary} onPress={() => router.replace("/emergency")}>
           <Text style={styles.primaryText}>{t("emergencyTitle")}</Text>
@@ -69,7 +69,7 @@ export default function AgeCheckScreen() {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
       <Text style={styles.title}>{t("ageTitle")}</Text>
-      <Text style={styles.body}>{t("ageBody").replace("{age}", String(minAge))}</Text>
+      <Text style={styles.body}>{tf("ageBody", { age: minAge })}</Text>
       <Text style={styles.label}>{t("ageYear")}</Text>
       <TextInput accessibilityLabel={t("ageYear")} value={year} onChangeText={(v) => setYear(v.replace(/\D/g, "").slice(0, 4))} keyboardType="number-pad" maxLength={4}
         placeholder="1995" placeholderTextColor={colors.textMuted} style={styles.input} />

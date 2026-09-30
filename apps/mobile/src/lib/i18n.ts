@@ -1,12 +1,14 @@
-import { langFromLocale, type Lang } from "@dizaster/contracts";
+import { formatMessage, resolveLocale, type Lang } from "@dizaster/contracts";
 import { fr } from "./locales/fr";
 import { pt } from "./locales/pt";
+import { setFormatLocale } from "./ui/format";
 import { pluralCategory } from "./ui/plural";
 
 /**
  * Textos de la interfaz en los idiomas iniciales (Blueprint D-19): español, inglés, portugués y francés.
  * El español es la referencia; cada otro catálogo es `Record<MessageKey, string>`, así que TypeScript no deja
- * compilar si falta una clave. Un idioma nuevo = un archivo en `locales/` y una entrada aquí.
+ * compilar si falta una clave. Un idioma nuevo = un archivo en `locales/` y una entrada aquí, más su entrada en el
+ * registro del Language Engine (`@dizaster/contracts`, ADR 0216; ver docs/LANGUAGE_ENGINE.md).
  */
 const base = {
   es: {
@@ -516,7 +518,7 @@ const base = {
     deleteAccount: "Borrar mi cuenta",
     signOut: "Cerrar sesión en este teléfono",
     signOutConfirm: "Se borrará de este teléfono lo guardado de tu cuenta. Tu cuenta y tus publicaciones siguen igual.",
-    signOutPending: "Tienes {n} reportes sin enviar: se descartarán.",
+    signOutPending: "{n, plural, one {Tienes # reporte sin enviar: se descartará.} other {Tienes # reportes sin enviar: se descartarán.}}",
     deleteAccountIntro: "Esto no se puede deshacer. Al borrar tu cuenta:",
     deleteAccountPoint1: "Tu perfil desaparece y tus publicaciones, comentarios y me gusta se retiran.",
     deleteAccountPoint2: "Se borran tus fotos y videos, tus alertas, zonas y seguimientos.",
@@ -1303,7 +1305,7 @@ const base = {
     deleteAccount: "Delete my account",
     signOut: "Sign out on this phone",
     signOutConfirm: "What your account saved on this phone will be erased. Your account and posts stay as they are.",
-    signOutPending: "You have {n} unsent reports: they will be discarded.",
+    signOutPending: "{n, plural, one {You have # unsent report: it will be discarded.} other {You have # unsent reports: they will be discarded.}}",
     deleteAccountIntro: "This cannot be undone. When you delete your account:",
     deleteAccountPoint1: "Your profile disappears and your posts, comments and likes are removed.",
     deleteAccountPoint2: "Your photos and videos, alerts, areas and follows are deleted.",
@@ -1587,13 +1589,30 @@ const base = {
 
 export type MessageKey = keyof (typeof base)["es"];
 const catalogs: Record<Lang, Record<MessageKey, string>> = { es: base.es, en: base.en, pt, fr };
+/** Catálogos completos, solo lectura (pruebas de completitud del Language Engine). */
+export const CATALOGS: Readonly<Record<Lang, Readonly<Record<MessageKey, string>>>> = catalogs;
+/** Locale del teléfono (BCP 47). Solo para detectar idioma y región; los formatos usan `appLocale`. */
 export const locale: string = Intl.DateTimeFormat().resolvedOptions().locale ?? "es";
-/** Idioma de la interfaz: el del teléfono salvo que se elija otro en el perfil (ADR 0069). */
-export let lang: Lang = langFromLocale(locale);
+const initial = resolveLocale({ deviceLocales: [locale] });
+/** Idioma de la interfaz: el del teléfono salvo que se elija otro en el perfil (ADR 0069, ADR 0216). */
+export let lang: Lang = initial.lang;
+/** Locale de formatos de la app: idioma de la interfaz + región del teléfono si habla ese idioma ("es-PE"). */
+export let appLocale: string = initial.locale;
+setFormatLocale(appLocale);
 export function setLang(next: Lang): void {
-  lang = next;
+  const r = resolveLocale({ pref: next, deviceLocales: [locale] });
+  lang = r.lang;
+  appLocale = r.locale;
+  setFormatLocale(appLocale);
 }
 export const t = (key: MessageKey): string => catalogs[lang][key];
+
+/**
+ * Texto con variables y plurales del idioma (ADR 0216): `tf("trDays", { n: 7 })` sobre "{n} días" o sobre
+ * "{n, plural, one {# reporte} other {# reportes}}". Los números salen en el formato regional de la app.
+ */
+export const tf = (key: MessageKey, params: Readonly<Record<string, string | number>>): string =>
+  formatMessage(t(key), params, lang, appLocale);
 
 /** "1 reporte", "3 reportes", "0 signalement": número y palabra con el plural correcto del idioma (ADR 0079). */
 export function tCount(n: number, one: MessageKey, other: MessageKey): string {

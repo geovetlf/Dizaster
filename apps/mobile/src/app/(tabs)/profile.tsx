@@ -9,7 +9,7 @@ import { Icon, type IconProps } from "../../components/icon";
 import { exportMyData } from "../../lib/account/export";
 import { api } from "../../lib/api";
 import { enablePush } from "../../lib/device/push";
-import { lang, t } from "../../lib/i18n";
+import { lang, t, tf } from "../../lib/i18n";
 import { LANGUAGE_NAMES } from "../../lib/language";
 import { reportQueue } from "../../lib/report/outbox";
 import { useSession } from "../../lib/session";
@@ -109,7 +109,7 @@ export default function ProfileScreen() {
 }
 
 function confirmSignOut(pending: number, onConfirm: () => void) {
-  const msg = pending > 0 ? `${t("signOutConfirm")}\n\n${t("signOutPending").replace("{n}", String(pending))}` : t("signOutConfirm");
+  const msg = pending > 0 ? `${t("signOutConfirm")}\n\n${tf("signOutPending", { n: pending })}` : t("signOutConfirm");
   Alert.alert(t("signOut"), msg, [
     { text: t("cancel"), style: "cancel" },
     { text: t("signOut"), style: "destructive", onPress: onConfirm },

@@ -1,7 +1,7 @@
 import type { SavedZone } from "@dizaster/contracts";
 import { useEffect, useState } from "react";
 import { Alert, Pressable, StyleSheet, Text } from "react-native";
-import { t } from "../lib/i18n";
+import { t, tf } from "../lib/i18n";
 import { deleteZoneMap, downloadZoneMap, zoneMapStates, type ZoneMapState } from "../lib/map/offline";
 import { planZonePack } from "../lib/map/offline-plan";
 import { colors } from "../theme";
@@ -20,14 +20,14 @@ export function ZoneMapButton({ zone, styleUrl }: { zone: SavedZone; styleUrl: s
   function onPress(style: string) {
     if (state.kind === "downloading") return;
     if (state.kind === "ready") {
-      Alert.alert(t("offlineMap"), t("offlineMapReady").replace("{mb}", String(state.mb)), [
+      Alert.alert(t("offlineMap"), tf("offlineMapReady", { mb: state.mb }), [
         { text: t("cancel"), style: "cancel" },
         { text: t("offlineMapDelete"), style: "destructive", onPress: () => void deleteZoneMap(zone.id).then(() => setState({ kind: "none" })) },
       ]);
       return;
     }
     const plan = planZonePack(zone.center, zone.radiusKm);
-    Alert.alert(t("offlineMap"), t("offlineMapConfirm").replace("{mb}", String(plan.estimatedMb)), [
+    Alert.alert(t("offlineMap"), tf("offlineMapConfirm", { mb: plan.estimatedMb }), [
       { text: t("cancel"), style: "cancel" },
       {
         text: t("offlineMapDownload"),

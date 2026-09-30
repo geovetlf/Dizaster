@@ -23,6 +23,8 @@ describe("plurales", () => {
 describe("hora en la zona del evento", () => {
   const labels = { local: "hora local", yours: "tu hora" };
   const iso = "2026-09-29T19:05:00Z";
+  // Formato regional del locale de la app (ADR 0216): es-PE usa reloj de 12 h ("02:05 p. m.").
+  const at = (timeZone: string) => new Intl.DateTimeFormat("es-PE", { hour: "2-digit", minute: "2-digit", timeZone }).format(new Date(iso));
 
   it("misma zona: una sola hora", () => {
     expect(eventTime(iso, "es", "America/Lima", labels, "time", "America/Lima")).toBe(formatInZone(iso, "es", "America/Lima", "time"));
@@ -30,11 +32,11 @@ describe("hora en la zona del evento", () => {
 
   it("zona distinta: hora del lugar y hora de la persona", () => {
     const s = eventTime(iso, "es", "America/Lima", labels, "time", "Europe/Madrid");
-    expect(s).toBe("14:05 hora local · 21:05 tu hora");
+    expect(s).toBe(`${at("America/Lima")} hora local · ${at("Europe/Madrid")} tu hora`);
   });
 
   it("zona desconocida o inválida: la del teléfono", () => {
-    expect(eventTime(iso, "es", null, labels, "time", "America/Lima")).toBe("14:05");
-    expect(eventTime(iso, "es", "Mars/Olympus", labels, "time", "America/Lima")).toBe("14:05");
+    expect(eventTime(iso, "es", null, labels, "time", "America/Lima")).toBe(at("America/Lima"));
+    expect(eventTime(iso, "es", "Mars/Olympus", labels, "time", "America/Lima")).toBe(at("America/Lima"));
   });
 });

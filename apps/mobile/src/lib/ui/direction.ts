@@ -1,3 +1,5 @@
+import { baseLanguage, isSupportedLang, LANGUAGES } from "@dizaster/contracts";
+
 /**
  * Dirección de escritura (Blueprint §5.15, ADR 0102). Hoy la app no tiene idiomas RTL, pero el diseño queda listo:
  * estilos con start/end, iconos de avance que se invierten y la dirección fijada según el idioma de la app, no el
@@ -5,8 +7,10 @@
  */
 export const RTL_LANGS = ["ar", "he", "fa", "ur", "yi", "ps", "sd", "ug", "dv", "ckb"] as const;
 
+/** Para idiomas de la app manda el registro del Language Engine (ADR 0216); para el resto, la lista conocida. */
 export function isRtlLang(lang: string): boolean {
-  const base = lang.toLowerCase().split(/[-_]/)[0] ?? "";
+  const base = baseLanguage(lang);
+  if (isSupportedLang(base)) return LANGUAGES[base].dir === "rtl";
   return (RTL_LANGS as readonly string[]).includes(base);
 }
 
