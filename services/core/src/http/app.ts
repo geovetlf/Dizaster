@@ -15,7 +15,7 @@ import { listConfigChanges, recordConfigChange } from "../platform/config-audit.
 import { isOverloadError, withTransaction } from "../platform/db.js";
 import { DomainError, forbidden } from "../platform/errors.js";
 import { latencyMetric } from "../platform/metrics.js";
-import { FixedWindowLimiter, SharedAccountLimiter } from "../platform/rate-limit.js";
+import { AccountCooldown, FixedWindowLimiter, SharedAccountLimiter } from "../platform/rate-limit.js";
 import { acceptRequestId, currentContext, REQUEST_ID_HEADER, runWithContext } from "../platform/request-context.js";
 import { newId } from "../platform/ids.js";
 import { buildOpenApi } from "./openapi.js";
@@ -558,13 +558,14 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
   });
 
   /** Roles de la sesión: la app muestra herramientas de moderación o administración solo a quien las tiene. */
-  // Exportar mis datos (ADR 0038). Consultas acotadas; como mucho una por minuto y persona en cada instancia.
-  const lastExport = new Map<string, number>();
+  // Exportar mis datos (ADR 0038). Consultas acotadas; como mucho una por minuto y persona, contando todas las réplicas
+  // y sin memoria que crezca con cada persona que exporta (ADR 0290).
+  const exportCooldown = new AccountCooldown(c.db, "export", 60);
   app.get("/v1/me/export", async (req, reply) => {
     const session = requireSession(req);
+    const wait = await exportCooldown.take(session.userId);
+    if (wait !== null) throw Object.assign(new DomainError("RATE_LIMITED", "Espera un minuto antes de volver a exportar", 429), { retryAfter: wait });
     const now = Date.now();
-    if (now - (lastExport.get(session.userId) ?? 0) < 60_000) throw new DomainError("RATE_LIMITED", "Espera un minuto antes de volver a exportar", 429);
-    lastExport.set(session.userId, now);
     const who = { userId: session.userId, profileId: session.profileId };
     const body: DataExport = {
       format: DATA_EXPORT_FORMAT,

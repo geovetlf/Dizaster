@@ -1,5 +1,6 @@
 import type { Container } from "./container.js";
 import { withTransaction } from "./platform/db.js";
+import { pruneCooldowns } from "./platform/rate-limit.js";
 
 /** Una tarea de mantenimiento: nombre para el registro y lo que hace (devuelve lo que se registra). */
 export type Job = readonly [name: string, run: () => Promise<unknown>];
@@ -54,6 +55,7 @@ export function dailyJobs(c: Container): Job[] {
     ["retention.outbox", async () => ({ deleted: await c.dispatcher.purgeProcessed(c.env.OUTBOX_RETENTION_DAYS) })],
     ["retention.heartbeats", async () => ({ deleted: await c.heartbeat.prune() })],
     ["retention.ai-jobs", async () => ({ deleted: await c.verification.purgeAiJobs() })],
+    ["retention.cooldowns", async () => ({ deleted: await pruneCooldowns(c.db) })],
     ["retention.client_crashes", async () => ({ deleted: await c.crashes.applyRetention(c.env.CLIENT_CRASH_RETENTION_DAYS) })],
   ];
 }
