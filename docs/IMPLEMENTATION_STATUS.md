@@ -480,6 +480,7 @@ Actualizado: 2026-10-01 (hasta ADR 0291; auditoría de preparación en `docs/PRO
 | "Mis avisos de moderación" por páginas con cursor propio; la app carga los anteriores al llegar al final (ADR 0289) | ✅ | §6.3, §13.1, §13.3 |
 | Exportar mis datos: una vez por minuto y persona contando todas las réplicas, sin memoria que crezca (ADR 0290) | ✅ | §13.1, §13.2 |
 | Búsquedas con cupo propio por minuto (cuenta o IP en memoria), aparte del límite general (ADR 0291) | ✅ | §13.1, §12 |
+| Feed de inicio sin conexión: primera página guardada por pestaña y categoría ("Cerca de mí" nunca) (ADR 0294) | ✅ | §3, ADR 0066 |
 | Licencias, auditoría, SBOM, Dependabot; respaldo con prueba de restauración en CI | ✅ | ADR 0070, `scripts/supply-chain.mjs`, `scripts/db-restore-check.mjs` |
 | Idioma de la app elegible en el perfil (es/en/pt/fr o del teléfono) | ✅ | ADR 0069, `app/language.tsx` |
 | Varias cuentas en un teléfono corroboran como una (clave seudónima del teléfono) | ✅ | ADR 0068, migración 0036 |

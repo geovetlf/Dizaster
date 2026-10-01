@@ -1,3 +1,5 @@
+import type { FeedTab } from "@dizaster/contracts";
+
 /**
  * Lectura sin conexión (ADR 0066). Guarda en el teléfono la última respuesta buena de lo que más importa cuando cae la
  * red (avisos, mapa, eventos abiertos) y la muestra marcada como "guardada" si la petición falla. Sin servidor ni costo.
@@ -51,4 +53,10 @@ export const cacheKeys = {
   alerts: "alerts:first-page",
   map: "map:last-view",
   event: (id: string) => `event:${id}`,
+  /**
+   * Primera página del feed de inicio (ADR 0294), por pestaña y categoría. "Cerca de mí" no se guarda: su respuesta
+   * depende de dónde está el teléfono. La categoría es un código del catálogo, nunca texto libre.
+   */
+  feed: (tab: FeedTab, category: string | null): string | null =>
+    tab === "nearby" ? null : `feed:${tab}:${category && /^[a-z0-9._-]{1,64}$/.test(category) ? category : "all"}`,
 } as const;
