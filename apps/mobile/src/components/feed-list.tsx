@@ -6,6 +6,9 @@ import { t } from "../lib/i18n";
 import { colors, radius, space } from "../theme";
 import { PostCard } from "./post-card";
 import { categoryLabel } from "../lib/category-store";
+import { cacheKeys, readThrough } from "../lib/offline/read-cache";
+import { readCache } from "../lib/offline/sqlite-cache";
+import { OfflineNote } from "./offline-note";
 
 export const categoryName = categoryLabel;
 
@@ -24,6 +27,8 @@ export function FeedList(props: {
   const [cursor, setCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
+  // Primera página guardada sin conexión (ADR 0294): hora de la copia que se muestra, o null si es fresca.
+  const [savedAt, setSavedAt] = useState<number | null>(null);
   const request = useRef(0);
   const needsLocation = props.tab === "nearby" && !props.near;
 
@@ -34,8 +39,14 @@ export function FeedList(props: {
     setError(false);
     try {
       const next = reset ? null : cursor;
-      const r = props.fetchPage ? await props.fetchPage(next) : await api.feed({ tab: props.tab, category: props.category, near: props.near, cursor: next });
+      const fetchFeed = () => api.feed({ tab: props.tab, category: props.category, near: props.near, cursor: next });
+      const key = !props.fetchPage && reset ? cacheKeys.feed(props.tab, props.category) : null;
+      const got = props.fetchPage
+        ? { value: await props.fetchPage(next), savedAt: null }
+        : key ? await readThrough(readCache(), key, fetchFeed) : { value: await fetchFeed(), savedAt: null };
+      const r = got.value;
       if (id !== request.current) return; // respuesta de un filtro anterior
+      if (reset) setSavedAt(got.savedAt);
       setPosts((prev) => (reset ? r.posts : [...prev, ...r.posts]));
       setCursor(r.nextCursor);
     } catch {
@@ -53,7 +64,7 @@ export function FeedList(props: {
       data={posts}
       keyExtractor={(p) => p.id}
       renderItem={({ item }) => <PostCard post={item} categoryName={categoryName} />}
-      ListHeaderComponent={props.header}
+      ListHeaderComponent={savedAt ? <>{props.header}<OfflineNote savedAt={savedAt} /></> : props.header}
       ListEmptyComponent={
         loading ? null : error ? (
           <Pressable accessibilityRole="button" style={styles.empty} onPress={() => void load(true)}>
@@ -64,7 +75,8 @@ export function FeedList(props: {
       }
       ListFooterComponent={loading ? <ActivityIndicator color={colors.accent} style={styles.loader} /> : null}
       onEndReachedThreshold={0.5}
-      onEndReached={() => { if (cursor && !loading) void load(false); }}
+      // Con la copia guardada no se piden más páginas: sin red fallarían y la copia es solo la primera.
+      onEndReached={() => { if (cursor && !loading && !savedAt) void load(false); }}
       refreshControl={<RefreshControl tintColor={colors.accent} refreshing={false} onRefresh={() => void load(true)} />}
       contentContainerStyle={styles.content}
       style={styles.list}
