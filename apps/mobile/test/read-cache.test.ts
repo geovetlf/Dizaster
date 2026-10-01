@@ -39,3 +39,22 @@ describe("lectura sin conexión (ADR 0066)", () => {
     expect(Object.values(cacheKeys).filter((k) => typeof k === "string").join(" ")).not.toMatch(/\d+\.\d+/);
   });
 });
+
+describe("feed de inicio sin conexión (ADR 0294)", () => {
+  it("guarda por pestaña y categoría; 'Cerca de mí' nunca, y la clave no lleva texto libre ni coordenadas", () => {
+    expect(cacheKeys.feed("for_you", null)).toBe("feed:for_you:all");
+    expect(cacheKeys.feed("following", "natural.flood")).toBe("feed:following:natural.flood");
+    expect(cacheKeys.feed("videos", null)).toBe("feed:videos:all");
+    expect(cacheKeys.feed("nearby", null)).toBeNull();
+    expect(cacheKeys.feed("nearby", "natural.flood")).toBeNull();
+    expect(cacheKeys.feed("for_you", "-12.04,-77.03 calle X")).toBe("feed:for_you:all");
+  });
+
+  it("sin red muestra la primera página guardada del feed con su hora", async () => {
+    const store = new MemoryCacheStore();
+    const key = cacheKeys.feed("for_you", null)!;
+    const page = { posts: [{ id: "p1" }], nextCursor: "c1" };
+    await readThrough(store, key, async () => page, () => 1_000);
+    expect(await readThrough(store, key, offline, () => 2_000)).toEqual({ value: page, savedAt: 1_000 });
+  });
+});
