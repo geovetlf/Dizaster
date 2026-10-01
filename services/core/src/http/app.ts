@@ -47,6 +47,9 @@ const SourcePushParams = z.object({ sourceKey: z.string().regex(/^[a-z0-9-]{1,64
  * Escrituras permitidas a una cuenta suspendida: apelar, cerrar y renovar sesiones, borrar sus posts y comentarios,
  * retirar sus reportes (ADR 0237) y borrar la cuenta. Quitar lo propio nunca se impide.
  */
+/** Búsquedas por texto con cupo propio (ADR 0291): eventos, publicaciones, perfiles, negocios, hashtags y lugares. */
+const SEARCH_ROUTES = /^\/v1\/(search\/(events|posts)|profiles|businesses|tags|geo\/areas)$/;
+
 const WRITE_ALLOWED_WHEN_SUSPENDED = /^(POST \/v1\/me\/policies\/accept|POST \/v1\/me\/moderation\/[^/]+\/appeal|POST \/v1\/auth\/(refresh|logout)|DELETE \/v1\/me|DELETE \/v1\/posts\/[^/]+|DELETE \/v1\/comments\/[^/]+|DELETE \/v1\/me\/reports\/[^/]+|DELETE \/v1\/me\/sessions\/[^/]+|POST \/v1\/me\/sessions\/revoke-others)$/;
 /**
  * La suspensión nunca quita la protección (ADR 0225): una cuenta suspendida (no una borrada) mantiene sus avisos de
@@ -94,6 +97,8 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
   // Límite general (ADR 0047): por cuenta con sesión, por IP sin ella. Las escrituras tienen un cupo menor.
   const allLimiter = new FixedWindowLimiter(c.env.RATE_LIMIT_PER_MINUTE);
   const writeLimiter = new FixedWindowLimiter(c.env.RATE_LIMIT_WRITES_PER_MINUTE);
+  // Búsquedas (ADR 0291): cupo propio, más bajo, en memoria de cada réplica (sin IPs en la base).
+  const searchLimiter = new FixedWindowLimiter(c.env.SEARCH_RATE_LIMIT_PER_MINUTE);
   // Varias réplicas (ADR 0228): el cupo por cuenta se comparte en PostgreSQL; sin sesión sigue en memoria (sin IPs en la base).
   const sharedLimiter = c.env.RATE_LIMIT_SHARED ? new SharedAccountLimiter(c.db, c.env.RATE_LIMIT_PER_MINUTE, c.env.RATE_LIMIT_WRITES_PER_MINUTE) : null;
 
@@ -145,6 +150,11 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
       const wait = sharedLimiter && req.session
         ? await sharedLimiter.hit(req.session.userId, write)
         : allLimiter.hit(key) ?? (write ? writeLimiter.hit(key) : null);
+      const searchWait = wait === null && !write && SEARCH_ROUTES.test(req.url.split("?")[0]!) ? searchLimiter.hit(key) : null;
+      if (searchWait !== null) {
+        c.meter.add("http", "rate_limited", 1);
+        throw Object.assign(new DomainError("RATE_LIMITED", "Demasiadas búsquedas; espera un momento", 429), { retryAfter: searchWait });
+      }
       if (wait !== null) {
         c.meter.add("http", "rate_limited", 1);
         throw Object.assign(new DomainError("RATE_LIMITED", "Demasiadas peticiones; espera un momento", 429), { retryAfter: wait });
