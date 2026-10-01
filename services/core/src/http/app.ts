@@ -5,7 +5,7 @@ import Fastify, { type FastifyInstance, type FastifyRequest } from "fastify";
 import { z } from "zod";
 import {
   BBox, CreateCommentRequest, DevicePlatform, MEDIA_UPLOAD_LIMITS, MergeEventsRequest, NegativeState, ReactionKind, CommentReactionKind, ConfirmAgeRequest, RegisterPushTokenRequest, RegisterSigningKeyRequest, RevertMergeRequest,
-  SplitEventRequest, SetEventStatusRequest, SetEventSeverityRequest, RaiseEventSensitivityRequest, SetSourceStatusRequest, AcceptPoliciesRequest, type PolicyStatusResponse, ClientCrashReport, type ClientCrashesResponse, type AdminSourcesResponse, ChangeRoleRequest, type StaffResponse, OriginalAccessRequest, IdTokenSignInRequest, EmailStartRequest, EmailVerifyRequest, LinkIdentityRequest, AddModeratorNoteRequest, DismissDuplicateRequest, DATA_EXPORT_FORMAT, type AppConfig, type Attribution, type AttributionsResponse, type DataExport, type EmergencyNumbersResponse, type EventSearchResponse,
+  SplitEventRequest, SetEventStatusRequest, SetEventSeverityRequest, RaiseEventSensitivityRequest, SetSourceStatusRequest, AcceptPoliciesRequest, type PolicyStatusResponse, ClientCrashReport, type ClientCrashesResponse, type AdminSourcesResponse, ChangeRoleRequest, type StaffResponse, OriginalAccessRequest, IdTokenSignInRequest, EmailStartRequest, EmailVerifyRequest, LinkIdentityRequest, AddModeratorNoteRequest, DismissDuplicateRequest, DATA_EXPORT_FORMAT, capExportSections, type AppConfig, type Attribution, type AttributionsResponse, type DataExport, type EmergencyNumbersResponse, type EventSearchResponse,
 } from "@dizaster/contracts";
 import { LocalDiskStorage } from "../modules/media/index.js";
 import type { Container } from "../container.js";
@@ -567,18 +567,16 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
     if (wait !== null) throw Object.assign(new DomainError("RATE_LIMITED", "Espera un minuto antes de volver a exportar", 429), { retryAfter: wait });
     const now = Date.now();
     const who = { userId: session.userId, profileId: session.profileId };
-    const body: DataExport = {
-      format: DATA_EXPORT_FORMAT,
-      generatedAt: new Date(now).toISOString(),
-      sections: {
-        identity: await c.identity.exportData(c.db, session.userId),
-        social: await c.social.exportData(c.db, who),
-        reports: { ...(await c.reports.exportData(c.db, session.userId)), ...(await c.events.exportData(c.db, session.userId)) },
-        alerts: await c.alerts.exportData(c.db, session.profileId),
-        moderation: await c.moderation.exportData(c.db, who),
-        media: await c.media.exportData(c.db, session.profileId),
-      },
-    };
+    // Cada lista con tope; las que llegan a él se nombran en `truncated` (ADR 0295).
+    const { sections, truncated } = capExportSections({
+      identity: await c.identity.exportData(c.db, session.userId),
+      social: await c.social.exportData(c.db, who),
+      reports: { ...(await c.reports.exportData(c.db, session.userId)), ...(await c.events.exportData(c.db, session.userId)) },
+      alerts: await c.alerts.exportData(c.db, session.profileId),
+      moderation: await c.moderation.exportData(c.db, who),
+      media: await c.media.exportData(c.db, session.profileId),
+    });
+    const body: DataExport = { format: DATA_EXPORT_FORMAT, generatedAt: new Date(now).toISOString(), sections, truncated };
     reply.header("cache-control", "no-store");
     reply.header("content-disposition", `attachment; filename="dizaster-export-${body.generatedAt.slice(0, 10)}.json"`);
     return body;

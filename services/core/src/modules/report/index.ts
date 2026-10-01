@@ -12,6 +12,7 @@ import {
   type PresenceRejectionReason,
   type ReportAssertion,
   type SubmitReportResponse,
+  DATA_EXPORT_ROW_LIMIT,
 } from "@dizaster/contracts";
 import { H3_RES, PRESENCE_RULES_BY_VERSION, PRESENCE_RULES_CURRENT, bandOf, computePresence, extractKeywords, generalize, h3, textFingerprint, withoutMediaBonus, type PresenceBreakdown } from "@dizaster/geo-kit";
 import type { Clock } from "../../platform/clock.js";
@@ -522,13 +523,13 @@ export class ReportService {
               r.captured_offline, r.presence_band, ST_Y(r.pin::geometry) AS pin_lat, ST_X(r.pin::geometry) AS pin_lng,
               p.device_fix, p.device_fix_enc, p.generalized_at AS precise_location_removed_at
          FROM report.reports r LEFT JOIN report.presence_evidence p ON p.report_id = r.id
-        WHERE r.author_user_id = $1 ORDER BY r.received_at DESC LIMIT 10000`,
+        WHERE r.author_user_id = $1 ORDER BY r.received_at DESC LIMIT ${DATA_EXPORT_ROW_LIMIT + 1}`,
       [userId],
     );
     // Transparencia (ADR 0089): cuándo moderación consultó la presencia de sus reportes (sin decir quién).
     const accesses = await q.query(
       `SELECT l.report_id, l.accessed_at, l.precise_shown FROM report.presence_access_log l JOIN report.reports r ON r.id = l.report_id
-        WHERE r.author_user_id = $1 ORDER BY l.accessed_at DESC LIMIT 10000`,
+        WHERE r.author_user_id = $1 ORDER BY l.accessed_at DESC LIMIT ${DATA_EXPORT_ROW_LIMIT + 1}`,
       [userId],
     );
     // Se descifra solo para la propia persona; el valor cifrado nunca sale.
