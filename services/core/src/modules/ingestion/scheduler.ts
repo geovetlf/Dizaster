@@ -59,8 +59,10 @@ export class NodeHttpFetcher implements HttpFetcher {
  *  - "M *\/N * * *" → cada N horas en el minuto M
  * Devuelve el último instante programado ≤ now.
  */
+export const SCHEDULE_PATTERN = /^(\d{1,2}) (\d{1,2}|\*\/(\d{1,2})) \* \* \*$/;
+
 export function lastScheduledAt(schedule: string, now: Date): Date {
-  const m = /^(\d{1,2}) (\d{1,2}|\*\/(\d{1,2})) \* \* \*$/.exec(schedule.trim());
+  const m = SCHEDULE_PATTERN.exec(schedule.trim());
   const minute = m ? Number(m[1]) : 0;
   const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, minute));
   if (m?.[3]) {

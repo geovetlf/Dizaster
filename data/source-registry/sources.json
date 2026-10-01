@@ -90,7 +90,7 @@
    },
    "license": "Revisar términos antes de producción",
    "termsUrl": "https://www.gdacs.org/About/termsofuse.aspx",
-   "scheduleNormal": "0 5 * * *",
+   "scheduleNormal": "5 5 * * *",
    "urgentCapable": true,
    "urgentPollSeconds": 300,
    "status": "PLANNED",
@@ -115,7 +115,7 @@
    },
    "license": "Por confirmar (revisar términos de reutilización de EMSC antes de activar)",
    "termsUrl": "https://www.emsc-csem.org/",
-   "scheduleNormal": "0 5 * * *",
+   "scheduleNormal": "10 5 * * *",
    "urgentCapable": true,
    "urgentPollSeconds": 300,
    "status": "PLANNED"
@@ -177,7 +177,7 @@
    },
    "license": "Por confirmar (política de datos de Copernicus; revisar la atribución exigida antes de activar)",
    "termsUrl": "https://emergency.copernicus.eu/",
-   "scheduleNormal": "0 5 * * *",
+   "scheduleNormal": "15 5 * * *",
    "urgentCapable": false,
    "status": "PLANNED",
    "notes": "Adapter listo (ADR 0120); se activa tras revisar términos y validar el feed real (el sandbox no llega a emergency.copernicus.eu)."
@@ -204,7 +204,7 @@
    },
    "license": "Datos abiertos NASA; requiere clave MAP_KEY gratuita",
    "termsUrl": "https://firms.modaps.eosdis.nasa.gov/",
-   "scheduleNormal": "0 */6 * * *",
+   "scheduleNormal": "30 */6 * * *",
    "urgentCapable": true,
    "urgentPollSeconds": 900,
    "status": "PLANNED"
@@ -224,7 +224,7 @@
    "config": {},
    "license": "Por confirmar",
    "termsUrl": null,
-   "scheduleNormal": "0 5 * * *",
+   "scheduleNormal": "20 5 * * *",
    "urgentCapable": true,
    "urgentPollSeconds": 120,
    "status": "RESEARCH"
@@ -247,7 +247,7 @@
    "config": {},
    "license": "Por confirmar",
    "termsUrl": null,
-   "scheduleNormal": "0 5 * * *",
+   "scheduleNormal": "25 5 * * *",
    "urgentCapable": true,
    "urgentPollSeconds": 300,
    "status": "RESEARCH"
@@ -268,7 +268,7 @@
    "config": {},
    "license": "Por confirmar",
    "termsUrl": null,
-   "scheduleNormal": "0 5 * * *",
+   "scheduleNormal": "30 5 * * *",
    "urgentCapable": true,
    "urgentPollSeconds": 600,
    "status": "RESEARCH"
@@ -316,7 +316,7 @@
    },
    "license": "Por confirmar: términos de la API de ReliefWeb (requiere appname aprobado)",
    "termsUrl": "https://apidoc.reliefweb.int/",
-   "scheduleNormal": "0 5 * * *",
+   "scheduleNormal": "35 5 * * *",
    "urgentCapable": false,
    "status": "PLANNED",
    "notes": "Adapter listo (ADR 0092). Solo país: punto del país con incertidumbre de 250 km."
@@ -353,7 +353,7 @@
    },
    "license": "Por confirmar: términos de uso del sitio de la OMS",
    "termsUrl": "https://www.who.int/about/policies/terms-of-use",
-   "scheduleNormal": "0 5 * * *",
+   "scheduleNormal": "40 5 * * *",
    "urgentCapable": false,
    "status": "PLANNED",
    "notes": "Adapter listo (ADR 0092). Ubicación por el país del título (geocódigo ISO3166-1)."

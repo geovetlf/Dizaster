@@ -10,7 +10,7 @@ import type { GeoService } from "../geo/index.js";
 
 export { FEED_ADAPTERS, type FeedAdapter } from "./adapters/index.js";
 export { InstitutionService, INSTITUTION_ADAPTER, institutionSourceKey } from "./institution.js";
-export { IngestionScheduler, NodeHttpFetcher, lastScheduledAt, resolveSourceUrl, type HttpFetcher, type FetchResult, type RunSummary, type PushResult, pushSecretName, pushSignature, PUSH_TOLERANCE_S } from "./scheduler.js";
+export { IngestionScheduler, NodeHttpFetcher, lastScheduledAt, SCHEDULE_PATTERN, resolveSourceUrl, type HttpFetcher, type FetchResult, type RunSummary, type PushResult, pushSecretName, pushSignature, PUSH_TOLERANCE_S } from "./scheduler.js";
 
 /** Ítem ya normalizado al esquema común, independiente del formato de la fuente. */
 export interface NormalizedItem {
