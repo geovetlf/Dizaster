@@ -39,7 +39,10 @@ describe("límites por mes con UUIDv7", () => {
       await t.c.db.query(`INSERT INTO ${dst} (${cols}) SELECT ${cols} FROM ${src}`);
       const n = (await t.c.db.query<{ a: number; b: number }>(`SELECT (SELECT count(*) FROM ${src})::int AS a, (SELECT count(*) FROM ${dst})::int AS b`)).rows[0]!;
       expect(n.b).toBe(n.a);
-      const current = `${dst}_${months[1]!.suffix}`;
+      // El mes de los datos se calcula a partir de su id, no de "hoy menos 31 días": así no falla el día 1 de un mes.
+      const newest = (await t.c.db.query<{ id: string }>(`SELECT max(id::text) AS id FROM ${src}`)).rows[0]!.id;
+      const month = months.find((m) => newest >= m.from && newest < m.to)!;
+      const current = `${dst}_${month.suffix}`;
       expect((await t.c.db.query<{ n: number }>(`SELECT count(*)::int AS n FROM ${current}`)).rows[0]!.n).toBe(n.a);
     }
     // El índice único de idempotencia no incluye id: al partir, pasa a una tabla aparte (ver ADR 0182).
