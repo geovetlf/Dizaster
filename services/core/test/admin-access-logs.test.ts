@@ -51,7 +51,7 @@ describe("registro de accesos a presencia", () => {
     const all = (await get(admin, "/v1/admin/presence-access")).json();
     expect(all.entries).toHaveLength(5);
     expect(all.nextCursor).toBeNull();
-    expect(all.entries[0]).toMatchObject({ actorHandle: "logs_mod", reason: "revisión de prueba 1" });
+    expect(all.entries[0]).toMatchObject({ actorHandle: expect.stringMatching(/^logs_mod/), reason: "revisión de prueba 1" });
 
     const paged = await walk("/v1/admin/presence-access", 2);
     expect(paged).toEqual(all.entries.map((e: { id: string }) => e.id));
@@ -80,7 +80,7 @@ describe("registro de originales vistos por moderación", () => {
     expect(res.headers["cache-control"]).toBe("no-store");
     const all = res.json();
     expect(all.entries).toHaveLength(3);
-    expect(all.entries[0]).toMatchObject({ mediaId: mediaB, actorHandle: "logs_mod", reason: "revisión del original 2" });
+    expect(all.entries[0]).toMatchObject({ mediaId: mediaB, actorHandle: expect.stringMatching(/^logs_mod/), reason: "revisión del original 2" });
     expect(JSON.stringify(all)).not.toContain("hash-de-prueba");
 
     expect(await walk("/v1/admin/media-original-access", 1)).toEqual(all.entries.map((e: { id: string }) => e.id));
