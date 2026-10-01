@@ -9,6 +9,7 @@ import { lang, t } from "../../lib/i18n";
 import { actionReasonText, reasonSummary, validReason } from "../../lib/moderation/logic";
 import { eventTitle, timeAgo } from "../../lib/ui/format";
 import { colors, radius, space } from "../../theme";
+import { ErrorText } from "../../components/error-text";
 
 /** Herramientas de moderación dentro de la app (V1 sin panel web): cola priorizada, apelaciones y posibles duplicados (ADR 0096). */
 export default function ModerationScreen() {
@@ -129,7 +130,7 @@ function DuplicateRow({ candidate, onDone }: { candidate: DuplicateCandidateView
           </Pressable>
         ))}
         <TextInput accessibilityLabel={t("actionReason")} value={reason} onChangeText={setReason} maxLength={1000} placeholder={t("actionReason")} placeholderTextColor={colors.textMuted} style={styles.input} />
-        {error ? <Text style={styles.error}>{error}</Text> : null}
+        {error ? <ErrorText style={styles.error}>{error}</ErrorText> : null}
         <View style={styles.buttons}>
           <Pressable accessibilityRole="button" disabled={!ok} style={[styles.button, !ok && styles.disabled]} onPress={() => void act(() => api.mergeEvents(a.id, [b.id], reason.trim()))}>
             <Text style={styles.buttonText}>{t("mergeIntoFirst")}</Text>
@@ -166,7 +167,7 @@ function AppealRow({ appeal, onDone }: { appeal: AppealView; onDone: () => void 
         {appeal.target?.text ? <Text style={styles.text} numberOfLines={3}>{appeal.target.text}</Text> : null}
         <Text style={styles.appealText}>“{appeal.text}”</Text>
         <TextInput accessibilityLabel={t("appealDecisionReason")} value={reason} onChangeText={setReason} maxLength={1000} placeholder={t("appealDecisionReason")} placeholderTextColor={colors.textMuted} style={styles.input} />
-        {error ? <Text style={styles.error}>{error}</Text> : null}
+        {error ? <ErrorText style={styles.error}>{error}</ErrorText> : null}
         <View style={styles.buttons}>
           <Pressable accessibilityRole="button" disabled={!ok} style={[styles.button, !ok && styles.disabled]} onPress={() => void decide("UPHOLD")}>
             <Text style={styles.buttonText}>{t("upholdAppeal")}</Text>

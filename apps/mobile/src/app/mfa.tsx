@@ -6,6 +6,7 @@ import { api } from "../lib/api";
 import { cleanTotp, groupSecret } from "../lib/auth/mfa";
 import { t } from "../lib/i18n";
 import { colors, radius, space } from "../theme";
+import { ErrorText } from "../components/error-text";
 
 /**
  * Verificación en dos pasos del personal (ADR 0090): alta con cualquier app de autenticación (TOTP), códigos de
@@ -99,7 +100,7 @@ export default function MfaScreen() {
           ) : null}
         </>
       ) : null}
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+      {error ? <ErrorText style={styles.error}>{error}</ErrorText> : null}
     </ScrollView>
   );
 }

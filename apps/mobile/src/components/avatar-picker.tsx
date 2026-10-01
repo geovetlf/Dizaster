@@ -4,6 +4,7 @@ import { t } from "../lib/i18n";
 import { pickProcessedImage } from "../lib/media/avatar-pick";
 import { colors, radius, space } from "../theme";
 import { Avatar } from "./avatar";
+import { ErrorText } from "./error-text";
 
 /**
  * Cambiar o quitar la foto de perfil o el logo (ADR 0119). Se aplica al momento (no espera a "Guardar"):
@@ -47,7 +48,7 @@ export function AvatarPicker({ name, url, square = false, apply }: {
           </View>
         )}
         <Text style={styles.hint}>{t("avatarHint")}</Text>
-        {error ? <Text style={styles.error}>{error}</Text> : null}
+        {error ? <ErrorText style={styles.error}>{error}</ErrorText> : null}
       </View>
     </View>
   );

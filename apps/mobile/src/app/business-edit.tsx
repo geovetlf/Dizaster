@@ -7,6 +7,7 @@ import { api } from "../lib/api";
 import { lang, t, type MessageKey } from "../lib/i18n";
 import { BUSINESS_CATEGORY_LABEL } from "../lib/social/business";
 import { colors, radius, space } from "../theme";
+import { ErrorText } from "../components/error-text";
 
 /** Crear o editar un negocio. El handle solo se elige al crear (luego es fijo para que no se suplante). */
 export default function BusinessEditScreen() {
@@ -94,7 +95,7 @@ export default function BusinessEditScreen() {
       <Pressable accessibilityRole="button" disabled={busy} style={[styles.save, busy && styles.disabled]} onPress={() => void save()}>
         <Text style={styles.saveText}>{busy ? t("sending") : t("save")}</Text>
       </Pressable>
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+      {error ? <ErrorText style={styles.error}>{error}</ErrorText> : null}
       {editing ? (
         <Pressable accessibilityRole="button" style={styles.delete} onPress={remove}>
           <Text style={styles.deleteText}>{t("deleteBusiness")}</Text>

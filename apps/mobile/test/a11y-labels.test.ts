@@ -30,4 +30,13 @@ describe("accesibilidad", () => {
     }
     expect(hard).toEqual([]);
   });
+
+  it("los errores en línea se anuncian con ErrorText, no con un <Text> mudo (ADR 0292)", () => {
+    const mute: string[] = [];
+    for (const f of files(SRC)) {
+      const src = readFileSync(f, "utf8");
+      for (const m of src.matchAll(/<Text style=\{styles\.error\}>\{[a-zA-Z]+\}<\/Text>/g)) mute.push(`${f.slice(SRC.length)}:${src.slice(0, m.index).split("\n").length}`);
+    }
+    expect(mute).toEqual([]);
+  });
 });
