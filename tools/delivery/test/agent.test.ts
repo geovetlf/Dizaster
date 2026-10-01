@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 import { RuleAgent, validateProposal, type AgentContext, type AgentProposal } from "../src/agent.js";
 import type { Impact } from "../src/inspect.js";
 import { loadPolicy, type Policy } from "../src/policy.js";
+import { localEnv } from "./cli-env.js";
 
 // Delivery Agent opcional (ADR 0283): propone; el ejecutor valida; nada se salta un gate.
 const root = new URL("../../../", import.meta.url).pathname;
@@ -16,7 +17,7 @@ const areas = { backend: true, mobile: false, contracts: false, migrations: fals
 const impact = (risk: Impact["risk"], over: Partial<Impact["areas"]> = {}): Impact =>
   ({ files: [], packages: [], affectedPackages: [], coreModules: [], areas: { ...areas, ...over }, migrationFindings: [], risk, reasons: [], fullRegression: false });
 const ctx = (over: Partial<AgentContext> = {}): AgentContext => ({ impact: impact("low"), policy: at(4), env: "staging", digest: D, ...over });
-const cli = (args: string[]) => spawnSync(process.execPath, [`${root}tools/delivery/dist/cli.js`, ...args], { cwd: root, encoding: "utf8" });
+const cli = (args: string[]) => spawnSync(process.execPath, [`${root}tools/delivery/dist/cli.js`, ...args], { cwd: root, encoding: "utf8", env: localEnv() });
 
 describe("agente de reglas", () => {
   it("staging: política, gates, documentación, firma, despliegue y SLO, en ese orden", async () => {

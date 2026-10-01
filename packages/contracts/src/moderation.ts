@@ -106,6 +106,14 @@ export interface ModerationNotice {
   canAppeal: boolean;
 }
 
+/** Mis avisos de moderación por páginas (ADR 0289): `cursor` = id del último aviso de la página anterior. */
+export const MyNoticesQuery = z.object({
+  cursor: z.uuid().optional(),
+  limit: z.coerce.number().int().min(1).max(200).default(50),
+});
+export type MyNoticesQuery = z.infer<typeof MyNoticesQuery>;
+export interface MyNoticesResponse { notices: ModerationNotice[]; nextCursor: string | null }
+
 export interface AppealView {
   id: string;
   status: AppealStatus;

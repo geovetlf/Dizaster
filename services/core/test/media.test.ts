@@ -49,6 +49,24 @@ describe("subida directa firmada", () => {
     expect(publicCopy.includes(Buffer.from("GPSLatitude"))).toBe(false);
   });
 
+  it("las variantes públicas se escriben con Cache-Control acotado (ADR 0286)", async () => {
+    const u = await createUser(t, "media_cache");
+    const storage = t.c.storage;
+    const original = storage.put.bind(storage);
+    const writes: { key: string; cacheControl: string | undefined }[] = [];
+    storage.put = async (key, data, mime, opts) => { writes.push({ key, cacheControl: opts?.cacheControl }); return original(key, data, mime, opts); };
+    try {
+      await uploadReady(u, makeJpeg());
+    } finally {
+      storage.put = original;
+    }
+    const pub = writes.filter((w) => w.key.startsWith("public/"));
+    expect(pub.length).toBeGreaterThan(0);
+    for (const w of pub) expect(w.cacheControl).toBe("public, max-age=3600");
+    // El original privado no lleva cabecera de caché pública.
+    for (const w of writes.filter((x) => !x.key.startsWith("public/"))) expect(w.cacheControl).toBeUndefined();
+  });
+
   it("video: la ubicación del contenedor desaparece de la copia pública", async () => {
     const u = await createUser(t, "media_video");
     const file = makeMp4();

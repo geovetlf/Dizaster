@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { cameOnline, online } from "../src/lib/report/connectivity";
 import { fetchWithTimeout } from "../src/lib/async/timeout";
+import { networkErrorKey } from "../src/lib/errors/network-error";
 
 // Cola que se envía sola (ADR 0190). NO AI REQUIRED.
 describe("vuelta de la red", () => {
@@ -22,6 +23,10 @@ describe("fetchWithTimeout", () => {
     const e = (await fetchWithTimeout("https://x", {}, 20, hang).then(() => null, (err: unknown) => err)) as Error & { status?: number };
     expect(e.message).toMatch(/Sin respuesta/);
     expect(e.status).toBeUndefined();
+    // La app lo muestra como "sin respuesta" traducido, no con este texto (ADR 0292).
+    expect(networkErrorKey(e)).toBe("errTimeout");
+    expect(networkErrorKey(new TypeError("Network request failed"))).toBe("errOffline");
+    expect(networkErrorKey(null)).toBe("errOffline");
   });
 
   it("respeta la señal de quien llama", async () => {

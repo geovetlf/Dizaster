@@ -31,6 +31,11 @@ const Env = z.object({
   /** Límite general por persona (o por IP sin sesión), por minuto (ADR 0047). */
   RATE_LIMIT_PER_MINUTE: z.coerce.number().int().positive().default(300),
   RATE_LIMIT_WRITES_PER_MINUTE: z.coerce.number().int().positive().default(60),
+  /**
+   * Búsquedas por minuto y persona (o IP sin sesión), aparte del límite general (ADR 0291): son las lecturas más caras
+   * y no piden sesión. La app lanza 6 por búsqueda tras 300 ms sin escribir; 120 da unas 20 búsquedas por minuto.
+   */
+  SEARCH_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().positive().default(120),
   /** Con más de una réplica de la API: contar el cupo por cuenta en PostgreSQL, compartido (ADR 0228). */
   RATE_LIMIT_SHARED: z.enum(["true", "false"]).default("false").transform((v) => v === "true"),
   /** Detrás de un CDN o balanceador: tomar la IP de X-Forwarded-For. Solo si ese proxy la fija. */
@@ -80,6 +85,11 @@ const Env = z.object({
   S3_SECRET_ACCESS_KEY: z.string().optional(),
   S3_FORCE_PATH_STYLE: z.enum(["true", "false"]).default("false").transform((v) => v === "true"),
   MEDIA_PUBLIC_BASE_URL: z.string().optional(),
+  /**
+   * Cache-Control de las variantes públicas en el almacenamiento y la CDN (ADR 0286). Una hora por defecto: la
+   * CDN absorbe las lecturas repetidas y una media retirada deja de servirse en, como mucho, ese plazo.
+   */
+  MEDIA_PUBLIC_CACHE_CONTROL: z.string().regex(/^(public|private)(, ?[a-z-]+(=\d+)?)*$/, "Cache-Control inválido").default("public, max-age=3600"),
   MEDIA_UPLOADS_PER_HOUR_LIMIT: z.coerce.number().int().positive().default(30),
   /** MB subidos en 24 h por cuenta con reputación normal; nueva: la mitad; baja: un cuarto (ADR 0072). */
   MEDIA_DAILY_UPLOAD_MB: z.coerce.number().int().min(60).default(300),

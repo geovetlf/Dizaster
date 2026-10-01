@@ -100,6 +100,7 @@ export function buildContainer(env: AppEnv, overrides: { db?: Db; clock?: Clock;
     uploadsPerHour: env.MEDIA_UPLOADS_PER_HOUR_LIMIT,
     uploadUrlTtlSeconds: env.MEDIA_UPLOAD_URL_TTL_SECONDS,
     originalRetentionDays: env.MEDIA_ORIGINAL_RETENTION_DAYS,
+    publicCacheControl: env.MEDIA_PUBLIC_CACHE_CONTROL,
   }, env.MEDIA_DECODER === "inprocess" ? inProcessDecoder
     : new IsolatedDecoder({ timeoutMs: env.MEDIA_DECODE_TIMEOUT_MS, maxOldSpaceMb: env.MEDIA_DECODER_MAX_OLD_SPACE_MB }));
   if (env.NODE_ENV === "production" && !overrides.attestation) {

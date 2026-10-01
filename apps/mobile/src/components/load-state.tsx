@@ -19,7 +19,8 @@ export function LoadState({ state, onRetry }: { state: "loading" | LoadErrorKind
   if (state === "notFound") return <NotFound />;
   return (
     <View style={styles.box} accessibilityLiveRegion="polite">
-      <Text style={styles.body}>{t("loadError")}</Text>
+      {/* Sin respuesta: revisar la conexión. Con respuesta de error: el problema no es la red del teléfono (ADR 0292). */}
+      <Text style={styles.body}>{t(state === "offline" ? "loadError" : "loadFailed")}</Text>
       {onRetry ? (
         <Pressable accessibilityRole="button" onPress={onRetry} style={styles.button}>
           <Text style={styles.buttonText}>{t("retry")}</Text>

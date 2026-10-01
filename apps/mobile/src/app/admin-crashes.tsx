@@ -6,6 +6,7 @@ import { api } from "../lib/api";
 import { lang, t } from "../lib/i18n";
 import { timeAgo } from "../lib/ui/format";
 import { colors, radius, space } from "../theme";
+import { ErrorText } from "../components/error-text";
 
 const PERIODS = [1, 7, 30] as const;
 
@@ -37,7 +38,7 @@ export default function AdminCrashesScreen() {
               </Pressable>
             ))}
           </View>
-          {error ? <Text style={styles.error}>{error}</Text> : <Text style={styles.meta}>{t("crashTotal")}: {total}</Text>}
+          {error ? <ErrorText style={styles.error}>{error}</ErrorText> : <Text style={styles.meta}>{t("crashTotal")}: {total}</Text>}
         </View>
       }
       ListEmptyComponent={error ? null : <Text style={styles.meta}>{t("crashNone")}</Text>}

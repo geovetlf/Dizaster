@@ -4,13 +4,16 @@ import { useCallback, useState } from "react";
 import { Alert, FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import { api } from "../lib/api";
 import { lang, t } from "../lib/i18n";
+import { uploadErrorText } from "../lib/media/upload-errors";
 import { canWithdraw, myReportLines, queuedState } from "../lib/report/my-reports";
 import { discardQueuedReport, reportQueue, retryQueuedReport } from "../lib/report/outbox";
 import type { QueuedReport } from "../lib/report/queue";
 import { formatInZone, timeAgo } from "../lib/ui/format";
+import { appendPage } from "../lib/ui/pages";
 import { colors, radius, space } from "../theme";
 import { categoryLabel } from "../lib/category-store";
 import { askSameEvent } from "../lib/report/same-event";
+import { ErrorText } from "../components/error-text";
 
 const categoryName = categoryLabel;
 const fmt = (iso: string) => formatInZone(iso, lang, undefined, "datetime") ?? iso;
@@ -21,10 +24,22 @@ export default function MyReportsScreen() {
   const [error, setError] = useState<string | null>(null);
   // Lo que sigue en el teléfono (ADR 0158): sin red, reintentando o detenido. Nunca se borra sin preguntar.
   const [queued, setQueued] = useState<QueuedReport[]>([]);
+  // Por páginas (ADR 0287): al llegar al final se piden los anteriores.
+  const [next, setNext] = useState<string | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
   const load = useCallback(() => {
     reportQueue.pending().then(setQueued).catch(() => setQueued([]));
-    api.myReports().then((r) => setReports(r.reports)).catch((e: Error) => setError(e.message));
+    api.myReports().then((r) => { setReports(r.reports); setNext(r.nextCursor); }).catch((e: Error) => setError(e.message));
   }, []);
+
+  function loadMore() {
+    if (!next || loadingMore) return;
+    setLoadingMore(true);
+    api.myReports(next)
+      .then((r) => { setReports((prev) => appendPage(prev ?? [], r.reports)); setNext(r.nextCursor); })
+      .catch(() => setError(t("loadError")))
+      .finally(() => setLoadingMore(false));
+  }
 
   function confirmDiscard(q: QueuedReport) {
     Alert.alert(t("queuedDiscard"), t("queuedDiscardConfirm"), [
@@ -41,7 +56,7 @@ export default function MyReportsScreen() {
         return (
           <View key={q.clientReportId} style={styles.card}>
             <Text style={styles.title}>{categoryName(q.body.categoryCode)} · {timeAgo(q.createdAt, lang)}</Text>
-            <Text style={styles.meta}>{t(`queuedState_${state}`)}{state === "STUCK" && q.stuck ? ` · ${q.stuck.reason}` : ""}</Text>
+            <Text style={styles.meta}>{t(`queuedState_${state}`)}{state === "STUCK" && q.stuck ? ` · ${uploadErrorText(q.stuck.reason, t)}` : ""}</Text>
             {q.media?.length ? <Text style={styles.meta}>{t("queuedMediaKept")}</Text> : null}
             <View style={styles.actions}>
               <Pressable accessibilityRole="button" onPress={() => void retryQueuedReport(q.clientReportId).then(load).catch(load)}><Text style={styles.link}>{t("queuedRetry")}</Text></Pressable>
@@ -66,8 +81,10 @@ export default function MyReportsScreen() {
       style={styles.container}
       data={reports ?? []}
       keyExtractor={(r) => r.id}
-      ListHeaderComponent={<>{queuedHeader}{error ? <Text style={styles.error}>{error}</Text> : null}</>}
+      ListHeaderComponent={<>{queuedHeader}{error ? <ErrorText style={styles.error}>{error}</ErrorText> : null}</>}
       ListEmptyComponent={reports ? <Text style={styles.meta}>{t("myReportsEmpty")}</Text> : null}
+      onEndReached={loadMore}
+      onEndReachedThreshold={0.5}
       renderItem={({ item }) => (
         <View style={styles.card}>
           <Text style={styles.title}>{categoryName(item.categoryCode)} · {timeAgo(item.capturedAt, lang)}</Text>
