@@ -54,7 +54,7 @@ export default function AdminModerationLogScreen() {
       ListEmptyComponent={error ? null : <Text style={styles.meta}>{t("moderationLogEmpty")}</Text>}
       renderItem={({ item }) => (
         <View style={styles.card}>
-          <Text style={styles.title}>{t(`action_${item.action}` as MessageKey)} · {item.targetType}</Text>
+          <Text style={styles.title}>{t(`action_${item.action}` as MessageKey)} · {t(`trTarget_${item.targetType}`)}</Text>
           <Text style={styles.meta}>
             {formatInZone(item.createdAt, lang, undefined, "datetime") ?? item.createdAt} · {item.actor === "RULE" ? t("moderationLogAutomatic") : `@${item.moderatorHandle ?? "—"}`}
           </Text>

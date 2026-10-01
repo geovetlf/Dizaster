@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { actionsFor, appendNotices, canBlock, FLAG_REASONS, isSevere, presenceBandKey, presenceLines, reasonSummary, validReason } from "../src/lib/moderation/logic";
+import { actionsFor, appendNotices, canBlock, FLAG_REASONS, isSevere, presenceBandKey, presenceLines, reasonSummary, targetStateText, validReason } from "../src/lib/moderation/logic";
 import type { ModerationNotice, ModeratorEvidenceView, NearbyEvent } from "@dizaster/contracts";
 import { canSetNegative, canSplit, duplicateCandidates, toggle } from "../src/lib/moderation/event-tools";
 
@@ -69,6 +69,14 @@ describe("presenceLines (ADR 0089)", () => {
     expect(presenceLines({ ...base, deviceFix: null, mockLocation: true, reasons: ["LOW_ACCURACY"], priorAccesses: 2 }, tr as never)).toEqual([
       "alta 0.87 12m GENUINE", "MOCK_LOCATION", "LOW_ACCURACY", "generalizada", "antes 2",
     ]);
+  });
+  it("estado del objetivo en palabras: verificación para eventos, moderación para lo demás (ADR 0301)", () => {
+    const t = (k: string) => `T:${k}`;
+    const v = (s: string) => `V:${s}`;
+    expect(targetStateText("POST", "HIDDEN", t, v)).toBe("T:contentState_HIDDEN");
+    expect(targetStateText("PROFILE", "DELETED", t, v)).toBe("T:contentState_DELETED");
+    expect(targetStateText("EVENT", "DISPUTED", t, v)).toBe("V:DISPUTED");
+    expect(targetStateText("COMMENT", "NUEVO", t, v)).toBe("NUEVO");
   });
   it("la banda se traduce; una desconocida cuenta como baja", () => {
     expect(presenceBandKey("HIGH")).toBe("presenceBand_HIGH");

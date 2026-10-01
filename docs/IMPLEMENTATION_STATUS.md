@@ -1,6 +1,6 @@
 # Estado de la implementación
 
-Actualizado: 2026-10-01 (hasta ADR 0297; auditoría de preparación en `docs/PRODUCTION_READINESS_REPORT.md`). Informe de preparación para producción: `docs/PRODUCTION_READINESS_REPORT.md`.
+Actualizado: 2026-10-01 (hasta ADR 0301; auditoría de preparación en `docs/PRODUCTION_READINESS_REPORT.md`). Informe de preparación para producción: `docs/PRODUCTION_READINESS_REPORT.md`.
 
 ## Etapa 1 — Fundación (hecha)
 
@@ -486,6 +486,7 @@ Actualizado: 2026-10-01 (hasta ADR 0297; auditoría de preparación en `docs/PRO
 | Exportación con tope único por lista y aviso de listas recortadas (`truncated`), también en la app (ADR 0295) | ✅ | §13.2 |
 | Requerimientos de autoridades y cambios de rol por páginas (cursor), sin tope fijo en la app (ADR 0296) | ✅ | §13.1, §15 |
 | Proveedor `hashicorp/google` 8.x igual en staging, producción y bootstrap (ADR 0297) | ✅ | §16 |
+| Moderación y administración sin códigos internos: tipo, estado, estado de caso, estado de fuente, presupuesto y periodos traducidos (ADR 0301) | ✅ | §11, §13.1 |
 | Licencias, auditoría, SBOM, Dependabot; respaldo con prueba de restauración en CI | ✅ | ADR 0070, `scripts/supply-chain.mjs`, `scripts/db-restore-check.mjs` |
 | Idioma de la app elegible en el perfil (es/en/pt/fr o del teléfono) | ✅ | ADR 0069, `app/language.tsx` |
 | Varias cuentas en un teléfono corroboran como una (clave seudónima del teléfono) | ✅ | ADR 0068, migración 0036 |

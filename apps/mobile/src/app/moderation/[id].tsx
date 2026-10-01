@@ -4,8 +4,8 @@ import { useEffect, useState } from "react";
 import { Alert, Image, Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { api } from "../../lib/api";
 import { API_URL } from "../../lib/config";
-import { lang, t } from "../../lib/i18n";
-import { actionReasonText, actionsFor, isSevere, presenceLines, reasonSummary, validReason } from "../../lib/moderation/logic";
+import { lang, t, verificationLabel } from "../../lib/i18n";
+import { actionReasonText, actionsFor, isSevere, presenceLines, reasonSummary, targetStateText, validReason } from "../../lib/moderation/logic";
 import { timeAgo } from "../../lib/ui/format";
 import { colors, radius, space } from "../../theme";
 import { ErrorText } from "../../components/error-text";
@@ -80,7 +80,7 @@ export default function CaseScreen() {
   const ok = validReason(reason);
   return (
     <ScrollView automaticallyAdjustKeyboardInsets style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-      <Text style={styles.kind}>{c.target.type} · {c.target.state} · {c.status}</Text>
+      <Text style={styles.kind}>{t(`trTarget_${c.target.type}`)} · {targetStateText(c.target.type, c.target.state, t, verificationLabel)} · {t(`caseStatus_${c.status}`)}</Text>
       <Text style={styles.author}>{c.target.authorHandle ? `@${c.target.authorHandle}` : t("pseudonymousAuthor")}</Text>
       <Text style={styles.text}>{c.target.text ?? "—"}</Text>
       {c.target.media?.length ? (
