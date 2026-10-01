@@ -1228,7 +1228,7 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
   app.get("/v1/me/moderation", async (req, reply) => {
     const session = requireSession(req);
     reply.header("cache-control", "no-store");
-    return { notices: await c.moderation.myNotices(session.userId) };
+    return c.moderation.myNotices(session.userId, req.query);
   });
   app.post("/v1/me/moderation/:id/appeal", async (req, reply) => {
     const session = requireSession(req);

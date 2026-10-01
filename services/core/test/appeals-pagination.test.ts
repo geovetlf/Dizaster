@@ -52,4 +52,29 @@ describe("apelaciones paginadas y por id (ADR 0236)", () => {
     expect(new Set(seen).size).toBe(5);
     expect([...seen].sort()).toEqual(seen); // abiertas: las más antiguas primero
   });
+
+  it("mis avisos se paginan con cursor propio, sin repetir ni perder ninguno (ADR 0289)", async () => {
+    const total = (await t.c.db.query<{ n: number }>(`SELECT count(*)::int AS n FROM moderation.actions WHERE affected_user_id = $1`, [autor.userId])).rows[0]!.n;
+    expect(total).toBeGreaterThan(50);
+    const first = (await t.app.inject({ url: "/v1/me/moderation", headers: auth(autor) })).json() as { notices: Array<{ action: { id: string } }>; nextCursor: string | null };
+    expect(first.notices).toHaveLength(50);
+    expect(first.nextCursor).toBe(first.notices[49]!.action.id);
+
+    const seen: string[] = [];
+    let cursor: string | null = null;
+    do {
+      const res = await t.app.inject({ url: `/v1/me/moderation?limit=20${cursor ? `&cursor=${cursor}` : ""}`, headers: auth(autor) });
+      expect(res.statusCode).toBe(200);
+      const page = res.json() as { notices: Array<{ action: { id: string; createdAt: string }; canAppeal: boolean; appeal: unknown }>; nextCursor: string | null };
+      seen.push(...page.notices.map((n) => n.action.id));
+      cursor = page.nextCursor;
+    } while (cursor);
+    expect(seen).toHaveLength(total);
+    expect(new Set(seen).size).toBe(total);
+
+    // El cursor de otra persona no sirve ni para saber la fecha de su acción.
+    const otra = await createUser(t, "otra_persona_avisos");
+    expect((await t.app.inject({ url: `/v1/me/moderation?cursor=${first.nextCursor}`, headers: auth(otra) })).statusCode).toBe(400);
+    expect((await t.app.inject({ url: "/v1/me/moderation?limit=0", headers: auth(autor) })).statusCode).toBe(400);
+  });
 });
