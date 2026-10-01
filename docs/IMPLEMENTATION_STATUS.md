@@ -1,6 +1,6 @@
 # Estado de la implementación
 
-Actualizado: 2026-10-01 (hasta ADR 0292; auditoría de preparación en `docs/PRODUCTION_READINESS_REPORT.md`). Informe de preparación para producción: `docs/PRODUCTION_READINESS_REPORT.md`.
+Actualizado: 2026-10-01 (hasta ADR 0293; auditoría de preparación en `docs/PRODUCTION_READINESS_REPORT.md`). Informe de preparación para producción: `docs/PRODUCTION_READINESS_REPORT.md`.
 
 ## Etapa 1 — Fundación (hecha)
 
@@ -481,6 +481,7 @@ Actualizado: 2026-10-01 (hasta ADR 0292; auditoría de preparación en `docs/PRO
 | Exportar mis datos: una vez por minuto y persona contando todas las réplicas, sin memoria que crezca (ADR 0290) | ✅ | §13.1, §13.2 |
 | Búsquedas con cupo propio por minuto (cuenta o IP en memoria), aparte del límite general (ADR 0291) | ✅ | §13.1, §12 |
 | Errores de acción sin respuesta traducidos (sin conexión / sin respuesta a tiempo) y errores en línea anunciados al lector de pantalla (ADR 0292) | ✅ | §3, ADR 0198 |
+| Retención de ítems de fuentes que no llegaron a ningún evento (IGNORED/ERROR, 90 días) (ADR 0293) | ✅ | §7.4, §12 |
 | Licencias, auditoría, SBOM, Dependabot; respaldo con prueba de restauración en CI | ✅ | ADR 0070, `scripts/supply-chain.mjs`, `scripts/db-restore-check.mjs` |
 | Idioma de la app elegible en el perfil (es/en/pt/fr o del teléfono) | ✅ | ADR 0069, `app/language.tsx` |
 | Varias cuentas en un teléfono corroboran como una (clave seudónima del teléfono) | ✅ | ADR 0068, migración 0036 |

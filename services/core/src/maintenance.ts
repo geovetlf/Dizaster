@@ -51,6 +51,7 @@ export function dailyJobs(c: Container): Job[] {
     ["retention.cost", () => c.cost.applyRetention()],
     ["retention.media", () => c.media.applyRetention()],
     ["retention.source-raw", () => c.ingestionScheduler.applyRawRetention()],
+    ["retention.source-items", () => c.ingestionScheduler.purgeUnusedItems()],
     ["trust.standing.refresh", () => c.trust.refreshStanding()],
     ["retention.outbox", async () => ({ deleted: await c.dispatcher.purgeProcessed(c.env.OUTBOX_RETENTION_DAYS) })],
     ["retention.heartbeats", async () => ({ deleted: await c.heartbeat.prune() })],
