@@ -479,6 +479,7 @@ Actualizado: 2026-10-01 (hasta ADR 0290; auditoría de preparación en `docs/PRO
 | Carril NORMAL escalonado: un minuto por fuente en el registro y prueba que impide horarios repetidos o inválidos (ADR 0288) | ✅ | §9.2 |
 | "Mis avisos de moderación" por páginas con cursor propio; la app carga los anteriores al llegar al final (ADR 0289) | ✅ | §6.3, §13.1, §13.3 |
 | Exportar mis datos: una vez por minuto y persona contando todas las réplicas, sin memoria que crezca (ADR 0290) | ✅ | §13.1, §13.2 |
+| Retención de ítems de fuentes que no llegaron a ningún evento (IGNORED/ERROR, 90 días) (ADR 0293) | ✅ | §7.4, §12 |
 | Licencias, auditoría, SBOM, Dependabot; respaldo con prueba de restauración en CI | ✅ | ADR 0070, `scripts/supply-chain.mjs`, `scripts/db-restore-check.mjs` |
 | Idioma de la app elegible en el perfil (es/en/pt/fr o del teléfono) | ✅ | ADR 0069, `app/language.tsx` |
 | Varias cuentas en un teléfono corroboran como una (clave seudónima del teléfono) | ✅ | ADR 0068, migración 0036 |
