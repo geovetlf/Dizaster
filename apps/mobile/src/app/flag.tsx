@@ -7,6 +7,7 @@ import { api } from "../lib/api";
 import { t } from "../lib/i18n";
 import { FLAG_REASONS } from "../lib/moderation/logic";
 import { colors, radius, space } from "../theme";
+import { ErrorText } from "../components/error-text";
 
 /** Denunciar un post, comentario, evento o perfil. La persona denunciada nunca sabe quién fue. */
 export default function FlagScreen() {
@@ -47,7 +48,7 @@ export default function FlagScreen() {
         </Pressable>
       ))}
       <TextInput accessibilityLabel={t("flagNote")} value={note} onChangeText={setNote} maxLength={500} multiline placeholder={t("flagNote")} placeholderTextColor={colors.textMuted} style={styles.input} />
-      {state === "error" ? <Text style={styles.error}>{t("loadError")}</Text> : null}
+      {state === "error" ? <ErrorText style={styles.error}>{t("loadError")}</ErrorText> : null}
       <Pressable accessibilityRole="button" disabled={!reason || state === "sending"} style={[styles.button, (!reason || state === "sending") && styles.disabled]} onPress={() => void send()}>
         <Text style={styles.buttonText}>{t("flag")}</Text>
       </Pressable>

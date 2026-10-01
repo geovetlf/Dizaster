@@ -1,4 +1,4 @@
-import type { EventDonationsResponse, ModerationActionsResponse, AcceptPoliciesRequest, ConfigChangeKind, ConfigChangesResponse, PolicyStatusResponse, ClientCrashReport, ClientCrashesResponse, AdminSourcesResponse, OriginalAccessEntry, OriginalAccessGrant, ChangeRoleRequest, RoleChangesResponse, StaffResponse, TransparencyReport, AuthorityRequestDetail, AuthorityRequestSummary, AuthorityRequestStatus, CreateAuthorityRequest, PublishDelayView, PresenceAccessEntry, DuplicateCandidateView, OfficialScopeView, MyReportsResponse, MyNoticesResponse, MfaEnrollResponse, MfaStatus, PresenceReview, EventSourceView, EventStatus, MyProfile, UpdateProfileRequest, ReactionKind, ReactionState, DataExport, VerificationView, ModeratorEventDetail, SavedZone, SavedZoneInput, AppealView, CaseDetail, CaseSummary, CreateFlagRequest, ModerationActionType, ModerationNotice, CostDashboard, KillSwitchView, QualityReport, CreatePostRequest, TagView, BusinessView, SessionView, CreateBusinessRequest, UpdateBusinessRequest, AlertPreferences, CategorySubscription, CategorySubscriptionInput, NotificationsResponse, AppConfig, AttributionsResponse, AreaSearchResult, FollowTarget, MyFollows, ProfileSearchResult, ProfileView, CommentView, CreateUploadRequest, FeedPost, FeedResponse, FeedTab, CreateUploadResponse, DevicePlatform, MediaView, RegisterPushTokenRequest, EventMapResponse, EventDetail, EventSummary, NearbyEventsResponse, SubmitReportRequest, SubmitReportResponse, TimelineEntryView } from "@dizaster/contracts";
+import type { EventDonationsResponse, ModerationActionsResponse, AcceptPoliciesRequest, ConfigChangeKind, ConfigChangesResponse, PolicyStatusResponse, ClientCrashReport, ClientCrashesResponse, AdminSourcesResponse, OriginalAccessEntry, OriginalAccessGrant, ChangeRoleRequest, RoleChangesResponse, StaffResponse, TransparencyReport, AuthorityRequestDetail, AuthorityRequestSummary, AuthorityRequestStatus, CreateAuthorityRequest, PublishDelayView, DuplicateQueueResponse, OfficialScopeView, MyReportsResponse, MyNoticesResponse, MfaEnrollResponse, MfaStatus, PresenceReview, EventSourceView, EventStatus, MyProfile, UpdateProfileRequest, ReactionKind, ReactionState, DataExport, VerificationView, ModeratorEventDetail, SavedZone, SavedZoneInput, AppealView, CaseDetail, CaseSummary, CreateFlagRequest, ModerationActionType, ModerationNotice, CostDashboard, KillSwitchView, QualityReport, CreatePostRequest, TagView, BusinessView, SessionView, CreateBusinessRequest, UpdateBusinessRequest, AlertPreferences, CategorySubscription, CategorySubscriptionInput, NotificationsResponse, AppConfig, AttributionsResponse, AreaSearchResult, FollowTarget, MyFollows, ProfileSearchResult, ProfileView, CommentView, CreateUploadRequest, FeedPost, FeedResponse, FeedTab, CreateUploadResponse, DevicePlatform, MediaView, RegisterPushTokenRequest, EventMapResponse, EventDetail, EventSummary, NearbyEventsResponse, SubmitReportRequest, SubmitReportResponse, TimelineEntryView, PresenceAccessResponse } from "@dizaster/contracts";
 import { mergeMapTiles, tilesForView } from "@dizaster/geo-kit";
 import { canRetryWithRefresh, singleFlight } from "./auth/refresh";
 import { appVersionHeaders } from "./app-identity";
@@ -250,7 +250,7 @@ export const api = {
   moderatorEvent: (id: string) => request<ModeratorEventDetail>(`/v1/moderation/events/${id}`),
   setNegativeState: (id: string, to: "NONE" | "DISPUTED" | "FALSE", reason: string, evidenceRefs: string[]) =>
     request<VerificationView>(`/v1/moderation/events/${id}/negative-state`, { method: "POST", body: JSON.stringify({ to, reason, evidenceRefs }) }),
-  duplicateQueue: () => request<{ candidates: DuplicateCandidateView[] }>("/v1/moderation/duplicates"),
+  duplicateQueue: (cursor?: string | null) => request<DuplicateQueueResponse>(`/v1/moderation/duplicates${pageQuery({ cursor })}`),
   dismissDuplicate: (id: string, reason: string) =>
     request<void>(`/v1/moderation/duplicates/${id}/dismiss`, { method: "POST", body: JSON.stringify({ reason }) }),
   mergeEvents: (targetId: string, sourceEventIds: string[], reason: string) =>
@@ -263,7 +263,8 @@ export const api = {
     request<ModeratorEventDetail>(`/v1/moderation/events/${id}/status`, { method: "POST", body: JSON.stringify({ to, reason }) }),
   moderationOriginal: (mediaId: string, reason: string, caseId?: string) =>
     request<OriginalAccessGrant>(`/v1/moderation/media/${mediaId}/original`, { method: "POST", body: JSON.stringify({ reason, ...(caseId ? { caseId } : {}) }) }),
-  originalAccessLog: () => request<{ entries: OriginalAccessEntry[]; nextCursor: string | null }>("/v1/admin/media-original-access"),
+  originalAccessLog: (cursor?: string | null) =>
+    request<{ entries: OriginalAccessEntry[]; nextCursor: string | null }>(`/v1/admin/media-original-access${pageQuery({ cursor })}`),
   adminStaff: () => request<StaffResponse>("/v1/admin/staff"),
   adminStaffChanges: (cursor: string) => request<RoleChangesResponse>(`/v1/admin/staff/changes${pageQuery({ cursor })}`),
   changeRole: (body: ChangeRoleRequest) => request<void>("/v1/admin/staff/roles", { method: "POST", body: JSON.stringify(body) }),
@@ -297,7 +298,7 @@ export const api = {
     request<ConfigChangesResponse>(`/v1/admin/config-changes?${new URLSearchParams({ ...(kind ? { kind } : {}), ...(cursor ? { cursor } : {}) }).toString()}`),
   moderationActions: (moderator?: string, cursor?: string | null) =>
     request<ModerationActionsResponse>(`/v1/admin/moderation-actions?${new URLSearchParams({ ...(moderator ? { moderator } : {}), ...(cursor ? { cursor } : {}) }).toString()}`),
-  presenceAccessLog: () => request<{ entries: PresenceAccessEntry[] }>("/v1/admin/presence-access"),
+  presenceAccessLog: (cursor?: string | null) => request<PresenceAccessResponse>(`/v1/admin/presence-access${pageQuery({ cursor })}`),
   mfaDisable: (code: string) => request<void>("/v1/me/mfa/totp/disable", { method: "POST", body: JSON.stringify({ code }) }),
   qualityReport: (days = 7) => request<QualityReport>(`/v1/admin/quality?days=${days}`),
   setKillSwitch: (feature: string, killed: boolean, reason: string) =>

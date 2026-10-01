@@ -9,6 +9,7 @@ import { validReason } from "../lib/admin/sources-format";
 import { barHeights, budgetLabel, budgetTone, formatBytes, formatUnits, formatUsd, moduleRows } from "../lib/admin/cost-format";
 import { lang, t, tf } from "../lib/i18n";
 import { colors, radius, space } from "../theme";
+import { ErrorText } from "../components/error-text";
 
 const RANGES = [7, 30, 90] as const;
 const TONE = { ok: "#22C55E", warn: "#FACC15", high: "#F97316", over: colors.accent } as const;
@@ -56,7 +57,7 @@ export default function AdminCostScreen() {
           </Pressable>
         ))}
       </View>
-      {!d ? <Text style={styles.note}>{error ? t("loadError") : ""}</Text> : (
+      {!d ? (error ? <ErrorText>{t("loadError")}</ErrorText> : null) : (
         <>
           <View style={styles.card}>
             <Text style={styles.label}>{t("costTotal")}</Text>
@@ -148,7 +149,7 @@ function BudgetEditor({ budget, reason, onSaved }: { budget: BudgetView; reason:
         ))}
       </View>
       <TextInput accessibilityLabel={t("budgetAmount")} value={text} onChangeText={setText} keyboardType="decimal-pad" placeholder="USD" placeholderTextColor={colors.textMuted} style={styles.input} />
-      {error ? <Text style={styles.note}>{error}</Text> : null}
+      {error ? <ErrorText>{error}</ErrorText> : null}
       <Pressable accessibilityRole="button" disabled={value === null} style={[styles.save, value === null && styles.disabled]} onPress={save}>
         <Text style={styles.rangeText}>{t("apply")}</Text>
       </Pressable>

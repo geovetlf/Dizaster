@@ -123,6 +123,8 @@ export const fr: Record<MessageKey, string> = {
   method_GOOGLE: "Google",
   viewOriginal: "Voir l'original (avec motif)",
   originalLogTitle: "Originaux de photos et vidéos consultés par la modération",
+  mediaWord: "média",
+  originalLogOlder: "Voir les originaux précédents",
   close: "Fermer",
   viewPhoto: "Voir la photo en entier",
   morePhotos: "Plus de photos",

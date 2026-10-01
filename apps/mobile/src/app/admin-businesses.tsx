@@ -88,7 +88,7 @@ function BusinessAdminRow({ business, reason, onChange }: { business: BusinessVi
           <Text style={styles.meta}>{t("bizScopeHint")}</Text>
           <TextInput accessibilityLabel={t("bizScopeCategories")} value={categories} onChangeText={setCategories} placeholder={t("bizScopeCategories")} placeholderTextColor={colors.textMuted} autoCapitalize="none" style={styles.input} />
           <TextInput accessibilityLabel={t("bizScopeCountries")} value={countries} onChangeText={setCountries} placeholder={t("bizScopeCountries")} placeholderTextColor={colors.textMuted} autoCapitalize="characters" style={styles.input} />
-          {[...cats.invalid, ...ctry.invalid].length ? <Text style={styles.error}>{t("bizScopeInvalid")}: {[...cats.invalid, ...ctry.invalid].join(", ")}</Text> : null}
+          {[...cats.invalid, ...ctry.invalid].length ? <ErrorText style={styles.error}>{`${t("bizScopeInvalid")}: ${[...cats.invalid, ...ctry.invalid].join(", ")}`}</ErrorText> : null}
           <Pressable accessibilityRole="button" disabled={!scopeOk} style={[styles.save, !scopeOk && styles.disabled]} onPress={saveScope}>
             <Text style={styles.chipText}>{t("apply")}</Text>
           </Pressable>

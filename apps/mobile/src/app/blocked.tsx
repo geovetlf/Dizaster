@@ -4,6 +4,7 @@ import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import { api } from "../lib/api";
 import { t } from "../lib/i18n";
 import { colors, radius, space } from "../theme";
+import { ErrorText } from "../components/error-text";
 
 /** Personas y negocios bloqueados (ADR 0097), con "Desbloquear". */
 export default function BlockedScreen() {
@@ -26,7 +27,12 @@ export default function BlockedScreen() {
       contentContainerStyle={styles.content}
       data={handles ?? []}
       keyExtractor={(h) => h}
-      ListHeaderComponent={<Text style={styles.meta}>{error ?? t("blockedHint")}</Text>}
+      ListHeaderComponent={(
+        <View style={{ gap: space.xs }}>
+          <Text style={styles.meta}>{t("blockedHint")}</Text>
+          {error ? <ErrorText>{error}</ErrorText> : null}
+        </View>
+      )}
       ListEmptyComponent={handles ? <Text style={styles.meta}>{t("blockedEmpty")}</Text> : null}
       renderItem={({ item }) => (
         <View style={styles.row}>
