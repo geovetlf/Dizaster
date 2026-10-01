@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { actionsFor, appendNotices, canBlock, FLAG_REASONS, isSevere, presenceBandKey, presenceLines, reasonSummary, validReason } from "../src/lib/moderation/logic";
 import type { ModerationNotice, ModeratorEvidenceView, NearbyEvent } from "@dizaster/contracts";
-import { canSetNegative, canSplit, duplicateCandidates, toggle } from "../src/lib/moderation/event-tools";
+import { canSetNegative, canSplit, duplicateCandidates, historyTruncated, toggle } from "../src/lib/moderation/event-tools";
 
 describe("moderación (lógica de la app)", () => {
   it("acciones por tipo y confirmación de las graves", () => {
@@ -69,6 +69,13 @@ describe("presenceLines (ADR 0089)", () => {
     expect(presenceLines({ ...base, deviceFix: null, mockLocation: true, reasons: ["LOW_ACCURACY"], priorAccesses: 2 }, tr as never)).toEqual([
       "alta 0.87 12m GENUINE", "MOCK_LOCATION", "LOW_ACCURACY", "generalizada", "antes 2",
     ]);
+  });
+  it("ofrece ver todo el historial solo si falta algo (ADR 0302)", () => {
+    const base = { evidence: [], merges: [], statusChanges: [], notes: [], severityChanges: [], sensitivityChanges: [] };
+    const zero = { evidence: 0, merges: 0, statusChanges: 0, notes: 0, severityChanges: 0, sensitivityChanges: 0 };
+    expect(historyTruncated({ ...base, historyTotals: zero })).toBe(false);
+    expect(historyTruncated({ ...base, historyTotals: { ...zero, notes: 1 } })).toBe(true);
+    expect(historyTruncated({ ...base, historyTotals: undefined as never })).toBe(false);
   });
   it("la banda se traduce; una desconocida cuenta como baja", () => {
     expect(presenceBandKey("HIGH")).toBe("presenceBand_HIGH");

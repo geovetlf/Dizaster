@@ -1,4 +1,4 @@
-import type { ModeratorEvidenceView, NearbyEvent } from "@dizaster/contracts";
+import type { ModeratorEventDetail, ModeratorEvidenceView, NearbyEvent } from "@dizaster/contracts";
 
 /** Posibles duplicados para fusionar en este evento: los cercanos de la misma categoría, sin él mismo. */
 export function duplicateCandidates(nearby: NearbyEvent[], eventId: string, max = 10): NearbyEvent[] {
@@ -38,4 +38,15 @@ export function canSetNegative(
 export function raisableSensitivities(current: "NORMAL" | "SENSITIVE" | "HIGHLY_SENSITIVE"): ("SENSITIVE" | "HIGHLY_SENSITIVE")[] {
   const order = ["NORMAL", "SENSITIVE", "HIGHLY_SENSITIVE"] as const;
   return order.slice(order.indexOf(current) + 1) as ("SENSITIVE" | "HIGHLY_SENSITIVE")[];
+}
+
+/**
+ * ¿Falta historial por ver? (ADR 0302): algún historial tiene más entradas que las recibidas. Sin totales (servidor
+ * anterior) no se ofrece nada.
+ */
+export function historyTruncated(d: Pick<ModeratorEventDetail, "historyTotals" | "evidence" | "merges" | "statusChanges" | "notes" | "severityChanges" | "sensitivityChanges">): boolean {
+  const tot = d.historyTotals;
+  if (!tot) return false;
+  return tot.evidence > d.evidence.length || tot.merges > d.merges.length || tot.statusChanges > d.statusChanges.length
+    || tot.notes > d.notes.length || tot.severityChanges > d.severityChanges.length || tot.sensitivityChanges > d.sensitivityChanges.length;
 }

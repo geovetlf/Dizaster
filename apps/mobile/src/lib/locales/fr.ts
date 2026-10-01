@@ -363,6 +363,7 @@ export const fr: Record<MessageKey, string> = {
   trTarget_PROFILE: "profil",
   trTarget_BUSINESS: "commerce",
   trTarget_EVENT: "événement",
+  historyAll: "Voir tout l'historique",
   trShare: "Partager le rapport",
   authorityHint: "Registre audité uniquement. Dizaster ne transmet aucune donnée tant qu'aucun conseil juridique n'est en place.",
   authorityNew: "Enregistrer une demande",

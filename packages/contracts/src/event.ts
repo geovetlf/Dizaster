@@ -292,7 +292,16 @@ export interface ModeratorEventDetail {
   /** Sensibilidad vigente y sus subidas por contexto (ADR 0179). */
   sensitivity: Sensitivity;
   sensitivityChanges: { from: Sensitivity; to: Sensitivity; reason: string; at: string }[];
+  /**
+   * Cuántos hay en total de cada historial (ADR 0302). Por defecto se envían los más recientes; con `history=full`,
+   * hasta `MODERATOR_HISTORY_FULL_LIMIT` de cada uno. Si el total es mayor que lo recibido, la app ofrece "ver todo".
+   */
+  historyTotals: { evidence: number; merges: number; statusChanges: number; notes: number; severityChanges: number; sensitivityChanges: number };
 }
+/** Tope de cada historial al pedir el detalle completo (ADR 0302). */
+export const MODERATOR_HISTORY_FULL_LIMIT = 500;
+export const ModeratorEventDetailQuery = z.object({ history: z.enum(["recent", "full"]).default("recent") });
+export type ModeratorEventDetailQuery = z.infer<typeof ModeratorEventDetailQuery>;
 export interface EventSeverityChangeView { from: number; to: number; override: number | null; reason: string; at: string }
 export interface ModeratorNoteView { id: string; text: string; byUserId: string | null; at: string }
 export const AddModeratorNoteRequest = z.object({ text: z.string().trim().min(3).max(2000) });

@@ -1,4 +1,4 @@
-import { SENSITIVITY_ORDER, DATA_EXPORT_ROW_LIMIT } from "@dizaster/contracts";
+import { SENSITIVITY_ORDER, DATA_EXPORT_ROW_LIMIT, MODERATOR_HISTORY_FULL_LIMIT } from "@dizaster/contracts";
 import type {
   EventStatus,
   CategoryConfig,
@@ -937,39 +937,51 @@ export class EventService {
     return rows.map((r) => r.ref_id);
   }
 
-  async moderatorDetail(q: Queryable, eventId: string): Promise<ModeratorEventDetail> {
+  async moderatorDetail(q: Queryable, eventId: string, history: "recent" | "full" = "recent"): Promise<ModeratorEventDetail> {
+    // Lo reciente basta para trabajar; el historial completo se pide aparte (ADR 0302).
+    const full = history === "full";
+    const cap = (recent: number) => (full ? MODERATOR_HISTORY_FULL_LIMIT : recent);
     const ev = (await q.query<{ merged_into_id: string | null; status: EventStatus; severity: number; severity_override: number | null; sensitivity: Sensitivity }>(
       `SELECT merged_into_id, status, severity, severity_override, sensitivity FROM event.events WHERE id = $1`, [eventId],
     )).rows[0];
     if (!ev) throw notFound("Evento");
     const sensitivityChanges = await q.query<{ from_level: Sensitivity; to_level: Sensitivity; reason: string; created_at: Date }>(
-      `SELECT from_level, to_level, reason, created_at FROM event.sensitivity_log WHERE event_id = $1 ORDER BY created_at DESC LIMIT 20`, [eventId],
+      `SELECT from_level, to_level, reason, created_at FROM event.sensitivity_log WHERE event_id = $1 ORDER BY created_at DESC, id DESC LIMIT $2`, [eventId, cap(20)],
     );
     const severityChanges = await q.query<{ from_severity: number; to_severity: number; override: number | null; reason: string; created_at: Date }>(
-      `SELECT from_severity, to_severity, override, reason, created_at FROM event.severity_log WHERE event_id = $1 ORDER BY created_at DESC LIMIT 20`,
-      [eventId],
+      `SELECT from_severity, to_severity, override, reason, created_at FROM event.severity_log WHERE event_id = $1 ORDER BY created_at DESC, id DESC LIMIT $2`,
+      [eventId, cap(20)],
     );
     const evidence = await q.query<{
       id: string; evidence_type: ModeratorEventDetail["evidence"][number]["evidenceType"]; trust_tier: TrustTier; assertion: "OCCURRING" | "NOT_OCCURRING";
       presence_band: string | null; match_confidence: string; observed_at: Date;
     }>(
       `SELECT id, evidence_type, trust_tier, assertion, presence_band, match_confidence, observed_at
-         FROM event.evidence WHERE event_id = $1 AND status = 'ACTIVE' ORDER BY observed_at, id LIMIT 500`,
-      [eventId],
+         FROM event.evidence WHERE event_id = $1 AND status = 'ACTIVE' ORDER BY observed_at, id LIMIT $2`,
+      [eventId, MODERATOR_HISTORY_FULL_LIMIT],
     );
     const merges = await q.query<{ id: string; target_event_id: string; merged_event_id: string; reason: string; moved: number; at: Date; reverted_at: Date | null }>(
       `SELECT id, target_event_id, merged_event_id, reason, cardinality(moved_evidence) AS moved, at, reverted_at
-         FROM event.merge_log WHERE target_event_id = $1 OR merged_event_id = $1 ORDER BY at DESC LIMIT 50`,
-      [eventId],
+         FROM event.merge_log WHERE target_event_id = $1 OR merged_event_id = $1 ORDER BY at DESC, id DESC LIMIT $2`,
+      [eventId, cap(50)],
     );
     const notes = await q.query<{ id: string; payload: { text?: string; byUserId?: string | null }; at: Date }>(
-      `SELECT id, payload, at FROM event.timeline WHERE event_id = $1 AND type = 'MODERATOR_NOTE' AND visibility = 'INTERNAL' ORDER BY at DESC, id DESC LIMIT 100`,
-      [eventId],
+      `SELECT id, payload, at FROM event.timeline WHERE event_id = $1 AND type = 'MODERATOR_NOTE' AND visibility = 'INTERNAL' ORDER BY at DESC, id DESC LIMIT $2`,
+      [eventId, cap(100)],
     );
     const changes = await q.query<{ from_status: EventStatus; to_status: EventStatus; reason: string; at: Date }>(
-      `SELECT from_status, to_status, reason, at FROM event.status_log WHERE event_id = $1 ORDER BY at DESC LIMIT 20`,
-      [eventId],
+      `SELECT from_status, to_status, reason, at FROM event.status_log WHERE event_id = $1 ORDER BY at DESC, id DESC LIMIT $2`,
+      [eventId, cap(20)],
     );
+    const totals = (await q.query<{ evidence: number; merges: number; status: number; notes: number; severity: number; sensitivity: number }>(
+      `SELECT (SELECT count(*)::int FROM event.evidence WHERE event_id = $1 AND status = 'ACTIVE') AS evidence,
+              (SELECT count(*)::int FROM event.merge_log WHERE target_event_id = $1 OR merged_event_id = $1) AS merges,
+              (SELECT count(*)::int FROM event.status_log WHERE event_id = $1) AS status,
+              (SELECT count(*)::int FROM event.timeline WHERE event_id = $1 AND type = 'MODERATOR_NOTE' AND visibility = 'INTERNAL') AS notes,
+              (SELECT count(*)::int FROM event.severity_log WHERE event_id = $1) AS severity,
+              (SELECT count(*)::int FROM event.sensitivity_log WHERE event_id = $1) AS sensitivity`,
+      [eventId],
+    )).rows[0]!;
     return {
       eventId,
       status: ev.status,
@@ -981,6 +993,10 @@ export class EventService {
       })),
       sensitivity: ev.sensitivity,
       sensitivityChanges: sensitivityChanges.rows.map((r) => ({ from: r.from_level, to: r.to_level, reason: r.reason, at: r.created_at.toISOString() })),
+      historyTotals: {
+        evidence: totals.evidence, merges: totals.merges, statusChanges: totals.status, notes: totals.notes,
+        severityChanges: totals.severity, sensitivityChanges: totals.sensitivity,
+      },
       statusChanges: changes.rows.map((r) => ({ from: r.from_status, to: r.to_status, reason: r.reason, at: r.at.toISOString() })),
       notes: notes.rows.map((r) => ({ id: r.id, text: r.payload.text ?? "", byUserId: r.payload.byUserId ?? null, at: r.at.toISOString() })),
       evidence: evidence.rows.map((r) => ({

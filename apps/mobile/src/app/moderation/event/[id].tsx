@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { api } from "../../../lib/api";
 import { lang, t, type MessageKey } from "../../../lib/i18n";
-import { canSetNegative, canSplit, duplicateCandidates, raisableSensitivities, toggle } from "../../../lib/moderation/event-tools";
+import { canSetNegative, canSplit, duplicateCandidates, historyTruncated, raisableSensitivities, toggle } from "../../../lib/moderation/event-tools";
 import { presenceBandKey, validReason } from "../../../lib/moderation/logic";
 import { distanceLabel, eventTitle, timeAgo } from "../../../lib/ui/format";
 import { colors, radius, space } from "../../../theme";
@@ -28,12 +28,14 @@ export default function EventToolsScreen() {
   const [reason, setReason] = useState("");
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
+  // Historial completo pedido a mano (ADR 0302); se mantiene al recargar tras una acción.
+  const [fullHistory, setFullHistory] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!id) return;
     try {
-      const [ev, d, v] = await Promise.all([api.event(id), api.moderatorEvent(id), api.verification(id)]);
+      const [ev, d, v] = await Promise.all([api.event(id), api.moderatorEvent(id, fullHistory), api.verification(id)]);
       setEvent(ev);
       setDetail(d);
       setVerification(v);
@@ -44,7 +46,7 @@ export default function EventToolsScreen() {
     } catch (e) {
       setError((e as Error).message);
     }
-  }, [id]);
+  }, [id, fullHistory]);
   useEffect(() => { void load(); }, [load]);
 
   async function run(action: () => Promise<unknown>) {
@@ -218,6 +220,12 @@ export default function EventToolsScreen() {
           ) : null}
         </View>
       ))}
+
+      {!fullHistory && historyTruncated(detail) ? (
+        <Pressable accessibilityRole="button" style={[styles.button, styles.wide]} onPress={() => setFullHistory(true)}>
+          <Text style={styles.buttonText}>{t("historyAll")}</Text>
+        </Pressable>
+      ) : null}
     </ScrollView>
   );
 }
