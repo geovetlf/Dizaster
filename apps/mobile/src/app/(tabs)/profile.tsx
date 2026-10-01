@@ -60,7 +60,9 @@ export default function ProfileScreen() {
     if (exporting) return;
     setExporting(true);
     try {
-      if ((await exportMyData()) === "saved") Alert.alert(t("exportData"), t("exportSaved"));
+      const r = await exportMyData();
+      const notes = [r.outcome === "saved" ? t("exportSaved") : null, r.partial ? t("exportPartial") : null].filter(Boolean);
+      if (notes.length) Alert.alert(t("exportData"), notes.join("\n\n"));
     } catch {
       Alert.alert(t("exportData"), t("exportFailed"));
     } finally {

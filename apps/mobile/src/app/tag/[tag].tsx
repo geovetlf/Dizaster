@@ -6,6 +6,7 @@ import { FeedList } from "../../components/feed-list";
 import { api } from "../../lib/api";
 import { t } from "../../lib/i18n";
 import { colors, radius, space } from "../../theme";
+import { ErrorText } from "../../components/error-text";
 
 /** Posts públicos con una etiqueta, por recientes. Se puede seguir la etiqueta para verla en "Siguiendo". */
 export default function TagScreen() {
@@ -47,7 +48,7 @@ export default function TagScreen() {
     [view],
   );
 
-  if (error) return <Text style={styles.error}>{error}</Text>;
+  if (error) return <ErrorText style={styles.error}>{error}</ErrorText>;
   return (
     <View style={styles.container}>
       <Stack.Screen options={{ title: view ? `#${view.display}` : "" }} />

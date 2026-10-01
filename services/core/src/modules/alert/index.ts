@@ -20,6 +20,7 @@ import {
   type AlertOrigin,
   type NotificationView,
   type NotificationsResponse,
+  DATA_EXPORT_ROW_LIMIT,
 } from "@dizaster/contracts";
 import { H3_RES, h3, h3Center } from "@dizaster/geo-kit";
 import type { z } from "zod";
@@ -829,7 +830,7 @@ export class AlertService {
       `SELECT ST_Y(center::geometry) AS lat, ST_X(center::geometry) AS lng, seen_at FROM alert.last_locations WHERE profile_id = $1`, [profileId],
     );
     const notifications = await q.query(
-      `SELECT id, alert_id, title, body, status, created_at, pushed_at, read_at FROM alert.notifications WHERE profile_id = $1 ORDER BY created_at DESC LIMIT 5000`, [profileId],
+      `SELECT id, alert_id, title, body, status, created_at, pushed_at, read_at FROM alert.notifications WHERE profile_id = $1 ORDER BY created_at DESC LIMIT ${DATA_EXPORT_ROW_LIMIT + 1}`, [profileId],
     );
     return { preferences: preferences.rows, subscriptions: subscriptions.rows, zones: zones.rows, lastLocation: lastLocation.rows, notifications: notifications.rows };
   }
