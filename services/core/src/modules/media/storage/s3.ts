@@ -47,8 +47,8 @@ export class S3Storage implements StorageProvider {
     return new Uint8Array(await res.arrayBuffer());
   }
 
-  async put(key: string, data: Uint8Array, mime: string): Promise<void> {
-    const res = await this.request("PUT", key, data, { "content-type": mime });
+  async put(key: string, data: Uint8Array, mime: string, opts?: { cacheControl?: string }): Promise<void> {
+    const res = await this.request("PUT", key, data, { "content-type": mime, ...(opts?.cacheControl ? { "cache-control": opts.cacheControl } : {}) });
     if (!res.ok) throw new Error(`S3 PUT ${res.status}: ${await res.text()}`);
   }
 

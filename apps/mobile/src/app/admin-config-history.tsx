@@ -7,6 +7,7 @@ import { api } from "../lib/api";
 import { lang, t, type MessageKey } from "../lib/i18n";
 import { formatInZone } from "../lib/ui/format";
 import { colors, radius, space } from "../theme";
+import { ErrorText } from "../components/error-text";
 
 /**
  * Historial de configuración (§13.1, ADR 0219). Solo administración y solo lectura: quién cambió qué, cuándo, el
@@ -39,7 +40,7 @@ export default function AdminConfigHistoryScreen() {
               <Text style={styles.chipText}>{k ? kindLabel(k) : t("configAll")}</Text>
             </Pressable>
           ))}
-          {error ? <Text style={styles.error}>{error}</Text> : null}
+          {error ? <ErrorText style={styles.error}>{error}</ErrorText> : null}
         </View>
       }
       ListEmptyComponent={error ? null : <Text style={styles.meta}>{t("configHistoryEmpty")}</Text>}

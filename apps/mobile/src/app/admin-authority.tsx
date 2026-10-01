@@ -15,6 +15,7 @@ import { dueFromDays, parseSubjectRefs, shortId } from "../lib/admin/admin-tools
 import { api } from "../lib/api";
 import { t, type MessageKey } from "../lib/i18n";
 import { colors, radius, space } from "../theme";
+import { ErrorText } from "../components/error-text";
 
 const typeLabel = (x: AuthorityRequestType) => t(`authType_${x}` as MessageKey);
 const channelLabel = (x: AuthorityRequestChannel) => t(`authChannel_${x}` as MessageKey);
@@ -91,7 +92,7 @@ export default function AdminAuthorityScreen() {
       ListHeaderComponent={
         <View style={styles.header}>
           <Text style={styles.meta}>{t("authorityHint")}</Text>
-          {error ? <Text style={styles.error}>{error}</Text> : null}
+          {error ? <ErrorText style={styles.error}>{error}</ErrorText> : null}
           {creating ? (
             <View style={styles.card}>
               {field("authority", t("authorityName"))}

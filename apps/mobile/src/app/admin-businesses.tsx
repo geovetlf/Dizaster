@@ -6,6 +6,7 @@ import { validReason } from "../lib/admin/sources-format";
 import { api } from "../lib/api";
 import { t, type MessageKey } from "../lib/i18n";
 import { colors, radius, space } from "../theme";
+import { ErrorText } from "../components/error-text";
 
 const LEVELS: BusinessVerification[] = ["UNVERIFIED", "VERIFIED", "INSTITUTIONAL_OFFICIAL"];
 const LEVEL_LABEL: Record<BusinessVerification, MessageKey> = {
@@ -40,7 +41,7 @@ export default function AdminBusinessesScreen() {
           <TextInput accessibilityLabel={t("bizSearch")} value={q} onChangeText={setQ} onSubmitEditing={() => void search()} placeholder={t("bizSearch")} placeholderTextColor={colors.textMuted}
             autoCapitalize="none" returnKeyType="search" style={styles.input} />
           <TextInput accessibilityLabel={t("actionReason")} value={reason} onChangeText={setReason} maxLength={500} placeholder={t("actionReason")} placeholderTextColor={colors.textMuted} style={styles.input} />
-          {error ? <Text style={styles.error}>{error}</Text> : null}
+          {error ? <ErrorText style={styles.error}>{error}</ErrorText> : null}
         </View>
       }
       renderItem={({ item }) => <BusinessAdminRow business={item} reason={reason.trim()} onChange={(b) => setResults((prev) => prev.map((x) => (x.handle === b.handle ? b : x)))} />}
@@ -94,7 +95,7 @@ function BusinessAdminRow({ business, reason, onChange }: { business: BusinessVi
           {scope ? <Text style={styles.meta}>✓ {scope.categories.join(", ")} · {scope.countries.join(", ")}</Text> : null}
         </View>
       ) : null}
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+      {error ? <ErrorText style={styles.error}>{error}</ErrorText> : null}
     </View>
   );
 }

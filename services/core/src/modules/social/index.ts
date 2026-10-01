@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { ChronoPageQuery, POST_EDIT_WINDOW_HOURS, compileTerms, matchTerms, type CompiledTerms, type ModerationTermList, type MentionsFrom, detectLanguage, detectPersonalData, extractMentions, extractTags, textFingerprintBase, type CommentView, type FeedTab, type GeoPoint, type PostAuthor, type ProfileSearchResult, type ReactionCounts, type ReactionKind, type ReactionState, type CommentReactionKind, type Units, type UpdateProfileRequest, type ProfileView, type TagView } from "@dizaster/contracts";
+import { ChronoPageQuery, POST_EDIT_WINDOW_HOURS, compileTerms, matchTerms, type CompiledTerms, type ModerationTermList, type MentionsFrom, detectLanguage, detectPersonalData, extractMentions, extractTags, textFingerprintBase, type CommentView, type FeedTab, type GeoPoint, type PostAuthor, type ProfileSearchResult, type ReactionCounts, type ReactionKind, type ReactionState, type CommentReactionKind, type Units, type UpdateProfileRequest, type ProfileView, type TagView, DATA_EXPORT_ROW_LIMIT } from "@dizaster/contracts";
 import type { Queryable } from "../../platform/db.js";
 import { publish, type OutboxDispatcher } from "../../platform/outbox.js";
 import { DomainError, notFound } from "../../platform/errors.js";
@@ -1319,14 +1319,14 @@ export class SocialService {
          FROM social.posts p
         WHERE (p.author_type = 'PROFILE' AND p.author_id = $1)
            OR (p.author_type = 'BUSINESS' AND p.author_id IN (SELECT id FROM social.business_profiles WHERE owner_user_id = $2))
-        ORDER BY p.created_at DESC LIMIT 10000`,
+        ORDER BY p.created_at DESC LIMIT ${DATA_EXPORT_ROW_LIMIT + 1}`,
       [p, who.userId],
     );
-    const comments = await q.query(`SELECT id, post_id, parent_comment_id, text, moderation_state, created_at, deleted_at FROM social.comments WHERE author_profile_id = $1 ORDER BY created_at DESC LIMIT 10000`, [p]);
-    const reactions = await q.query(`SELECT post_id, kind, created_at FROM social.reactions WHERE profile_id = $1 ORDER BY created_at DESC LIMIT 10000`, [p]);
-    const commentReactions = await q.query(`SELECT comment_id, kind, created_at FROM social.comment_reactions WHERE profile_id = $1 ORDER BY created_at DESC LIMIT 10000`, [p]);
+    const comments = await q.query(`SELECT id, post_id, parent_comment_id, text, moderation_state, created_at, deleted_at FROM social.comments WHERE author_profile_id = $1 ORDER BY created_at DESC LIMIT ${DATA_EXPORT_ROW_LIMIT + 1}`, [p]);
+    const reactions = await q.query(`SELECT post_id, kind, created_at FROM social.reactions WHERE profile_id = $1 ORDER BY created_at DESC LIMIT ${DATA_EXPORT_ROW_LIMIT + 1}`, [p]);
+    const commentReactions = await q.query(`SELECT comment_id, kind, created_at FROM social.comment_reactions WHERE profile_id = $1 ORDER BY created_at DESC LIMIT ${DATA_EXPORT_ROW_LIMIT + 1}`, [p]);
     const follows = await q.query(`SELECT target_type, target_id, created_at FROM social.follows WHERE follower_profile_id = $1`, [p]);
-    const externalShares = await q.query(`SELECT post_id, created_at FROM social.external_shares WHERE profile_id = $1 ORDER BY created_at DESC LIMIT 10000`, [p]);
+    const externalShares = await q.query(`SELECT post_id, created_at FROM social.external_shares WHERE profile_id = $1 ORDER BY created_at DESC LIMIT ${DATA_EXPORT_ROW_LIMIT + 1}`, [p]);
     const blocks = await q.query(
       `SELECT pr.handle AS blocked_handle, b.created_at FROM social.blocks b JOIN social.profiles pr ON pr.id = b.blocked_profile_id WHERE b.blocker_profile_id = $1
        UNION ALL
@@ -1334,7 +1334,7 @@ export class SocialService {
     );
     // Mis ediciones (ADR 0209): el texto anterior de mis propios posts.
     const postEdits = await q.query(
-      `SELECT post_id, previous_text, edited_at FROM social.post_edits WHERE editor_profile_id = $1 ORDER BY edited_at DESC LIMIT 10000`, [p],
+      `SELECT post_id, previous_text, edited_at FROM social.post_edits WHERE editor_profile_id = $1 ORDER BY edited_at DESC LIMIT ${DATA_EXPORT_ROW_LIMIT + 1}`, [p],
     );
     return {
       postEdits: postEdits.rows,

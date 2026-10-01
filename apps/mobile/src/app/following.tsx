@@ -7,6 +7,7 @@ import { lang, t, type MessageKey } from "../lib/i18n";
 import { EMPTY_FOLLOWS, followSections, withFollow, type FollowRow } from "../lib/social/follow-state";
 import { colors, radius, space } from "../theme";
 import { categoryLabel } from "../lib/category-store";
+import { ErrorText } from "../components/error-text";
 
 const categoryName = categoryLabel;
 const eventName = (e: MyFollows["events"][number]) => e.title?.[lang] ?? (e.title ? Object.values(e.title)[0] : undefined) ?? categoryName(e.categoryCode);
@@ -45,7 +46,7 @@ export default function FollowingScreen() {
       contentContainerStyle={styles.content}
       sections={sections}
       keyExtractor={(r) => `${r.target}:${r.id}`}
-      ListHeaderComponent={error ? <Text style={styles.error}>{error}</Text> : null}
+      ListHeaderComponent={error ? <ErrorText style={styles.error}>{error}</ErrorText> : null}
       ListEmptyComponent={my ? <Text style={styles.meta}>{t("followListEmpty")}</Text> : null}
       renderSectionHeader={({ section }) => <Text style={styles.section}>{t(SECTION[section.key]!)}</Text>}
       renderItem={({ item }) => (
