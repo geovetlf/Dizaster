@@ -8,6 +8,7 @@ import { canSetNegative, canSplit, duplicateCandidates, raisableSensitivities, t
 import { validReason } from "../../../lib/moderation/logic";
 import { distanceLabel, eventTitle, timeAgo } from "../../../lib/ui/format";
 import { colors, radius, space } from "../../../theme";
+import { ErrorText } from "../../../components/error-text";
 
 const STATUSES: EventStatus[] = ["ACTIVE", "MONITORING", "RESOLVED", "ARCHIVED"];
 const NEGATIVE = ["NONE", "DISPUTED", "FALSE"] as const;
@@ -65,7 +66,7 @@ export default function EventToolsScreen() {
       { text: t("apply"), onPress: () => void run(action) },
     ]);
 
-  if (!detail || !event) return <View style={styles.container}>{error ? <Text style={styles.error}>{error}</Text> : null}</View>;
+  if (!detail || !event) return <View style={styles.container}>{error ? <ErrorText style={styles.error}>{error}</ErrorText> : null}</View>;
   const ok = validReason(reason) && !busy;
   const merged = detail.mergedIntoId !== null;
   return (
@@ -76,7 +77,7 @@ export default function EventToolsScreen() {
       {merged ? <Text style={styles.meta}>{t("mergedInto")}</Text> : null}
 
       <TextInput accessibilityLabel={t("actionReason")} value={reason} onChangeText={setReason} multiline maxLength={1000} placeholder={t("actionReason")} placeholderTextColor={colors.textMuted} style={styles.input} />
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+      {error ? <ErrorText style={styles.error}>{error}</ErrorText> : null}
 
       {/* Notas internas (ADR 0147): solo moderación las ve; nunca salen en la línea de tiempo pública. */}
       <Text style={styles.section}>{t("moderatorNotes")}</Text>

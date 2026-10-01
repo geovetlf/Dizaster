@@ -7,6 +7,7 @@ import { api } from "../lib/api";
 import { lang, t } from "../lib/i18n";
 import { timeAgo } from "../lib/ui/format";
 import { colors, radius, space } from "../theme";
+import { ErrorText } from "../components/error-text";
 
 /**
  * Personal y roles (§13.1, ADR 0167). Solo administración. Dar o quitar un rol pide motivo y queda registrado; quitarlo
@@ -45,7 +46,7 @@ export default function AdminStaffScreen() {
   const target = handle.trim().replace(/^@/, "");
   return (
     <ScrollView automaticallyAdjustKeyboardInsets style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+      {error ? <ErrorText style={styles.error}>{error}</ErrorText> : null}
       <TextInput accessibilityLabel={t("actionReason")} value={reason} onChangeText={setReason} maxLength={1000} placeholder={t("actionReason")} placeholderTextColor={colors.textMuted} style={styles.input} />
 
       <Text style={styles.section}>{t("roleGrantSection")}</Text>

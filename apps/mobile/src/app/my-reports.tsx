@@ -13,6 +13,7 @@ import { appendPage } from "../lib/ui/pages";
 import { colors, radius, space } from "../theme";
 import { categoryLabel } from "../lib/category-store";
 import { askSameEvent } from "../lib/report/same-event";
+import { ErrorText } from "../components/error-text";
 
 const categoryName = categoryLabel;
 const fmt = (iso: string) => formatInZone(iso, lang, undefined, "datetime") ?? iso;
@@ -80,7 +81,7 @@ export default function MyReportsScreen() {
       style={styles.container}
       data={reports ?? []}
       keyExtractor={(r) => r.id}
-      ListHeaderComponent={<>{queuedHeader}{error ? <Text style={styles.error}>{error}</Text> : null}</>}
+      ListHeaderComponent={<>{queuedHeader}{error ? <ErrorText style={styles.error}>{error}</ErrorText> : null}</>}
       ListEmptyComponent={reports ? <Text style={styles.meta}>{t("myReportsEmpty")}</Text> : null}
       onEndReached={loadMore}
       onEndReachedThreshold={0.5}

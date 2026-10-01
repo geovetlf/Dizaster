@@ -7,6 +7,7 @@ import { API_URL } from "./config";
 import { newId } from "./ids";
 import { EtagCache } from "./http/etag-cache";
 import { isMfaError } from "./auth/mfa";
+import { networkErrorKey } from "./errors/network-error";
 import { serverErrorMessage } from "./errors/server-error";
 import { lang, t } from "./i18n";
 import { pageQuery } from "./ui/pages";
@@ -64,11 +65,19 @@ async function request<T>(path: string, init: RequestInit = {}, retried = false)
   const isGet = (init.method ?? "GET") === "GET";
   // Id de correlación (ADR 0172): el servidor lo propaga a sus eventos y lo devuelve; queda en el error si falla.
   const requestId = newId();
-  const res = await fetchWithTimeout(`${API_URL}${path}`, {
-    ...init,
-    // Sin cuerpo no se declara JSON: el servidor rechaza un cuerpo JSON vacío (p. ej. DELETE o POST .../complete).
-    headers: { ...(init.body ? { "content-type": "application/json" } : {}), "x-request-id": requestId, ...appVersionHeaders, ...auth, ...(isGet ? etags.headers(path) : {}), ...(init.headers ?? {}) },
-  });
+  let res: Response;
+  try {
+    res = await fetchWithTimeout(`${API_URL}${path}`, {
+      ...init,
+      // Sin cuerpo no se declara JSON: el servidor rechaza un cuerpo JSON vacío (p. ej. DELETE o POST .../complete).
+      headers: { ...(init.body ? { "content-type": "application/json" } : {}), "x-request-id": requestId, ...appVersionHeaders, ...auth, ...(isGet ? etags.headers(path) : {}), ...(init.headers ?? {}) },
+    });
+  } catch (e) {
+    // Cancelada por quien llama: se propaga tal cual.
+    if (init.signal?.aborted) throw e;
+    // Sin respuesta (ADR 0292): texto traducido y sin `status`, así la cola y las pantallas lo tratan como "sin conexión".
+    throw Object.assign(new Error(t(networkErrorKey(e)), { cause: e }), { requestId });
+  }
   if (canRetryWithRefresh(path, res.status, retried, refreshToken !== null) && (await renew())) return request<T>(path, init, true);
   if (res.status === 304 && isGet) {
     const cached = etags.hit(path);

@@ -26,7 +26,8 @@ export async function fetchWithTimeout(url: string, init: RequestInit = {}, ms =
   try {
     return await doFetch(url, { ...init, signal: ctrl.signal });
   } catch (e) {
-    if (ctrl.signal.aborted && !outer?.aborted) throw new Error(`Sin respuesta en ${Math.round(ms / 1000)} s`, { cause: e });
+    // `timedOut` permite mostrar "sin respuesta" traducido en vez de este texto (ADR 0292).
+    if (ctrl.signal.aborted && !outer?.aborted) throw Object.assign(new Error(`Sin respuesta en ${Math.round(ms / 1000)} s`, { cause: e }), { timedOut: true });
     throw e;
   } finally {
     clearTimeout(timer);

@@ -10,6 +10,7 @@ import { lang, t } from "../../lib/i18n";
 import { alertFailure, confirmBlock, openFlag } from "../../lib/moderation/menu";
 import { BUSINESS_CATEGORY_LABEL, telUri, verificationIcon } from "../../lib/social/business";
 import { colors, radius, space } from "../../theme";
+import { ErrorText } from "../../components/error-text";
 
 /** Página de un negocio: datos públicos que el negocio eligió publicar y sus posts. */
 export default function BusinessScreen() {
@@ -95,7 +96,7 @@ export default function BusinessScreen() {
     );
   }, [b]);
 
-  if (error) return <Text style={styles.error}>{error}</Text>;
+  if (error) return <ErrorText style={styles.error}>{error}</ErrorText>;
   return (
     <View style={styles.container}>
       <Stack.Screen options={{ title: b ? b.name : "" }} />

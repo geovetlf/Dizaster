@@ -12,6 +12,7 @@ import { lang, locale, t } from "../lib/i18n";
 import { forgetMe } from "../lib/social/me";
 import { setUnits } from "../lib/ui/format";
 import { colors, radius, space } from "../theme";
+import { ErrorText } from "../components/error-text";
 
 const BIO_MAX = 160;
 
@@ -50,7 +51,7 @@ export default function ProfileEditScreen() {
     }
   }
 
-  if (!me) return <View style={styles.container}>{error ? <Text style={styles.error}>{error}</Text> : null}</View>;
+  if (!me) return <View style={styles.container}>{error ? <ErrorText style={styles.error}>{error}</ErrorText> : null}</View>;
   const valid = name.trim().length > 0;
   return (
     <ScrollView automaticallyAdjustKeyboardInsets style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
@@ -101,7 +102,7 @@ export default function ProfileEditScreen() {
         ))}
       </View>
       <Text style={styles.hint}>{t("preferredCountryHint")}</Text>
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+      {error ? <ErrorText style={styles.error}>{error}</ErrorText> : null}
       <Pressable accessibilityRole="button" disabled={!valid || busy} onPress={() => void save()} style={[styles.save, (!valid || busy) && styles.disabled]}>
         <Text style={styles.saveText}>{t("save")}</Text>
       </Pressable>

@@ -6,6 +6,7 @@ import { api } from "../lib/api";
 import { lang, t, type MessageKey } from "../lib/i18n";
 import { formatInZone } from "../lib/ui/format";
 import { colors, radius, space } from "../theme";
+import { ErrorText } from "../components/error-text";
 
 /**
  * Registro de moderación (§5.21, §13.1, ADR 0239). Solo administración y solo lectura: qué acción, sobre qué, por qué
@@ -47,7 +48,7 @@ export default function AdminModerationLogScreen() {
             autoCorrect={false}
             returnKeyType="search"
           />
-          {error ? <Text style={styles.error}>{error}</Text> : null}
+          {error ? <ErrorText style={styles.error}>{error}</ErrorText> : null}
         </View>
       }
       ListEmptyComponent={error ? null : <Text style={styles.meta}>{t("moderationLogEmpty")}</Text>}
