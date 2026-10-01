@@ -265,6 +265,14 @@ export interface DuplicateCandidateView {
   events: [EventSummary, EventSummary];
 }
 
+/** Cola de posibles duplicados por páginas (ADR 0298): `cursor` = id del último par, por `(created_at, id)`. */
+export const DuplicateQueueQuery = z.object({
+  cursor: z.uuid().optional(),
+  limit: z.coerce.number().int().min(1).max(200).default(50),
+});
+export type DuplicateQueueQuery = z.infer<typeof DuplicateQueueQuery>;
+/** `total`: pares abiertos en toda la cola, no solo en esta página. */
+export interface DuplicateQueueResponse { candidates: DuplicateCandidateView[]; nextCursor: string | null; total: number }
 export const DismissDuplicateRequest = z.object({ reason: z.string().trim().min(3).max(2000) });
 export type DismissDuplicateRequest = z.infer<typeof DismissDuplicateRequest>;
 

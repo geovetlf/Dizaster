@@ -7,6 +7,7 @@ import type {
   EventCandidate,
   EventMapResponse,
   DuplicateCandidateView,
+  DuplicateQueueResponse,
   EventMergeView,
   AffectedAreaView,
   EventDetail,
@@ -20,7 +21,7 @@ import type {
   TrustTier,
   VerificationLevel,
 } from "@dizaster/contracts";
-import { AreaGeometry, ChronoPageQuery, GalleryPageQuery, SetPublishDelayRequest, type PublishDelayView, EventSearchQuery, VERIFICATION_LEVEL_RANK, publicVerificationState } from "@dizaster/contracts";
+import { AreaGeometry, ChronoPageQuery, DuplicateQueueQuery, GalleryPageQuery, SetPublishDelayRequest, type PublishDelayView, EventSearchQuery, VERIFICATION_LEVEL_RANK, publicVerificationState } from "@dizaster/contracts";
 import {
   DEDUP_RULES,
   H3_RES,
@@ -302,6 +303,7 @@ export class EventService {
           AND ST_DWithin(geom, ST_SetSRID(ST_MakePoint($3, $4), 4326)::geography, $5)
           AND last_activity_at >= $6::timestamptz - make_interval(mins => $7)
           AND ($8::uuid IS NULL OR id <> $8)
+        ORDER BY ST_Distance(geom, ST_SetSRID(ST_MakePoint($3, $4), 4326)::geography), last_activity_at DESC, id
         LIMIT 50`,
       [
         [categoryCode, ...category.compatibleWith], `${root}.%`, point.lng, point.lat,
@@ -749,22 +751,35 @@ export class EventService {
     return new Map(rows.map((r) => [r.id, toSummary(r)]));
   }
 
-  async duplicateQueue(q: Queryable, limit = 50): Promise<DuplicateCandidateView[]> {
-    const { rows } = await q.query<{ id: string; event_a: string; event_b: string; score: number; reason: DuplicateCandidateView["reason"]; created_at: Date }>(
-      `SELECT d.id, d.event_a, d.event_b, d.score, d.reason, d.created_at FROM event.duplicate_candidates d
+  /** Cola de posibles duplicados (ADR 0076), por páginas y con el total de pares abiertos (ADR 0298). */
+  async duplicateQueue(q: Queryable, raw: unknown = {}): Promise<DuplicateQueueResponse> {
+    const parsed = DuplicateQueueQuery.safeParse(raw ?? {});
+    if (!parsed.success) throw new DomainError("VALIDATION", parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; "));
+    const { cursor, limit } = parsed.data;
+    if (cursor) {
+      const known = await q.query(`SELECT 1 FROM event.duplicate_candidates WHERE id = $1`, [cursor]);
+      if (!known.rowCount) throw new DomainError("VALIDATION", "Cursor inválido");
+    }
+    const open = `FROM event.duplicate_candidates d
          JOIN event.events a ON a.id = d.event_a AND a.merged_into_id IS NULL
          JOIN event.events b ON b.id = d.event_b AND b.merged_into_id IS NULL
-        WHERE d.status = 'OPEN' ORDER BY d.created_at LIMIT $1`,
-      [limit],
+        WHERE d.status = 'OPEN'`;
+    const { rows } = await q.query<{ id: string; event_a: string; event_b: string; score: number; reason: DuplicateCandidateView["reason"]; created_at: Date }>(
+      `SELECT d.id, d.event_a, d.event_b, d.score, d.reason, d.created_at ${open}
+          AND ($1::uuid IS NULL OR (d.created_at, d.id) > (SELECT c.created_at, c.id FROM event.duplicate_candidates c WHERE c.id = $1))
+        ORDER BY d.created_at, d.id LIMIT $2`,
+      [cursor ?? null, limit],
     );
+    const total = Number((await q.query<{ n: string }>(`SELECT count(*) AS n ${open}`)).rows[0]!.n);
     const ids = [...new Set(rows.flatMap((r) => [r.event_a, r.event_b]))];
     const events = ids.length
       ? new Map((await q.query<EventRow>(`SELECT ${PUBLIC_EVENT_COLUMNS} FROM event.events e WHERE e.id = ANY($1)`, [ids])).rows.map((r) => [r.id, toSummary(r)]))
       : new Map<string, EventSummary>();
-    return rows.map((r) => ({
+    const candidates = rows.map((r): DuplicateCandidateView => ({
       id: r.id, score: r.score, reason: r.reason, createdAt: r.created_at.toISOString(),
       events: [events.get(r.event_a)!, events.get(r.event_b)!],
     }));
+    return { candidates, nextCursor: rows.length === limit ? rows[rows.length - 1]!.id : null, total };
   }
 
   /** "No son el mismo": el par sale de la cola y el barrido no lo vuelve a proponer. */
@@ -1272,6 +1287,7 @@ export class EventService {
           AND (e.category_code = ANY($1) OR e.category_code LIKE $2)
           AND ST_DWithin(e.public_geom, ST_SetSRID(ST_MakePoint($3, $4), 4326)::geography, $5)
           AND e.last_activity_at >= now() - make_interval(mins => $6)
+        ORDER BY ST_Distance(e.public_geom, ST_SetSRID(ST_MakePoint($3, $4), 4326)::geography), e.last_activity_at DESC, e.id
         LIMIT 40`,
       [[input.categoryCode, ...category.compatibleWith], `${root}.%`, input.point.lng, input.point.lat, radius + generalizationMarginM("HIGHLY_SENSITIVE"), category.dedupWindowMinutes],
     );
