@@ -5,7 +5,7 @@ import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 
 import { api } from "../../../lib/api";
 import { lang, t, type MessageKey } from "../../../lib/i18n";
 import { canSetNegative, canSplit, duplicateCandidates, raisableSensitivities, toggle } from "../../../lib/moderation/event-tools";
-import { validReason } from "../../../lib/moderation/logic";
+import { presenceBandKey, validReason } from "../../../lib/moderation/logic";
 import { distanceLabel, eventTitle, timeAgo } from "../../../lib/ui/format";
 import { colors, radius, space } from "../../../theme";
 import { ErrorText } from "../../../components/error-text";
@@ -188,7 +188,7 @@ export default function EventToolsScreen() {
                 <Text style={styles.check}>{on ? "☑" : "☐"}</Text>
                 <Text style={styles.rowText}>
                   {t(TIER[e.trustTier] ?? "tierCitizen")}{e.assertion === "NOT_OCCURRING" ? ` · ${t("counterReport")}` : ""}
-                  {e.presenceBand ? ` · ${e.presenceBand}` : ""} · {timeAgo(e.observedAt, lang)}
+                  {e.presenceBand ? ` · ${t("presenceWord")} ${t(presenceBandKey(e.presenceBand))}` : ""} · {timeAgo(e.observedAt, lang)}
                 </Text>
               </Pressable>
             );
