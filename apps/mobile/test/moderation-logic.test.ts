@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { actionsFor, canBlock, FLAG_REASONS, isSevere, presenceLines, reasonSummary, validReason } from "../src/lib/moderation/logic";
-import type { ModeratorEvidenceView, NearbyEvent } from "@dizaster/contracts";
+import { actionsFor, appendNotices, canBlock, FLAG_REASONS, isSevere, presenceLines, reasonSummary, validReason } from "../src/lib/moderation/logic";
+import type { ModerationNotice, ModeratorEvidenceView, NearbyEvent } from "@dizaster/contracts";
 import { canSetNegative, canSplit, duplicateCandidates, toggle } from "../src/lib/moderation/event-tools";
 
 describe("moderación (lógica de la app)", () => {
@@ -96,5 +96,16 @@ describe("sensibilidad por contexto (ADR 0179)", () => {
     expect(raisableSensitivities("NORMAL")).toEqual(["SENSITIVE", "HIGHLY_SENSITIVE"]);
     expect(raisableSensitivities("SENSITIVE")).toEqual(["HIGHLY_SENSITIVE"]);
     expect(raisableSensitivities("HIGHLY_SENSITIVE")).toEqual([]);
+  });
+});
+
+describe("avisos de moderación por páginas (ADR 0289)", () => {
+  const n = (id: string, canAppeal = true) => ({ action: { id }, appeal: null, canAppeal }) as unknown as ModerationNotice;
+  it("añade la página siguiente sin repetir avisos ya mostrados", () => {
+    const first = [n("a"), n("b", false)];
+    const merged = appendNotices(first, [n("b"), n("c")]);
+    expect(merged.map((x) => x.action.id)).toEqual(["a", "b", "c"]);
+    // El que ya estaba se conserva tal cual (p. ej. recién apelado).
+    expect(merged[1]!.canAppeal).toBe(false);
   });
 });

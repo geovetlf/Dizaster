@@ -18,6 +18,8 @@ import {
   type ModerationActionType,
   type ModerationActionView,
   type ModerationNotice,
+  MyNoticesQuery,
+  type MyNoticesResponse,
   type ModerationTargetPreview,
 } from "@dizaster/contracts";
 import { z } from "zod";
@@ -474,18 +476,36 @@ export class ModerationService {
   // ───────────── Transparencia y apelaciones ─────────────
 
   /**
-   * Acciones que afectan a mi contenido o a mi cuenta (sin datos de quién denunció). Con `actionId`, solo esa
-   * (ADR 0236): apelar no depende de que la acción esté entre las 50 más recientes.
+   * Acciones que afectan a mi contenido o a mi cuenta (sin datos de quién denunció), por páginas (ADR 0289): el cursor
+   * es el id del último aviso de la página anterior, comparado por `(created_at, id)`.
    */
-  async myNotices(userId: string, actionId?: string): Promise<ModerationNotice[]> {
+  async myNotices(userId: string, raw: unknown = {}): Promise<MyNoticesResponse> {
+    const parsed = MyNoticesQuery.safeParse(raw ?? {});
+    if (!parsed.success) throw new DomainError("VALIDATION", parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; "));
+    const { cursor, limit } = parsed.data;
+    // El cursor tiene que ser una acción sobre mí: la de otra persona no sirve ni para saber su fecha.
+    if (cursor && !(await this.db.query(`SELECT 1 FROM moderation.actions WHERE id = $1 AND affected_user_id = $2`, [cursor, userId])).rowCount) {
+      throw new DomainError("VALIDATION", "Cursor inválido");
+    }
+    const notices = await this.noticeRows(userId, { cursor: cursor ?? null, limit });
+    return { notices, nextCursor: notices.length === limit ? notices[notices.length - 1]!.action.id : null };
+  }
+
+  /** Un aviso concreto (ADR 0236): apelar no depende de en qué página esté la acción. */
+  private async notice(userId: string, actionId: string): Promise<ModerationNotice | undefined> {
+    return (await this.noticeRows(userId, { actionId, limit: 1 }))[0];
+  }
+
+  private async noticeRows(userId: string, p: { cursor?: string | null; actionId?: string; limit: number }): Promise<ModerationNotice[]> {
     const { rows } = await this.db.query<ActionRow & { appeal_id: string | null; appeal_status: AppealView["status"] | null; decision_reason: string | null }>(
       `SELECT a.id, a.action, a.reason, a.actor, a.target_type, a.target_id, a.created_at,
               ap.id AS appeal_id, ap.status AS appeal_status, ap.decision_reason
          FROM moderation.actions a LEFT JOIN moderation.appeals ap ON ap.action_id = a.id
         WHERE a.affected_user_id = $1 AND a.action NOT IN ('DISMISS','RESTORE','UNSUSPEND_USER','APPROVE_MEDIA')
           AND ($2::uuid IS NULL OR a.id = $2)
-        ORDER BY a.created_at DESC LIMIT 50`,
-      [userId, actionId ?? null],
+          AND ($3::uuid IS NULL OR (a.created_at, a.id) < (SELECT c.created_at, c.id FROM moderation.actions c WHERE c.id = $3))
+        ORDER BY a.created_at DESC, a.id DESC LIMIT $4`,
+      [userId, p.actionId ?? null, p.cursor ?? null, p.limit],
     );
     const cutoff = Date.now() - APPEAL_WINDOW_DAYS * 86_400_000;
     return rows.map((r) => ({
@@ -498,11 +518,11 @@ export class ModerationService {
   async appeal(userId: string, actionId: string, raw: unknown): Promise<ModerationNotice> {
     const { text } = parse(AppealRequest, raw);
     const id = parse(z.uuid(), actionId);
-    const notice = (await this.myNotices(userId, id))[0];
+    const notice = await this.notice(userId, id);
     if (!notice) throw notFound("Acción");
     if (!notice.canAppeal) throw new DomainError("NOT_APPEALABLE", "Esta acción no se puede apelar", 409);
     await this.db.query(`INSERT INTO moderation.appeals (id, action_id, appellant_user_id, text) VALUES ($1, $2, $3, $4)`, [newId(), id, userId, text]);
-    return (await this.myNotices(userId, id))[0]!;
+    return (await this.notice(userId, id))!;
   }
 
   /**

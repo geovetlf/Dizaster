@@ -6,7 +6,7 @@ import { LoadState } from "../components/load-state";
 import { api } from "../lib/api";
 import { classifyLoadError, type LoadErrorKind } from "../lib/errors/load-error";
 import { lang, t } from "../lib/i18n";
-import { actionReasonText, validReason } from "../lib/moderation/logic";
+import { actionReasonText, appendNotices, validReason } from "../lib/moderation/logic";
 import { timeAgo } from "../lib/ui/format";
 import { colors, radius, space } from "../theme";
 
@@ -15,9 +15,20 @@ export default function MyModerationScreen() {
   const [notices, setNotices] = useState<ModerationNotice[]>([]);
   // Cargando, error (con Reintentar) o lista (ADR 0233): un fallo de red nunca parece "no hay avisos".
   const [state, setState] = useState<"loading" | LoadErrorKind | "ok">("loading");
+  // Por páginas (ADR 0289): al llegar al final se piden los anteriores.
+  const [next, setNext] = useState<string | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
   const load = useCallback(() => {
-    api.myModeration().then((r) => { setNotices(r.notices); setState("ok"); }).catch((e) => setState(classifyLoadError(e)));
+    api.myModeration().then((r) => { setNotices(r.notices); setNext(r.nextCursor); setState("ok"); }).catch((e) => setState(classifyLoadError(e)));
   }, []);
+  function loadMore() {
+    if (!next || loadingMore) return;
+    setLoadingMore(true);
+    api.myModeration(next)
+      .then((r) => { setNotices((prev) => appendNotices(prev, r.notices)); setNext(r.nextCursor); })
+      .catch(() => undefined) // la página siguiente se vuelve a pedir al volver a llegar al final
+      .finally(() => setLoadingMore(false));
+  }
   useFocusEffect(load);
   if (state !== "ok" && notices.length === 0) return <LoadState state={state === "notFound" ? "failed" : state} onRetry={load} />;
   return (
@@ -26,6 +37,8 @@ export default function MyModerationScreen() {
       data={notices}
       ListEmptyComponent={<Text style={styles.empty}>{t("noModerationNotices")}</Text>}
       keyExtractor={(n) => n.action.id}
+      onEndReached={loadMore}
+      onEndReachedThreshold={0.5}
       renderItem={({ item }) => <Notice notice={item} onChange={(n) => setNotices((prev) => prev.map((x) => (x.action.id === n.action.id ? n : x)))} />}
     />
   );
