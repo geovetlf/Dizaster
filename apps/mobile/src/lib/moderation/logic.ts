@@ -33,15 +33,22 @@ export function reasonSummary(reasons: Partial<Record<FlagReason, number>>, labe
     .join(" · ");
 }
 
+export type PresenceBandKey = "presenceBand_HIGH" | "presenceBand_MEDIUM" | "presenceBand_LOW";
+
+/** Banda de presencia como clave de texto (ADR 0089); una banda desconocida se muestra como baja. */
+export function presenceBandKey(band: string): PresenceBandKey {
+  return band === "HIGH" ? "presenceBand_HIGH" : band === "MEDIUM" ? "presenceBand_MEDIUM" : "presenceBand_LOW";
+}
+
 /**
  * Evidencia de presencia en líneas para la pantalla del caso (ADR 0089). La ubicación precisa se muestra con 5
  * decimales (~1 m) solo si aún existe. NO AI REQUIRED.
  */
-export function presenceLines(v: PresenceReview, t: (k: "presenceBandLine" | "presencePrecise" | "presenceGeneralized" | "presencePrior" | "presenceMediaProof") => string): string[] {
+export function presenceLines(v: PresenceReview, t: (k: "presenceBandLine" | "presencePrecise" | "presenceGeneralized" | "presencePrior" | "presenceMediaProof" | PresenceBandKey) => string): string[] {
   const fill = (s: string, p: Record<string, string | number>) => s.replace(/\{(\w+)\}/g, (_, k: string) => String(p[k] ?? ""));
   const lines = [
     fill(t("presenceBandLine"), {
-      band: v.presenceBand, score: Math.round(v.presenceScore * 100) / 100, distance: Math.round(v.fixToPinM), attestation: v.attestationVerdict,
+      band: t(presenceBandKey(v.presenceBand)), score: Math.round(v.presenceScore * 100) / 100, distance: Math.round(v.fixToPinM), attestation: v.attestationVerdict,
     }),
   ];
   if (v.mockLocation) lines.push("MOCK_LOCATION");

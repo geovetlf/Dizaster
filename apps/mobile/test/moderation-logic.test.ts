@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { actionsFor, appendNotices, canBlock, FLAG_REASONS, isSevere, presenceLines, reasonSummary, validReason } from "../src/lib/moderation/logic";
+import { actionsFor, appendNotices, canBlock, FLAG_REASONS, isSevere, presenceBandKey, presenceLines, reasonSummary, validReason } from "../src/lib/moderation/logic";
 import type { ModerationNotice, ModeratorEvidenceView, NearbyEvent } from "@dizaster/contracts";
 import { canSetNegative, canSplit, duplicateCandidates, toggle } from "../src/lib/moderation/event-tools";
 
@@ -53,7 +53,7 @@ describe("herramientas de evento (fusionar y dividir)", () => {
 describe("presenceLines (ADR 0089)", () => {
   const tr = (k: string) => ({
     presenceBandLine: "{band} {score} {distance}m {attestation}", presencePrecise: "{lat},{lng} hasta {until}",
-    presenceGeneralized: "generalizada", presencePrior: "antes {n}", presenceMediaProof: "{kind} -{s}s",
+    presenceGeneralized: "generalizada", presencePrior: "antes {n}", presenceMediaProof: "{kind} -{s}s", presenceBand_HIGH: "alta",
   })[k]!;
   const base = {
     reportId: "r", presenceBand: "HIGH", presenceScore: 0.8734, fixToPinM: 12.4, mockLocation: false, attestationVerdict: "GENUINE" as const,
@@ -62,13 +62,19 @@ describe("presenceLines (ADR 0089)", () => {
   };
   it("con ubicación precisa y sin accesos previos", () => {
     expect(presenceLines({ ...base, deviceFix: { lat: -12.046412345, lng: -77.04281 } }, tr as never)).toEqual([
-      "HIGH 0.87 12m GENUINE", "-12.04641,-77.04281 hasta 2026-10-29",
+      "alta 0.87 12m GENUINE", "-12.04641,-77.04281 hasta 2026-10-29",
     ]);
   });
   it("generalizada, con motivos y accesos previos", () => {
     expect(presenceLines({ ...base, deviceFix: null, mockLocation: true, reasons: ["LOW_ACCURACY"], priorAccesses: 2 }, tr as never)).toEqual([
-      "HIGH 0.87 12m GENUINE", "MOCK_LOCATION", "LOW_ACCURACY", "generalizada", "antes 2",
+      "alta 0.87 12m GENUINE", "MOCK_LOCATION", "LOW_ACCURACY", "generalizada", "antes 2",
     ]);
+  });
+  it("la banda se traduce; una desconocida cuenta como baja", () => {
+    expect(presenceBandKey("HIGH")).toBe("presenceBand_HIGH");
+    expect(presenceBandKey("MEDIUM")).toBe("presenceBand_MEDIUM");
+    expect(presenceBandKey("LOW")).toBe("presenceBand_LOW");
+    expect(presenceBandKey("OTRA")).toBe("presenceBand_LOW");
   });
   it("con pruebas de captura (ADR 0181)", () => {
     const proof = { mediaId: "m", kind: "IMAGE", capturedAt: "x", serverSeenAt: "y", secondsBeforeReport: 30 };
