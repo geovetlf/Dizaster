@@ -33,6 +33,18 @@ export function reasonSummary(reasons: Partial<Record<FlagReason, number>>, labe
     .join(" · ");
 }
 
+const CONTENT_STATES = ["VISIBLE", "LIMITED", "HIDDEN", "REMOVED", "DELETED"] as const;
+export type ContentStateKey = `contentState_${(typeof CONTENT_STATES)[number]}`;
+
+/**
+ * Estado del objetivo de un caso en palabras (ADR 0301): un evento muestra su estado de verificación; lo demás, su
+ * estado de moderación. Un estado que la app no conoce se muestra tal cual, para no esconder nada.
+ */
+export function targetStateText(type: string, state: string, t: (k: ContentStateKey) => string, verification: (s: string) => string): string {
+  if (type === "EVENT") return verification(state);
+  return (CONTENT_STATES as readonly string[]).includes(state) ? t(`contentState_${state}` as ContentStateKey) : state;
+}
+
 export type PresenceBandKey = "presenceBand_HIGH" | "presenceBand_MEDIUM" | "presenceBand_LOW";
 
 /** Banda de presencia como clave de texto (ADR 0089); una banda desconocida se muestra como baja. */

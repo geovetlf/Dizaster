@@ -42,3 +42,11 @@ export function barHeights(values: number[]): number[] {
   const max = Math.max(0, ...values);
   return values.map((v) => (max > 0 ? v / max : 0));
 }
+
+const BUDGET_KEYS = ["ai", "sms", "translation"] as const;
+export type BudgetKeyLabel = `budgetKey_${(typeof BUDGET_KEYS)[number]}`;
+
+/** Nombre del presupuesto (ADR 0301); uno creado después sin traducción se muestra con su clave. */
+export function budgetLabel(key: string, t: (k: BudgetKeyLabel) => string): string {
+  return (BUDGET_KEYS as readonly string[]).includes(key) ? t(`budgetKey_${key}` as BudgetKeyLabel) : key;
+}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { barHeights, budgetTone, formatBytes, formatUnits, formatUsd, moduleRows } from "../src/lib/admin/cost-format";
+import { barHeights, budgetLabel, budgetTone, formatBytes, formatUnits, formatUsd, moduleRows } from "../src/lib/admin/cost-format";
 
 describe("tablero de costos (formato)", () => {
   it("formatea importes, bytes y unidades", () => {
@@ -25,5 +25,11 @@ describe("tablero de costos (formato)", () => {
     expect([null, 10, 50, 80, 100, 130].map(budgetTone)).toEqual(["ok", "ok", "warn", "high", "over", "over"]);
     expect(barHeights([0, 5, 10])).toEqual([0, 0.5, 1]);
     expect(barHeights([0, 0])).toEqual([0, 0]);
+  });
+  it("nombra los presupuestos conocidos y deja la clave de los nuevos (ADR 0301)", () => {
+    const t = (k: string) => `T:${k}`;
+    expect(budgetLabel("ai", t)).toBe("T:budgetKey_ai");
+    expect(budgetLabel("translation", t)).toBe("T:budgetKey_translation");
+    expect(budgetLabel("maps", t)).toBe("maps");
   });
 });

@@ -1,6 +1,6 @@
 # Estado de la implementación
 
-Actualizado: 2026-10-01 (hasta ADR 0300; auditoría de preparación en `docs/PRODUCTION_READINESS_REPORT.md`). Informe de preparación para producción: `docs/PRODUCTION_READINESS_REPORT.md`.
+Actualizado: 2026-10-01 (hasta ADR 0301; auditoría de preparación en `docs/PRODUCTION_READINESS_REPORT.md`). Informe de preparación para producción: `docs/PRODUCTION_READINESS_REPORT.md`.
 
 ## Etapa 1 — Fundación (hecha)
 
@@ -489,6 +489,7 @@ Actualizado: 2026-10-01 (hasta ADR 0300; auditoría de preparación en `docs/PRO
 | Candidatos de deduplicación ordenados por distancia; cola de duplicados por páginas con total real (ADR 0298) | ✅ | §8.4, §13.1 |
 | Registros de accesos a presencia y a originales por páginas, con alias de quien consultó y errores visibles (ADR 0299) | ✅ | §7.3, §13.1 |
 | Errores visibles y anunciados (ErrorText) en publicar, bloqueados, retrasos, transparencia, costos, negocios y reportar; prueba más amplia (ADR 0300) | ✅ | §11, §13.1 |
+| Moderación y administración sin códigos internos: tipo, estado, estado de caso, estado de fuente, presupuesto y periodos traducidos (ADR 0301) | ✅ | §11, §13.1 |
 | Licencias, auditoría, SBOM, Dependabot; respaldo con prueba de restauración en CI | ✅ | ADR 0070, `scripts/supply-chain.mjs`, `scripts/db-restore-check.mjs` |
 | Idioma de la app elegible en el perfil (es/en/pt/fr o del teléfono) | ✅ | ADR 0069, `app/language.tsx` |
 | Varias cuentas en un teléfono corroboran como una (clave seudónima del teléfono) | ✅ | ADR 0068, migración 0036 |

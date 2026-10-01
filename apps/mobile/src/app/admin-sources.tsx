@@ -5,7 +5,7 @@ import { Alert, FlatList, Pressable, StyleSheet, Text, TextInput, View } from "r
 import { HEALTH_COLOR, sortSources, sourceAction, validReason } from "../lib/admin/sources-format";
 import { api } from "../lib/api";
 import { lang, t } from "../lib/i18n";
-import { timeAgo } from "../lib/ui/format";
+import { formatInZone, timeAgo } from "../lib/ui/format";
 import { colors, radius, space } from "../theme";
 import { ErrorText } from "../components/error-text";
 
@@ -63,14 +63,14 @@ export default function AdminSourcesScreen() {
               {s.urgentCapable ? <Text style={styles.badge}>{t("sourceUrgent")}</Text> : null}
             </View>
             <Text style={styles.meta}>
-              {t(`sourceHealth_${s.health}`)} · {s.status}
+              {t(`sourceHealth_${s.health}`)} · {t(`sourceStatus_${s.status}`)}
               {s.lastOkAt ? ` · ${t("sourceLastOk")} ${timeAgo(s.lastOkAt, lang)}` : ""}
             </Text>
             <Text style={styles.meta}>{t("sourceLast24h")}: {s.runsOk} ✓ · {s.runsFailed} ✗ · {s.itemsNew} {t("sourceNewItems")}</Text>
-            {s.breakerOpenUntil ? <Text style={styles.warn}>{t("sourceRetryAt")} {s.breakerOpenUntil.slice(11, 16)} UTC</Text> : null}
+            {s.breakerOpenUntil ? <Text style={styles.warn}>{t("sourceRetryAt")} {formatInZone(s.breakerOpenUntil, lang, undefined, "time") ?? s.breakerOpenUntil}</Text> : null}
             {s.lastError ? <Text style={styles.warn} numberOfLines={2}>{s.lastError}</Text> : null}
             {s.lastStatusChange ? (
-              <Text style={styles.meta}>{timeAgo(s.lastStatusChange.at, lang)} · {s.lastStatusChange.from} → {s.lastStatusChange.to} · {s.lastStatusChange.reason}</Text>
+              <Text style={styles.meta}>{timeAgo(s.lastStatusChange.at, lang)} · {t(`sourceStatus_${s.lastStatusChange.from}`)} → {t(`sourceStatus_${s.lastStatusChange.to}`)} · {s.lastStatusChange.reason}</Text>
             ) : null}
             {action ? (
               <Pressable accessibilityRole="button" accessibilityState={{ disabled: !ok }} disabled={!ok}
