@@ -6,6 +6,7 @@ import { formatCount, formatHours, sortedActions, sortedCounts, transparencyText
 import { api } from "../lib/api";
 import { t, tf, type MessageKey } from "../lib/i18n";
 import { colors, radius, space } from "../theme";
+import { ErrorText } from "../components/error-text";
 
 const PERIODS = [30, 90, 365] as const;
 const known = (key: string, fallback: string) => {
@@ -56,7 +57,8 @@ export default function AdminTransparencyScreen() {
           </Pressable>
         ))}
       </View>
-      <Text style={error ? styles.error : styles.meta}>{error ?? l.note}</Text>
+      <Text style={styles.meta}>{l.note}</Text>
+      {error ? <ErrorText style={styles.error}>{error}</ErrorText> : null}
       {report ? (
         <>
           <View style={styles.card}>
