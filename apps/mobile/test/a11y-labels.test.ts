@@ -35,7 +35,11 @@ describe("accesibilidad", () => {
     const mute: string[] = [];
     for (const f of files(SRC)) {
       const src = readFileSync(f, "utf8");
-      for (const m of src.matchAll(/<Text style=\{styles\.error\}>\{[a-zA-Z]+\}<\/Text>/g)) mute.push(`${f.slice(SRC.length)}:${src.slice(0, m.index).split("\n").length}`);
+      // Un <Text> con estilo de error, o que pinta directamente la variable `error`, debería ser <ErrorText> (ADR 0300).
+      const patterns = [/<Text style=\{(?:styles\.error|error \? styles\.error[^}]*)\}>/g, /<Text[^>]*>\{error\}<\/Text>/g, /\{error \?\? /g];
+      for (const re of patterns) {
+        for (const m of src.matchAll(re)) mute.push(`${f.slice(SRC.length)}:${src.slice(0, m.index).split("\n").length}`);
+      }
     }
     expect(mute).toEqual([]);
   });
