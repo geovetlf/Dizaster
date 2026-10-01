@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { FEED_ADAPTERS, IngestionScheduler, lastScheduledAt, type FetchResult, type HttpFetcher } from "../src/modules/ingestion/index.js";
+import { FEED_ADAPTERS, IngestionScheduler, lastScheduledAt, SCHEDULE_PATTERN, type FetchResult, type HttpFetcher } from "../src/modules/ingestion/index.js";
 import { actAsOfficial, createTestContext, type TestContext } from "./helpers.js";
 
 const fixture = (f: string) => readFileSync(new URL(`./fixtures/${f}`, import.meta.url), "utf8");
@@ -72,6 +72,15 @@ describe("adapters (sin red)", () => {
     const now = new Date("2026-09-29T04:00:00Z");
     expect(lastScheduledAt("0 5 * * *", now).toISOString()).toBe("2026-09-28T05:00:00.000Z");
     expect(lastScheduledAt("30 */6 * * *", now).toISOString()).toBe("2026-09-29T00:30:00.000Z");
+  });
+
+  it("planificador escalonado por fuente (§9.2, ADR 0288): horarios válidos y sin dos fuentes en el mismo minuto", () => {
+    const registry = JSON.parse(readFileSync(new URL("../../../data/source-registry/sources.json", import.meta.url), "utf8")) as { sources: Array<{ key: string; scheduleNormal?: string }> };
+    const schedules = registry.sources.filter((s) => s.scheduleNormal).map((s) => ({ key: s.key, at: s.scheduleNormal! }));
+    for (const s of schedules) expect(SCHEDULE_PATTERN.test(s.at), `${s.key}: "${s.at}"`).toBe(true);
+    // Mismo instante = mismo minuto de la misma hora (o del mismo ciclo de N horas): el lote diario no sale de golpe.
+    const slots = schedules.map((s) => s.at);
+    expect(new Set(slots).size).toBe(slots.length);
   });
 });
 
