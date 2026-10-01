@@ -1,6 +1,6 @@
 # DIZASTER PRODUCTION READINESS AUDIT
 
-Fecha: 2026-09-30 · Código hasta ADR 0283 · Migraciones 0001–0104 · 285 commits
+Fecha: 2026-09-30 · Código hasta ADR 0293 · Migraciones 0001–0105 · 285 commits
 
 Esta auditoría compara el Blueprint con los ADR, el código y las pruebas. Solo se marca un bloqueo cuando está
 escrito qué falta y quién lo da. No se inventan decisiones, límites, precios ni capacidades. El procedimiento exacto
@@ -28,7 +28,7 @@ El código de V1 está **terminado y probado localmente**:
 El camino completo de entrega se ensayó con contenedores reales (ADR 0282): despliegue gradual, verificación, carga,
 rechazo y rollback.
 
-**No se puede publicar todavía.** Faltan el acceso de escritura a GitHub, la facturación de Google Cloud, cuentas de
+**No se puede publicar todavía.** Faltan la facturación de Google Cloud, cuentas de
 tiendas y credenciales, decisiones de producto y revisión legal. Nada de eso lo puede dar el agente.
 
 ## 2. Verificación ejecutada (local, 2026-09-30)
@@ -37,7 +37,7 @@ tiendas y credenciales, decisiones de producto y revisión legal. Nada de eso lo
 | --- | --- |
 | `pnpm check`: lint, fronteras de módulos, secretos, workflows, typecheck, build y pruebas | ✅ Pruebas: contracts 40, geo-kit 39, móvil 277, backend 627 (+3 omitidas), delivery 90 |
 | Empaquetado móvil iOS + Android (`bundle:check`) y paridad nativa | ✅ |
-| Migraciones 0001–0104 sobre PostgreSQL 16 + PostGIS + H3; restauración de respaldo | ✅ |
+| Migraciones 0001–0105 sobre PostgreSQL 16 + PostGIS + H3; restauración de respaldo | ✅ |
 | Gitleaks: historial (285 commits) y árbol de trabajo | ✅ sin hallazgos |
 | Trivy (dependencias, Dockerfiles, IaC) y Semgrep con reglas propias | ✅ sin HIGH/CRITICAL |
 | Imagen del backend: usuario no root, sin gestores de paquetes | ✅ |
@@ -45,8 +45,8 @@ tiendas y credenciales, decisiones de producto y revisión legal. Nada de eso lo
 | Firma cosign y atestaciones, de extremo a extremo con registro local y clave local | ✅ La firma keyless espera GitHub |
 | Entrega local real: candidata, 10 %, 100 %, carga, candidata rota rechazada, rollback | ✅ ADR 0282 |
 | k6 50 peticiones/s durante 30 s contra la API local | ✅ p95 5 ms, sin 5xx. La base local tiene pocos datos: sirve para detectar regresiones, no predice producción |
-| OSV-Scanner | ⏳ OSV.dev no es alcanzable desde este entorno. Corre en GitHub Actions |
-| Push a `github.com/geovetlf/Dizaster` | ✗ 403: la app de Claude no tiene acceso al repositorio |
+| OSV-Scanner | ✅ En GitHub Actions (PR #10): `uuid` y `decode-uri-component` corregidos, 0 avisos |
+| Push a `github.com/geovetlf/Dizaster` | ✅ `main` = 58cc151, sin force push. CI completo en verde en PR #10 (6 jobs) |
 
 ## 3. Producto
 
@@ -94,8 +94,9 @@ tiendas y credenciales, decisiones de producto y revisión legal. Nada de eso lo
 | Capacidad | Etiqueta | Evidencia / qué falta |
 | --- | --- | --- |
 | `dzd`: impacto, gates, política, autonomía, auditoría encadenada, informe, métricas | READY | 90 pruebas. Separado del runtime y del AI Core |
-| CI: gates, SBOM, escáneres, imagen con manifiesto | READY | Corre en cuanto el código llegue a GitHub |
-| Repositorio oficial y push | BLOCKED BY AUTHORIZATION | Instalar la app de Claude en `geovetlf/Dizaster`. `origin` ya está configurado y el historial está limpio |
+| CI: gates, SBOM, escáneres, imagen con manifiesto | READY | En verde en GitHub Actions (PR #10) |
+| Repositorio oficial y push | READY | `geovetlf/Dizaster`, trabajo por ramas y PRs |
+| Informe de delivery en cada PR | READY | ADR 0284: un comentario que se actualiza en cada push |
 | Reglas de `main`, entornos `staging` y `production`, CODEOWNERS | BLOCKED BY AUTHORIZATION | `scripts/github-bootstrap.mjs`, en seco hasta el visto bueno. En repositorios privados depende del plan de GitHub (D-24) |
 | Firma keyless, procedencia SLSA y SBOM atestado | READY en código · BLOCKED BY AUTHORIZATION | Identidad `geovetlf/Dizaster` fijada. Se activa con el primer push y la nube (D-18) |
 | Despliegue gradual, promoción del mismo digest, rollback | READY: ensayado local · FINANCIAL AUTHORIZATION REQUIRED en la nube | `deliver.yml`. Producción exige la aprobación del propietario |
@@ -109,8 +110,8 @@ tiendas y credenciales, decisiones de producto y revisión legal. Nada de eso lo
 
 En orden de impacto:
 
-1. **Acceso de la app de Claude a `geovetlf/Dizaster`** (https://claude.ai/connect-github). Desbloquea el push, CI y
-   la firma. Costo 0.
+1. **Revisar y fusionar los PRs abiertos**, y autorizar las reglas de `main` y los entornos
+   (`scripts/github-bootstrap.mjs`). Costo 0.
 2. **`EXPO_TOKEN`** de una cuenta gratuita de Expo. Desbloquea el primer APK, el video 720p, Maestro y el camino a la
    atestación. Costo 0.
 3. **D-18**: proyectos de Google Cloud, facturación y presupuesto mensual por entorno.
@@ -134,9 +135,8 @@ En orden de impacto:
 
 ## 6. Riesgos abiertos
 
-1. **Sin control de versiones remoto.** El único historial está en esta sesión y en
-   `/mnt/project-files/dizaster/dizaster.bundle`. Mientras no haya push, CI no corre en GitHub y OSV-Scanner no se
-   ejecutó.
+1. **`main` sin protección.** Hasta que el propietario autorice las reglas (`scripts/github-bootstrap.mjs`), GitHub
+   no exige CI en verde ni revisión antes de fusionar.
 2. **La extensión `h3` en Cloud SQL no está verificada.** Si falta, se usa el modo `vm` o `external` (ADR 0261 y 0278).
 3. **Latencia sin datos reales.** Las pruebas de carga corrieron sobre una base casi vacía.
 4. **Límite por IP.** Detrás de un balanceador o CDN mal configurado, todas las personas compartirían una IP y el
@@ -148,8 +148,8 @@ En orden de impacto:
 
 ## 7. Siguiente paso mínimo para producción
 
-1. El propietario instala la app de Claude en `geovetlf/Dizaster`.
-2. El agente hace push de `main` y de las etiquetas, sin force, y deja CI en verde.
+1. ✅ Push de `main` sin force y CI en verde (PR #10).
+2. El propietario fusiona los PRs y autoriza las reglas de `main`.
 3. Con `EXPO_TOKEN`, el primer APK de prueba.
 4. Con D-18 y D-23:
    1. `tofu plan` → `dzd iac-check`;

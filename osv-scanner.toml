@@ -1,0 +1,12 @@
+# Configuración de OSV-Scanner (job `security` de CI).
+#
+# decode-uri-component en vendor/ es la 0.5.0 (la versión corregida de GHSA-vcc3-ghjq-m6fr y GHSA-w573-4hg7-7wgq)
+# convertida a CommonJS; ver vendor/README.md. En pnpm-lock.yaml figura como `file:vendor/decode-uri-component`,
+# una versión que OSV no puede comparar y por eso la da por afectada. Se excluye solo esa entrada exacta: cualquier
+# decode-uri-component publicado en npm (por ejemplo la 0.2.2) se sigue revisando.
+[[PackageOverrides]]
+name = "decode-uri-component"
+version = "file:vendor/decode-uri-component"
+ecosystem = "npm"
+ignore = true
+reason = "Copia en vendor/ de la 0.5.0 corregida (vendor/README.md); OSV no compara versiones file:"

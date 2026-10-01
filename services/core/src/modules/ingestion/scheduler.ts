@@ -59,8 +59,10 @@ export class NodeHttpFetcher implements HttpFetcher {
  *  - "M *\/N * * *" → cada N horas en el minuto M
  * Devuelve el último instante programado ≤ now.
  */
+export const SCHEDULE_PATTERN = /^(\d{1,2}) (\d{1,2}|\*\/(\d{1,2})) \* \* \*$/;
+
 export function lastScheduledAt(schedule: string, now: Date): Date {
-  const m = /^(\d{1,2}) (\d{1,2}|\*\/(\d{1,2})) \* \* \*$/.exec(schedule.trim());
+  const m = SCHEDULE_PATTERN.exec(schedule.trim());
   const minute = m ? Number(m[1]) : 0;
   const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, minute));
   if (m?.[3]) {
@@ -231,6 +233,29 @@ export class IngestionScheduler {
       [now, RUNS_RETENTION_DAYS],
     );
     return { deleted, runsPurged: runs.rowCount ?? 0 };
+  }
+
+  /**
+   * Ítems de fuentes que no llegaron a ningún evento (IGNORED o ERROR, sin `event_id`), con más de
+   * `RUNS_RETENTION_DAYS` días (ADR 0293): no respaldan nada y solo ocupan espacio. Los ligados a un evento se quedan
+   * (son su evidencia). En lotes, con el mismo tope de tiempo que el crudo; si la fuente lo vuelve a publicar, entra de
+   * nuevo como ítem nuevo.
+   */
+  async purgeUnusedItems(now: Date = this.clock.now(), batch = 500): Promise<{ deleted: number }> {
+    let deleted = 0;
+    const started = Date.now();
+    for (;;) {
+      const r = await this.db.query(
+        `DELETE FROM ingestion.external_items WHERE id IN (
+           SELECT id FROM ingestion.external_items
+            WHERE status IN ('IGNORED','ERROR') AND event_id IS NULL AND fetched_at < $1::timestamptz - make_interval(days => $2)
+            LIMIT $3)`,
+        [now, RUNS_RETENTION_DAYS, batch],
+      );
+      deleted += r.rowCount ?? 0;
+      if ((r.rowCount ?? 0) < batch || Date.now() - started > RETENTION_TIME_BUDGET_MS) break;
+    }
+    return { deleted };
   }
 
   /** Un ítem que falla por sí mismo queda en ERROR y no tumba el resto del documento (ADR 0155). */

@@ -10,6 +10,7 @@ import { t } from "../lib/i18n";
 import { areaRow, formatKm } from "../lib/ui/format";
 import { useCoarseLocation } from "../lib/ui/use-coarse-location";
 import { colors, radius, space } from "../theme";
+import { ErrorText } from "../components/error-text";
 
 /**
  * Nueva zona guardada (casa, trabajo, familia…): tipo, nombre privado opcional, radio y punto. El punto sale de
@@ -149,7 +150,7 @@ export default function ZoneEditScreen() {
         </>
       )}
       <Text style={styles.note}>{t("zonePrivacy")}</Text>
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+      {error ? <ErrorText style={styles.error}>{error}</ErrorText> : null}
       <Pressable accessibilityRole="button" disabled={!point} style={[styles.button, !point && styles.disabled]} onPress={() => void save()}>
         <Text style={styles.buttonText}>{t("saveZone")}</Text>
       </Pressable>

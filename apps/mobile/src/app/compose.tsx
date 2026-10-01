@@ -9,6 +9,7 @@ import { t } from "../lib/i18n";
 import { discardLocal } from "../lib/media/capture";
 import type { LocalMedia } from "../lib/media/local-media";
 import { uploadMedia } from "../lib/media/upload";
+import { uploadErrorText } from "../lib/media/upload-errors";
 import { composeProblem } from "../lib/social/compose";
 import { colors, radius, space } from "../theme";
 import { UpdateRequired, useUpdateRequirement } from "../components/update-required";
@@ -55,7 +56,7 @@ export default function ComposeScreen() {
       const mediaIds: string[] = [];
       for (const m of media) {
         const r = await uploadMedia(m);
-        if (!r.ok) throw new Error(r.error);
+        if (!r.ok) throw new Error(uploadErrorText(r.error, t));
         mediaIds.push(r.mediaId);
       }
       await api.createPost({ text: text.trim(), mediaIds, anonymityMode: pseudonymous && !asBusiness ? "PSEUDONYMOUS" : "PUBLIC", ...(asBusiness ? { asBusiness } : {}), ...(params.eventId ? { eventId: params.eventId } : {}), ...(official ? { official: true } : {}), clientId });

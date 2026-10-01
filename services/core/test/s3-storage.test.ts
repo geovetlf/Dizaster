@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { S3Storage } from "../src/modules/media/index.js";
+import { loadEnv } from "../src/platform/config.js";
 import { makeJpeg } from "./media-fixtures.js";
 
 /**
@@ -36,6 +37,15 @@ describe("firma SigV4 (vector oficial de AWS)", () => {
   });
 });
 
+describe("Cache-Control de la media pública (ADR 0286)", () => {
+  const base = { NODE_ENV: "test", DATABASE_URL: "postgres://x", AUTH_JWT_SECRET: "s".repeat(40) };
+  it("una hora por defecto y solo valores con forma de Cache-Control", () => {
+    expect(loadEnv(base).MEDIA_PUBLIC_CACHE_CONTROL).toBe("public, max-age=3600");
+    expect(loadEnv({ ...base, MEDIA_PUBLIC_CACHE_CONTROL: "public, max-age=600, immutable" }).MEDIA_PUBLIC_CACHE_CONTROL).toBe("public, max-age=600, immutable");
+    expect(() => loadEnv({ ...base, MEDIA_PUBLIC_CACHE_CONTROL: "public\r\nx-evil: 1" })).toThrow();
+  });
+});
+
 describe.skipIf(!endpoint)("S3Storage contra un servidor compatible", () => {
   const bucket = `dizaster-test-${Date.now()}`;
   const s3 = new S3Storage({
@@ -64,5 +74,12 @@ describe.skipIf(!endpoint)("S3Storage contra un servidor compatible", () => {
     await s3.delete("public/x.jpg");
     expect(await s3.stat("public/x.jpg")).toBeNull();
     expect(s3.publicUrl("public/x.jpg")).toContain("X-Amz-Signature=");
+  });
+
+  it("guarda el Cache-Control firmado con el objeto (ADR 0286)", async () => {
+    await s3.put("public/c.jpg", makeJpeg(), "image/jpeg", { cacheControl: "public, max-age=3600" });
+    const head = await (s3 as unknown as { request(m: string, k: string): Promise<Response> }).request("HEAD", "public/c.jpg");
+    expect(head.headers.get("cache-control")).toBe("public, max-age=3600");
+    await s3.delete("public/c.jpg");
   });
 });

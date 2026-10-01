@@ -11,6 +11,7 @@ import {
   type OriginalAccessEntry,
   type OriginalAccessGrant,
   type RedactionBox,
+  DATA_EXPORT_ROW_LIMIT,
 } from "@dizaster/contracts";
 import type { Clock } from "../../platform/clock.js";
 import { withTransaction, type Db, type Queryable } from "../../platform/db.js";
@@ -39,6 +40,8 @@ export interface MediaLimits {
   uploadsPerHour: number;
   uploadUrlTtlSeconds: number;
   originalRetentionDays: number;
+  /** Cache-Control de las variantes públicas (ADR 0286). Sin valor, el del proveedor. */
+  publicCacheControl?: string | undefined;
 }
 
 /** Variante pública saneada (sin metadatos de ubicación). La única que sale por la API. */
@@ -221,7 +224,7 @@ export class MediaService {
       throw err;
     }
     const variant = async (name: string, key: string, data: Uint8Array, mime: string) => {
-      await this.storage.put(key, data, mime);
+      await this.storage.put(key, data, mime, this.limits.publicCacheControl ? { cacheControl: this.limits.publicCacheControl } : undefined);
       await tx.query(
         `INSERT INTO media.variants (media_id, variant, storage_key, bytes, mime) VALUES ($1, $2, $3, $4, $5)
          ON CONFLICT (media_id, variant) DO UPDATE SET storage_key = EXCLUDED.storage_key, bytes = EXCLUDED.bytes, mime = EXCLUDED.mime`,
@@ -621,7 +624,7 @@ export class MediaService {
       captured_at: Date | null; created_at: Date; moderation_state: string; content_warning: string | null; storage_key: string | null }>(
       `SELECT m.id, m.kind, m.state, m.mime, m.bytes, m.captured_in_app, m.captured_at, m.created_at, m.moderation_state, m.content_warning, v.storage_key
          FROM media.media m LEFT JOIN media.variants v ON v.media_id = m.id AND v.variant = $2
-        WHERE m.owner_profile_id = $1 ORDER BY m.created_at DESC LIMIT 5000`,
+        WHERE m.owner_profile_id = $1 ORDER BY m.created_at DESC LIMIT ${DATA_EXPORT_ROW_LIMIT + 1}`,
       [profileId, PUBLIC_VARIANT],
     );
     return {

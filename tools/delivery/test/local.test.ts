@@ -10,6 +10,7 @@ import { runLoad } from "../src/load.js";
 import { applyShift, LocalDockerTarget, pickRevision, prunable, readState, startProxy, type LocalState } from "../src/local.js";
 import { evaluateSlo, fromK6Summary, fromSamples } from "../src/slo.js";
 import type { CheckResult } from "../src/verify.js";
+import { localEnv } from "./cli-env.js";
 
 // Destino local y carga mínima (ADR 0282). Docker se reemplaza por un Runner falso: nada se ejecuta de verdad.
 const root = new URL("../../../", import.meta.url).pathname;
@@ -152,11 +153,11 @@ describe("proxy local y carga", () => {
 
   it("CLI: `deploy --env local` en seco imprime docker run sin tocar nada; un entorno desconocido se rechaza", () => {
     const dir = mkdtempSync(join(tmpdir(), "dzd-cli-"));
-    const r = spawnSync(process.execPath, [`${root}tools/delivery/dist/cli.js`, "deploy", "--env", "local", "--digest", D("5"), "--state", join(dir, "s.json"), "--releases", join(dir, "r.jsonl"), "--log", join(dir, "a.jsonl"), "--policy", `${root}delivery/policy.json`], { cwd: dir, encoding: "utf8" });
+    const r = spawnSync(process.execPath, [`${root}tools/delivery/dist/cli.js`, "deploy", "--env", "local", "--digest", D("5"), "--state", join(dir, "s.json"), "--releases", join(dir, "r.jsonl"), "--log", join(dir, "a.jsonl"), "--policy", `${root}delivery/policy.json`], { cwd: dir, encoding: "utf8", env: localEnv() });
     expect(r.status).toBe(0);
     expect(r.stdout).toMatch(/\[en seco\] docker run -d/);
     expect(r.stdout).toMatch(/firma no exigida/);
-    const x = spawnSync(process.execPath, [`${root}tools/delivery/dist/cli.js`, "deploy", "--env", "qa", "--digest", D("5")], { cwd: dir, encoding: "utf8" });
+    const x = spawnSync(process.execPath, [`${root}tools/delivery/dist/cli.js`, "deploy", "--env", "qa", "--digest", D("5")], { cwd: dir, encoding: "utf8", env: localEnv() });
     expect(x.status).toBe(1);
     expect(x.stderr).toMatch(/staging, production o local/);
   });
