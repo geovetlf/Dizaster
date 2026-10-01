@@ -88,3 +88,32 @@ describe("fusión automática de duplicados", () => {
     expect(mergeOrder(e("x", "UNVERIFIED", false, 1), e("y", "UNVERIFIED", false, 2))[0].id).toBe("x");
   });
 });
+
+describe("cola de duplicados por páginas (ADR 0298)", () => {
+  it("recorre la cola con cursor, informa el total y rechaza un cursor desconocido", async () => {
+    const ids: string[] = [];
+    for (let i = 0; i < 4; i++) {
+      const u = await createUser(t, `pag_dup_${i}`);
+      ids.push((await submit(t, u, reportBody(u, { category: "fire.structure", pin: offset(LIMA, -40_000 - i * 10_000, 90_000) }))).body.eventId!);
+    }
+    for (const other of ids.slice(1)) {
+      const [x, y] = [ids[0]!, other].sort();
+      await t.c.db.query(`INSERT INTO event.duplicate_candidates (id, event_a, event_b, score, reason) VALUES (gen_random_uuid(), $1, $2, 0.6, 'AMBIGUOUS_SCORE')`, [x, y]);
+    }
+    const all = (await t.app.inject({ url: "/v1/moderation/duplicates?limit=200", headers: auth(mod) })).json() as { candidates: DuplicateCandidateView[]; total: number };
+    expect(all.total).toBe(all.candidates.length);
+    expect(all.total).toBeGreaterThanOrEqual(3);
+    const seen: string[] = [];
+    let cursor: string | null = null;
+    do {
+      const page = (await t.app.inject({ url: `/v1/moderation/duplicates?limit=2${cursor ? `&cursor=${cursor}` : ""}`, headers: auth(mod) })).json() as { candidates: DuplicateCandidateView[]; nextCursor: string | null; total: number };
+      expect(page.candidates.length).toBeLessThanOrEqual(2);
+      expect(page.total).toBe(all.total);
+      seen.push(...page.candidates.map((c) => c.id));
+      cursor = page.nextCursor;
+    } while (cursor);
+    expect(seen).toEqual(all.candidates.map((c) => c.id));
+    const bad = await t.app.inject({ url: "/v1/moderation/duplicates?cursor=00000000-0000-4000-8000-000000000000", headers: auth(mod) });
+    expect(bad.statusCode).toBe(400);
+  });
+});

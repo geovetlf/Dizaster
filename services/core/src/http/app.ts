@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { AdminReason, donationLinksFor, type EventDonationsResponse, APP_PLATFORM_HEADER, APP_VERSION_HEADER, ConfigChangesQuery, ModerationActionsQuery, type ModerationActionsResponse, OriginalAccessQuery, isBelowMinVersion, type ConfigChangesResponse, MAP_WINDOW_HOURS, MEDIA_KILL_SWITCHES, MapWindow, MfaCodeRequest, MfaVerifyRequest, can, isStaff, type MfaStatus, type Permission } from "@dizaster/contracts";
+import { AdminReason, donationLinksFor, type EventDonationsResponse, APP_PLATFORM_HEADER, APP_VERSION_HEADER, ConfigChangesQuery, ModerationActionsQuery, type ModerationActionsResponse, OriginalAccessQuery, PresenceAccessQuery, isBelowMinVersion, type ConfigChangesResponse, MAP_WINDOW_HOURS, MEDIA_KILL_SWITCHES, MapWindow, MfaCodeRequest, MfaVerifyRequest, can, isStaff, type MfaStatus, type Permission } from "@dizaster/contracts";
 import { isValidTile, tileBounds } from "@dizaster/geo-kit";
 import Fastify, { type FastifyInstance, type FastifyRequest } from "fastify";
 import { z } from "zod";
@@ -1303,7 +1303,9 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
   app.get("/v1/admin/media-original-access", async (req, reply) => {
     await requireAdmin(req);
     reply.header("cache-control", "no-store");
-    return c.media.originalAccessLog(parse(OriginalAccessQuery, req.query));
+    const log = await c.media.originalAccessLog(parse(OriginalAccessQuery, req.query));
+    const handles = await c.social.handlesForUsers(c.db, log.entries.map((e) => e.actorUserId));
+    return { ...log, entries: log.entries.map((e) => ({ ...e, actorHandle: handles.get(e.actorUserId) ?? null })) };
   });
   // Quién moderó qué (§5.21, §13.1, ADR 0239): solo administración, solo lectura.
   app.get("/v1/admin/moderation-actions", async (req, reply): Promise<ModerationActionsResponse> => {
@@ -1321,8 +1323,9 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
   app.get("/v1/admin/presence-access", async (req, reply) => {
     await requireAdmin(req);
     reply.header("cache-control", "no-store");
-    const q = parse(z.object({ reportId: z.uuid().optional(), actorUserId: z.uuid().optional(), limit: z.coerce.number().int().min(1).max(200).default(100) }), req.query);
-    return { entries: await c.reports.presenceAccessLog(c.db, q) };
+    const log = await c.reports.presenceAccessLog(c.db, parse(PresenceAccessQuery, req.query));
+    const handles = await c.social.handlesForUsers(c.db, log.entries.map((e) => e.actorUserId));
+    return { ...log, entries: log.entries.map((e) => ({ ...e, actorHandle: handles.get(e.actorUserId) ?? null })) };
   });
   app.post("/v1/moderation/cases/:id/actions", async (req) => {
     const session = await requireModerator(req);
@@ -1370,7 +1373,7 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
   app.get("/v1/moderation/duplicates", async (req, reply) => {
     await requireVerifier(req);
     reply.header("cache-control", "no-store");
-    return { candidates: await c.events.duplicateQueue(c.db) };
+    return c.events.duplicateQueue(c.db, req.query);
   });
   app.post("/v1/moderation/duplicates/:id/dismiss", async (req, reply) => {
     const session = await requireVerifier(req);

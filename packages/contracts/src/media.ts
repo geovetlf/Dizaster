@@ -144,4 +144,4 @@ export const OriginalAccessQuery = z.object({
   limit: z.coerce.number().int().min(1).max(200).default(100),
 });
 export type OriginalAccessQuery = z.infer<typeof OriginalAccessQuery>;
-export interface OriginalAccessEntry { id: string; mediaId: string; actorUserId: string; reason: string; caseId: string | null; accessedAt: string }
+export interface OriginalAccessEntry { id: string; mediaId: string; actorUserId: string; actorHandle?: string | null; reason: string; caseId: string | null; accessedAt: string }
