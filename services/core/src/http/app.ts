@@ -5,7 +5,7 @@ import Fastify, { type FastifyInstance, type FastifyRequest } from "fastify";
 import { z } from "zod";
 import {
   BBox, CreateCommentRequest, DevicePlatform, MEDIA_UPLOAD_LIMITS, MergeEventsRequest, NegativeState, ReactionKind, CommentReactionKind, ConfirmAgeRequest, RegisterPushTokenRequest, RegisterSigningKeyRequest, RevertMergeRequest,
-  SplitEventRequest, SetEventStatusRequest, SetEventSeverityRequest, RaiseEventSensitivityRequest, SetSourceStatusRequest, AcceptPoliciesRequest, type PolicyStatusResponse, ClientCrashReport, type ClientCrashesResponse, type AdminSourcesResponse, ChangeRoleRequest, type StaffResponse, OriginalAccessRequest, IdTokenSignInRequest, EmailStartRequest, EmailVerifyRequest, LinkIdentityRequest, AddModeratorNoteRequest, DismissDuplicateRequest, DATA_EXPORT_FORMAT, type AppConfig, type Attribution, type AttributionsResponse, type DataExport, type EmergencyNumbersResponse, type EventSearchResponse,
+  SplitEventRequest, SetEventStatusRequest, SetEventSeverityRequest, RaiseEventSensitivityRequest, SetSourceStatusRequest, AcceptPoliciesRequest, type PolicyStatusResponse, ClientCrashReport, type ClientCrashesResponse, type AdminSourcesResponse, ChangeRoleRequest, type StaffResponse, OriginalAccessRequest, IdTokenSignInRequest, EmailStartRequest, EmailVerifyRequest, LinkIdentityRequest, AddModeratorNoteRequest, DismissDuplicateRequest, DATA_EXPORT_FORMAT, capExportSections, type AppConfig, type Attribution, type AttributionsResponse, type DataExport, type EmergencyNumbersResponse, type EventSearchResponse,
 } from "@dizaster/contracts";
 import { LocalDiskStorage } from "../modules/media/index.js";
 import type { Container } from "../container.js";
@@ -15,7 +15,7 @@ import { listConfigChanges, recordConfigChange } from "../platform/config-audit.
 import { isOverloadError, withTransaction } from "../platform/db.js";
 import { DomainError, forbidden } from "../platform/errors.js";
 import { latencyMetric } from "../platform/metrics.js";
-import { FixedWindowLimiter, SharedAccountLimiter } from "../platform/rate-limit.js";
+import { AccountCooldown, FixedWindowLimiter, SharedAccountLimiter } from "../platform/rate-limit.js";
 import { acceptRequestId, currentContext, REQUEST_ID_HEADER, runWithContext } from "../platform/request-context.js";
 import { newId } from "../platform/ids.js";
 import { buildOpenApi } from "./openapi.js";
@@ -47,6 +47,9 @@ const SourcePushParams = z.object({ sourceKey: z.string().regex(/^[a-z0-9-]{1,64
  * Escrituras permitidas a una cuenta suspendida: apelar, cerrar y renovar sesiones, borrar sus posts y comentarios,
  * retirar sus reportes (ADR 0237) y borrar la cuenta. Quitar lo propio nunca se impide.
  */
+/** Búsquedas por texto con cupo propio (ADR 0291): eventos, publicaciones, perfiles, negocios, hashtags y lugares. */
+const SEARCH_ROUTES = /^\/v1\/(search\/(events|posts)|profiles|businesses|tags|geo\/areas)$/;
+
 const WRITE_ALLOWED_WHEN_SUSPENDED = /^(POST \/v1\/me\/policies\/accept|POST \/v1\/me\/moderation\/[^/]+\/appeal|POST \/v1\/auth\/(refresh|logout)|DELETE \/v1\/me|DELETE \/v1\/posts\/[^/]+|DELETE \/v1\/comments\/[^/]+|DELETE \/v1\/me\/reports\/[^/]+|DELETE \/v1\/me\/sessions\/[^/]+|POST \/v1\/me\/sessions\/revoke-others)$/;
 /**
  * La suspensión nunca quita la protección (ADR 0225): una cuenta suspendida (no una borrada) mantiene sus avisos de
@@ -94,6 +97,8 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
   // Límite general (ADR 0047): por cuenta con sesión, por IP sin ella. Las escrituras tienen un cupo menor.
   const allLimiter = new FixedWindowLimiter(c.env.RATE_LIMIT_PER_MINUTE);
   const writeLimiter = new FixedWindowLimiter(c.env.RATE_LIMIT_WRITES_PER_MINUTE);
+  // Búsquedas (ADR 0291): cupo propio, más bajo, en memoria de cada réplica (sin IPs en la base).
+  const searchLimiter = new FixedWindowLimiter(c.env.SEARCH_RATE_LIMIT_PER_MINUTE);
   // Varias réplicas (ADR 0228): el cupo por cuenta se comparte en PostgreSQL; sin sesión sigue en memoria (sin IPs en la base).
   const sharedLimiter = c.env.RATE_LIMIT_SHARED ? new SharedAccountLimiter(c.db, c.env.RATE_LIMIT_PER_MINUTE, c.env.RATE_LIMIT_WRITES_PER_MINUTE) : null;
 
@@ -145,6 +150,11 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
       const wait = sharedLimiter && req.session
         ? await sharedLimiter.hit(req.session.userId, write)
         : allLimiter.hit(key) ?? (write ? writeLimiter.hit(key) : null);
+      const searchWait = wait === null && !write && SEARCH_ROUTES.test(req.url.split("?")[0]!) ? searchLimiter.hit(key) : null;
+      if (searchWait !== null) {
+        c.meter.add("http", "rate_limited", 1);
+        throw Object.assign(new DomainError("RATE_LIMITED", "Demasiadas búsquedas; espera un momento", 429), { retryAfter: searchWait });
+      }
       if (wait !== null) {
         c.meter.add("http", "rate_limited", 1);
         throw Object.assign(new DomainError("RATE_LIMITED", "Demasiadas peticiones; espera un momento", 429), { retryAfter: wait });
@@ -548,26 +558,25 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
   });
 
   /** Roles de la sesión: la app muestra herramientas de moderación o administración solo a quien las tiene. */
-  // Exportar mis datos (ADR 0038). Consultas acotadas; como mucho una por minuto y persona en cada instancia.
-  const lastExport = new Map<string, number>();
+  // Exportar mis datos (ADR 0038). Consultas acotadas; como mucho una por minuto y persona, contando todas las réplicas
+  // y sin memoria que crezca con cada persona que exporta (ADR 0290).
+  const exportCooldown = new AccountCooldown(c.db, "export", 60);
   app.get("/v1/me/export", async (req, reply) => {
     const session = requireSession(req);
+    const wait = await exportCooldown.take(session.userId);
+    if (wait !== null) throw Object.assign(new DomainError("RATE_LIMITED", "Espera un minuto antes de volver a exportar", 429), { retryAfter: wait });
     const now = Date.now();
-    if (now - (lastExport.get(session.userId) ?? 0) < 60_000) throw new DomainError("RATE_LIMITED", "Espera un minuto antes de volver a exportar", 429);
-    lastExport.set(session.userId, now);
     const who = { userId: session.userId, profileId: session.profileId };
-    const body: DataExport = {
-      format: DATA_EXPORT_FORMAT,
-      generatedAt: new Date(now).toISOString(),
-      sections: {
-        identity: await c.identity.exportData(c.db, session.userId),
-        social: await c.social.exportData(c.db, who),
-        reports: { ...(await c.reports.exportData(c.db, session.userId)), ...(await c.events.exportData(c.db, session.userId)) },
-        alerts: await c.alerts.exportData(c.db, session.profileId),
-        moderation: await c.moderation.exportData(c.db, who),
-        media: await c.media.exportData(c.db, session.profileId),
-      },
-    };
+    // Cada lista con tope; las que llegan a él se nombran en `truncated` (ADR 0295).
+    const { sections, truncated } = capExportSections({
+      identity: await c.identity.exportData(c.db, session.userId),
+      social: await c.social.exportData(c.db, who),
+      reports: { ...(await c.reports.exportData(c.db, session.userId)), ...(await c.events.exportData(c.db, session.userId)) },
+      alerts: await c.alerts.exportData(c.db, session.profileId),
+      moderation: await c.moderation.exportData(c.db, who),
+      media: await c.media.exportData(c.db, session.profileId),
+    });
+    const body: DataExport = { format: DATA_EXPORT_FORMAT, generatedAt: new Date(now).toISOString(), sections, truncated };
     reply.header("cache-control", "no-store");
     reply.header("content-disposition", `attachment; filename="dizaster-export-${body.generatedAt.slice(0, 10)}.json"`);
     return body;
@@ -727,7 +736,7 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
   app.get("/v1/me/reports", async (req, reply) => {
     const session = requireSession(req);
     reply.header("cache-control", "no-store");
-    return { reports: await c.reports.myReports(c.db, session.userId) };
+    return c.reports.myReports(c.db, session.userId, req.query);
   });
 
   app.post("/v1/me/reports/:id/match", async (req) => {
@@ -1228,7 +1237,7 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
   app.get("/v1/me/moderation", async (req, reply) => {
     const session = requireSession(req);
     reply.header("cache-control", "no-store");
-    return { notices: await c.moderation.myNotices(session.userId) };
+    return c.moderation.myNotices(session.userId, req.query);
   });
   app.post("/v1/me/moderation/:id/appeal", async (req, reply) => {
     const session = requireSession(req);

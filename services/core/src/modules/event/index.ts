@@ -1,4 +1,4 @@
-import { SENSITIVITY_ORDER } from "@dizaster/contracts";
+import { SENSITIVITY_ORDER, DATA_EXPORT_ROW_LIMIT } from "@dizaster/contracts";
 import type {
   EventStatus,
   CategoryConfig,
@@ -1016,7 +1016,7 @@ export class EventService {
       `SELECT e.ref_id AS report_id, d.reporter_answer AS answer, d.answered_at
          FROM event.dedup_reviews d JOIN event.evidence e ON e.id = d.evidence_id
         WHERE e.contributor_user_id = $1 AND e.evidence_type = 'CITIZEN_REPORT' AND d.reporter_answer IS NOT NULL
-        ORDER BY d.answered_at DESC LIMIT 10000`,
+        ORDER BY d.answered_at DESC LIMIT ${DATA_EXPORT_ROW_LIMIT + 1}`,
       [userId],
     );
     return { sameEventAnswers: rows };

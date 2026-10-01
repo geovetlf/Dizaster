@@ -23,6 +23,7 @@ describe("exportar mis datos (ADR 0038)", () => {
     expect(res.statusCode, res.body).toBe(200);
     expect(res.headers["content-disposition"]).toMatch(/^attachment; filename="dizaster-export-\d{4}-\d{2}-\d{2}\.json"$/);
     const body = res.json() as DataExport;
+    expect(body.truncated).toEqual([]); // nada llega al tope (ADR 0295)
     expect(body.format).toBe("dizaster-export-1");
     const s = body.sections;
     expect(s.identity["account"]![0]).toMatchObject({ id: yo.userId, mfa_enabled: false });

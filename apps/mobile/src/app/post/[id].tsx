@@ -19,6 +19,7 @@ import { colors, radius, space } from "../../theme";
 import { appendPage } from "../../lib/ui/pages";
 import { LoadState } from "../../components/load-state";
 import { classifyLoadError, type LoadErrorKind } from "../../lib/errors/load-error";
+import { ErrorText } from "../../components/error-text";
 
 /** Una publicación y sus comentarios. Destino de dizaster://post/<id> y https://<dominio>/p/<id> (ADR 0083). */
 export default function PostCommentsScreen() {
@@ -142,7 +143,7 @@ export default function PostCommentsScreen() {
           );
         }}
       />
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+      {error ? <ErrorText style={styles.error}>{error}</ErrorText> : null}
       {replyTo ? (
         <Pressable accessibilityRole="button" onPress={() => setReplyTo(null)} style={styles.replying}>
           <Text style={styles.time}>{t("replyingTo")} {replyTo.author.displayName}  ✕</Text>

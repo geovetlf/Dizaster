@@ -5,6 +5,7 @@ import { Pressable, ScrollView, StyleSheet, Text, TextInput } from "react-native
 import { api } from "../lib/api";
 import { t } from "../lib/i18n";
 import { colors, radius, space } from "../theme";
+import { ErrorText } from "../components/error-text";
 
 /** Editar el texto de un post propio durante 24 h (ADR 0136). Las fotos y el evento no cambian. */
 export default function PostEditScreen() {
@@ -33,7 +34,7 @@ export default function PostEditScreen() {
         style={styles.input} value={text} onChangeText={setText} multiline maxLength={POST_TEXT_MAX}
         accessibilityLabel={t("editPost")} autoFocus
       />
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+      {error ? <ErrorText style={styles.error}>{error}</ErrorText> : null}
       <Pressable accessibilityRole="button" disabled={busy || !text.trim()} style={[styles.button, (busy || !text.trim()) && styles.disabled]} onPress={() => void save()}>
         <Text style={styles.buttonText}>{t("save")}</Text>
       </Pressable>

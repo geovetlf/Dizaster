@@ -66,3 +66,37 @@ export class SharedAccountLimiter {
     return Math.max(1, Math.ceil(((w + 1) * this.windowMs - t) / 1000));
   }
 }
+
+/**
+ * Espera mínima entre dos usos de una acción cara por la misma cuenta (ADR 0290), compartida entre réplicas: una fila
+ * por cuenta y acción con la hora en que vuelve a estar permitida. Guarda el id interno y esa hora; nada más, y la
+ * fila se borra al vencer (aquí y en la limpieza diaria).
+ */
+export class AccountCooldown {
+  constructor(
+    private readonly db: Queryable,
+    readonly kind: string,
+    readonly seconds: number,
+  ) {}
+
+  /** Reserva la acción. Devuelve null si estaba permitida, o los segundos que faltan para poder repetirla. */
+  async take(userId: string): Promise<number | null> {
+    await this.db.query(`DELETE FROM platform.account_cooldowns WHERE user_id = $1 AND kind = $2 AND until <= now()`, [userId, this.kind]);
+    const taken = await this.db.query(
+      `INSERT INTO platform.account_cooldowns (user_id, kind, until) VALUES ($1, $2, now() + make_interval(secs => $3))
+       ON CONFLICT (user_id, kind) DO NOTHING`,
+      [userId, this.kind, this.seconds],
+    );
+    if (taken.rowCount) return null;
+    const { rows } = await this.db.query<{ wait: number }>(
+      `SELECT ceil(extract(epoch FROM until - now()))::int AS wait FROM platform.account_cooldowns WHERE user_id = $1 AND kind = $2`,
+      [userId, this.kind],
+    );
+    return Math.max(1, rows[0]?.wait ?? 1);
+  }
+}
+
+/** Limpieza diaria de esperas vencidas (las de cuentas que no volvieron a intentar la acción). */
+export async function pruneCooldowns(db: Queryable): Promise<number> {
+  return (await db.query(`DELETE FROM platform.account_cooldowns WHERE until <= now()`)).rowCount ?? 0;
+}
