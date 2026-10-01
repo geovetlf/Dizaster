@@ -122,6 +122,7 @@ export const OPERATIONS: Record<string, Operation> = {
   "GET /v1/admin/sources": { summary: "Salud de las fuentes (estado, breaker, ejecuciones de 24 h)" },
   "POST /v1/admin/sources/:key/status": { summary: "Pausar o reanudar una fuente (auditado)", body: C.SetSourceStatusRequest },
   "GET /v1/admin/staff": { summary: "Personal con roles y últimos cambios de rol" },
+  "GET /v1/admin/staff/changes": { summary: "Historial de cambios de rol, por páginas (ADR 0296)", query: C.RoleChangesQuery },
   "GET /v1/admin/config-changes": { summary: "Historial de cambios de configuración con motivo (solo inserción)", query: C.ConfigChangesQuery },
   "GET /v1/admin/moderation-actions": { summary: "Registro de acciones de moderación con quién las tomó (solo administración)", query: C.ModerationActionsQuery },
   "POST /v1/admin/staff/roles": { summary: "Dar o quitar un rol de personal (auditado; nunca al último administrador)", body: C.ChangeRoleRequest },

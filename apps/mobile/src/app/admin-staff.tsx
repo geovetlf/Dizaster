@@ -26,6 +26,17 @@ export default function AdminStaffScreen() {
   }, []);
   useFocusEffect(load);
 
+  /** Cambios más antiguos (ADR 0296): se añaden al final, sin perder lo ya mostrado. */
+  function older() {
+    const cursor = data?.changesNextCursor;
+    if (!cursor || busy) return;
+    setBusy(true);
+    api.adminStaffChanges(cursor)
+      .then((p) => setData((d) => (d ? { ...d, changes: [...d.changes, ...p.changes], changesNextCursor: p.nextCursor } : d)))
+      .catch((e: Error) => setError(e.message))
+      .finally(() => setBusy(false));
+  }
+
   function change(target: string, r: StaffRole, action: "GRANT" | "REVOKE") {
     Alert.alert(`@${target}`, t(action === "GRANT" ? "roleGrantConfirm" : "roleRevokeConfirm"), [
       { text: t("cancel"), style: "cancel" },
@@ -84,6 +95,11 @@ export default function AdminStaffScreen() {
           {timeAgo(c.at, lang)} · {c.action === "GRANT" ? "+" : "−"} {t(`role_${c.role}`)} · @{c.handle ?? "—"} · {c.reason}
         </Text>
       ))}
+      {data?.changesNextCursor ? (
+        <Pressable accessibilityRole="button" accessibilityState={{ disabled: busy }} disabled={busy} style={[styles.button, busy && styles.disabled]} onPress={older}>
+          <Text style={styles.buttonText}>{t("roleChangesOlder")}</Text>
+        </Pressable>
+      ) : null}
     </ScrollView>
   );
 }

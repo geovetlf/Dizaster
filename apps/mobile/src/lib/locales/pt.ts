@@ -313,6 +313,7 @@ export const pt: Record<MessageKey, string> = {
   roleRevoke: "Remover",
   staffSection: "Equipe atual (toque numa função para removê-la)",
   roleChanges: "Mudanças recentes",
+  roleChangesOlder: "Ver mudanças anteriores",
   roleGrantConfirm: "Dar esta função? Fica registrado com seu motivo e vale a partir do próximo login.",
   roleRevokeConfirm: "Remover esta função? Fica registrado e todas as sessões serão encerradas.",
   role_moderator: "Moderação",

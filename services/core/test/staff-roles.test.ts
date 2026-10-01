@@ -1,4 +1,4 @@
-import type { StaffResponse } from "@dizaster/contracts";
+import type { StaffResponse, RoleChangesResponse } from "@dizaster/contracts";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createTestContext, createUser, type TestContext, type TestUser } from "./helpers.js";
 
@@ -47,6 +47,22 @@ describe("roles de personal", () => {
       { handle: oh, role: "operator", action: "REVOKE", reason: "Dejó el equipo" },
       { handle: oh, role: "operator", action: "GRANT", reason: "Turno de noche" },
     ]);
+    // Historial completo por páginas (ADR 0296): sin repetir ni perder cambios.
+    const total = (await t.c.db.query<{ n: number }>(`SELECT count(*)::int AS n FROM identity.role_changes`)).rows[0]!.n;
+    const seen: string[] = [];
+    let cursor: string | null = null;
+    do {
+      const res = await t.app.inject({ url: `/v1/admin/staff/changes?limit=1${cursor ? `&cursor=${cursor}` : ""}`, headers: auth(admin) });
+      expect(res.statusCode).toBe(200);
+      const page = res.json() as RoleChangesResponse;
+      seen.push(...page.changes.map((x) => `${x.at}|${x.role}|${x.action}|${x.reason}`));
+      cursor = page.nextCursor;
+    } while (cursor);
+    expect(seen).toHaveLength(total);
+    expect(new Set(seen).size).toBe(total);
+    expect(view.changesNextCursor).toBeNull(); // menos de 50 cambios: todo en la primera vista
+    expect((await t.app.inject({ url: "/v1/admin/staff/changes", headers: auth(o) })).statusCode).toBe(403);
+
     // El registro no se puede reescribir.
     await expect(t.c.db.query(`DELETE FROM identity.role_changes`)).rejects.toThrow(/solo se inserta/);
   });

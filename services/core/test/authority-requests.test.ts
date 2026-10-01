@@ -84,4 +84,33 @@ describe("requerimientos de autoridades", () => {
     const rep = (await t.app.inject({ url: "/v1/admin/transparency", headers: auth(admin) })).json() as TransparencyReport;
     expect(rep.authorityRequests).toEqual({ received: "<5", byType: { DATA_DISCLOSURE: "<5" } });
   });
+
+  it("la lista se pagina con el mismo orden: abiertos por vencimiento, luego cerrados (ADR 0296)", async () => {
+    const day = 86_400_000;
+    const make = async (dueDays: number | null, receivedAgoH: number) => {
+      const res = await t.app.inject({ method: "POST", url: "/v1/admin/authority-requests", headers: auth(admin), payload: {
+        ...body(mod), receivedAt: new Date(Date.now() - receivedAgoH * 3600_000).toISOString(),
+        dueAt: dueDays === null ? undefined : new Date(Date.now() + dueDays * day).toISOString(),
+      } });
+      expect(res.statusCode).toBe(201);
+    };
+    // Varios con el mismo vencimiento (empate) y otros sin vencimiento.
+    for (const [due, ago] of [[3, 1], [3, 2], [1, 5], [null, 3], [null, 4], [7, 6]] as const) await make(due, ago);
+
+    const all = (await t.app.inject({ url: "/v1/admin/authority-requests?limit=100", headers: auth(admin) })).json() as { requests: { id: string }[]; nextCursor: string | null };
+    expect(all.nextCursor).toBeNull();
+    const seen: string[] = [];
+    let cursor: string | null = null;
+    do {
+      const res = await t.app.inject({ url: `/v1/admin/authority-requests?limit=2${cursor ? `&cursor=${cursor}` : ""}`, headers: auth(admin) });
+      expect(res.statusCode).toBe(200);
+      const page = res.json() as { requests: { id: string }[]; nextCursor: string | null };
+      expect(page.requests.length).toBeLessThanOrEqual(2);
+      seen.push(...page.requests.map((x) => x.id));
+      cursor = page.nextCursor;
+    } while (cursor);
+    // Mismas filas y mismo orden que la lista de una sola vez: sin repetir ni perder ninguna.
+    expect(seen).toEqual(all.requests.map((x) => x.id));
+    expect((await t.app.inject({ url: "/v1/admin/authority-requests?cursor=no-es-uuid", headers: auth(admin) })).statusCode).toBe(400);
+  });
 });

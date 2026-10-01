@@ -13,6 +13,7 @@ import { useCallback, useState } from "react";
 import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { dueFromDays, parseSubjectRefs, shortId } from "../lib/admin/admin-tools";
 import { api } from "../lib/api";
+import { appendPage } from "../lib/ui/pages";
 import { t, type MessageKey } from "../lib/i18n";
 import { colors, radius, space } from "../theme";
 import { ErrorText } from "../components/error-text";
@@ -34,10 +35,22 @@ export default function AdminAuthorityScreen() {
   const [channel, setChannel] = useState<AuthorityRequestChannel>("EMAIL");
   const [note, setNote] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [next, setNext] = useState<string | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   const reload = useCallback(() => {
-    api.authorityRequests().then((r) => setList(r.requests)).catch((e: Error) => setError(e.message));
+    api.authorityRequests().then((r) => { setList(r.requests); setNext(r.nextCursor); }).catch((e: Error) => setError(e.message));
   }, []);
+
+  /** Página siguiente (ADR 0296): sin repetir lo que ya está en la lista. */
+  function more() {
+    if (!next || loadingMore) return;
+    setLoadingMore(true);
+    api.authorityRequests(next)
+      .then((r) => { setList((l) => appendPage(l, r.requests)); setNext(r.nextCursor); })
+      .catch((e: Error) => setError(e.message))
+      .finally(() => setLoadingMore(false));
+  }
   useFocusEffect(reload);
 
   function create() {
@@ -89,6 +102,8 @@ export default function AdminAuthorityScreen() {
       contentContainerStyle={styles.content}
       data={list}
       keyExtractor={(r) => r.id}
+      onEndReached={more}
+      onEndReachedThreshold={0.5}
       ListHeaderComponent={
         <View style={styles.header}>
           <Text style={styles.meta}>{t("authorityHint")}</Text>
