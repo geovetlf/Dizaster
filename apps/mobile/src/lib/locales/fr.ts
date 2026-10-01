@@ -365,6 +365,7 @@ export const fr: Record<MessageKey, string> = {
   trTarget_PROFILE: "profil",
   trTarget_BUSINESS: "commerce",
   trTarget_EVENT: "événement",
+  historyAll: "Voir tout l'historique",
   contentState_VISIBLE: "Visible",
   contentState_LIMITED: "Portée limitée",
   contentState_HIDDEN: "Masqué",

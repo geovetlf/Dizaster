@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { AdminReason, donationLinksFor, type EventDonationsResponse, APP_PLATFORM_HEADER, APP_VERSION_HEADER, ConfigChangesQuery, ModerationActionsQuery, type ModerationActionsResponse, OriginalAccessQuery, PresenceAccessQuery, isBelowMinVersion, type ConfigChangesResponse, MAP_WINDOW_HOURS, MEDIA_KILL_SWITCHES, MapWindow, MfaCodeRequest, MfaVerifyRequest, can, isStaff, type MfaStatus, type Permission } from "@dizaster/contracts";
+import { AdminReason, ModeratorEventDetailQuery, donationLinksFor, type EventDonationsResponse, APP_PLATFORM_HEADER, APP_VERSION_HEADER, ConfigChangesQuery, ModerationActionsQuery, type ModerationActionsResponse, OriginalAccessQuery, PresenceAccessQuery, isBelowMinVersion, type ConfigChangesResponse, MAP_WINDOW_HOURS, MEDIA_KILL_SWITCHES, MapWindow, MfaCodeRequest, MfaVerifyRequest, can, isStaff, type MfaStatus, type Permission } from "@dizaster/contracts";
 import { isValidTile, tileBounds } from "@dizaster/geo-kit";
 import Fastify, { type FastifyInstance, type FastifyRequest } from "fastify";
 import { z } from "zod";
@@ -1349,7 +1349,7 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
   app.get("/v1/moderation/events/:id", async (req, reply) => {
     await requireVerifier(req);
     reply.header("cache-control", "no-store");
-    return c.events.moderatorDetail(c.db, parse(IdParam, req.params).id);
+    return c.events.moderatorDetail(c.db, parse(IdParam, req.params).id, parse(ModeratorEventDetailQuery, req.query).history);
   });
   app.post("/v1/moderation/events/:id/notes", async (req, reply) => {
     const session = await requireVerifier(req);

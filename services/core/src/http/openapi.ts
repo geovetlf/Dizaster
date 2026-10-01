@@ -162,7 +162,7 @@ export const OPERATIONS: Record<string, Operation> = {
   "POST /v1/moderation/cases/:id/actions": { summary: "Tomar una acción", body: C.TakeActionRequest },
   "GET /v1/moderation/appeals": { summary: "Apelaciones por estado, paginadas con cursor" },
   "POST /v1/moderation/appeals/:id/decision": { summary: "Decidir una apelación", body: C.DecideAppealRequest },
-  "GET /v1/moderation/events/:id": { summary: "Evento visto por moderación" },
+  "GET /v1/moderation/events/:id": { summary: "Evento visto por moderación (history=full: historial completo)", query: C.ModeratorEventDetailQuery },
   "POST /v1/moderation/events/:id/notes": { summary: "Nota de moderación en la línea de tiempo del evento (solo visible para moderación)", body: C.AddModeratorNoteRequest },
   "POST /v1/moderation/events/:id/merge": { summary: "Fusionar eventos", body: C.MergeEventsRequest },
   "POST /v1/moderation/merges/:id/revert": { summary: "Revertir una fusión", body: C.RevertMergeRequest },
