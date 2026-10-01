@@ -235,6 +235,29 @@ export class IngestionScheduler {
     return { deleted, runsPurged: runs.rowCount ?? 0 };
   }
 
+  /**
+   * Ítems de fuentes que no llegaron a ningún evento (IGNORED o ERROR, sin `event_id`), con más de
+   * `RUNS_RETENTION_DAYS` días (ADR 0293): no respaldan nada y solo ocupan espacio. Los ligados a un evento se quedan
+   * (son su evidencia). En lotes, con el mismo tope de tiempo que el crudo; si la fuente lo vuelve a publicar, entra de
+   * nuevo como ítem nuevo.
+   */
+  async purgeUnusedItems(now: Date = this.clock.now(), batch = 500): Promise<{ deleted: number }> {
+    let deleted = 0;
+    const started = Date.now();
+    for (;;) {
+      const r = await this.db.query(
+        `DELETE FROM ingestion.external_items WHERE id IN (
+           SELECT id FROM ingestion.external_items
+            WHERE status IN ('IGNORED','ERROR') AND event_id IS NULL AND fetched_at < $1::timestamptz - make_interval(days => $2)
+            LIMIT $3)`,
+        [now, RUNS_RETENTION_DAYS, batch],
+      );
+      deleted += r.rowCount ?? 0;
+      if ((r.rowCount ?? 0) < batch || Date.now() - started > RETENTION_TIME_BUDGET_MS) break;
+    }
+    return { deleted };
+  }
+
   /** Un ítem que falla por sí mismo queda en ERROR y no tumba el resto del documento (ADR 0155). */
   private async ingestSafely(key: string, item: Parameters<IngestionService["ingest"]>[1], lane: "NORMAL" | "URGENT", rawRef: string | null, summary: RunSummary) {
     try {
