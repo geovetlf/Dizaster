@@ -9,7 +9,7 @@ import { publish } from "../../platform/outbox.js";
 import type { SocialService } from "../social/index.js";
 
 export type { Role } from "@dizaster/contracts";
-import { STAFF_ROLES, type AcceptPoliciesRequest, type LegalDocument, type PolicyStatusResponse, type Role, type StaffRole } from "@dizaster/contracts";
+import { RoleChangesQuery, STAFF_ROLES, type AcceptPoliciesRequest, type LegalDocument, type PolicyStatusResponse, type Role, type StaffRole } from "@dizaster/contracts";
 
 export interface Session {
   userId: string;
@@ -287,16 +287,32 @@ export class IdentityService {
   }
 
   /** Personal con roles y últimos cambios (ADR 0167). Los handles los pone quien llama. */
-  async staff(): Promise<{ members: { userId: string; roles: StaffRole[] }[]; changes: { userId: string; role: StaffRole; action: "GRANT" | "REVOKE"; reason: string; at: Date }[] }> {
+  async staff(): Promise<{ members: { userId: string; roles: StaffRole[] }[]; changes: { userId: string; role: StaffRole; action: "GRANT" | "REVOKE"; reason: string; at: Date }[]; changesNextCursor: string | null }> {
     const members = await this.db.query<{ id: string; roles: string[] }>(
       `SELECT id, roles FROM identity.users WHERE roles && $1::text[] AND status <> 'DELETED' ORDER BY id`, [[...STAFF_ROLES]],
     );
-    const changes = await this.db.query<{ user_id: string; role: StaffRole; action: "GRANT" | "REVOKE"; reason: string; at: Date }>(
-      `SELECT user_id, role, action, reason, at FROM identity.role_changes ORDER BY at DESC LIMIT 50`,
-    );
+    const changes = await this.roleChanges({});
     return {
       members: members.rows.map((r) => ({ userId: r.id, roles: r.roles.filter((x): x is StaffRole => (STAFF_ROLES as readonly string[]).includes(x)) })),
-      changes: changes.rows.map((r) => ({ userId: r.user_id, role: r.role, action: r.action, reason: r.reason, at: r.at })),
+      changes: changes.changes,
+      changesNextCursor: changes.nextCursor,
+    };
+  }
+
+  /** Historial de cambios de rol, por páginas (ADR 0296): `cursor` = id del último, comparado por `(at, id)`. */
+  async roleChanges(raw: unknown): Promise<{ changes: { userId: string; role: StaffRole; action: "GRANT" | "REVOKE"; reason: string; at: Date }[]; nextCursor: string | null }> {
+    const parsed = RoleChangesQuery.safeParse(raw ?? {});
+    if (!parsed.success) throw new DomainError("VALIDATION", parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; "));
+    const { cursor, limit } = parsed.data;
+    const { rows } = await this.db.query<{ id: string; user_id: string; role: StaffRole; action: "GRANT" | "REVOKE"; reason: string; at: Date }>(
+      `SELECT id, user_id, role, action, reason, at FROM identity.role_changes
+        WHERE ($1::uuid IS NULL OR (at, id) < (SELECT c.at, c.id FROM identity.role_changes c WHERE c.id = $1))
+        ORDER BY at DESC, id DESC LIMIT $2`,
+      [cursor ?? null, limit],
+    );
+    return {
+      changes: rows.map((r) => ({ userId: r.user_id, role: r.role, action: r.action, reason: r.reason, at: r.at })),
+      nextCursor: rows.length === limit ? rows[rows.length - 1]!.id : null,
     };
   }
 

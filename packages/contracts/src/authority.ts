@@ -58,6 +58,8 @@ export const AddAuthorityRequestNote = z.object({ note: Note });
 export type AddAuthorityRequestNote = z.infer<typeof AddAuthorityRequestNote>;
 export const AuthorityRequestListQuery = z.object({
   status: AuthorityRequestStatus.optional(),
+  /** Id del último de la página anterior (ADR 0296). */
+  cursor: z.uuid().optional(),
   limit: z.coerce.number().int().min(1).max(100).default(50),
 });
 

@@ -38,7 +38,14 @@ export function isStaffRole(v: string): v is StaffRole {
 /** Personal y sus roles, para administración (ADR 0167). */
 export interface StaffMemberView { handle: string; roles: StaffRole[] }
 export interface RoleChangeView { handle: string | null; role: StaffRole; action: "GRANT" | "REVOKE"; reason: string; at: string }
-export interface StaffResponse { staff: StaffMemberView[]; changes: RoleChangeView[] }
+/** `changesNextCursor`: hay cambios más antiguos; se piden en `/v1/admin/staff/changes` (ADR 0296). */
+export interface StaffResponse { staff: StaffMemberView[]; changes: RoleChangeView[]; changesNextCursor: string | null }
+export const RoleChangesQuery = z.object({
+  cursor: z.uuid().optional(),
+  limit: z.coerce.number().int().min(1).max(200).default(50),
+});
+export type RoleChangesQuery = z.infer<typeof RoleChangesQuery>;
+export interface RoleChangesResponse { changes: RoleChangeView[]; nextCursor: string | null }
 export const ChangeRoleRequest = z.object({
   handle: z.string().trim().min(1).max(40),
   role: z.enum(STAFF_ROLES),

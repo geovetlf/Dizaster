@@ -49,14 +49,27 @@ export class AuthorityRequestRegister {
     return this.detail(id);
   }
 
-  async list(rawQuery: unknown): Promise<{ requests: AuthorityRequestSummary[] }> {
+  /**
+   * Abiertos primero, por vencimiento; luego cerrados (ADR 0139). Por páginas (ADR 0296): `cursor` = id del último de la
+   * página anterior, comparado por la misma clave de orden (cerrado, vencimiento, recepción descendente, id descendente).
+   */
+  async list(rawQuery: unknown): Promise<{ requests: AuthorityRequestSummary[]; nextCursor: string | null }> {
     const q = parse(AuthorityRequestListQuery, rawQuery ?? {});
     const { rows } = await this.db.query<Row>(
-      `SELECT * FROM moderation.authority_requests WHERE ($1::text IS NULL OR status = $1)
-        ORDER BY (status IN ('ANSWERED','REJECTED','WITHDRAWN')), due_at NULLS LAST, received_at DESC LIMIT $2`,
-      [q.status ?? null, q.limit],
+      `WITH c AS (
+         SELECT status IN ('ANSWERED','REJECTED','WITHDRAWN') AS closed, coalesce(due_at, 'infinity') AS due, received_at, id
+           FROM moderation.authority_requests WHERE id = $3)
+       SELECT r.* FROM moderation.authority_requests r
+        WHERE ($1::text IS NULL OR r.status = $1)
+          AND ($3::uuid IS NULL OR EXISTS (SELECT 1 FROM c WHERE
+                (r.status IN ('ANSWERED','REJECTED','WITHDRAWN'), coalesce(r.due_at, 'infinity')) > (c.closed, c.due)
+             OR ((r.status IN ('ANSWERED','REJECTED','WITHDRAWN'), coalesce(r.due_at, 'infinity')) = (c.closed, c.due)
+                 AND (r.received_at, r.id) < (c.received_at, c.id))))
+        ORDER BY (r.status IN ('ANSWERED','REJECTED','WITHDRAWN')), coalesce(r.due_at, 'infinity'), r.received_at DESC, r.id DESC
+        LIMIT $2`,
+      [q.status ?? null, q.limit, q.cursor ?? null],
     );
-    return { requests: rows.map((r) => this.summary(r)) };
+    return { requests: rows.map((r) => this.summary(r)), nextCursor: rows.length === q.limit ? rows[rows.length - 1]!.id : null };
   }
 
   async detail(id: string): Promise<AuthorityRequestDetail> {

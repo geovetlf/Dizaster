@@ -313,6 +313,7 @@ export const fr: Record<MessageKey, string> = {
   roleRevoke: "Retirer",
   staffSection: "Équipe actuelle (touchez un rôle pour le retirer)",
   roleChanges: "Changements récents",
+  roleChangesOlder: "Voir les changements précédents",
   roleGrantConfirm: "Attribuer ce rôle ? C'est enregistré avec votre motif et s'applique à la prochaine connexion.",
   roleRevokeConfirm: "Retirer ce rôle ? C'est enregistré et toutes ses sessions sont fermées.",
   role_moderator: "Modération",

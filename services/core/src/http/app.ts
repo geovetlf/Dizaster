@@ -5,7 +5,7 @@ import Fastify, { type FastifyInstance, type FastifyRequest } from "fastify";
 import { z } from "zod";
 import {
   BBox, CreateCommentRequest, DevicePlatform, MEDIA_UPLOAD_LIMITS, MergeEventsRequest, NegativeState, ReactionKind, CommentReactionKind, ConfirmAgeRequest, RegisterPushTokenRequest, RegisterSigningKeyRequest, RevertMergeRequest,
-  SplitEventRequest, SetEventStatusRequest, SetEventSeverityRequest, RaiseEventSensitivityRequest, SetSourceStatusRequest, AcceptPoliciesRequest, type PolicyStatusResponse, ClientCrashReport, type ClientCrashesResponse, type AdminSourcesResponse, ChangeRoleRequest, type StaffResponse, OriginalAccessRequest, IdTokenSignInRequest, EmailStartRequest, EmailVerifyRequest, LinkIdentityRequest, AddModeratorNoteRequest, DismissDuplicateRequest, DATA_EXPORT_FORMAT, capExportSections, type AppConfig, type Attribution, type AttributionsResponse, type DataExport, type EmergencyNumbersResponse, type EventSearchResponse,
+  SplitEventRequest, SetEventStatusRequest, SetEventSeverityRequest, RaiseEventSensitivityRequest, SetSourceStatusRequest, AcceptPoliciesRequest, type PolicyStatusResponse, ClientCrashReport, type ClientCrashesResponse, type AdminSourcesResponse, ChangeRoleRequest, type StaffResponse, OriginalAccessRequest, IdTokenSignInRequest, EmailStartRequest, EmailVerifyRequest, LinkIdentityRequest, AddModeratorNoteRequest, DismissDuplicateRequest, DATA_EXPORT_FORMAT, capExportSections, type AppConfig, type Attribution, type AttributionsResponse, type DataExport, type EmergencyNumbersResponse, type EventSearchResponse, type RoleChangesResponse,
 } from "@dizaster/contracts";
 import { LocalDiskStorage } from "../modules/media/index.js";
 import type { Container } from "../container.js";
@@ -1123,11 +1123,23 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
   app.get("/v1/admin/staff", async (req, reply): Promise<StaffResponse> => {
     await requireAdmin(req);
     reply.header("cache-control", "no-store");
-    const { members, changes } = await c.identity.staff();
+    const { members, changes, changesNextCursor } = await c.identity.staff();
     const handles = await c.social.handlesForUsers(c.db, [...members.map((m) => m.userId), ...changes.map((x) => x.userId)]);
     return {
       staff: members.filter((m) => handles.has(m.userId)).map((m) => ({ handle: handles.get(m.userId)!, roles: m.roles })),
       changes: changes.map((x) => ({ handle: handles.get(x.userId) ?? null, role: x.role, action: x.action, reason: x.reason, at: x.at.toISOString() })),
+      changesNextCursor,
+    };
+  });
+  // Historial completo de cambios de rol, por páginas (ADR 0296).
+  app.get("/v1/admin/staff/changes", async (req, reply): Promise<RoleChangesResponse> => {
+    await requireAdmin(req);
+    reply.header("cache-control", "no-store");
+    const { changes, nextCursor } = await c.identity.roleChanges(req.query);
+    const handles = await c.social.handlesForUsers(c.db, changes.map((x) => x.userId));
+    return {
+      changes: changes.map((x) => ({ handle: handles.get(x.userId) ?? null, role: x.role, action: x.action, reason: x.reason, at: x.at.toISOString() })),
+      nextCursor,
     };
   });
   app.post("/v1/admin/staff/roles", async (req, reply) => {
