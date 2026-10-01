@@ -6,6 +6,7 @@ import { acceptBody, isUpdate, pendingPolicies } from "../lib/account/policies";
 import { api } from "../lib/api";
 import { t } from "../lib/i18n";
 import { colors, radius, space } from "../theme";
+import { ErrorText } from "../components/error-text";
 
 /**
  * Aceptar términos y políticas (ADR 0176). Cada documento se abre en el navegador; se acepta la versión mostrada.
@@ -45,7 +46,7 @@ export default function PoliciesScreen() {
           <Text style={styles.meta}>{isUpdate(d) ? t("policyUpdated") : t("policyNew")} · {d.version}{d.required ? "" : ` · ${t("policyOptional")}`}</Text>
         </Pressable>
       ))}
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+      {error ? <ErrorText style={styles.error}>{error}</ErrorText> : null}
       <Pressable accessibilityRole="button" accessibilityState={{ disabled: busy || docs.length === 0 }} disabled={busy || docs.length === 0}
         style={[styles.primary, (busy || docs.length === 0) && styles.disabled]} onPress={() => void accept()}>
         <Text style={styles.primaryText}>{t("policiesAccept")}</Text>

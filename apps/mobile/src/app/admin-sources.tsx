@@ -7,6 +7,7 @@ import { api } from "../lib/api";
 import { lang, t } from "../lib/i18n";
 import { timeAgo } from "../lib/ui/format";
 import { colors, radius, space } from "../theme";
+import { ErrorText } from "../components/error-text";
 
 /**
  * Salud de las fuentes y pausa/reanudación (§5.21, §9.2, ADR 0162). Verla y cambiarla es de operación; cada cambio
@@ -48,7 +49,7 @@ export default function AdminSourcesScreen() {
       keyExtractor={(s) => s.key}
       ListHeaderComponent={
         <View style={{ gap: space.sm }}>
-          {error ? <Text style={styles.error}>{error}</Text> : <Text style={styles.meta}>{t("sourcesHint")}</Text>}
+          {error ? <ErrorText style={styles.error}>{error}</ErrorText> : <Text style={styles.meta}>{t("sourcesHint")}</Text>}
           <TextInput accessibilityLabel={t("actionReason")} value={reason} onChangeText={setReason} maxLength={1000} placeholder={t("actionReason")} placeholderTextColor={colors.textMuted} style={styles.input} />
         </View>
       }
