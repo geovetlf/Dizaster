@@ -1370,7 +1370,7 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
   app.get("/v1/moderation/duplicates", async (req, reply) => {
     await requireVerifier(req);
     reply.header("cache-control", "no-store");
-    return { candidates: await c.events.duplicateQueue(c.db) };
+    return c.events.duplicateQueue(c.db, req.query);
   });
   app.post("/v1/moderation/duplicates/:id/dismiss", async (req, reply) => {
     const session = await requireVerifier(req);
