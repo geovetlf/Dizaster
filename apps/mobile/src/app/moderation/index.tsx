@@ -8,6 +8,7 @@ import { useRoles } from "../../lib/auth/roles";
 import { lang, t } from "../../lib/i18n";
 import { actionReasonText, reasonSummary, validReason } from "../../lib/moderation/logic";
 import { eventTitle, timeAgo } from "../../lib/ui/format";
+import { appendPage } from "../../lib/ui/pages";
 import { colors, radius, space } from "../../theme";
 import { ErrorText } from "../../components/error-text";
 
@@ -19,6 +20,8 @@ export default function ModerationScreen() {
   const [appeals, setAppeals] = useState<AppealView[]>([]);
   const [appealsCursor, setAppealsCursor] = useState<string | null>(null);
   const [duplicates, setDuplicates] = useState<DuplicateCandidateView[]>([]);
+  const [duplicatesCursor, setDuplicatesCursor] = useState<string | null>(null);
+  const [duplicatesTotal, setDuplicatesTotal] = useState(0);
   const [loaded, setLoaded] = useState(false);
   // Pestañas cuya carga falló (ADR 0233): se muestra error con Reintentar, nunca "no hay casos".
   const [failed, setFailed] = useState<Record<"queue" | "appeals" | "duplicates", boolean>>({ queue: false, appeals: false, duplicates: false });
@@ -39,7 +42,7 @@ export default function ModerationScreen() {
     setFailed({ queue: q === undefined, appeals: a === undefined, duplicates: d === undefined });
     if (q) { setCases(q.cases); setCursor(q.nextCursor); }
     if (a) { setAppeals(a.appeals); setAppealsCursor(a.nextCursor); }
-    if (d) setDuplicates(d.candidates);
+    if (d) { setDuplicates(d.candidates); setDuplicatesCursor(d.nextCursor); setDuplicatesTotal(d.total); }
     setLoaded(true);
   }, [moderates, verifies]);
   useFocusEffect(useCallback(() => { void load(); }, [load]));
@@ -56,13 +59,20 @@ export default function ModerationScreen() {
     if (a) { setAppeals((prev) => [...prev, ...a.appeals]); setAppealsCursor(a.nextCursor); }
   }
 
+  /** Más pares de la cola (ADR 0298), sin repetir los que ya están. */
+  async function moreDuplicates() {
+    if (!duplicatesCursor) return;
+    const d = await api.duplicateQueue(duplicatesCursor).catch(() => null);
+    if (d) { setDuplicates((prev) => appendPage(prev, d.candidates)); setDuplicatesCursor(d.nextCursor); setDuplicatesTotal(d.total); }
+  }
+
   return (
     <View style={styles.container}>
       <View style={styles.tabs}>
         {tabs.map((k) => (
           <Pressable key={k} accessibilityRole="tab" accessibilityState={{ selected: shown === k }} style={[styles.tab, shown === k && styles.tabOn]} onPress={() => setTab(k)}>
             <Text style={styles.tabText}>
-              {k === "queue" ? `${t("moderationQueue")} (${cases.length})` : k === "appeals" ? `${t("moderationAppeals")} (${appeals.length})` : `${t("duplicatesTab")} (${duplicates.length})`}
+              {k === "queue" ? `${t("moderationQueue")} (${cases.length})` : k === "appeals" ? `${t("moderationAppeals")} (${appeals.length})` : `${t("duplicatesTab")} (${duplicatesTotal})`}
             </Text>
           </Pressable>
         ))}
@@ -89,9 +99,11 @@ export default function ModerationScreen() {
         <FlatList automaticallyAdjustKeyboardInsets
           data={duplicates}
           keyExtractor={(d) => d.id}
+          onEndReached={() => void moreDuplicates()}
+          onEndReachedThreshold={0.5}
           refreshControl={<RefreshControl refreshing={false} onRefresh={() => void load()} tintColor={colors.textMuted} />}
           ListEmptyComponent={failed.duplicates ? <LoadState state="failed" onRetry={() => void load()} /> : loaded ? <Text style={styles.empty}>{t("noDuplicatePairs")}</Text> : null}
-          renderItem={({ item }) => <DuplicateRow candidate={item} onDone={() => setDuplicates((prev) => prev.filter((d) => d.id !== item.id))} />}
+          renderItem={({ item }) => <DuplicateRow candidate={item} onDone={() => { setDuplicates((prev) => prev.filter((d) => d.id !== item.id)); setDuplicatesTotal((n) => Math.max(0, n - 1)); }} />}
         />
       ) : (
         <FlatList automaticallyAdjustKeyboardInsets

@@ -486,6 +486,7 @@ Actualizado: 2026-10-01 (hasta ADR 0299; auditoría de preparación en `docs/PRO
 | Exportación con tope único por lista y aviso de listas recortadas (`truncated`), también en la app (ADR 0295) | ✅ | §13.2 |
 | Requerimientos de autoridades y cambios de rol por páginas (cursor), sin tope fijo en la app (ADR 0296) | ✅ | §13.1, §15 |
 | Proveedor `hashicorp/google` 8.x igual en staging, producción y bootstrap (ADR 0297) | ✅ | §16 |
+| Candidatos de deduplicación ordenados por distancia; cola de duplicados por páginas con total real (ADR 0298) | ✅ | §8.4, §13.1 |
 | Registros de accesos a presencia y a originales por páginas, con alias de quien consultó y errores visibles (ADR 0299) | ✅ | §7.3, §13.1 |
 | Licencias, auditoría, SBOM, Dependabot; respaldo con prueba de restauración en CI | ✅ | ADR 0070, `scripts/supply-chain.mjs`, `scripts/db-restore-check.mjs` |
 | Idioma de la app elegible en el perfil (es/en/pt/fr o del teléfono) | ✅ | ADR 0069, `app/language.tsx` |
