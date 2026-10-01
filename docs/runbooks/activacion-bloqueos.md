@@ -8,22 +8,18 @@ Orden recomendado: 1 → 2 → 3 → 4 → 5. El resto no depende del orden.
 
 ---
 
-## 1. Acceso de escritura al repositorio (GitHub)
+## 1. Reglas de `main` y entornos (GitHub)
 
-- **Falta:** la app de Claude instalada en `geovetlf/Dizaster`. Hoy el push responde 403. El repositorio existe y está
-  vacío.
-- **Listo:**
-  - historial completo, con el commit base `chore: establish Dizaster repository baseline`;
-  - `origin` configurado;
-  - `.github/rulesets/`, `.github/CODEOWNERS` y `scripts/github-bootstrap.mjs`.
-- **Propietario:**
-  1. En https://claude.ai/connect-github, conectar GitHub e instalar la app de Claude en `geovetlf/Dizaster`.
-  2. Decir si se aplican ya las reglas de `main` (todo cambio pasa por PR con tu revisión) y los entornos.
-- **Agente:**
-  1. `git push -u origin main` y `git push origin --tags`, sin force.
-  2. Con tu visto bueno: `node scripts/github-bootstrap.mjs --repo geovetlf/Dizaster --owner geovetlf --execute`,
-     que aplica los rulesets y los entornos `staging` y `production` (este último contigo como revisor obligatorio).
-- **Verificación:** CI verde en `main`. Los rulesets aparecen en Settings → Rules.
+- **Hecho (2026-09-30 y 2026-10-01):**
+  - La app de Claude está instalada.
+  - `main` tiene el historial completo, sin force push.
+  - Todo cambio entra por PR con CI en verde, y el agente fusiona sus propios PRs.
+- **Falta:** las reglas de `main` y los entornos `staging` y `production`. Hoy `main` no está protegida.
+- **Listo:** `.github/rulesets/`, `.github/CODEOWNERS` y `scripts/github-bootstrap.mjs`, que corre en seco.
+- **Propietario:** decir si se aplican ya las reglas de `main` (PR obligatorio y CI en verde) y los entornos.
+- **Agente:** con tu visto bueno, `node scripts/github-bootstrap.mjs --repo geovetlf/Dizaster --owner geovetlf --execute`.
+  Aplica los rulesets y los entornos `staging` y `production`, este último contigo como revisor obligatorio.
+- **Verificación:** los rulesets aparecen en Settings → Rules y `main` figura como protegida.
 - **Plan de GitHub (D-24):** en repositorios privados, los rulesets y los revisores obligatorios de entornos dependen
   del plan. Si el plan no los incluye, GitHub rechaza esos pasos y se informa. El código no cambia.
 
