@@ -4,6 +4,8 @@ import {
   PresenceReviewRequest,
   SubmitReportRequest,
   type MyReportView,
+  MyReportsQuery,
+  type MyReportsResponse,
   type PresenceAccessEntry,
   type PresenceReview,
   type MediaCaptureProof,
@@ -453,7 +455,6 @@ export class ReportService {
 
   // ───────────── Mis reportes (ADR 0094) ─────────────
 
-  /** Reportes propios, más recientes primero. NO AI REQUIRED. */
   /** "¿Es el mismo evento?" (ADR 0156): solo quien lo reportó y sobre un reporte vigente. */
   async answerMatch(session: Session, reportId: string, raw: unknown): Promise<{ answer: "SAME" | "DIFFERENT" }> {
     const parsed = ReportMatchAnswerRequest.safeParse(raw);
@@ -467,7 +468,15 @@ export class ReportService {
     return parsed.data;
   }
 
-  async myReports(q: Queryable, userId: string, limit = MY_REPORTS_LIMIT): Promise<MyReportView[]> {
+  /** Reportes propios por páginas (ADR 0287): cursor = id del último recibido, comparado por `(received_at, id)`. */
+  async myReports(q: Queryable, userId: string, raw: unknown = {}): Promise<MyReportsResponse> {
+    const parsed = MyReportsQuery.safeParse(raw ?? {});
+    if (!parsed.success) throw new DomainError("VALIDATION", parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; "));
+    const { cursor, limit } = parsed.data;
+    // El cursor tiene que ser un reporte propio: el de otra persona no sirve ni para saber su fecha.
+    if (cursor && !(await q.query(`SELECT 1 FROM report.reports WHERE id = $1 AND author_user_id = $2`, [cursor, userId])).rowCount) {
+      throw new DomainError("VALIDATION", "Cursor inválido");
+    }
     const { rows } = await q.query<{
       id: string; post_id: string; event_id: string | null; category_code: string; assertion: ReportAssertion; status: MyReportView["status"];
       captured_at: Date; received_at: Date; captured_offline: boolean; expires_at: Date | null; generalized_at: Date | null; reviews: number;
@@ -476,11 +485,13 @@ export class ReportService {
               p.expires_at, p.generalized_at,
               (SELECT count(*) FROM report.presence_access_log l WHERE l.report_id = r.id)::int AS reviews
          FROM report.reports r LEFT JOIN report.presence_evidence p ON p.report_id = r.id
-        WHERE r.author_user_id = $1 ORDER BY r.received_at DESC, r.id DESC LIMIT $2`,
-      [userId, limit],
+        WHERE r.author_user_id = $1
+          AND ($3::uuid IS NULL OR (r.received_at, r.id) < (SELECT c.received_at, c.id FROM report.reports c WHERE c.id = $3))
+        ORDER BY r.received_at DESC, r.id DESC LIMIT $2`,
+      [userId, limit, cursor ?? null],
     );
     const pending = await this.d.events.pendingMatchQuestions(q, rows.filter((r) => r.status === "ACCEPTED").map((r) => r.id));
-    return rows.map((r) => ({
+    const reports = rows.map((r) => ({
       id: r.id,
       askSameEvent: pending.has(r.id),
       // El post de un reporte retirado ya no existe.
@@ -496,6 +507,7 @@ export class ReportService {
       preciseLocationRemovedAt: r.generalized_at?.toISOString() ?? null,
       presenceReviews: r.reviews,
     }));
+    return { reports, nextCursor: reports.length === limit ? reports[reports.length - 1]!.id : null };
   }
 
   // ───────────── Exportación de datos personales (ADR 0038) ─────────────
@@ -536,8 +548,6 @@ function textHash(text: string | undefined): string | null {
   return f ? createHash("sha256").update(f).digest("hex").slice(0, 32) : null;
 }
 
-/** Cuántos reportes muestra "Mis reportes": con 10 por hora como máximo, cubre semanas de uso intenso. */
-export const MY_REPORTS_LIMIT = 200;
 
 /** Consultas de evidencia de presencia por persona de moderación y hora (ADR 0089). */
 export const PRESENCE_ACCESS_PER_HOUR = 30;

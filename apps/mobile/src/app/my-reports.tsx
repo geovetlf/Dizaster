@@ -9,6 +9,7 @@ import { canWithdraw, myReportLines, queuedState } from "../lib/report/my-report
 import { discardQueuedReport, reportQueue, retryQueuedReport } from "../lib/report/outbox";
 import type { QueuedReport } from "../lib/report/queue";
 import { formatInZone, timeAgo } from "../lib/ui/format";
+import { appendPage } from "../lib/ui/pages";
 import { colors, radius, space } from "../theme";
 import { categoryLabel } from "../lib/category-store";
 import { askSameEvent } from "../lib/report/same-event";
@@ -22,10 +23,22 @@ export default function MyReportsScreen() {
   const [error, setError] = useState<string | null>(null);
   // Lo que sigue en el teléfono (ADR 0158): sin red, reintentando o detenido. Nunca se borra sin preguntar.
   const [queued, setQueued] = useState<QueuedReport[]>([]);
+  // Por páginas (ADR 0287): al llegar al final se piden los anteriores.
+  const [next, setNext] = useState<string | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
   const load = useCallback(() => {
     reportQueue.pending().then(setQueued).catch(() => setQueued([]));
-    api.myReports().then((r) => setReports(r.reports)).catch((e: Error) => setError(e.message));
+    api.myReports().then((r) => { setReports(r.reports); setNext(r.nextCursor); }).catch((e: Error) => setError(e.message));
   }, []);
+
+  function loadMore() {
+    if (!next || loadingMore) return;
+    setLoadingMore(true);
+    api.myReports(next)
+      .then((r) => { setReports((prev) => appendPage(prev ?? [], r.reports)); setNext(r.nextCursor); })
+      .catch(() => setError(t("loadError")))
+      .finally(() => setLoadingMore(false));
+  }
 
   function confirmDiscard(q: QueuedReport) {
     Alert.alert(t("queuedDiscard"), t("queuedDiscardConfirm"), [
@@ -69,6 +82,8 @@ export default function MyReportsScreen() {
       keyExtractor={(r) => r.id}
       ListHeaderComponent={<>{queuedHeader}{error ? <Text style={styles.error}>{error}</Text> : null}</>}
       ListEmptyComponent={reports ? <Text style={styles.meta}>{t("myReportsEmpty")}</Text> : null}
+      onEndReached={loadMore}
+      onEndReachedThreshold={0.5}
       renderItem={({ item }) => (
         <View style={styles.card}>
           <Text style={styles.title}>{categoryName(item.categoryCode)} · {timeAgo(item.capturedAt, lang)}</Text>
