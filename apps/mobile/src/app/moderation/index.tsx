@@ -5,8 +5,8 @@ import { FlatList, Pressable, RefreshControl, StyleSheet, Text, TextInput, View 
 import { LoadState } from "../../components/load-state";
 import { api } from "../../lib/api";
 import { useRoles } from "../../lib/auth/roles";
-import { lang, t } from "../../lib/i18n";
-import { actionReasonText, reasonSummary, validReason } from "../../lib/moderation/logic";
+import { lang, t, verificationLabel } from "../../lib/i18n";
+import { actionReasonText, reasonSummary, targetStateText, validReason } from "../../lib/moderation/logic";
 import { eventTitle, timeAgo } from "../../lib/ui/format";
 import { appendPage } from "../../lib/ui/pages";
 import { colors, radius, space } from "../../theme";
@@ -88,7 +88,7 @@ export default function ModerationScreen() {
             <Pressable accessibilityRole="link" style={styles.row} onPress={() => router.push(`/moderation/${item.id}`)}>
               <View style={styles.priority}><Text style={styles.priorityText}>{Math.round(item.priority)}</Text></View>
               <View style={styles.body}>
-                <Text style={styles.kind}>{item.target.type} · {item.target.state}</Text>
+                <Text style={styles.kind}>{t(`trTarget_${item.target.type}`)} · {targetStateText(item.target.type, item.target.state, t, verificationLabel)}</Text>
                 <Text style={styles.text} numberOfLines={2}>{item.target.text ?? "—"}</Text>
                 <Text style={styles.meta}>{reasonSummary(item.reasons, (r) => t(`reason_${r}`))} · {timeAgo(item.openedAt, lang)}</Text>
               </View>

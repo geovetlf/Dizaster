@@ -359,18 +359,26 @@ export class ReportService {
     });
   }
 
-  /** Registro de accesos para administración (quién consultó qué y por qué), más reciente primero. */
-  async presenceAccessLog(q: Queryable, filter: { reportId?: string; actorUserId?: string; limit: number }): Promise<PresenceAccessEntry[]> {
+  /** Registro de accesos para administración (quién consultó qué y por qué), más reciente primero, por páginas (ADR 0299). */
+  async presenceAccessLog(q: Queryable, filter: { reportId?: string; actorUserId?: string; cursor?: string; limit: number }): Promise<{ entries: PresenceAccessEntry[]; nextCursor: string | null }> {
+    if (filter.cursor) {
+      const known = await q.query(`SELECT 1 FROM report.presence_access_log WHERE id = $1`, [filter.cursor]);
+      if (!known.rowCount) throw new DomainError("VALIDATION", "Cursor inválido");
+    }
     const { rows } = await q.query<{ id: string; report_id: string; actor_user_id: string; reason: string; case_id: string | null; precise_shown: boolean; accessed_at: Date }>(
       `SELECT id, report_id, actor_user_id, reason, case_id, precise_shown, accessed_at FROM report.presence_access_log
         WHERE ($1::uuid IS NULL OR report_id = $1) AND ($2::uuid IS NULL OR actor_user_id = $2)
-        ORDER BY accessed_at DESC, id DESC LIMIT $3`,
-      [filter.reportId ?? null, filter.actorUserId ?? null, filter.limit],
+          AND ($3::uuid IS NULL OR (accessed_at, id) < (SELECT c.accessed_at, c.id FROM report.presence_access_log c WHERE c.id = $3))
+        ORDER BY accessed_at DESC, id DESC LIMIT $4`,
+      [filter.reportId ?? null, filter.actorUserId ?? null, filter.cursor ?? null, filter.limit],
     );
-    return rows.map((r) => ({
-      id: r.id, reportId: r.report_id, actorUserId: r.actor_user_id, reason: r.reason, caseId: r.case_id, preciseShown: r.precise_shown,
-      accessedAt: r.accessed_at.toISOString(),
-    }));
+    return {
+      entries: rows.map((r) => ({
+        id: r.id, reportId: r.report_id, actorUserId: r.actor_user_id, reason: r.reason, caseId: r.case_id, preciseShown: r.precise_shown,
+        accessedAt: r.accessed_at.toISOString(),
+      })),
+      nextCursor: rows.length === filter.limit ? rows[rows.length - 1]!.id : null,
+    };
   }
 
   /** Post de un reporte (para que "borrar" un post propio de tipo REPORT lo retire). */

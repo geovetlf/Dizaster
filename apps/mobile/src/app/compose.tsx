@@ -13,6 +13,7 @@ import { uploadErrorText } from "../lib/media/upload-errors";
 import { composeProblem } from "../lib/social/compose";
 import { colors, radius, space } from "../theme";
 import { UpdateRequired, useUpdateRequirement } from "../components/update-required";
+import { ErrorText } from "../components/error-text";
 
 /**
  * Publicar sin reporte (D-03): opinión, apoyo o noticia, desde cualquier lugar. Si se abre desde un evento lo
@@ -29,6 +30,7 @@ export default function ComposeScreen() {
   const [pseudonymous, setPseudonymous] = useState(false);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   // "Publicar como": yo o uno de mis negocios. Un negocio nunca publica de forma seudónima.
   const [businesses, setBusinesses] = useState<BusinessView[]>([]);
   // Versión por debajo de la mínima (ADR 0164): no se envía; emergencias sigue a mano.
@@ -43,7 +45,8 @@ export default function ComposeScreen() {
   const problem = sharing ? null : composeProblem(text, media);
 
   async function publish() {
-    if (problem) return setStatus(t(problem));
+    if (problem) return setError(t(problem));
+    setError(null);
     setBusy(true);
     setStatus(media.length ? t("uploadingMedia") : null);
     try {
@@ -63,7 +66,8 @@ export default function ComposeScreen() {
       for (const m of media) discardLocal(m);
       router.back();
     } catch (e) {
-      setStatus((e as Error).message || t("publishError"));
+      setStatus(null);
+      setError((e as Error).message || t("publishError"));
     } finally {
       setBusy(false);
     }
@@ -113,6 +117,7 @@ export default function ComposeScreen() {
         <Text style={styles.sendText}>{busy ? t("sending") : t("publish")}</Text>
       </Pressable>
       {status ? <Text style={styles.status}>{status}</Text> : null}
+      {error ? <ErrorText style={styles.error}>{error}</ErrorText> : null}
     </ScrollView>
   );
 }
@@ -133,4 +138,5 @@ const styles = StyleSheet.create({
   disabled: { opacity: 0.5 },
   sendText: { color: colors.white, fontWeight: "700", fontSize: 16 },
   status: { color: colors.textMuted, marginTop: space.sm },
+  error: { color: colors.accentText, marginTop: space.sm },
 });

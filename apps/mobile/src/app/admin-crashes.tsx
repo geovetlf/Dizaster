@@ -3,7 +3,7 @@ import { useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import { api } from "../lib/api";
-import { lang, t } from "../lib/i18n";
+import { lang, t, tf } from "../lib/i18n";
 import { timeAgo } from "../lib/ui/format";
 import { colors, radius, space } from "../theme";
 import { ErrorText } from "../components/error-text";
@@ -34,7 +34,7 @@ export default function AdminCrashesScreen() {
             {PERIODS.map((d) => (
               <Pressable key={d} accessibilityRole="button" accessibilityState={{ selected: d === days }} onPress={() => setDays(d)}
                 style={[styles.chip, d === days && styles.chipOn]}>
-                <Text style={styles.chipText}>{d === 1 ? "24 h" : `${d} d`}</Text>
+                <Text style={styles.chipText}>{d === 1 ? t("period24h") : tf("periodDays", { n: d })}</Text>
               </Pressable>
             ))}
           </View>

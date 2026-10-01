@@ -6,9 +6,10 @@ import { api } from "../lib/api";
 import { useRoles } from "../lib/auth/roles";
 import { parseUsd } from "../lib/admin/admin-tools";
 import { validReason } from "../lib/admin/sources-format";
-import { barHeights, budgetTone, formatBytes, formatUnits, formatUsd, moduleRows } from "../lib/admin/cost-format";
+import { barHeights, budgetLabel, budgetTone, formatBytes, formatUnits, formatUsd, moduleRows } from "../lib/admin/cost-format";
 import { lang, t, tf } from "../lib/i18n";
 import { colors, radius, space } from "../theme";
+import { ErrorText } from "../components/error-text";
 
 const RANGES = [7, 30, 90] as const;
 const TONE = { ok: "#22C55E", warn: "#FACC15", high: "#F97316", over: colors.accent } as const;
@@ -56,7 +57,7 @@ export default function AdminCostScreen() {
           </Pressable>
         ))}
       </View>
-      {!d ? <Text style={styles.note}>{error ? t("loadError") : ""}</Text> : (
+      {!d ? (error ? <ErrorText>{t("loadError")}</ErrorText> : null) : (
         <>
           <View style={styles.card}>
             <Text style={styles.label}>{t("costTotal")}</Text>
@@ -97,7 +98,7 @@ export default function AdminCostScreen() {
             <View key={b.key}>
               <Pressable accessibilityRole={isAdmin ? "button" : "text"} disabled={!isAdmin} style={styles.row} onPress={() => setEditing(editing === b.key ? null : b.key)}>
                 <View style={[styles.dot, { backgroundColor: TONE[budgetTone(b.percent)] }]} />
-                <Text style={styles.rowLabel}>{b.key} · {b.period === "DAILY" ? "24 h" : t("costMonth")}</Text>
+                <Text style={styles.rowLabel}>{budgetLabel(b.key, t)} · {b.period === "DAILY" ? t("period24h") : t("costMonth")}</Text>
                 <Text style={styles.amount}>{usd(b.spentUsd)} / {usd(b.limitUsd)}</Text>
               </Pressable>
               {isAdmin && editing === b.key ? <BudgetEditor budget={b} reason={reason.trim()} onSaved={() => { setEditing(null); void load(days); }} /> : null}
@@ -143,12 +144,12 @@ function BudgetEditor({ budget, reason, onSaved }: { budget: BudgetView; reason:
       <View style={styles.ranges}>
         {(["DAILY", "MONTHLY"] as const).map((p) => (
           <Pressable key={p} accessibilityRole="button" accessibilityState={{ selected: p === period }} style={[styles.range, p === period && styles.rangeOn]} onPress={() => setPeriod(p)}>
-            <Text style={styles.rangeText}>{p === "DAILY" ? "24 h" : t("costMonth")}</Text>
+            <Text style={styles.rangeText}>{p === "DAILY" ? t("period24h") : t("costMonth")}</Text>
           </Pressable>
         ))}
       </View>
       <TextInput accessibilityLabel={t("budgetAmount")} value={text} onChangeText={setText} keyboardType="decimal-pad" placeholder="USD" placeholderTextColor={colors.textMuted} style={styles.input} />
-      {error ? <Text style={styles.note}>{error}</Text> : null}
+      {error ? <ErrorText>{error}</ErrorText> : null}
       <Pressable accessibilityRole="button" disabled={value === null} style={[styles.save, value === null && styles.disabled]} onPress={save}>
         <Text style={styles.rangeText}>{t("apply")}</Text>
       </Pressable>

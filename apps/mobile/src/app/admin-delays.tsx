@@ -7,6 +7,7 @@ import { validReason } from "../lib/admin/sources-format";
 import { api } from "../lib/api";
 import { lang, t } from "../lib/i18n";
 import { colors, radius, space } from "../theme";
+import { ErrorText } from "../components/error-text";
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const catalog = require("../reference-data/categories.json") as CategoryCatalog;
@@ -48,7 +49,8 @@ export default function AdminDelaysScreen() {
       keyboardShouldPersistTaps="handled"
       ListHeaderComponent={
         <View style={styles.header}>
-          <Text style={error ? styles.error : styles.meta}>{error ?? t("delayHint")}</Text>
+          <Text style={styles.meta}>{t("delayHint")}</Text>
+          {error ? <ErrorText style={styles.error}>{error}</ErrorText> : null}
           <TextInput accessibilityLabel={t("actionReason")} value={reason} onChangeText={setReason} maxLength={500} placeholder={t("actionReason")} placeholderTextColor={colors.textMuted} style={[styles.input, styles.reason]} />
         </View>
       }
