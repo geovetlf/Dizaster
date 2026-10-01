@@ -1,10 +1,6 @@
 # Estado de la implementación
 
-<<<<<<< ours
 Actualizado: 2026-10-01 (hasta ADR 0296; auditoría de preparación en `docs/PRODUCTION_READINESS_REPORT.md`). Informe de preparación para producción: `docs/PRODUCTION_READINESS_REPORT.md`.
-=======
-Actualizado: 2026-10-01 (hasta ADR 0295; auditoría de preparación en `docs/PRODUCTION_READINESS_REPORT.md`). Informe de preparación para producción: `docs/PRODUCTION_READINESS_REPORT.md`.
->>>>>>> theirs
 
 ## Etapa 1 — Fundación (hecha)
 
