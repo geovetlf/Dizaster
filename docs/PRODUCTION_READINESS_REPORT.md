@@ -1,6 +1,6 @@
 # DIZASTER PRODUCTION READINESS AUDIT
 
-Fecha: 2026-09-30 · Código hasta ADR 0298 · Migraciones 0001–0105 · 285 commits
+Fecha: 2026-09-30 · Código hasta ADR 0299 · Migraciones 0001–0105 · 285 commits
 
 Esta auditoría compara el Blueprint con los ADR, el código y las pruebas. Solo se marca un bloqueo cuando está
 escrito qué falta y quién lo da. No se inventan decisiones, límites, precios ni capacidades. El procedimiento exacto

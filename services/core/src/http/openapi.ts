@@ -158,7 +158,7 @@ export const OPERATIONS: Record<string, Operation> = {
   "POST /v1/me/mfa/verify": { summary: "Verificar esta sesión con TOTP o código de recuperación", body: C.MfaVerifyRequest },
   "POST /v1/me/mfa/totp/disable": { summary: "Desactivar el autenticador (exige un código)", body: C.MfaCodeRequest },
   "POST /v1/moderation/posts/:id/presence": { summary: "Ver la evidencia de presencia de un reporte, con motivo auditado (moderación)", body: C.PresenceReviewRequest },
-  "GET /v1/admin/presence-access": { summary: "Registro de accesos a evidencia de presencia (admin)" },
+  "GET /v1/admin/presence-access": { summary: "Registro de accesos a evidencia de presencia (admin, filtros y cursor)", query: C.PresenceAccessQuery },
   "POST /v1/moderation/cases/:id/actions": { summary: "Tomar una acción", body: C.TakeActionRequest },
   "GET /v1/moderation/appeals": { summary: "Apelaciones por estado, paginadas con cursor" },
   "POST /v1/moderation/appeals/:id/decision": { summary: "Decidir una apelación", body: C.DecideAppealRequest },

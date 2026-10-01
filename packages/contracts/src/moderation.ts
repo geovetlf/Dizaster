@@ -164,11 +164,23 @@ export interface PresenceAccessEntry {
   id: string;
   reportId: string;
   actorUserId: string;
+  /** Usuario de quien consultó, para leer el registro sin ids (ADR 0299); null si ya no tiene perfil. */
+  actorHandle?: string | null;
   reason: string;
   caseId: string | null;
   preciseShown: boolean;
   accessedAt: string;
 }
+
+/** Registro de consultas de presencia por páginas (ADR 0299): `cursor` = id de la última, por `(accessed_at, id)`. */
+export const PresenceAccessQuery = z.object({
+  reportId: z.uuid().optional(),
+  actorUserId: z.uuid().optional(),
+  cursor: z.uuid().optional(),
+  limit: z.coerce.number().int().min(1).max(200).default(100),
+});
+export type PresenceAccessQuery = z.infer<typeof PresenceAccessQuery>;
+export interface PresenceAccessResponse { entries: PresenceAccessEntry[]; nextCursor: string | null }
 
 // ───────────── MFA TOTP del personal (ADR 0090) ─────────────
 export interface MfaStatus {
