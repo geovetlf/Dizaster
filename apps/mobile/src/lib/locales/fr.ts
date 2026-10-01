@@ -698,6 +698,7 @@ export const fr: Record<MessageKey, string> = {
   exportPreparing: "Préparation…",
   exportFailed: "Impossible de préparer la copie de vos données. Réessayez dans une minute.",
   exportSaved: "Votre copie a été enregistrée sur l'appareil.",
+  exportPartial: "Vous avez beaucoup d'activité : la copie contient les 10 000 éléments les plus récents de chaque liste. Le fichier indique lesquelles ont été coupées.",
   withdrawReport: "Retirer le signalement",
   withdrawReportConfirm: "Votre signalement ne comptera plus pour l'événement et sera supprimé avec ses photos. S'il a déjà été jugé faux, cela reste dans votre historique.",
   why_CITIZEN_CORROBORATION: "Confirmations indépendantes sur place : {independentWeight} sur {threshold} nécessaires.",

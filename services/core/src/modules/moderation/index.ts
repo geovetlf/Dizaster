@@ -21,6 +21,7 @@ import {
   MyNoticesQuery,
   type MyNoticesResponse,
   type ModerationTargetPreview,
+  DATA_EXPORT_ROW_LIMIT,
 } from "@dizaster/contracts";
 import { z } from "zod";
 import { withTransaction, type Db, type Queryable } from "../../platform/db.js";
@@ -678,10 +679,10 @@ export class ModerationService {
   /** Acciones sobre mi contenido o cuenta, mis apelaciones y mis denuncias. Nunca quién me denunció. */
   async exportData(q: Queryable, who: { userId: string; profileId: string }): Promise<Record<string, unknown[]>> {
     const actions = await q.query(
-      `SELECT id, target_type, target_id, action, actor, reason, created_at FROM moderation.actions WHERE affected_user_id = $1 ORDER BY created_at DESC LIMIT 5000`, [who.userId],
+      `SELECT id, target_type, target_id, action, actor, reason, created_at FROM moderation.actions WHERE affected_user_id = $1 ORDER BY created_at DESC LIMIT ${DATA_EXPORT_ROW_LIMIT + 1}`, [who.userId],
     );
     const appeals = await q.query(`SELECT id, action_id, text, status, decision_reason, created_at, decided_at FROM moderation.appeals WHERE appellant_user_id = $1`, [who.userId]);
-    const flags = await q.query(`SELECT target_type, target_id, reason, note, created_at FROM moderation.flags WHERE reporter_profile_id = $1 ORDER BY created_at DESC LIMIT 5000`, [who.profileId]);
+    const flags = await q.query(`SELECT target_type, target_id, reason, note, created_at FROM moderation.flags WHERE reporter_profile_id = $1 ORDER BY created_at DESC LIMIT ${DATA_EXPORT_ROW_LIMIT + 1}`, [who.profileId]);
     return { actionsOnMyContent: actions.rows, appeals: appeals.rows, flagsISent: flags.rows };
   }
 }

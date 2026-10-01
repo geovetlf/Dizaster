@@ -698,6 +698,7 @@ export const pt: Record<MessageKey, string> = {
   exportPreparing: "Preparando…",
   exportFailed: "Não foi possível preparar a cópia dos seus dados. Tente novamente em um minuto.",
   exportSaved: "Sua cópia foi salva no dispositivo.",
+  exportPartial: "Você tem muita atividade: a cópia traz os 10.000 registros mais recentes de cada lista. O arquivo indica quais foram cortadas.",
   withdrawReport: "Retirar relato",
   withdrawReportConfirm: "Seu relato deixará de contar para o evento e será apagado com as fotos. Se já foi considerado falso, isso fica no seu histórico.",
   why_CITIZEN_CORROBORATION: "Confirmações independentes no local: {independentWeight} de {threshold} necessárias.",
