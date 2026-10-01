@@ -1,6 +1,6 @@
 # Estado de la implementación
 
-Actualizado: 2026-09-30 (hasta ADR 0288; auditoría de preparación en `docs/PRODUCTION_READINESS_REPORT.md`). Informe de preparación para producción: `docs/PRODUCTION_READINESS_REPORT.md`.
+Actualizado: 2026-10-01 (hasta ADR 0290; auditoría de preparación en `docs/PRODUCTION_READINESS_REPORT.md`). Informe de preparación para producción: `docs/PRODUCTION_READINESS_REPORT.md`.
 
 ## Etapa 1 — Fundación (hecha)
 
@@ -477,6 +477,7 @@ Actualizado: 2026-09-30 (hasta ADR 0288; auditoría de preparación en `docs/PRO
 | Cache-Control explícito y configurable en las variantes públicas de media (`MEDIA_PUBLIC_CACHE_CONTROL`, 1 h por defecto) (ADR 0286) | ✅ | §5.9, §12 |
 | "Mis reportes" por páginas con cursor propio; la app carga los anteriores al llegar al final (ADR 0287) | ✅ | §6.3, §13.1 |
 | Carril NORMAL escalonado: un minuto por fuente en el registro y prueba que impide horarios repetidos o inválidos (ADR 0288) | ✅ | §9.2 |
+| "Mis avisos de moderación" por páginas con cursor propio; la app carga los anteriores al llegar al final (ADR 0289) | ✅ | §6.3, §13.1, §13.3 |
 | Exportar mis datos: una vez por minuto y persona contando todas las réplicas, sin memoria que crezca (ADR 0290) | ✅ | §13.1, §13.2 |
 | Licencias, auditoría, SBOM, Dependabot; respaldo con prueba de restauración en CI | ✅ | ADR 0070, `scripts/supply-chain.mjs`, `scripts/db-restore-check.mjs` |
 | Idioma de la app elegible en el perfil (es/en/pt/fr o del teléfono) | ✅ | ADR 0069, `app/language.tsx` |
