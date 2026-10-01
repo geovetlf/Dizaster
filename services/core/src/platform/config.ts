@@ -31,6 +31,11 @@ const Env = z.object({
   /** Límite general por persona (o por IP sin sesión), por minuto (ADR 0047). */
   RATE_LIMIT_PER_MINUTE: z.coerce.number().int().positive().default(300),
   RATE_LIMIT_WRITES_PER_MINUTE: z.coerce.number().int().positive().default(60),
+  /**
+   * Búsquedas por minuto y persona (o IP sin sesión), aparte del límite general (ADR 0291): son las lecturas más caras
+   * y no piden sesión. La app lanza 6 por búsqueda tras 300 ms sin escribir; 120 da unas 20 búsquedas por minuto.
+   */
+  SEARCH_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().positive().default(120),
   /** Con más de una réplica de la API: contar el cupo por cuenta en PostgreSQL, compartido (ADR 0228). */
   RATE_LIMIT_SHARED: z.enum(["true", "false"]).default("false").transform((v) => v === "true"),
   /** Detrás de un CDN o balanceador: tomar la IP de X-Forwarded-For. Solo si ese proxy la fija. */
