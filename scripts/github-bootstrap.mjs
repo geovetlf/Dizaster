@@ -4,6 +4,9 @@
 // el repositorio ni pide ni guarda tokens.
 //
 //   node scripts/github-bootstrap.mjs --repo OWNER/REPO --owner LOGIN [--outputs tofu-outputs.json] [--execute]
+//   node scripts/github-bootstrap.mjs --repo OWNER/REPO --owner LOGIN --only rules [--execute]
+//
+// `--only rules` es para un repositorio que ya existe (ADR 0303): solo rulesets y entornos (pasos 3 y 4).
 //
 // Pasos: 1) política (signing.repository, owners) y CODEOWNERS; 2) push de main y etiquetas; 3) rulesets de main y de
 // etiquetas; 4) entornos staging y production (production con el propietario como revisor obligatorio);
@@ -15,6 +18,7 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 const args = process.argv.slice(2);
 const opt = (k) => { const i = args.indexOf(`--${k}`); return i >= 0 ? args[i + 1] : undefined; };
 const execute = args.includes("--execute");
+const onlyRules = opt("only") === "rules";
 const repo = opt("repo");
 const owner = opt("owner");
 if (!repo || !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repo) || !owner || !/^[A-Za-z0-9-]{1,39}$/.test(owner)) {
@@ -36,8 +40,8 @@ const nextPolicy = policy
   .replace(/"owners": \[[^\]]*\]/, `"owners": ["${owner}"]`);
 const codeowners = readFileSync(".github/CODEOWNERS.template", "utf8").replaceAll("@OWNER", `@${owner}`)
   .split("\n").filter((l) => !l.startsWith("# Plantilla")).join("\n");
-console.log(`${execute ? "▶" : "[en seco]"} delivery/policy.json: signing.repository = ${repo}, owners = [${owner}]; .github/CODEOWNERS`);
-if (execute) {
+if (!onlyRules) console.log(`${execute ? "▶" : "[en seco]"} delivery/policy.json: signing.repository = ${repo}, owners = [${owner}]; .github/CODEOWNERS`);
+if (execute && !onlyRules) {
   writeFileSync(policyPath, nextPolicy);
   writeFileSync(".github/CODEOWNERS", codeowners);
   run("git", ["add", policyPath, ".github/CODEOWNERS"]);
@@ -45,10 +49,12 @@ if (execute) {
 }
 
 // 2) Historia completa: main y etiquetas. Sin --force: si el remoto ya tiene commits, se detiene.
-const remotes = execute ? run("git", ["remote"]) : "";
-if (!remotes.split("\n").includes("origin")) run("git", ["remote", "add", "origin", `https://github.com/${repo}.git`]);
-run("git", ["push", "-u", "origin", "main"]);
-run("git", ["push", "origin", "--tags"]);
+if (!onlyRules) {
+  const remotes = execute ? run("git", ["remote"]) : "";
+  if (!remotes.split("\n").includes("origin")) run("git", ["remote", "add", "origin", `https://github.com/${repo}.git`]);
+  run("git", ["push", "-u", "origin", "main"]);
+  run("git", ["push", "origin", "--tags"]);
+}
 
 // 3) Rulesets (en repositorios privados requieren un plan de GitHub que los incluya: D-24).
 for (const f of [".github/rulesets/main.json", ".github/rulesets/tags.json"]) {
@@ -68,7 +74,9 @@ run("gh", ["api", "-X", "PUT", `repos/${repo}/environments/production`, "--input
 
 // 5) Variables no secretas de Actions (salidas de `tofu output -json` de cada entorno).
 const outputsPath = opt("outputs");
-if (outputsPath && existsSync(outputsPath)) {
+if (onlyRules) {
+  console.log("[omitido] variables de Actions (--only rules).");
+} else if (outputsPath && existsSync(outputsPath)) {
   const o = JSON.parse(readFileSync(outputsPath, "utf8"));
   const v = (env, k) => o[env]?.[k]?.value;
   const repoVars = { GCP_STAGING_REGISTRY: v("staging", "registry"), GCP_PRODUCTION_REGISTRY: v("production", "registry"), GCP_WIF_PROVIDER: v("staging", "wif_provider"), GCP_CI_SERVICE_ACCOUNT: v("staging", "ci_service_account") };

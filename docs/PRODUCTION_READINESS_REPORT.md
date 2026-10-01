@@ -1,6 +1,6 @@
 # DIZASTER PRODUCTION READINESS AUDIT
 
-Fecha: 2026-10-01 · Código hasta ADR 0302 · Migraciones 0001–0105 · Todo en `main` por PR (sin force push)
+Fecha: 2026-10-01 · Código hasta ADR 0303 · Migraciones 0001–0105 · Todo en `main` por PR (sin force push)
 
 Esta auditoría compara el Blueprint con los ADR, el código y las pruebas. Solo se marca un bloqueo cuando está
 escrito qué falta y quién lo da. No se inventan decisiones, límites, precios ni capacidades. El procedimiento exacto
@@ -35,7 +35,7 @@ tiendas y credenciales, decisiones de producto y revisión legal. Nada de eso lo
 
 | Verificación | Resultado |
 | --- | --- |
-| `pnpm check`: lint, fronteras de módulos, secretos, workflows, typecheck, build y pruebas | ✅ Pruebas: contracts 42, geo-kit 39, móvil 288, backend 647, delivery 90 |
+| `pnpm check`: lint, fronteras de módulos, secretos, workflows, typecheck, build y pruebas | ✅ Pruebas: contracts 42, geo-kit 39, móvil 288, backend 647, delivery 94 |
 | Empaquetado móvil iOS + Android (`bundle:check`) y paridad nativa | ✅ |
 | Migraciones 0001–0105 sobre PostgreSQL 16 + PostGIS + H3; restauración de respaldo | ✅ |
 | Gitleaks: historial (285 commits) y árbol de trabajo | ✅ sin hallazgos |
@@ -93,7 +93,7 @@ tiendas y credenciales, decisiones de producto y revisión legal. Nada de eso lo
 
 | Capacidad | Etiqueta | Evidencia / qué falta |
 | --- | --- | --- |
-| `dzd`: impacto, gates, política, autonomía, auditoría encadenada, informe, métricas | READY | 90 pruebas. Separado del runtime y del AI Core |
+| `dzd`: impacto, gates, política, autonomía, auditoría encadenada, informe, métricas | READY | 94 pruebas. Separado del runtime y del AI Core |
 | CI: gates, SBOM, escáneres, imagen con manifiesto | READY | En verde en GitHub Actions en cada PR (#10–#30) |
 | Repositorio oficial y push | READY | `geovetlf/Dizaster`, trabajo por ramas y PRs |
 | Informe de delivery en cada PR | READY | ADR 0284: un comentario que se actualiza en cada push |
@@ -179,6 +179,7 @@ fusionaron por PR, cada uno con `pnpm check` completo en local y los 7 checks de
 | #28 | 0300 | Errores visibles y anunciados en todas las pantallas |
 | #29 | 0301 | Códigos internos traducidos en moderación y administración |
 | #30 | 0302 | Historial completo del evento en moderación, con totales |
+| #32 | 0303 | Reglas de `main` y entornos listas para aplicar; guarda `dzd github-guard` en la entrega |
 
 Dependabot:
 
@@ -194,9 +195,9 @@ Cada paso dice quién lo hace. Nada se despliega por fusionar en `main`, porque 
 
 ### A. Antes de staging (costo 0)
 
-1. **Propietario:** autorizar las reglas de `main` y los entornos. **Agente:**
-   `node scripts/github-bootstrap.mjs --repo geovetlf/Dizaster --owner geovetlf --execute`. Con eso, `main` exige
-   PR y CI en verde, y `production` exige la aprobación del propietario. Ver el runbook, §1.
+1. **Propietario:** aplicar una vez las reglas de `main` y los entornos (autorizado el 2026-10-01; esta sesión no
+   puede escribirlas en GitHub). Son 4 pasos en el navegador, en el runbook §1. **Agente:** verificar que `main`
+   exige PR y los 7 checks, y que `production` exige la aprobación del propietario (ADR 0303).
 2. **Propietario:** crear una cuenta gratuita de Expo y cargar el secreto `EXPO_TOKEN` y la variable
    `DIZASTER_EXPO_OWNER`. **Agente:** `eas init` y luego `mobile-build` con el perfil `preview`, y entrega el APK.
    Ver el runbook, §2.
