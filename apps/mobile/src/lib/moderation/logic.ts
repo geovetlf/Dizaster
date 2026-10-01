@@ -1,4 +1,4 @@
-import type { FlagReason, FlagTargetType, Lang, ModerationActionType, ModerationActionView, PresenceReview } from "@dizaster/contracts";
+import type { FlagReason, FlagTargetType, Lang, ModerationActionType, ModerationActionView, ModerationNotice, PresenceReview } from "@dizaster/contracts";
 import type { MessageKey } from "../i18n";
 
 /** Motivos en el orden en que se muestran: primero los que ponen en riesgo a personas. */
@@ -63,4 +63,10 @@ export function presenceLines(v: PresenceReview, t: (k: "presenceBandLine" | "pr
 export function actionReasonText(a: Pick<ModerationActionView, "actor" | "action" | "reason">, lang: Lang, t: (k: MessageKey) => string): string {
   if (a.actor !== "RULE" || lang === "es") return a.reason;
   return t(a.action === "LIMIT" ? "ruleReason_LIMIT" : a.action === "HIDE" ? "ruleReason_HIDE" : "ruleReason_OTHER");
+}
+
+/** Añade una página de avisos sin repetir los que ya estaban (ADR 0289): una apelación recién enviada no se duplica. */
+export function appendNotices(prev: readonly ModerationNotice[], next: readonly ModerationNotice[]): ModerationNotice[] {
+  const seen = new Set(prev.map((n) => n.action.id));
+  return [...prev, ...next.filter((n) => !seen.has(n.action.id))];
 }
