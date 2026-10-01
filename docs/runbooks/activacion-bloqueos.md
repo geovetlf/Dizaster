@@ -10,18 +10,27 @@ Orden recomendado: 1 → 2 → 3 → 4 → 5. El resto no depende del orden.
 
 ## 1. Reglas de `main` y entornos (GitHub)
 
-- **Hecho (2026-09-30 y 2026-10-01):**
-  - La app de Claude está instalada.
-  - `main` tiene el historial completo, sin force push.
-  - Todo cambio entra por PR con CI en verde, y el agente fusiona sus propios PRs.
-- **Falta:** las reglas de `main` y los entornos `staging` y `production`. Hoy `main` no está protegida.
-- **Listo:** `.github/rulesets/`, `.github/CODEOWNERS` y `scripts/github-bootstrap.mjs`, que corre en seco.
-- **Propietario:** decir si se aplican ya las reglas de `main` (PR obligatorio y CI en verde) y los entornos.
-- **Agente:** con tu visto bueno, `node scripts/github-bootstrap.mjs --repo geovetlf/Dizaster --owner geovetlf --execute`.
-  Aplica los rulesets y los entornos `staging` y `production`, este último contigo como revisor obligatorio.
-- **Verificación:** los rulesets aparecen en Settings → Rules y `main` figura como protegida.
-- **Plan de GitHub (D-24):** en repositorios privados, los rulesets y los revisores obligatorios de entornos dependen
-  del plan. Si el plan no los incluye, GitHub rechaza esos pasos y se informa. El código no cambia.
+- **Autorizado** por el propietario el 2026-10-01 03:17. Diseño en ADR 0303.
+- **Listo en el repositorio:**
+  - `.github/rulesets/main.json`: PR obligatorio, los 7 checks de GitHub Actions al día con `main`, historial lineal,
+    sin force push, sin borrado y sin bypass para nadie;
+  - `.github/rulesets/tags.json`: etiquetas `v*` inmutables;
+  - `deliver.yml` se detiene si esas reglas o el entorno `production` faltan (`dzd github-guard`).
+- **Bloqueado para el agente:** esta sesión no puede escribir reglas ni entornos en GitHub (ADR 0303, "Limitación").
+- **Propietario, una sola vez, desde el navegador (también en el teléfono):**
+  1. Descargar `.github/rulesets/main.json` y `.github/rulesets/tags.json` de `main`.
+  2. Settings → Rules → Rulesets → New ruleset → Import a ruleset: importar `main.json` y guardar. Repetir con
+     `tags.json`. No añadir nada a "Bypass list".
+  3. Settings → Environments → New environment `staging`. En "Deployment branches and tags", elegir "Protected
+     branches only". Guardar.
+  4. New environment `production`. Marcar "Required reviewers" y poner `geovetlf`. En "Deployment branches and tags",
+     elegir "Protected branches only". Guardar.
+
+  Con `gh` en un ordenador, los pasos 2 a 4 son
+  `node scripts/github-bootstrap.mjs --repo geovetlf/Dizaster --owner geovetlf --only rules --execute`.
+- **Agente, después:** comprueba que `main` figura como protegida, pasa `dzd github-guard` contra la API y abre un PR
+  de prueba para confirmar que no se puede fusionar sin los 7 checks.
+- **Desde ese momento** el agente fusiona solo con `squash` (o `rebase` en Dependabot) y con los 7 checks en verde.
 
 ## 2. EXPO_TOKEN (primer build de iOS y Android)
 

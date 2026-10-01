@@ -15,6 +15,7 @@ import { costGate } from "./cost.js";
 import { rollbackTo, rollout, type DeployTarget } from "./deploy.js";
 import { diagnose } from "./diagnose.js";
 import { checkEnvironment } from "./envcheck.js";
+import { checkGithubGuards, requiredChecksOf } from "./github-guard.js";
 import { checkDocs } from "./docs.js";
 import { checkIamHcl, checkPlan, type TofuPlan } from "./iac.js";
 import { runLoad } from "./load.js";
@@ -320,6 +321,19 @@ switch (cmd) {
     if (findings.some((x) => x.severity === "block")) process.exit(1);
     break;
   }
+  case "github-guard": {
+    // Reglas efectivas de main y, con --production, el entorno production, tal como los devuelve la API (ADR 0303).
+    const production = flag("production");
+    const findings = checkGithubGuards({
+      branchRules: readJson(flag("rules") ?? fail("--rules es obligatorio")),
+      requiredChecks: requiredChecksOf(readJson(flag("ruleset", ".github/rulesets/main.json")!)),
+      owners: loadPolicy(flag("policy")).owners,
+      ...(production ? { production: readJson(production) } : {}),
+    });
+    out(findings, () => findings.map((x) => `${x.severity}: ${x.where} — ${x.message}`).join("\n") || "GitHub: main protegida" + (production ? " y production con aprobación del owner" : ""));
+    if (findings.length) process.exit(1);
+    break;
+  }
   case "provenance": {
     const policy = loadPolicy(flag("policy"));
     if (rest[0] === "verify") {
@@ -460,6 +474,6 @@ switch (cmd) {
     break;
   }
   default:
-    console.log("uso: dzd <inspect|plan|policy|run-gates|autonomy|audit [verify|stats]|artifact [verify]|verify [--repeat N --slo]|slo|env-check|provenance [verify]|signature verify|iac-check|diagnose|docs|report|cost|config-check|deploy|promote|rollback [--env local]|local-proxy|load|agent [run]> [--json]");
+    console.log("uso: dzd <inspect|plan|policy|run-gates|autonomy|audit [verify|stats]|artifact [verify]|verify [--repeat N --slo]|slo|env-check|github-guard|provenance [verify]|signature verify|iac-check|diagnose|docs|report|cost|config-check|deploy|promote|rollback [--env local]|local-proxy|load|agent [run]> [--json]");
     if (cmd) process.exit(1);
 }
