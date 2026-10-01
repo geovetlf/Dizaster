@@ -9,6 +9,7 @@ import { lang, t } from "../lib/i18n";
 import { actionReasonText, appendNotices, validReason } from "../lib/moderation/logic";
 import { timeAgo } from "../lib/ui/format";
 import { colors, radius, space } from "../theme";
+import { ErrorText } from "../components/error-text";
 
 /** Transparencia: qué se hizo con mi contenido o mi cuenta, por qué, y apelación (la revisa otra persona). */
 export default function MyModerationScreen() {
@@ -69,7 +70,7 @@ function Notice({ notice, onChange }: { notice: ModerationNotice; onChange: (n: 
       {open ? (
         <>
           <TextInput accessibilityLabel={t("appealText")} value={text} onChangeText={setText} multiline maxLength={1000} placeholder={t("appealText")} placeholderTextColor={colors.textMuted} style={styles.input} />
-          {error ? <Text style={styles.error}>{error}</Text> : null}
+          {error ? <ErrorText style={styles.error}>{error}</ErrorText> : null}
           <Pressable accessibilityRole="button" disabled={!validReason(text)} style={[styles.button, !validReason(text) && styles.disabled]} onPress={() => void send()}>
             <Text style={styles.buttonText}>{t("appeal")}</Text>
           </Pressable>

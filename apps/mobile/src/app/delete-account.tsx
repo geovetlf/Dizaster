@@ -6,6 +6,7 @@ import { deleteConfirmed } from "../lib/auth/refresh";
 import { t } from "../lib/i18n";
 import { useSession } from "../lib/session";
 import { colors, radius, space } from "../theme";
+import { ErrorText } from "../components/error-text";
 
 /**
  * Borrar la cuenta desde la app (exigido por App Store y Google Play). Explica qué pasa con cada cosa y pide
@@ -48,7 +49,7 @@ export default function DeleteAccountScreen() {
         accessibilityLabel={t("deleteAccountType")}
         style={styles.input}
       />
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+      {error ? <ErrorText style={styles.error}>{error}</ErrorText> : null}
       <Pressable accessibilityRole="button" disabled={!ok || busy} style={[styles.button, (!ok || busy) && styles.disabled]} onPress={() => void remove()}>
         <Text style={styles.buttonText}>{t("deleteAccountButton")}</Text>
       </Pressable>

@@ -8,6 +8,7 @@ import { t } from "../../lib/i18n";
 import { Avatar } from "../../components/avatar";
 import { alertFailure, confirmBlock, openFlag } from "../../lib/moderation/menu";
 import { colors, radius, space } from "../../theme";
+import { ErrorText } from "../../components/error-text";
 
 /** Perfil público: solo publicaciones con autoría pública (los reportes seudónimos nunca aparecen aquí). */
 export default function PublicProfileScreen() {
@@ -79,7 +80,7 @@ export default function PublicProfileScreen() {
     [profile],
   );
 
-  if (error) return <Text style={styles.error}>{error}</Text>;
+  if (error) return <ErrorText style={styles.error}>{error}</ErrorText>;
   return (
     <View style={styles.container}>
       <Stack.Screen options={{ title: profile ? `@${profile.handle}` : "" }} />

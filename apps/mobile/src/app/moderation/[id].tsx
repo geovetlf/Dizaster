@@ -8,6 +8,7 @@ import { lang, t } from "../../lib/i18n";
 import { actionReasonText, actionsFor, isSevere, presenceLines, reasonSummary, validReason } from "../../lib/moderation/logic";
 import { timeAgo } from "../../lib/ui/format";
 import { colors, radius, space } from "../../theme";
+import { ErrorText } from "../../components/error-text";
 
 /** Un caso: qué se denunció, por qué, qué se hizo, y las acciones posibles (con motivo obligatorio). */
 export default function CaseScreen() {
@@ -75,7 +76,7 @@ export default function CaseScreen() {
     ]);
   }
 
-  if (!c) return <View style={styles.container}>{error ? <Text style={styles.error}>{error}</Text> : null}</View>;
+  if (!c) return <View style={styles.container}>{error ? <ErrorText style={styles.error}>{error}</ErrorText> : null}</View>;
   const ok = validReason(reason);
   return (
     <ScrollView automaticallyAdjustKeyboardInsets style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
@@ -116,7 +117,7 @@ export default function CaseScreen() {
       ))}
 
       <TextInput accessibilityLabel={t("actionReason")} value={reason} onChangeText={setReason} multiline maxLength={1000} placeholder={t("actionReason")} placeholderTextColor={colors.textMuted} style={styles.input} />
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+      {error ? <ErrorText style={styles.error}>{error}</ErrorText> : null}
       {presence ? presenceLines(presence, t).map((l) => <Text key={l} style={styles.meta}>{l}</Text>) : null}
       <View style={styles.actions}>
         {c.target.type === "POST" && !presence ? (

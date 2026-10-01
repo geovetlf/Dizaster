@@ -8,6 +8,7 @@ import { api } from "../lib/api";
 import { countryOf } from "../lib/geo/country";
 import { t, tf } from "../lib/i18n";
 import { colors, radius, space } from "../theme";
+import { ErrorText } from "../components/error-text";
 
 /**
  * Edad mínima (D-13, ADR 0049): se pide año y mes de nacimiento antes de publicar. Solo se envían al servidor para
@@ -83,7 +84,7 @@ export default function AgeCheckScreen() {
         ))}
       </View>
       <Text style={styles.hint}>{t("ageNotStored")}</Text>
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+      {error ? <ErrorText style={styles.error}>{error}</ErrorText> : null}
       <Pressable accessibilityRole="button" disabled={!valid || busy} onPress={() => void submit()} style={[styles.primary, (!valid || busy) && styles.disabled]}>
         <Text style={styles.primaryText}>{t("ageContinue")}</Text>
       </Pressable>
