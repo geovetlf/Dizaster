@@ -1,6 +1,6 @@
 # Estado de la implementación
 
-Actualizado: 2026-09-30 (hasta ADR 0284; auditoría de preparación en `docs/PRODUCTION_READINESS_REPORT.md`). Informe de preparación para producción: `docs/PRODUCTION_READINESS_REPORT.md`.
+Actualizado: 2026-09-30 (hasta ADR 0285; auditoría de preparación en `docs/PRODUCTION_READINESS_REPORT.md`). Informe de preparación para producción: `docs/PRODUCTION_READINESS_REPORT.md`.
 
 ## Etapa 1 — Fundación (hecha)
 
@@ -473,6 +473,7 @@ Actualizado: 2026-09-30 (hasta ADR 0284; auditoría de preparación en `docs/PRO
 | Destino local de entrega (Docker + proxy de tráfico), `dzd load`, k6 `infra/load/smoke.js`, 429 separados de 5xx en el SLO; ensayo completo con rollback (ADR 0282) | ✅ | sin nube |
 | Delivery Agent opcional: interfaz, ejecutor que valida cada paso y agente de reglas determinístico; `dzd agent [run]` (ADR 0283) | ✅ | sin IA |
 | Informe de delivery como comentario único del PR, job sin checkout con `pull-requests: write` (ADR 0284) | ✅ | fase D1 |
+| Errores de subida como códigos traducidos al mostrarlos; distancias de eventos cercanos en metros, pies o millas con el decimal de la región (ADR 0285) | ✅ | §5.15 |
 | Licencias, auditoría, SBOM, Dependabot; respaldo con prueba de restauración en CI | ✅ | ADR 0070, `scripts/supply-chain.mjs`, `scripts/db-restore-check.mjs` |
 | Idioma de la app elegible en el perfil (es/en/pt/fr o del teléfono) | ✅ | ADR 0069, `app/language.tsx` |
 | Varias cuentas en un teléfono corroboran como una (clave seudónima del teléfono) | ✅ | ADR 0068, migración 0036 |

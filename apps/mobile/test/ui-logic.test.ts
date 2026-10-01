@@ -143,5 +143,13 @@ describe("unidades (ADR 0044)", () => {
     expect(formatKm(25, "imperial")).toBe("16 mi");
     expect(distanceLabel("<2km", "en", "imperial")).toBe("within 1.2 mi");
     expect(distanceLabel(">25km", "es", "metric")).toBe("a más de 25 km");
+    // Tramos en metros del contrato de eventos cercanos y decimales del idioma (ADR 0285).
+    expect(distanceLabel("<100m", "es", "metric")).toBe("a menos de 100 m");
+    expect(distanceLabel("<500m", "en", "imperial")).toBe("within 1,640 ft");
+    expect(distanceLabel("<100m", "fr", "imperial")).toBe("à moins de 330 ft");
+    expect(distanceLabel(">2km", "pt", "metric")).toBe("a mais de 2 km");
+    expect(distanceLabel("<2km", "es", "imperial")).toBe("a menos de 1.2 mi"); // es-PE usa punto decimal
+    expect(formatKm(5, "imperial", "fr")).toBe("3,1 mi");
+    expect(distanceLabel("cerca", "es")).toBeNull();
   });
 });

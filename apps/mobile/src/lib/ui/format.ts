@@ -11,13 +11,6 @@ let units: Units = "metric";
 /** Unidades de la persona (ADR 0044); se fijan al cargar su perfil. */
 export function setUnits(u: Units) { units = u; }
 
-/** "5 km" o, en imperial, "3.1 mi". */
-export function formatKm(km: number, u: Units = units): string {
-  if (u === "metric") return `${km} km`;
-  const mi = km * 0.621371;
-  return `${mi < 10 ? Math.round(mi * 10) / 10 : Math.round(mi)} mi`;
-}
-
 /** "Hace 12 min", "Hace 3 h", "Hace 2 d" (Language Engine, ADR 0216). */
 export function timeAgo(iso: string, lang: Lang, now = new Date()): string {
   return formatTimeAgo((now.getTime() - new Date(iso).getTime()) / 1000, lang);
@@ -31,12 +24,31 @@ export function localeFor(lang: Lang): string {
   return regionalLocale && regionalLocale.split("-")[0] === lang ? regionalLocale : LANGUAGES[lang].defaultLocale;
 }
 
-/** "a menos de 2 km" a partir del tramo que da el servidor ("<2km"). */
+/** Número con el separador decimal de la región (ADR 0285): "3,1" en fr-FR o pt-BR, "3.1" en es-PE o en-US. */
+function num(n: number, lang?: Lang): string {
+  const locale = lang ? localeFor(lang) : regionalLocale ?? "en";
+  return new Intl.NumberFormat(locale, { maximumFractionDigits: 1 }).format(n);
+}
+
+/** "5 km" o, en imperial, "3,1 mi" / "3.1 mi" según la región. */
+export function formatKm(km: number, u: Units = units, lang?: Lang): string {
+  if (u === "metric") return `${num(km, lang)} km`;
+  const mi = km * 0.621371;
+  return `${num(mi < 10 ? Math.round(mi * 10) / 10 : Math.round(mi), lang)} mi`;
+}
+
+/** Tramos cortos en metros ("<100m"): en imperial, pies redondeados a decenas (100 m → 330 ft). */
+function formatMeters(m: number, u: Units, lang?: Lang): string {
+  if (u === "metric") return `${num(m, lang)} m`;
+  return `${num(Math.round((m * 3.28084) / 10) * 10, lang)} ft`;
+}
+
+/** "a menos de 2 km" a partir del tramo que da el servidor ("<2km", "<500m", ">2km"). */
 export function distanceLabel(bucket: string | null, lang: Lang, u: Units = units): string | null {
   if (!bucket) return null;
-  const m = /^([<>])(\d+)km$/.exec(bucket);
+  const m = /^([<>])(\d+)(km|m)$/.exec(bucket);
   if (!m) return null;
-  const d = formatKm(Number(m[2]), u);
+  const d = m[3] === "km" ? formatKm(Number(m[2]), u, lang) : formatMeters(Number(m[2]), u, lang);
   return m[1] === ">" ? WORDS[lang].over(d) : WORDS[lang].within(d);
 }
 
