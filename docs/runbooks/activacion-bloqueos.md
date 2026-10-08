@@ -10,6 +10,9 @@ Orden recomendado: 1 → 2 → 3 → 4 → 5. El resto no depende del orden.
 
 ## 1. Reglas de `main` y entornos (GitHub)
 
+- **Aplicado** por el propietario el 2026-10-08 y verificado por el agente por la API (ADR 0303, "Aplicación").
+- **Falta (opcional):** importar `.github/rulesets/tags.json` en Settings → Rules → Rulesets. Hace inmutables las
+  etiquetas `v*`; no bloquea nada hasta la primera versión.
 - **Autorizado** por el propietario el 2026-10-01 03:17. Diseño en ADR 0303.
 - **Listo en el repositorio:**
   - `.github/rulesets/main.json`: PR obligatorio, los 7 checks de GitHub Actions al día con `main`, historial lineal,

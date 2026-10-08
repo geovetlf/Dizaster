@@ -179,7 +179,7 @@ fusionaron por PR, cada uno con `pnpm check` completo en local y los 7 checks de
 | #28 | 0300 | Errores visibles y anunciados en todas las pantallas |
 | #29 | 0301 | Códigos internos traducidos en moderación y administración |
 | #30 | 0302 | Historial completo del evento en moderación, con totales |
-| #32 | 0303 | Reglas de `main` y entornos listas para aplicar; guarda `dzd github-guard` en la entrega |
+| #32 | 0303 | Reglas de `main` y entornos (aplicados por el propietario el 2026-10-08); guarda `dzd github-guard` en la entrega |
 
 Dependabot:
 
@@ -195,9 +195,8 @@ Cada paso dice quién lo hace. Nada se despliega por fusionar en `main`, porque 
 
 ### A. Antes de staging (costo 0)
 
-1. **Propietario:** aplicar una vez las reglas de `main` y los entornos (autorizado el 2026-10-01; esta sesión no
-   puede escribirlas en GitHub). Son 4 pasos en el navegador, en el runbook §1. **Agente:** verificar que `main`
-   exige PR y los 7 checks, y que `production` exige la aprobación del propietario (ADR 0303).
+1. ✅ **Hecho el 2026-10-08.** El propietario aplicó las reglas de `main` y los entornos; el agente verificó `main`
+   por la API (ADR 0303). Falta solo el ruleset de etiquetas `v*`, que no bloquea nada hasta la primera versión.
 2. **Propietario:** crear una cuenta gratuita de Expo y cargar el secreto `EXPO_TOKEN` y la variable
    `DIZASTER_EXPO_OWNER`. **Agente:** `eas init` y luego `mobile-build` con el perfil `preview`, y entrega el APK.
    Ver el runbook, §2.

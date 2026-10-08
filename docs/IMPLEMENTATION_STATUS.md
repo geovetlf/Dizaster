@@ -491,7 +491,7 @@ Actualizado: 2026-10-08 (hasta ADR 0304; auditoría de preparación en `docs/PRO
 | Errores visibles y anunciados (ErrorText) en publicar, bloqueados, retrasos, transparencia, costos, negocios y reportar; prueba más amplia (ADR 0300) | ✅ | §11, §13.1 |
 | Moderación y administración sin códigos internos: tipo, estado, estado de caso, estado de fuente, presupuesto y periodos traducidos (ADR 0301) | ✅ | §11, §13.1 |
 | Historial del evento en moderación con totales reales y "Ver todo el historial" (ADR 0302) | ✅ | §7.3, §13.1 |
-| Reglas de `main` (PR + 7 checks, sin bypass) y entornos; guarda `dzd github-guard` en `deliver.yml` (ADR 0303) | ✅ código · aplicación BLOCKED_BY_OWNER | §20.11, §20.13 |
+| Reglas de `main` (PR + 7 checks, sin bypass) y entornos; guarda `dzd github-guard` en `deliver.yml` (ADR 0303) | ✅ aplicado en GitHub 2026-10-08 (falta el ruleset de etiquetas) | §20.11, §20.13 |
 | Avisos de octubre: `source-map-js` 1.2.2; excepción temporal para `node-forge` y `braces` hasta 2026-11-07 (ADR 0304) | ✅ vence 2026-11-07 | §20 |
 | Licencias, auditoría, SBOM, Dependabot; respaldo con prueba de restauración en CI | ✅ | ADR 0070, `scripts/supply-chain.mjs`, `scripts/db-restore-check.mjs` |
 | Idioma de la app elegible en el perfil (es/en/pt/fr o del teléfono) | ✅ | ADR 0069, `app/language.tsx` |
