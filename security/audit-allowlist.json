@@ -1,4 +1,21 @@
 {
  "note": "Avisos de seguridad aceptados temporalmente (ADR 0070). Cada uno con motivo y fecha de revisión; vencida la fecha, el control vuelve a fallar.",
- "advisories": []
+ "advisories": [
+  {
+   "id": 1240912,
+   "package": "node-forge",
+   "ghsa": "GHSA-86w9-cpqp-85rv",
+   "cve": "CVE-2026-85393",
+   "reason": "Sin versión corregida publicada (1.4.0 es la última). Solo la trae @expo/cli (herramienta de desarrollo); no está en la imagen de la API ni en el bundle de la app. Aceptado por el propietario el 2026-10-08 (ADR 0304).",
+   "reviewBy": "2026-11-06"
+  },
+  {
+   "id": 1240992,
+   "package": "braces",
+   "ghsa": "GHSA-vfj7-8cjw-p6xm",
+   "cve": "CVE-2026-93687",
+   "reason": "Sin versión corregida publicada (3.0.3 es la última). Llega por micromatch a Metro y Jest (herramientas de build de Expo); no está en la imagen de la API ni en el bundle de la app. Aceptado por el propietario el 2026-10-08 (ADR 0304).",
+   "reviewBy": "2026-11-06"
+  }
+ ]
 }

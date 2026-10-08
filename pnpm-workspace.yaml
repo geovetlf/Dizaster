@@ -7,5 +7,6 @@ patchedDependencies:
   expo-location@57.0.20: patches/expo-location@57.0.20.patch
 # Arreglos de seguridad en dependencias transitivas (OSV-Scanner, ver vendor/README.md).
 overrides:
+  source-map-js@<1.2.2: ^1.2.2
   xcode>uuid: ^11.1.1
   query-string>decode-uri-component: file:./vendor/decode-uri-component

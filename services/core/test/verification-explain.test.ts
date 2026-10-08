@@ -28,12 +28,15 @@ describe("explicación de verificación", () => {
     const pin = offset(LIMA, 80000, 80000);
     const u = await createUser(t, "explica_1");
     const r = await submit(t, u, reportBody(u, { pin, category: "fire.wildfire" }));
-    await t.c.ingestion.ingest("nasa-firms", item("firms-explain", offset(pin, 300)), "URGENT");
+    // Hora relativa a ahora: la corroboración solo cuenta fuentes cercanas en el tiempo al reporte.
+    const seen = new Date(Date.now() - 30 * 60_000);
+    seen.setUTCMilliseconds(0);
+    await t.c.ingestion.ingest("nasa-firms", item("firms-explain", offset(pin, 300), { occurredAt: seen.toISOString(), publishedAt: seen.toISOString() }), "URGENT");
     await t.c.dispatcher.drain();
     const v = await verification(r.body.eventId!);
     expect(v.level).toBe("EXTERNALLY_CORROBORATED");
     const ext = v.explanation.find((e: { code: string }) => e.code === "EXTERNAL_SOURCES");
-    expect(ext.params).toMatchObject({ count: 1, at: "2026-09-29T14:30:00.000Z" });
+    expect(ext.params).toMatchObject({ count: 1, at: seen.toISOString() });
     expect(ext.params.sources).toMatch(/FIRMS/);
     expect(codes(v).at(-1)).toBe("NOT_OFFICIAL_YET");
   });
