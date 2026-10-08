@@ -1,6 +1,6 @@
 # ADR 0303 — Reglas de `main` y entornos de GitHub compatibles con el flujo de PR del agente
 
-- Estado: Aceptado (código y pruebas). Aplicación en GitHub: BLOCKED_BY_OWNER (ver "Limitación")
+- Estado: Aceptado. Aplicado en GitHub por el propietario el 2026-10-08 (ver "Aplicación")
 - Fecha: 2026-10-01
 - Relación con el Blueprint: §20.7, §20.11, §20.13; ADR 0264, 0277, 0284
 - IA: **NO AI REQUIRED**. Costo: 0 (el repositorio es público: rulesets y revisores de entornos no dependen del plan).
@@ -48,6 +48,22 @@ workflow (`contents: read`, `actions: read`) las reglas efectivas de `main` y, c
 reglas se quiten o no se apliquen, nada sale hacia staging ni producción.
 
 **Flujo del agente desde ahora:** fusiona con `squash` (o `rebase` para Dependabot), solo con los 7 checks en verde.
+
+## Aplicación (2026-10-08)
+
+El propietario aplicó las reglas a mano. El agente las leyó por la API (`GET /repos/geovetlf/Dizaster/rulesets` y
+`/rules/branches/main`) y `dzd github-guard` las da por buenas:
+
+- Ruleset `dizaster main protection` (id 24722130), `active`, sobre `refs/heads/main`, sin bypass
+  (`current_user_can_bypass: never`). `main` figura como protegida.
+- Reglas: `deletion`, `non_fast_forward`, `required_linear_history`, `pull_request` con 0 aprobaciones y
+  `required_status_checks` estricto con los 7 checks, todos con `integration_id` 15368.
+- Diferencias con `.github/rulesets/main.json`, ninguna debilita lo esencial: no exige resolver hilos de revisión ni
+  descarta revisiones antiguas al hacer push (sin aprobaciones obligatorias, no afectan), y admite el método `merge`,
+  que el historial lineal ya impide.
+- Falta el ruleset de etiquetas `v*` (`tags.json`). No bloquea nada hoy porque aún no hay versiones.
+- Entornos `staging` y `production`: el proxy de la sesión no deja leerlos. El job `guard` de `deliver.yml` sí los lee
+  con el token del workflow y se detiene si `production` no tiene al propietario como revisor.
 
 ## Limitación
 
