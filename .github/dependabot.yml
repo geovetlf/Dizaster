@@ -18,6 +18,12 @@ updates:
       - dependency-name: "react-native"
       - dependency-name: "react-native-*"
       - dependency-name: "react"
+      # TypeScript 7 todavía no lo soporta typescript-eslint; @types/node sigue a Node 22 (.nvmrc). Se suben a mano,
+      # junto con lo que dependa de ellos, cuando corresponda.
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: github-actions
     directory: /
     schedule: { interval: monthly }
