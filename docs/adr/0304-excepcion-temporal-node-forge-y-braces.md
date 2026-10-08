@@ -27,6 +27,10 @@ son herramientas de desarrollo y build de Expo.
   - `security/audit-allowlist.json`: `reviewBy` 2026-11-06 (el 2026-11-07 `pnpm supply-chain` vuelve a fallar);
   - `.trivyignore`: los dos CVE con `exp:2026-11-07`; CI pasa el archivo a Trivy con `--ignorefile`;
   - `osv-scanner.toml`: los dos GHSA con `ignoreUntil` 2026-11-07.
+- Imagen de la API: el escaneo de `image` encontró `perl-base` 5.36.0-7+deb12u3 (CRITICAL/HIGH, corregido en deb12u4)
+  y `libpcre2-8-0` deb12u1 (corregido en deb12u2). Se actualiza el digest de `node:22-bookworm-slim` (trae pcre2
+  corregido) y la etapa final aplica `apt-get upgrade` para los parches de Debian que la imagen base aún no incluye.
+  No es una excepción: se corrigen.
 - Ningún check se desactiva y ningún otro aviso queda excluido. Si sale una versión corregida antes, se actualiza y se
   quita la excepción en el mismo PR.
 
