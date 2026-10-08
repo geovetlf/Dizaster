@@ -1,0 +1,4 @@
+# Avisos aceptados temporalmente por el propietario (ADR 0304). Mismo motivo que security/audit-allowlist.json.
+# Desde el 2026-11-07 Trivy vuelve a fallar con ellos.
+CVE-2026-85393 exp:2026-11-07
+CVE-2026-93687 exp:2026-11-07

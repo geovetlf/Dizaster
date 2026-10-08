@@ -10,3 +10,15 @@ version = "file:vendor/decode-uri-component"
 ecosystem = "npm"
 ignore = true
 reason = "Copia en vendor/ de la 0.5.0 corregida (vendor/README.md); OSV no compara versiones file:"
+
+# Avisos sin versión corregida, solo en herramientas de desarrollo de Expo; aceptados por el propietario hasta el
+# 2026-11-07 (ADR 0304). Mismo vencimiento que security/audit-allowlist.json y .trivyignore.
+[[IgnoredVulns]]
+id = "GHSA-86w9-cpqp-85rv"
+ignoreUntil = 2026-11-07T00:00:00Z
+reason = "node-forge 1.4.0 solo en @expo/cli; fuera de la imagen de la API y del bundle de la app (ADR 0304)"
+
+[[IgnoredVulns]]
+id = "GHSA-vfj7-8cjw-p6xm"
+ignoreUntil = 2026-11-07T00:00:00Z
+reason = "braces 3.0.3 solo en Metro y Jest vía micromatch; fuera de la imagen de la API y del bundle de la app (ADR 0304)"
