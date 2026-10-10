@@ -3,7 +3,8 @@
 // - cada workflow declara `permissions:` en la raíz (mínimo privilegio del GITHUB_TOKEN);
 // - cada `uses:` externo está fijado por SHA de 40 caracteres (una etiqueta se puede mover);
 // - ninguna herramienta se ejecuta con `@latest`;
-// - toda imagen de `docker run` va fijada por digest (ADR 0266).
+// - toda imagen de `docker run` va fijada por digest (ADR 0266);
+// - Node y PostgreSQL usan la misma versión mayor en todas partes, y Dependabot vigila cada raíz de OpenTofu (ADR 0308).
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -32,8 +33,36 @@ for (const name of readdirSync("infra/docker").filter((f) => f.endsWith("Dockerf
     if (from && !/@sha256:[0-9a-f]{64}$/.test(from)) problems.push(`infra/docker/${name}:${i + 1}: \`${from}\` no está fijada por digest`);
   }
 }
+// Versiones mayores alineadas (ADR 0308): una actualización aislada (p. ej. un PR de Dependabot que solo cambia la
+// imagen) deja CI en rojo hasta que se cambie todo junto y con su ADR.
+const read = (f) => readFileSync(f, "utf8");
+const node = read(".nvmrc").trim().split(".")[0];
+const engines = /(\d+)/.exec(JSON.parse(read("package.json")).engines?.node ?? "")?.[1];
+if (engines !== node) problems.push(`package.json engines.node (${engines}) no coincide con .nvmrc (${node})`);
+for (const m of read("infra/docker/core.Dockerfile").matchAll(/^FROM\s+node:(\d+)/gim)) {
+  if (m[1] !== node) problems.push(`infra/docker/core.Dockerfile usa node:${m[1]} y .nvmrc dice ${node}`);
+}
+const pg = /^FROM\s+postgis\/postgis:(\d+)-/im.exec(read("infra/docker/db.Dockerfile"))?.[1];
+const pgCi = [...read(".github/workflows/ci.yml").matchAll(/postgresql-(\d+)/g)].map((m) => m[1]);
+const pgCloudSql = /database_version\s*=\s*"POSTGRES_(\d+)"/.exec(read("infra/tofu/modules/database-cloudsql/main.tf"))?.[1];
+for (const [where, v] of [...pgCi.map((v) => ["ci.yml", v]), ["database-cloudsql", pgCloudSql]]) {
+  if (v !== pg) problems.push(`${where} usa PostgreSQL ${v} y infra/docker/db.Dockerfile usa ${pg}`);
+}
+// Cada raíz de OpenTofu (un main.tf con required_providers) figura en el bloque terraform de Dependabot.
+const tofuRoots = [];
+const walk = (d) => {
+  for (const e of readdirSync(d, { withFileTypes: true })) {
+    if (e.isDirectory()) walk(join(d, e.name));
+    else if (e.name === "main.tf" && /required_providers/.test(read(join(d, e.name)))) tofuRoots.push(`/${d}`);
+  }
+};
+walk("infra/tofu");
+const dependabot = read(".github/dependabot.yml");
+const terraformDirs = /package-ecosystem:\s*terraform[\s\S]*?directories:\s*\[([^\]]*)\]/.exec(dependabot)?.[1].split(",").map((x) => x.trim()) ?? [];
+for (const root of tofuRoots) if (!terraformDirs.includes(root)) problems.push(`.github/dependabot.yml: la raíz ${root} no está en terraform.directories`);
+
 if (problems.length) {
-  console.error(`Workflows sin endurecer (ADR 0264):\n${problems.map((p) => `  - ${p}`).join("\n")}`);
+  console.error(`Workflows sin endurecer o versiones desalineadas (ADR 0264, 0308):\n${[...new Set(problems)].map((p) => `  - ${p}`).join("\n")}`);
   process.exit(1);
 }
 console.log("workflows OK");
