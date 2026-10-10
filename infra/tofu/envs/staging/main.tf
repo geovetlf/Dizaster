@@ -63,7 +63,11 @@ variable "registry_readers" {
 }
 variable "database" {
   type        = any
-  description = "Ver modules/stack: mode cloudsql | vm | external (D-23)."
+  description = "Ver modules/stack. Staging corre en vm (D-23, decisión del propietario, ADR 0314)."
+  validation {
+    condition     = try(var.database.mode, null) == "vm"
+    error_message = "D-23 (ADR 0314): la base de staging corre en una VM propia. Cloud SQL no tiene la extensión h3; otro modo necesita una nueva decisión del propietario."
+  }
 }
 variable "media_bucket" {
   type = object({
