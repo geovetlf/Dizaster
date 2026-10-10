@@ -1,6 +1,6 @@
 # DIZASTER PRODUCTION READINESS AUDIT
 
-Fecha: 2026-10-10 · Código hasta ADR 0309 · Migraciones 0001–0105 · Todo en `main` por PR (sin force push)
+Fecha: 2026-10-10 · Código hasta ADR 0310 · Migraciones 0001–0106 · Todo en `main` por PR (sin force push)
 
 Esta auditoría compara el Blueprint con los ADR, el código y las pruebas. Solo se marca un bloqueo cuando está
 escrito qué falta y quién lo da. No se inventan decisiones, límites, precios ni capacidades. El procedimiento exacto
@@ -35,9 +35,9 @@ tiendas y credenciales, decisiones de producto y revisión legal. Nada de eso lo
 
 | Verificación | Resultado |
 | --- | --- |
-| `pnpm check`: lint, fronteras de módulos, secretos, workflows y versiones alineadas, typecheck, build y pruebas | ✅ Pruebas: contracts 42, geo-kit 39, móvil 288, backend 685, delivery 97 |
+| `pnpm check`: lint, fronteras de módulos, secretos, workflows y versiones alineadas, typecheck, build y pruebas | ✅ Pruebas: contracts 42, geo-kit 39, móvil 288, backend 702, delivery 97 |
 | Empaquetado móvil iOS + Android (`bundle:check`) y paridad nativa | ✅ |
-| Migraciones 0001–0105 sobre PostgreSQL 16 + PostGIS + H3; restauración de respaldo | ✅ |
+| Migraciones 0001–0106 sobre PostgreSQL 16 + PostGIS + H3; restauración de respaldo | ✅ |
 | Gitleaks: historial (285 commits) y árbol de trabajo | ✅ sin hallazgos |
 | Trivy (dependencias, Dockerfiles, IaC) y Semgrep con reglas propias | ✅ sin HIGH/CRITICAL |
 | Imagen del backend: usuario no root, sin gestores de paquetes | ✅ |
@@ -46,6 +46,7 @@ tiendas y credenciales, decisiones de producto y revisión legal. Nada de eso lo
 | Entrega local real: candidata, 10 %, 100 %, carga, candidata rota rechazada, rollback | ✅ ADR 0282 |
 | k6 50 peticiones/s durante 30 s contra la API local | ✅ p95 5 ms, sin 5xx. La base local tiene pocos datos: sirve para detectar regresiones, no predice producción |
 | Planes de consulta con volumen: 20 000 eventos, 40 000 posts y 40 000 comentarios | ✅ En cada `pnpm check`: ninguna lectura pública caliente recorre una tabla grande. "Para ti" con sesión pasó de 1,5 s a 19 ms (ADR 0309) |
+| Planes con volumen de lecturas con sesión y de moderación: 60 000 avisos, 40 000 reportes, 20 000 casos | ✅ En cada `pnpm check`: 16 lecturas sin recorrer tablas grandes. Tres índices nuevos: el detalle del caso pasó de 13,7 a 3,9 ms y la cola de 38,7 a 21,3 ms (ADR 0310) |
 | OSV-Scanner y `pnpm audit` | ✅ En GitHub Actions. Solo dos avisos HIGH sin arreglo upstream (`node-forge`, `braces`, herramientas de Expo), aceptados por el propietario hasta el 2026-11-07 y acotados a versión y ruta (ADR 0304, 0305) |
 | Push a `github.com/geovetlf/Dizaster` | ✅ Sin force push. `main` protegida desde el 2026-10-08: cada cambio entra por PR con los 7 jobs de CI en verde (check, delivery, report-comment, supply-chain, security, iac, image); PRs #10–#52 |
 
@@ -142,7 +143,8 @@ En orden de impacto:
    H3 a la aplicación con otro ADR.
 3. **Latencia sin datos reales.** Mitigado el 2026-10-10 (ADR 0309). Con 20 000 eventos, 40 000 posts y 40 000
    comentarios, ninguna lectura pública caliente recorre una tabla grande, y una prueba lo exige en cada `pnpm check`.
-   El feed era el único caso lento y bajó de 1,5 s a 19 ms. Falta medir en staging, con la red y los datos reales.
+   El feed era el único caso lento y bajó de 1,5 s a 19 ms. Lo mismo para 16 lecturas con sesión y de moderación
+   (ADR 0310). Falta medir en staging, con la red y los datos reales.
 4. **Límite por IP.** Detrás de un balanceador o CDN mal configurado, todas las personas compartirían una IP y el
    límite de 300 por minuto las frenaría. La IaC ya pone `TRUST_PROXY=true`; falta confirmar en staging que la API ve la IP de cada cliente.
 5. **Atestación y push reales sin probar en dispositivo.** Dependen del primer build.

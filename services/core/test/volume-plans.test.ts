@@ -1,7 +1,7 @@
-import pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { FeedFilter } from "../src/modules/social/index.js";
 import { MAX_RANK_BOOST_HOURS } from "../src/modules/social/index.js";
+import { clone, scansOf as plans } from "./query-plans.js";
 import { createTestContext, createUser, LIMA, offset, reportBody, submit, type TestContext, type TestUser } from "./helpers.js";
 
 /**
@@ -13,7 +13,7 @@ import { createTestContext, createUser, LIMA, offset, reportBody, submit, type T
 const EVENTS = 20_000;
 const POSTS = 40_000;
 const COMMENTS = 40_000;
-const BIG = new Set(["events", "posts", "comments", "timeline", "evidence", "post_event_links", "event_signals"]);
+const BIG = new Set(["event.events", "social.posts", "social.comments", "event.timeline", "event.evidence", "social.post_event_links", "social.event_signals"]);
 
 let t: TestContext;
 let users: TestUser[];
@@ -33,21 +33,6 @@ beforeAll(async () => {
   await seedVolume(users.map((u) => u.profileId));
 }, 180_000);
 afterAll(async () => { await t.close(); });
-
-/**
- * Clona filas plantilla con jsonb_populate_record: copia todas las columnas, incluso las que agreguen migraciones
- * futuras. Las columnas generadas se calculan solas y no se insertan.
- */
-async function clone(db: pg.PoolClient, table: string, overrides: string, from: string, values: unknown[]): Promise<void> {
-  const [schema, name] = table.split(".");
-  const { rows } = await db.query<{ column_name: string }>(
-    `SELECT column_name FROM information_schema.columns WHERE table_schema = $1 AND table_name = $2 AND is_generated = 'NEVER' ORDER BY ordinal_position`,
-    [schema, name]);
-  const cols = rows.map((r) => `"${r.column_name}"`).join(", ");
-  await db.query(`INSERT INTO ${table} (${cols})
-    SELECT ${rows.map((r) => `x."${r.column_name}"`).join(", ")}
-    FROM ${from}, LATERAL jsonb_populate_record(NULL::${table}, to_jsonb(s) || jsonb_build_object(${overrides})) x`, values);
-}
 
 async function seedVolume(profiles: string[]): Promise<void> {
   const db = await t.c.db.connect();
@@ -105,36 +90,7 @@ async function seedVolume(profiles: string[]): Promise<void> {
   }
 }
 
-interface PlanNode { "Node Type": string; "Relation Name"?: string; Plans?: PlanNode[] }
-function seqScans(node: PlanNode, out: string[] = []): string[] {
-  if (node["Node Type"] === "Seq Scan" && node["Relation Name"] && BIG.has(node["Relation Name"])) out.push(node["Relation Name"]);
-  for (const child of node.Plans ?? []) seqScans(child, out);
-  return out;
-}
-
-/** Ejecuta la petición, guarda cada SELECT que lanzó y devuelve las tablas grandes recorridas enteras. */
-async function scansOf(url: string, user?: TestUser): Promise<{ status: number; queries: number; scans: string[] }> {
-  const seen: { text: string; values: unknown[] }[] = [];
-  const proto = pg.Client.prototype as unknown as { query: (...a: unknown[]) => unknown };
-  const original = proto.query;
-  proto.query = function (this: unknown, ...a: unknown[]) {
-    const [text, values] = a;
-    if (typeof text === "string" && /^\s*(SELECT|WITH)\b/i.test(text)) seen.push({ text, values: Array.isArray(values) ? values : [] });
-    return original.apply(this, a);
-  };
-  let status: number;
-  try {
-    status = (await t.app.inject({ url, ...(user ? { headers: { authorization: `Bearer ${user.token}` } } : {}) })).statusCode;
-  } finally {
-    proto.query = original;
-  }
-  const scans: string[] = [];
-  for (const q of seen) {
-    const { rows } = await t.c.db.query<{ "QUERY PLAN": { Plan: PlanNode }[] }>(`EXPLAIN (FORMAT JSON) ${q.text}`, q.values);
-    for (const name of seqScans(rows[0]!["QUERY PLAN"][0]!.Plan)) scans.push(`${name} ← ${q.text.replace(/\s+/g, " ").trim().slice(0, 160)}`);
-  }
-  return { status, queries: seen.length, scans };
-}
+const scansOf = (url: string, user?: TestUser) => plans(t, url, BIG, user);
 
 describe("lecturas públicas con volumen", () => {
   it("el volumen quedó cargado", async () => {
