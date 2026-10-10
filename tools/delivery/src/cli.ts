@@ -5,7 +5,7 @@
  */
 import { execFileSync, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { sha256File, verifyManifest, type ArtifactManifest } from "./artifact.js";
 import { RuleAgent, validateProposal } from "./agent.js";
 import { appendAudit, readLog, verifyLog, type Actor } from "./audit.js";
@@ -15,7 +15,7 @@ import { costGate } from "./cost.js";
 import { rollbackTo, rollout, type DeployTarget } from "./deploy.js";
 import { diagnose } from "./diagnose.js";
 import { checkEnvironment } from "./envcheck.js";
-import { checkGithubGuards, requiredChecksOf } from "./github-guard.js";
+import { apiReadOf, checkGithubGuards, requiredChecksOf, verifiedSummary, type ApiRead } from "./github-guard.js";
 import { checkDocs } from "./docs.js";
 import { checkIamHcl, checkPlan, type TofuPlan } from "./iac.js";
 import { runLoad } from "./load.js";
@@ -322,15 +322,23 @@ switch (cmd) {
     break;
   }
   case "github-guard": {
-    // Reglas efectivas de main y, con --production, el entorno production, tal como los devuelve la API (ADR 0303).
+    // Lecturas de la API tal como las dejó el workflow (ADR 0303 y 0306): `<archivo>` con el cuerpo o, si la llamada
+    // falló, `<archivo>.err` con el mensaje de `gh`. Sin ninguno de los dos, la lectura cuenta como no verificable.
+    const apiRead = (path: string): ApiRead => existsSync(`${path}.err`) ? apiReadOf({ error: readFileSync(`${path}.err`, "utf8") })
+      : existsSync(path) ? apiReadOf({ body: readFileSync(path, "utf8") }) : { ok: false, missing: false, error: `sin lectura en ${path}` };
+    const staging = flag("staging");
     const production = flag("production");
+    const ref = flag("ref");
     const findings = checkGithubGuards({
-      branchRules: readJson(flag("rules") ?? fail("--rules es obligatorio")),
+      ...(ref ? { ref } : {}),
+      branchRules: apiRead(flag("rules") ?? fail("--rules es obligatorio")),
       requiredChecks: requiredChecksOf(readJson(flag("ruleset", ".github/rulesets/main.json")!)),
       owners: loadPolicy(flag("policy")).owners,
-      ...(production ? { production: readJson(production) } : {}),
+      ...(staging ? { staging: apiRead(staging) } : {}),
+      ...(production ? { production: apiRead(production) } : {}),
     });
-    out(findings, () => findings.map((x) => `${x.severity}: ${x.where} — ${x.message}`).join("\n") || "GitHub: main protegida" + (production ? " y production con aprobación del owner" : ""));
+    out(findings, () => findings.map((x) => `${x.severity} (${x.kind === "unverifiable" ? "no verificable" : "incorrecto"}): ${x.where} — ${x.message}`).join("\n")
+      || verifiedSummary({ staging: !!staging, production: !!production }));
     if (findings.length) process.exit(1);
     break;
   }
