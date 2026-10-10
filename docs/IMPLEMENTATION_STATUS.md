@@ -1,6 +1,6 @@
 # Estado de la implementación
 
-Actualizado: 2026-10-08 (hasta ADR 0304; auditoría de preparación en `docs/PRODUCTION_READINESS_REPORT.md`). Informe de preparación para producción: `docs/PRODUCTION_READINESS_REPORT.md`.
+Actualizado: 2026-10-10 (hasta ADR 0306; auditoría de preparación en `docs/PRODUCTION_READINESS_REPORT.md`). Informe de preparación para producción: `docs/PRODUCTION_READINESS_REPORT.md`.
 
 ## Etapa 1 — Fundación (hecha)
 
@@ -493,6 +493,7 @@ Actualizado: 2026-10-08 (hasta ADR 0304; auditoría de preparación en `docs/PRO
 | Historial del evento en moderación con totales reales y "Ver todo el historial" (ADR 0302) | ✅ | §7.3, §13.1 |
 | Reglas de `main` (PR + 7 checks, sin bypass) y entornos; guarda `dzd github-guard` en `deliver.yml` (ADR 0303) | ✅ aplicado en GitHub 2026-10-08 (falta el ruleset de etiquetas) | §20.11, §20.13 |
 | Avisos de octubre: `source-map-js` 1.2.2; excepción temporal para `node-forge` y `braces` hasta 2026-11-07 (ADR 0304) | ✅ vence 2026-11-07 | §20 |
+| Excepciones de avisos acotadas a paquete, versión y ruta; aviso en CI 14 días antes del vencimiento (ADR 0305) | ✅ | §20 |
 | Guarda de entrega: solo desde `main`, `staging` limitado a ramas protegidas, `production` sin bypass de administradores; "no verificable" distinto de "incorrecto" (ADR 0306) | ✅ | §20.11, §20.13 |
 | Licencias, auditoría, SBOM, Dependabot; respaldo con prueba de restauración en CI | ✅ | ADR 0070, `scripts/supply-chain.mjs`, `scripts/db-restore-check.mjs` |
 | Idioma de la app elegible en el perfil (es/en/pt/fr o del teléfono) | ✅ | ADR 0069, `app/language.tsx` |
