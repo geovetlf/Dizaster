@@ -1,6 +1,6 @@
 # Estado de la implementación
 
-Actualizado: 2026-10-10 (hasta ADR 0313; auditoría de preparación en `docs/PRODUCTION_READINESS_REPORT.md`). Informe de preparación para producción: `docs/PRODUCTION_READINESS_REPORT.md`.
+Actualizado: 2026-10-10 (hasta ADR 0314; auditoría de preparación en `docs/PRODUCTION_READINESS_REPORT.md`). Informe de preparación para producción: `docs/PRODUCTION_READINESS_REPORT.md`.
 
 ## Etapa 1 — Fundación (hecha)
 
@@ -501,6 +501,7 @@ Actualizado: 2026-10-10 (hasta ADR 0313; auditoría de preparación en `docs/PRO
 | Camino de un reporte y 13 trabajos de mantenimiento con volumen: sin recorrer tablas grandes; 5 índices (migración 0107) para cupo por teléfono, fusiones heredadas, cifrado de fixes antiguos y retención de avisos y ubicaciones (ADR 0311) | ✅ | §5.22, §13.2 |
 | Cola de moderación sin consultas por caso: motivos de toda la página en una consulta (cola de 50: 151 → 52 consultas, 29,9 → ~15 ms) y sin vista previa para la fila de más de las apelaciones (ADR 0312) | ✅ | §5.22, §13 |
 | Resto de lecturas con sesión con volumen: 10 lecturas más de `/v1/me` y `/v1/admin` en la prueba de planes; los informes de calidad y transparencia y la exportación quedan fuera, con motivo (ADR 0313) | ✅ | §5.22, §13.3 |
+| Decisiones D-23 (staging en VM, validado en `envs/staging`) y D-17 (piloto con límites oficiales de Perú) (ADR 0314) | ✅ | §11.5, §20 |
 | Contacto configurable en el User-Agent de ingesta (`INGEST_CONTACT`), con aviso en `config-check` si falta en producción (ADR 0307) | ✅ falta el valor del propietario | §9.3 |
 | Licencias, auditoría, SBOM, Dependabot; respaldo con prueba de restauración en CI | ✅ | ADR 0070, `scripts/supply-chain.mjs`, `scripts/db-restore-check.mjs` |
 | Idioma de la app elegible en el perfil (es/en/pt/fr o del teléfono) | ✅ | ADR 0069, `app/language.tsx` |
@@ -584,7 +585,7 @@ Plano de entrega (Blueprint §20, ADR 0260–0275). Ojo con los nombres: las fas
 - Fase D1 — el repositorio existe desde el 2026-09-30. ✅ Informes en PR (ADR 0284). ✅ Reglas de `main` y entornos `staging` y `production`, aplicados por el propietario el 2026-10-08 (ADR 0303); la guarda de `deliver.yml` los verifica en cada entrega (ADR 0306). Las casillas "sin bypass de administradores" en `production` y "solo ramas protegidas" en `staging` figuran como NOT_VERIFIABLE hasta esa primera entrega; producción sigue bloqueada mientras tanto. ✅ El agente fusiona sus PR con los 7 checks en verde (autorización del 2026-09-30). Opcional: ruleset de etiquetas `v*`.
 - Fase D2 — BLOCKED_BY_OWNER / BLOCKED_BY_BILLING: necesita proyectos de Google Cloud con facturación y presupuesto autorizados (D-18 actualizada), base de staging (D-23) y plan de GitHub (D-24): Workload Identity Federation, Artifact Registry, firma cosign, despliegue a staging, verificación y rollback.
 - Fase D3 — BLOCKED_BY_OWNER: además de D2, visto bueno del propietario para el nivel 5: promoción a producción por etiqueta, despliegue gradual, respaldo previo a migraciones.
-- Verificado el 2026-10-10: Cloud SQL **no** admite la extensión `h3` (lista oficial de extensiones). Para D-23 quedan `vm`, `external` o `cloudsql` moviendo antes H3 a la aplicación (ADR 0308).
+- Verificado el 2026-10-10: Cloud SQL **no** admite la extensión `h3` (lista oficial de extensiones). D-23 decidido el 2026-10-10: staging en `vm` (ADR 0314).
 
 Bloqueadas o en espera:
 
@@ -595,7 +596,7 @@ Bloqueadas o en espera:
 - **PENDING DECISION** — D2 (parte de ADR 0156): la respuesta "No, es otro" se guarda en `event.dedup_reviews.reporter_answer`; falta decidir si divide el evento, va a la cola de duplicados u otra cosa. Nada se mueve hasta entonces.
 - **PENDING DECISION** — Estado de lanzamiento por país (C-06, D-02): `launchStatus` (PILOT, AVAILABLE, AVAILABLE_READ_ONLY, RESTRICTED) existe en los datos pero no se aplica; falta decidir qué pasa con los reportes ciudadanos fuera de PILOT/AVAILABLE.
 - **PENDING DECISION** — Duración de suspensiones: hoy `SUSPEND_USER` no vence; falta decidir si hay duraciones estándar (24 h / 7 d / permanente).
-- **PENDING DECISION** — D-17 fronteras en disputa: sin implementar; falta criterio del propietario (y revisión legal antes de abrir más países).
+- ✅ **Decidido 2026-10-10** — D-17: el piloto usa los límites oficiales de Perú (INEI en el índice administrativo). Otro país con fronteras en disputa espera asesoría legal. Antes de publicar el mapa de Perú se revisan sus fronteras (ADR 0314).
 - **PENDING DECISION** — Uso sin cuenta (ADR 0171): hoy se puede cerrar "Entrar" y seguir en solo lectura; falta decidir si V1 lo permite o exige cuenta.
 - **PENDING DECISION** — Avisos sociales (comentarios en mis posts, respuestas a mis comentarios): el Blueprint no los pide de forma explícita y §5.3 exige evitar la fatiga de notificaciones; falta decidir si V1 los tiene, apagados o encendidos por defecto, y con qué límite diario.
 - **BLOCKED_BY_CREDENTIALS** — Envío real de push: clave APNs `.p8` (Apple Developer, US$99/año) y cuenta de servicio de Firebase del propietario. Producción exige `PUSH_DRIVER=live`.
@@ -609,5 +610,5 @@ Bloqueadas o en espera:
 - **BLOCKED_BY_OWNER** — Textos regionales por país (ADR 0281): el mecanismo existe y `data/locales/ui-regional.json` está vacío hasta que alguien con uso local proponga ajustes.
 - **BLOCKED_BY_OWNER** — Organizaciones para donar (ADR 0274): el directorio está vacío hasta que el propietario verifique y cargue cada una.
 - **Repositorio oficial**: https://github.com/geovetlf/Dizaster (creado por el propietario el 2026-09-30). Reglas de `main` y entornos aplicados el 2026-10-08 (ADR 0303). Pendiente: variables de Actions (`scripts/github-bootstrap.mjs`, cuando existan los proyectos de D-18) y, opcional, el ruleset de etiquetas.
-- **BLOCKED_BY_BILLING** — Proyectos de Google Cloud, facturación y presupuesto (D-18); base de staging (D-23); plan de GitHub (D-24). Hasta entonces `dzd deploy/promote/rollback` solo corren en seco y `infra/tofu` no se aplica.
+- **BLOCKED_BY_BILLING** — Proyectos de Google Cloud, facturación y presupuesto (D-18); base de staging decidida en `vm`, falta su tamaño (D-23, ADR 0314); plan de GitHub (D-24). Hasta entonces `dzd deploy/promote/rollback` solo corren en seco y `infra/tofu` no se aplica.
 - **BLOCKED_BY_OWNER (solo el valor)** — Contacto del cliente de ingesta (§9.3): el mecanismo está listo (`INGEST_CONTACT`, ADR 0307); falta el correo o URL de contacto del propietario. Sin él, el User-Agent dice "contacto pendiente" y `dzd config-check` lo avisa.

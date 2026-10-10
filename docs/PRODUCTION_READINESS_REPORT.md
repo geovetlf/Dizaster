@@ -1,6 +1,6 @@
 # DIZASTER PRODUCTION READINESS AUDIT
 
-Fecha: 2026-10-10 · Código hasta ADR 0313 · Migraciones 0001–0107 · Todo en `main` por PR (sin force push)
+Fecha: 2026-10-10 · Código hasta ADR 0314 · Migraciones 0001–0107 · Todo en `main` por PR (sin force push)
 
 Esta auditoría compara el Blueprint con los ADR, el código y las pruebas. Solo se marca un bloqueo cuando está
 escrito qué falta y quién lo da. No se inventan decisiones, límites, precios ni capacidades. El procedimiento exacto
@@ -76,7 +76,7 @@ tiendas y credenciales, decisiones de producto y revisión legal. Nada de eso lo
 | Detección de CSAM | LEGAL REVIEW REQUIRED | Proveedor y procedimiento de reporte |
 | Requerimientos de autoridades | READY el registro · LEGAL REVIEW REQUIRED la entrega | Solo registro auditado |
 | Textos legales | LEGAL REVIEW REQUIRED | |
-| Fronteras en disputa (D-17) | LEGAL REVIEW REQUIRED | |
+| Fronteras en disputa (D-17) | Piloto: límites oficiales de Perú (ADR 0314) · otros países: LEGAL REVIEW REQUIRED | |
 | Inicio de sesión: Apple, Google, correo, MFA | READY en código · BLOCKED BY AUTHORIZATION | IDs de Apple y Google. El proveedor de correo lo elige el propietario |
 | Uso sin cuenta; estado de lanzamiento por país | BLOCKED BY AUTHORIZATION | Decisiones de producto |
 | Números de emergencia | READY para Perú | Los demás países aparecen como "por verificar" |
@@ -120,7 +120,7 @@ En orden de impacto:
 2. **`EXPO_TOKEN`** de una cuenta gratuita de Expo. Desbloquea el primer APK, el video 720p, Maestro y el camino a la
    atestación. Costo 0.
 3. **D-18**: proyectos de Google Cloud, facturación y presupuesto mensual por entorno.
-4. **D-23**: modo de la base de staging (`cloudsql`, `vm` o `external`).
+4. ✅ **D-23**: staging en `vm` (decidido el 2026-10-10, ADR 0314). Falta el tamaño, con D-18.
 5. Almacenamiento de media: GCS o R2.
 6. Cuentas de Apple Developer y Google Play; clave APNs y Firebase; IDs de inicio de sesión de Apple y Google.
 7. Proveedor de correo.
@@ -142,8 +142,7 @@ En orden de impacto:
 
 1. ✅ **`main` protegida** desde el 2026-10-08 (ADR 0303). Ya no es un riesgo abierto.
 2. **Cloud SQL no admite la extensión `h3`.** Verificado el 2026-10-10 en la lista oficial de extensiones (ADR 0308).
-   Con el código actual, el modo `cloudsql` no sirve. Para D-23 quedan dos caminos: `vm` o `external`, o bien mover
-   H3 a la aplicación con otro ADR.
+   Resuelto para staging: el propietario eligió `vm` (ADR 0314). La base de producción aún no está decidida.
 3. **Latencia sin datos reales.** Mitigado el 2026-10-10 (ADR 0309). Con 20 000 eventos, 40 000 posts y 40 000
    comentarios, ninguna lectura pública caliente recorre una tabla grande, y una prueba lo exige en cada `pnpm check`.
    El feed era el único caso lento y bajó de 1,5 s a 19 ms. Lo mismo para 16 lecturas con sesión y de moderación
@@ -309,7 +308,7 @@ Cada fila dice qué falta, por qué el agente no puede resolverlo, qué quedó l
 | --- | --- | --- | --- | --- | --- | --- |
 | `EXPO_TOKEN` y primer build | Cuenta de Expo y token | Es una credencial del propietario | `mobile-build.yml` manual, `eas.json`, prebuild verificado, bundle iOS y Android en CI | temporal | Propietario: crear la cuenta y cargar `EXPO_TOKEN` (runbook §2) | 0 (plan gratuito de EAS, con cupo mensual limitado) |
 | Google Cloud y facturación (D-18) | Proyectos, facturación, presupuesto, región | Crea gasto y cuentas | IaC validada y nunca aplicada, presupuesto y alertas en código, `dzd env-check` e `iac-check` | temporal | Propietario: crear los proyectos y fijar el presupuesto (runbook §3) | El que fije el propietario. No se estima sin precios verificados de la región |
-| Base de staging (D-23) | Elegir `vm`, `external` o `cloudsql` (este último exige mover H3 a la app) | Decisión de costo y operación | Módulos `database-vm` y `database-cloudsql`, migrador seguro, respaldo con prueba de restauración | condicionado (D-18) | Propietario: elegir modo. Recomendación técnica: `vm` | Según modo y tamaño; se calcula con el plan de OpenTofu |
+| Base de staging (D-23) | Elegir `vm`, `external` o `cloudsql` (este último exige mover H3 a la app) | Decisión de costo y operación | Módulos `database-vm` y `database-cloudsql`, migrador seguro, respaldo con prueba de restauración | condicionado (D-18) | Decidido: `vm` (ADR 0314). Propietario: fijar tamaño con D-18 | Según modo y tamaño; se calcula con el plan de OpenTofu |
 | Media (GCS o R2) | Elegir proveedor y claves | Cuenta y gasto del propietario | Driver S3 probado contra un S3 local, caché, media sin metadatos | condicionado (D-18) | Propietario: elegir proveedor (runbook §5) | Según uso |
 | Proveedor de correo | Elegir proveedor | Decisión y cuenta del propietario | `EMAIL_PROVIDER=none`; se puede entrar solo con Apple o Google | temporal | Propietario: elegir proveedor o confirmar que no hace falta en V1 | Según proveedor |
 | Atestación real | App Attest y Play Integrity | Necesita cuentas de Apple y Google y un build | Interfaz, verificador de desarrollo, producción no arranca sin el real | condicionado (`EXPO_TOKEN` y cuentas) | Propietario: cuentas de Apple (US$99 al año) y Google Play (US$25 una vez) | US$99 al año + US$25 una vez |
@@ -320,7 +319,7 @@ Cada fila dice qué falta, por qué el agente no puede resolverlo, qué quedó l
 | FIRMS | `MAP_KEY` gratuita | Credencial del propietario | Adaptador listo (ADR 0067) | temporal | Propietario: pedir la clave en NASA FIRMS | 0 |
 | Contacto de ingesta | Correo o URL | Dato del propietario | `INGEST_CONTACT` y aviso en `config-check` (ADR 0307) | temporal | Propietario: dar el contacto | 0 |
 | Decisiones de producto | D1, D2, D3, uso sin cuenta, estado de lanzamiento por país, duración de suspensiones, avisos sociales | Son decisiones de producto | Todo lo que no depende de ellas | temporal | Propietario: responder cada una | 0 |
-| Fronteras en disputa (D-17) | Criterio | Decisión legal y de producto | Mapa con datos abiertos | permanente hasta asesoría | Asesoría | Según asesoría |
+| Fronteras en disputa (D-17) | Otros países | Decisión legal y de producto | Piloto: límites oficiales de Perú (ADR 0314) | permanente hasta asesoría | Asesoría antes de abrir otro país | Según asesoría |
 | Datos y revisiones | Revisión nativa de pt y fr, listas de términos, organizaciones para donar, textos regionales | Requieren personas con conocimiento local | Mecanismos con listas vacías | temporal | Propietario: proveerlos | 0 |
 | Pruebas reales | Dispositivo, push, staging, producción | Necesitan los bloqueos anteriores | Ensayo local completo de la entrega (ADR 0282), guardas, rollback | condicionado | Primer APK, luego staging | — |
 | Excepción `node-forge` y `braces` | Arreglo upstream | No hay versión corregida publicada | Acotada a versión y ruta, vence sola el 2026-11-07, aviso en CI desde el 2026-10-23 | temporal | Revisar el 2026-11-07, o antes si sale el arreglo | 0 |

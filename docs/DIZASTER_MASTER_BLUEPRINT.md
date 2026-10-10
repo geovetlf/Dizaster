@@ -1149,12 +1149,12 @@ Para cada una hay una recomendación. Puedes aprobar en bloque ("apruebo todas l
 | **D-14** | Publicidad en V1 | Sí / No (solo diseño) | **No** en V1; diseño y reglas de exclusión listos |
 | **D-15** | Donaciones en V1 | No / enlaces a organizaciones verificadas / integradas | **Enlaces externos a organizaciones verificadas**, sin manejar dinero |
 | **D-16** | Alertas por ubicación | Solo zonas guardadas / + ubicación en segundo plano | **Zonas guardadas + última ubicación aproximada al abrir la app**; segundo plano después |
-| **D-17** | Fronteras disputadas | Una sola visualización / según país del usuario | **Según país del usuario**, con revisión legal |
+| **D-17** | Fronteras disputadas | Una sola visualización / según país del usuario | **Según país del usuario**, con revisión legal. Decidido 2026-10-10: el piloto usa los límites oficiales de Perú; otro país, con asesoría legal (ADR 0314) |
 | **D-18** | Hosting | VPS económicos (p. ej. Hetzner/OVH) + R2/Cloudflare / cloud mayor (AWS/GCP/Azure) / PaaS | ~~VPS económicos~~ → **Google Cloud** por instrucción del propietario (2026-09-30, ADR 0261), contenedores portables; crear proyectos y facturación: pendiente de autorización |
 | **D-19** | Idiomas iniciales | Lista | **Español, inglés, portugués, francés** (ajustable según países piloto) |
 | **D-20** | Repositorio | Nuevo repositorio GitHub exclusivo de Dizaster / otro | **Nuevo repositorio exclusivo** (sin relación con WEE ni MelonOffice). Hecho: `github.com/geovetlf/Dizaster`, creado por el propietario el 2026-09-30 |
 | **D-21** | Nombre de marca y dominio | — | Pendiente de tu elección (verificar disponibilidad de dominio y marca) |
-| **D-23** | Base de datos de staging (ADR 0261) | Cloud SQL mínima / PostgreSQL en e2-micro gratuito / staging efímero | **PostgreSQL en e2-micro** mientras no haya usuarios |
+| **D-23** | Base de datos de staging (ADR 0261) | Cloud SQL mínima / PostgreSQL en e2-micro gratuito / staging efímero | **PostgreSQL en e2-micro** mientras no haya usuarios. Decidido 2026-10-10: VM propia (Cloud SQL no tiene h3; ADR 0314) |
 | **D-24** | Plan de GitHub (ADR 0261, 0262) | gratuito / de pago | **Gratuito** + promoción a producción solo desde etiqueta del propietario |
 
 ---

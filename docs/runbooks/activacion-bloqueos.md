@@ -81,18 +81,15 @@ Orden recomendado: 1 → 2 → 3 → 4 → 5. El resto no depende del orden.
 
 ## 4. Base de staging (D-23)
 
-- **Falta:** elegir `database.mode`:
-  - `cloudsql` (gestionado);
-  - `vm` (imagen propia con PostGIS y H3, la de menor cómputo);
-  - `external` (otro proveedor).
-- **Por qué:** es costo y operación.
+- **Decidido el 2026-10-10 (ADR 0314):** `database.mode = "vm"`, la imagen propia con PostGIS y H3.
+  `envs/staging` rechaza cualquier otro modo. Falta el tamaño, que es costo y espera D-18.
 - **Dato verificado el 2026-10-10 (ADR 0308):** Cloud SQL **no** admite la extensión `h3`, que usan la migración 0001
   y los módulos de reportes, eventos y media. Con el código actual, `cloudsql` no arranca. Quedan `vm` (recomendado:
   la misma imagen que CI) o `external` con H3, o bien `cloudsql` después de mover H3 a la aplicación (otro ADR).
 - **Listo:** los módulos `database-cloudsql` y `database-vm` (ADR 0278), migraciones hasta la 0107 con candado y
   checksum, y respaldo cifrado con `age`.
 - **Propietario:**
-  1. Elegir el modo, el tamaño y la retención de respaldos.
+  1. Elegir zona, tipo de máquina, disco y retención de respaldos.
   2. Crear la contraseña sin que pase por OpenTofu:
      - modo `vm`: `openssl rand -base64 32 | gcloud secrets versions add database-password --data-file=-`;
      - modo `cloudsql`: `gcloud sql users create dizaster --instance=dizaster-staging --password=…`.

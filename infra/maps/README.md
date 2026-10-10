@@ -12,6 +12,8 @@ Pipeline para servir el mapa desde nuestro object storage sin proveedor de pago 
 
 - `country-bbox.mjs` calcula la caja del país con los mismos polígonos Natural Earth que usa la app.
 - Perú hasta z15 pesa del orden de 1–2 GB; el coste es solo almacenamiento (sin egreso con un proveedor adecuado).
+- Fronteras (D-17, ADR 0314): antes de publicar el mapa de Perú, revisar cómo dibuja las fronteras de Perú y
+  ajustarlo a los límites oficiales. Otro país con fronteras en disputa espera asesoría legal.
 - Los datos son © OpenStreetMap (ODbL): la atribución va en el estilo y la app la muestra.
 - La salida (`infra/maps/out/`) no se versiona.
 
