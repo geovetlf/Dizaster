@@ -22,7 +22,7 @@ Tres se dejan fuera a propósito:
 | Lectura | Por qué queda fuera |
 | --- | --- |
 | `/v1/admin/quality` y `/v1/admin/transparency` | Son informes que cuentan todo lo de un periodo (eventos, avisos, casos, denuncias, acciones, apelaciones). Si el periodo abarca casi todos los datos, recorrer la tabla es el plan correcto. Solo los pide administración, a demanda. Un índice por fecha en cada tabla haría más lenta cada escritura en las tablas que más crecen, para acelerar una lectura rara. No se agregan. |
-| `/v1/me/export` | No es representativa con filas clonadas. El cifrado de cada campo va atado al id de su fila, y los clones copian el texto cifrado con otro id, así que descifrarlo falla. Además tiene un tope por sección (ADR 0295) y una espera de un minuto entre exportaciones. |
+| `/v1/me/export` | No es representativa con filas clonadas. El cifrado de cada campo va atado al id de su fila, y los clones copian el texto cifrado con otro id, así que descifrarlo falla. Además tiene un tope por sección (ADR 0295) y una espera de un minuto entre exportaciones. Desde ADR 0316, un valor ilegible ya no tumba la exportación. |
 | `/v1/me/policies` | No consulta la base de datos. |
 
 ## Consecuencias y límites
