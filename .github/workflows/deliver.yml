@@ -28,8 +28,9 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  # Antes de tocar nada: main debe exigir PR y los 7 checks, y si se promueve, production debe pedir la aprobación de
-  # un owner y aceptar solo ramas protegidas (ADR 0303). Lee la API con el token del workflow; falla cerrado.
+  # Antes de tocar nada: la entrega corre desde main; main exige PR y los 7 checks; staging acepta solo ramas
+  # protegidas; y si se promueve, production pide la aprobación de un owner sin bypass de administradores y acepta
+  # solo ramas protegidas (ADR 0303 y 0306). Lee la API con el token del workflow; falla cerrado si no puede leerla.
   guard:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
@@ -45,16 +46,20 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @dizaster/delivery build
-      - name: Reglas de main y entorno production
+      - name: Reglas de main y entornos staging y production
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
           PROMOTE: ${{ inputs.promote }}
         run: |
-          gh api "repos/$REPO/rules/branches/main" > main-rules.json
-          args=(--rules main-rules.json)
+          # Cada lectura deja el cuerpo en <archivo> o, si gh falla, el error en <archivo>.err: la guarda distingue
+          # "no existe" (404) de "no se pudo verificar" y en los dos casos detiene la entrega (ADR 0306).
+          read_api() { if gh api "$1" > "$2" 2> "$2.err"; then rm -f "$2.err"; fi; }
+          read_api "repos/$REPO/rules/branches/main" main-rules.json
+          read_api "repos/$REPO/environments/staging" staging.json
+          args=(--ref "$GITHUB_REF" --rules main-rules.json --staging staging.json)
           if [ "$PROMOTE" = "true" ]; then
-            gh api "repos/$REPO/environments/production" > production.json 2>/dev/null || echo null > production.json
+            read_api "repos/$REPO/environments/production" production.json
             args+=(--production production.json)
           fi
           pnpm dzd github-guard "${args[@]}"
