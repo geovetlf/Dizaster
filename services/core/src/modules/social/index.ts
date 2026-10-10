@@ -80,6 +80,8 @@ export interface FeedFilter {
   ids?: string[];
   /** Texto a buscar (ADR 0107), sin distinguir mayúsculas; usa el índice trigram de `lower(text)`. */
   text?: string;
+  /** Solo para pruebas: puntúa toda la ventana de "Para ti", sin el corte de ADR 0309, para comparar resultados. */
+  exhaustive?: boolean;
 }
 
 export type FollowType = "PROFILE" | "EVENT" | "PLACE" | "TAG" | "BUSINESS";
@@ -125,6 +127,23 @@ const POINT = "coalesce(p.public_point, s.public_point)";
 
 /** Ya pasó su retraso de publicación (ADR 0099): antes, solo su autor lo ve. */
 const VISIBLE_NOW = "(p.visible_after IS NULL OR p.visible_after <= now())";
+
+/** Mayor y menor ventaja que puede sumar `rankSql` a la hora de un post (ADR 0309). */
+const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
+export const MAX_RANK_BOOST_HOURS = sum([
+  Math.max(...Object.values(RANK_BOOST_HOURS.state)), Math.max(...Object.values(RANK_BOOST_HOURS.lifecycle)),
+  4 * RANK_BOOST_HOURS.perSeverityStep, Math.max(...RANK_BOOST_HOURS.distance.map(([, h]) => h)),
+  Math.max(0, RANK_BOOST_HOURS.followedAuthor), Math.max(0, RANK_BOOST_HOURS.lowTrustAuthor), Math.max(0, RANK_BOOST_HOURS.newAccountAuthor),
+]);
+export const MIN_RANK_BOOST_HOURS = sum([
+  Math.min(...Object.values(RANK_BOOST_HOURS.state)), Math.min(...Object.values(RANK_BOOST_HOURS.lifecycle)),
+  Math.min(0, RANK_BOOST_HOURS.followedAuthor), Math.min(0, RANK_BOOST_HOURS.lowTrustAuthor), Math.min(0, RANK_BOOST_HOURS.newAccountAuthor),
+]);
+
+/** Hora de puntuación (horas desde 1970) a fecha, con un margen de `slackSeconds` hacia fuera para no cortar de más. */
+function hoursToDate(hours: number, slackSeconds: number): Date {
+  return new Date(hours * 3_600_000 + slackSeconds * 1000);
+}
 
 function rankSql(nearSql: string | null): string {
   const B = RANK_BOOST_HOURS;
@@ -477,7 +496,15 @@ export class SocialService {
     if (f.tag) {
       where.push(`EXISTS (SELECT 1 FROM social.post_tags pt JOIN social.tags tg ON tg.id = pt.tag_id WHERE pt.post_id = p.id AND tg.normalized = $${params.push(f.tag)})`);
     }
-    if (f.tab === "nearby" && nearSql) where.push(`ST_DWithin(${POINT}, ${nearSql}, $${params.push(f.nearRadiusM ?? 25_000)})`);
+    if (f.tab === "nearby" && nearSql) {
+      const r = `$${params.push(f.nearRadiusM ?? 25_000)}`;
+      // Candidatos por los índices espaciales de posts y de señales de evento (ADR 0309); el filtro exacto sigue siendo
+      // el punto del post o, si no tiene, el de su evento.
+      where.push(`p.id IN (SELECT np.id FROM social.posts np WHERE np.public_point IS NOT NULL AND ST_DWithin(np.public_point, ${nearSql}, ${r})
+                           UNION SELECT nl.post_id FROM social.event_signals ns JOIN social.post_event_links nl ON nl.event_id = ns.event_id
+                                  WHERE ST_DWithin(ns.public_point, ${nearSql}, ${r}))`);
+      where.push(`ST_DWithin(${POINT}, ${nearSql}, ${r})`);
+    }
     if (f.tab === "videos") where.push(`EXISTS (SELECT 1 FROM social.post_media v WHERE v.post_id = p.id AND v.kind = 'VIDEO_RECORDED')`);
     if (f.tab === "following") {
       // Ids como uuid (no `author_id::text`): así el planificador usa los índices por autor y por evento (ADR 0226).
@@ -496,16 +523,12 @@ export class SocialService {
     const ranked = f.tab === "for_you" && !f.authorProfileId && !f.authorBusinessId && !f.tag && !f.eventId && !f.ids && !f.text;
     if (ranked) where.push(`p.created_at > now() - make_interval(days => ${FOR_YOU_WINDOW_DAYS})`);
     const score = ranked ? rankSql(nearSql) : `extract(epoch FROM p.created_at) / 3600.0`;
+    // Cota por fecha equivalente al cursor (ADR 0309): la puntuación es la hora del post más una ventaja acotada, así
+    // que nada con `score < cursor` puede ser más nuevo que esto. Deja recorrer el índice por fecha desde ahí.
+    if (f.cursor && !f.exhaustive) where.push(`p.created_at <= $${params.push(hoursToDate(f.cursor.score - (ranked ? MIN_RANK_BOOST_HOURS : 0), 1))}`);
     const cursor = f.cursor ? `WHERE (x.score, x.id) < ($${params.push(f.cursor.score)}::float8, $${params.push(f.cursor.id)}::uuid)` : "";
 
-    const { rows } = await q.query<{
-      id: string; kind: FeedRow["kind"]; author_visibility: string; handle: string; display_name: string; text: string | null; lang: string | null;
-      created_at: Date; category_code: string | null; event_id: string | null; distance_m: number | null; score: number;
-      media: { id: string; kind: "IMAGE" | "VIDEO_RECORDED" }[] | null; reactions: ReactionCounts | null; my_reactions: ReactionKind[]; comment_count: number; shared_post_id: string | null; share_count: number; external_share_count: number;
-      mentions: string[]; business_mentions: string[]; mine: boolean | null; edited_at: Date | null; business_verification: "UNVERIFIED" | "VERIFIED" | "INSTITUTIONAL_OFFICIAL" | null;
-      avatar_url: string | null;
-    }>(
-      `WITH x AS (
+    const withX = () => `WITH x AS (
          SELECT p.id, p.author_id, p.author_type, p.kind, p.author_visibility, coalesce(pr.handle, bp.handle) AS handle,
                 coalesce(pr.display_name, bp.name) AS display_name, bp.verification_status AS business_verification,
                 coalesce(pr.avatar_url, bp.logo_url) AS avatar_url, p.text, p.lang, p.created_at, p.edited_at, p.category_code, le.event_id,
@@ -518,7 +541,28 @@ export class SocialService {
            LEFT JOIN LATERAL (SELECT l.event_id FROM social.post_event_links l WHERE l.post_id = p.id ORDER BY l.created_at LIMIT 1) le ON true
            LEFT JOIN social.event_signals s ON s.event_id = le.event_id
           WHERE ${where.join(" AND ")}
-       )
+       )`;
+    if (ranked && !f.exhaustive) {
+      // "Para ti" sin puntuar todo el mes (ADR 0309): los `limit` posts más nuevos ya dan una puntuación mínima que la
+      // página alcanza. Un post cuya hora más la mayor ventaja posible no llega a ella no puede entrar.
+      const { rows: recent } = await q.query<{ score: number }>(
+        `${withX()} SELECT x.score FROM x ${cursor} ORDER BY x.created_at DESC, x.id DESC LIMIT $1`, [...params]);
+      if (recent.length === f.limit) {
+        const floor = Math.min(...recent.map((r) => r.score));
+        where.push(`p.created_at >= $${params.push(hoursToDate(floor - MAX_RANK_BOOST_HOURS, -1))}`);
+      }
+    }
+    // Sin ranking la puntuación es la hora del post: ordenar por la columna da el mismo orden y usa el índice.
+    const order = ranked ? "x.score DESC, x.id DESC" : "x.created_at DESC, x.id DESC";
+
+    const { rows } = await q.query<{
+      id: string; kind: FeedRow["kind"]; author_visibility: string; handle: string; display_name: string; text: string | null; lang: string | null;
+      created_at: Date; category_code: string | null; event_id: string | null; distance_m: number | null; score: number;
+      media: { id: string; kind: "IMAGE" | "VIDEO_RECORDED" }[] | null; reactions: ReactionCounts | null; my_reactions: ReactionKind[]; comment_count: number; shared_post_id: string | null; share_count: number; external_share_count: number;
+      mentions: string[]; business_mentions: string[]; mine: boolean | null; edited_at: Date | null; business_verification: "UNVERIFIED" | "VERIFIED" | "INSTITUTIONAL_OFFICIAL" | null;
+      avatar_url: string | null;
+    }>(
+      `${withX()}
        SELECT x.*,
               (SELECT json_agg(json_build_object('id', m.media_id, 'kind', m.kind) ORDER BY m.position)
                  FROM social.post_media m WHERE m.post_id = x.id) AS media,
@@ -534,7 +578,7 @@ export class SocialService {
                    ELSE EXISTS (SELECT 1 FROM social.business_profiles ob JOIN social.profiles op ON op.user_id = ob.owner_user_id
                                  WHERE ob.id = x.author_id AND op.id = $2) END AS mine
          FROM x ${cursor}
-        ORDER BY x.score DESC, x.id DESC
+        ORDER BY ${order}
         LIMIT $1`,
       params,
     );

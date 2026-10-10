@@ -1,6 +1,6 @@
 # Estado de la implementación
 
-Actualizado: 2026-10-10 (hasta ADR 0308; auditoría de preparación en `docs/PRODUCTION_READINESS_REPORT.md`). Informe de preparación para producción: `docs/PRODUCTION_READINESS_REPORT.md`.
+Actualizado: 2026-10-10 (hasta ADR 0309; auditoría de preparación en `docs/PRODUCTION_READINESS_REPORT.md`). Informe de preparación para producción: `docs/PRODUCTION_READINESS_REPORT.md`.
 
 ## Etapa 1 — Fundación (hecha)
 
@@ -496,6 +496,7 @@ Actualizado: 2026-10-10 (hasta ADR 0308; auditoría de preparación en `docs/PRO
 | Excepciones de avisos acotadas a paquete, versión y ruta; aviso en CI 14 días antes del vencimiento (ADR 0305) | ✅ | §20 |
 | Guarda de entrega: solo desde `main`, `staging` limitado a ramas protegidas, `production` sin bypass de administradores; "no verificable" distinto de "incorrecto" (ADR 0306) | ✅ | §20.11, §20.13 |
 | Node y PostgreSQL con la misma versión mayor en `.nvmrc`, `engines`, imágenes, CI y Cloud SQL; Dependabot cubre `infra/tofu/bootstrap`; #3 y #41 retenidos con condiciones; Cloud SQL no admite `h3` (ADR 0308) | ✅ | §16, §20.7 |
+| Lecturas públicas con volumen (20 000 eventos, 40 000 posts y 40 000 comentarios): ninguna recorre tablas grandes; "Para ti" con corte por ventaja acotada (mismo orden, 1,5 s → 19 ms); "Cerca" por índices espaciales; media y fin de fuentes por `uuid` (ADR 0309) | ✅ | §5.22, §8.4 |
 | Contacto configurable en el User-Agent de ingesta (`INGEST_CONTACT`), con aviso en `config-check` si falta en producción (ADR 0307) | ✅ falta el valor del propietario | §9.3 |
 | Licencias, auditoría, SBOM, Dependabot; respaldo con prueba de restauración en CI | ✅ | ADR 0070, `scripts/supply-chain.mjs`, `scripts/db-restore-check.mjs` |
 | Idioma de la app elegible en el perfil (es/en/pt/fr o del teléfono) | ✅ | ADR 0069, `app/language.tsx` |
@@ -576,7 +577,7 @@ Plano de entrega (Blueprint §20, ADR 0260–0275). Ojo con los nombres: las fas
   - ✅ `infra/tofu/` validado con `tofu validate` y escaneo, sin `apply`; imagen del backend con SBOM, manifiesto y verificación en CI (ADR 0267).
   - ✅ Firma cosign keyless y procedencia SLSA preparadas en CI, verificación en `dzd`, SLO, `env-check`, workflow `deliver`, rulesets, CODEOWNERS y `scripts/github-bootstrap.mjs` (ADR 0277).
 
-- Fase D1 — el repositorio existe desde el 2026-09-30. ✅ Informes en PR (ADR 0284). ✅ Reglas de `main` y entornos `staging` y `production`, aplicados por el propietario el 2026-10-08 (ADR 0303); la guarda de `deliver.yml` los verifica en cada entrega (ADR 0306). ✅ El agente fusiona sus PR con los 7 checks en verde (autorización del 2026-09-30). Opcional: ruleset de etiquetas `v*`.
+- Fase D1 — el repositorio existe desde el 2026-09-30. ✅ Informes en PR (ADR 0284). ✅ Reglas de `main` y entornos `staging` y `production`, aplicados por el propietario el 2026-10-08 (ADR 0303); la guarda de `deliver.yml` los verifica en cada entrega (ADR 0306). Las casillas "sin bypass de administradores" en `production` y "solo ramas protegidas" en `staging` figuran como NOT_VERIFIABLE hasta esa primera entrega; producción sigue bloqueada mientras tanto. ✅ El agente fusiona sus PR con los 7 checks en verde (autorización del 2026-09-30). Opcional: ruleset de etiquetas `v*`.
 - Fase D2 — BLOCKED_BY_OWNER / BLOCKED_BY_BILLING: necesita proyectos de Google Cloud con facturación y presupuesto autorizados (D-18 actualizada), base de staging (D-23) y plan de GitHub (D-24): Workload Identity Federation, Artifact Registry, firma cosign, despliegue a staging, verificación y rollback.
 - Fase D3 — BLOCKED_BY_OWNER: además de D2, visto bueno del propietario para el nivel 5: promoción a producción por etiqueta, despliegue gradual, respaldo previo a migraciones.
 - Verificado el 2026-10-10: Cloud SQL **no** admite la extensión `h3` (lista oficial de extensiones). Para D-23 quedan `vm`, `external` o `cloudsql` moviendo antes H3 a la aplicación (ADR 0308).
