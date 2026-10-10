@@ -540,13 +540,18 @@ export class ReportService {
         WHERE r.author_user_id = $1 ORDER BY l.accessed_at DESC LIMIT ${DATA_EXPORT_ROW_LIMIT + 1}`,
       [userId],
     );
-    // Se descifra solo para la propia persona; el valor cifrado nunca sale.
+    // Se descifra solo para la propia persona; el valor cifrado nunca sale. Un valor que no se puede descifrar (clave
+    // retirada o dato alterado) no tumba la exportación entera: sale vacío y marcado (ADR 0316).
     return {
       presenceAccesses: accesses.rows,
-      reports: rows.map(({ device_fix_enc, ...r }) => ({
-        ...r,
-        device_fix: device_fix_enc ? JSON.parse(this.d.cipher.decrypt(device_fix_enc as string, r["id"] as string)) : r["device_fix"],
-      })),
+      reports: rows.map(({ device_fix_enc, ...r }) => {
+        if (!device_fix_enc) return { ...r, device_fix: r["device_fix"] };
+        try {
+          return { ...r, device_fix: JSON.parse(this.d.cipher.decrypt(device_fix_enc as string, r["id"] as string)) };
+        } catch {
+          return { ...r, device_fix: null, precise_location_unreadable: true };
+        }
+      }),
     };
   }
 }

@@ -1,6 +1,6 @@
 # DIZASTER PRODUCTION READINESS AUDIT
 
-Fecha: 2026-10-10 · Código hasta ADR 0314 · Migraciones 0001–0107 · Todo en `main` por PR (sin force push)
+Fecha: 2026-10-10 · Código hasta ADR 0316 · Migraciones 0001–0107 · Todo en `main` por PR (sin force push)
 
 Esta auditoría compara el Blueprint con los ADR, el código y las pruebas. Solo se marca un bloqueo cuando está
 escrito qué falta y quién lo da. No se inventan decisiones, límites, precios ni capacidades. El procedimiento exacto
