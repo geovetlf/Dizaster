@@ -1,7 +1,8 @@
 # ADR 0315 — Expediente de las siete decisiones pendientes
 
-- Estado: **Propuesta. Nada de esto está aprobado por el propietario.** Cada recomendación es solo eso, hasta que
-  el propietario responda. Cuando responda, cada decisión tendrá su propio ADR, como pasó con ADR 0314.
+- Estado: **Propuesta, salvo lo que se marca como decidido.** Cinco recomendaciones siguen sin aprobar por el
+  propietario. La duración de las suspensiones y los avisos sociales los decidió el propietario el 2026-10-10. Cada decisión que se tome tendrá su
+  propio ADR, como pasó con ADR 0314.
 - Fecha: 2026-10-10
 - Relación con el Blueprint: §2 (C-06, C-07), §5.2, §5.3, §8, §13; ADR 0004, 0063, 0156, 0171, 0314
 - IA: **NO AI REQUIRED**. Costo: 0 (solo documentación).
@@ -81,32 +82,26 @@ por defecto), pero el código no lo aplica. Se aceptan reportes de cualquier pa�
 **Recomendación técnica:** aplicarlo tal como se llama cada estado. **Si no se decide:** se aceptan reportes de
 cualquier país. Es el riesgo más alto de las siete, porque abre países sin preparar.
 
-## Duración de las suspensiones
+## Duración de las suspensiones — DECIDIDO
 
-**Hoy:** `SUSPEND_USER` no vence. Dura hasta que moderación la levanta con `UNSUSPEND_USER`. Ambas acciones quedan en
-el registro y son apelables.
+**Decisión del propietario (2026-10-10, tarjeta de decisión):** «Decide cuánto dura una suspensión de cuenta.»
+Respuesta: **Escalonada**: «suspensiones de 24 horas, 7 días o permanentes: predecibles y apelables».
 
-| Alternativa | Riesgo |
-| --- | --- |
-| Duraciones estándar: 24 horas, 7 días o permanente | Hay que elegir bien la duración. El vencimiento es automático |
-| Sin vencimiento (lo de hoy) | Una suspensión corta se vuelve indefinida si nadie se acuerda de levantarla |
+**Antes de la decisión:** `SUSPEND_USER` no vencía. Duraba hasta que moderación la levantaba con `UNSUSPEND_USER`.
+Ambas acciones quedan en el registro y son apelables.
 
-**Recomendación técnica:** duraciones estándar. **Si no se decide:** cada suspensión dura hasta que moderación la
-levanta.
+La implementación tiene su propio ADR.
 
-## Avisos sociales (comentarios en mis posts y respuestas)
+## Avisos sociales (comentarios en mis posts y respuestas) — DECIDIDO
 
-**Hoy:** solo hay avisos por mención (ADR 0063), con tope por autor y respetando las horas de silencio. No hay avisos
-por comentarios ni por respuestas.
+**Decisión del propietario (2026-10-10, tarjeta de decisión):** «Decide si los avisos de comentarios y respuestas
+vienen activados en V1.» Respuesta: **Apagados**: «apagados por defecto, con límite diario: no compiten con las
+alertas».
 
-| Alternativa | Riesgo |
-| --- | --- |
-| En V1, apagados por defecto y con límite diario | Poco uso si nadie los enciende |
-| Encendidos por defecto | Compiten con las alertas de emergencia (§5.3, fatiga de avisos) |
-| Fuera de V1 (lo de hoy) | Quien publica no sabe que le respondieron hasta abrir la app |
+**Antes de la decisión:** solo había avisos por mención (ADR 0063), con tope por autor y respetando las horas de
+silencio.
 
-**Recomendación técnica:** en V1, apagados por defecto, con límite diario. **Si no se decide:** solo hay menciones,
-como hoy.
+La implementación tiene su propio ADR.
 
 ## Qué no depende de estas decisiones
 
