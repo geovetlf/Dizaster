@@ -496,6 +496,7 @@ Actualizado: 2026-10-10 (hasta ADR 0308; auditoría de preparación en `docs/PRO
 | Excepciones de avisos acotadas a paquete, versión y ruta; aviso en CI 14 días antes del vencimiento (ADR 0305) | ✅ | §20 |
 | Guarda de entrega: solo desde `main`, `staging` limitado a ramas protegidas, `production` sin bypass de administradores; "no verificable" distinto de "incorrecto" (ADR 0306) | ✅ | §20.11, §20.13 |
 | Node y PostgreSQL con la misma versión mayor en `.nvmrc`, `engines`, imágenes, CI y Cloud SQL; Dependabot cubre `infra/tofu/bootstrap`; #3 y #41 retenidos con condiciones; Cloud SQL no admite `h3` (ADR 0308) | ✅ | §16, §20.7 |
+| Contacto configurable en el User-Agent de ingesta (`INGEST_CONTACT`), con aviso en `config-check` si falta en producción (ADR 0307) | ✅ falta el valor del propietario | §9.3 |
 | Licencias, auditoría, SBOM, Dependabot; respaldo con prueba de restauración en CI | ✅ | ADR 0070, `scripts/supply-chain.mjs`, `scripts/db-restore-check.mjs` |
 | Idioma de la app elegible en el perfil (es/en/pt/fr o del teléfono) | ✅ | ADR 0069, `app/language.tsx` |
 | Varias cuentas en un teléfono corroboran como una (clave seudónima del teléfono) | ✅ | ADR 0068, migración 0036 |
@@ -604,4 +605,4 @@ Bloqueadas o en espera:
 - **BLOCKED_BY_OWNER** — Organizaciones para donar (ADR 0274): el directorio está vacío hasta que el propietario verifique y cargue cada una.
 - **Repositorio oficial**: https://github.com/geovetlf/Dizaster (creado por el propietario el 2026-09-30). Reglas de `main` y entornos aplicados el 2026-10-08 (ADR 0303). Pendiente: variables de Actions (`scripts/github-bootstrap.mjs`, cuando existan los proyectos de D-18) y, opcional, el ruleset de etiquetas.
 - **BLOCKED_BY_BILLING** — Proyectos de Google Cloud, facturación y presupuesto (D-18); base de staging (D-23); plan de GitHub (D-24). Hasta entonces `dzd deploy/promote/rollback` solo corren en seco y `infra/tofu` no se aplica.
-- **BLOQUEADA** — Contacto del cliente de ingesta (§9.3): el User-Agent dice "contacto pendiente"; falta el correo o URL de contacto del propietario.
+- **BLOCKED_BY_OWNER (solo el valor)** — Contacto del cliente de ingesta (§9.3): el mecanismo está listo (`INGEST_CONTACT`, ADR 0307); falta el correo o URL de contacto del propietario. Sin él, el User-Agent dice "contacto pendiente" y `dzd config-check` lo avisa.
