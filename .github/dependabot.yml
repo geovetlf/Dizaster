@@ -27,9 +27,9 @@ updates:
   - package-ecosystem: github-actions
     directory: /
     schedule: { interval: monthly }
-  # IaC e imágenes base (ADR 0267).
+  # IaC e imágenes base (ADR 0267). Todas las raíces de OpenTofu (lo comprueba `pnpm check:workflows`, ADR 0308).
   - package-ecosystem: terraform
-    directories: [/infra/tofu/envs/staging, /infra/tofu/envs/production]
+    directories: [/infra/tofu/bootstrap, /infra/tofu/envs/staging, /infra/tofu/envs/production]
     schedule: { interval: monthly }
   - package-ecosystem: docker
     directory: /infra/docker
