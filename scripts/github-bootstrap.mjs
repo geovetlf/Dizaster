@@ -61,12 +61,14 @@ for (const f of [".github/rulesets/main.json", ".github/rulesets/tags.json"]) {
   run("gh", ["api", "-X", "POST", `repos/${repo}/rulesets`, "--input", "-"], readFileSync(f, "utf8"));
 }
 
-// 4) Entornos: production solo con aprobación del propietario y solo desde main.
+// 4) Entornos: production solo con aprobación del propietario, sin bypass de administradores y solo desde main.
 const ownerId = execute ? run("gh", ["api", `users/${owner}`, "--jq", ".id"]).trim() : "<id>";
 const envBody = (reviewers) => JSON.stringify({
   wait_timer: 0,
   prevent_self_review: false,
   reviewers: reviewers ? [{ type: "User", id: Number(ownerId) || 0 }] : [],
+  // Sin esto GitHub deja que un administrador despliegue a production sin la aprobación (ADR 0306).
+  ...(reviewers ? { can_admins_bypass: false } : {}),
   deployment_branch_policy: { protected_branches: true, custom_branch_policies: false },
 });
 run("gh", ["api", "-X", "PUT", `repos/${repo}/environments/staging`, "--input", "-"], envBody(false));

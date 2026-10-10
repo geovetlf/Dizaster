@@ -37,17 +37,40 @@ function licenses() {
   console.log("Licencias: OK");
 }
 
+const DAY = 86_400_000;
+
+/**
+ * Un aviso solo queda aceptado si coincide todo lo que dice la excepción: id, paquete, versiones instaladas y
+ * rutas por las que llega (ADR 0305). Si aparece otra versión o el paquete entra por otro camino (por ejemplo, desde
+ * el backend), el aviso vuelve a bloquear aunque el id siga en la lista. Vencido `reviewBy`, bloquea siempre.
+ */
+export function blockingAdvisories(report, allow, today) {
+  const covers = (entry, id, a) => String(entry.id) === id && entry.reviewBy >= today && entry.package === a.module_name
+    && (a.findings ?? []).length > 0
+    && a.findings.every((f) => entry.versions.includes(f.version)
+      && f.paths.length > 0 && f.paths.every((path) => entry.paths.some((pattern) => glob(pattern, path))));
+  return Object.entries(report.advisories ?? {})
+    .filter(([id, a]) => (a.severity === "high" || a.severity === "critical") && !allow.some((e) => covers(e, id, a)));
+}
+
+/** Excepciones que vencen dentro de `days` días: CI las anuncia para que la revisión no llegue por sorpresa. */
+export function expiringSoon(allow, today, days = 14) {
+  const limit = new Date(Date.parse(today) + days * DAY).toISOString().slice(0, 10);
+  return allow.filter((a) => a.reviewBy >= today && a.reviewBy <= limit);
+}
+
 function audit() {
   let raw;
   try { raw = pnpm(["audit", "--prod", "--json"]); } catch (e) { raw = e.stdout; } // pnpm audit sale con 1 si hay avisos
   const report = JSON.parse(raw);
   const allow = readJson("security/audit-allowlist.json").advisories;
   const today = new Date().toISOString().slice(0, 10);
-  const accepted = new Set(allow.filter((a) => a.reviewBy >= today).map((a) => String(a.id)));
-  const blocking = Object.entries(report.advisories ?? {})
-    .filter(([id, a]) => (a.severity === "high" || a.severity === "critical") && !accepted.has(id));
+  const blocking = blockingAdvisories(report, allow, today);
   const counts = report.metadata?.vulnerabilities ?? {};
   console.log(`Avisos: ${JSON.stringify(counts)}`);
+  for (const a of expiringSoon(allow, today)) {
+    console.log(`::warning title=Excepción de seguridad por vencer::${a.package} (${a.ghsa}) vence el ${a.reviewBy}; revisar antes (ADR 0304)`);
+  }
   if (blocking.length) {
     for (const [id, a] of blocking) console.error(`  ${a.severity} ${id} ${a.module_name} ${a.vulnerable_versions}: ${a.title}`);
     process.exit(1);
