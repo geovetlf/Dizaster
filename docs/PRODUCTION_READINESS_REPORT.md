@@ -1,6 +1,6 @@
 # DIZASTER PRODUCTION READINESS AUDIT
 
-Fecha: 2026-10-10 · Código hasta ADR 0312 · Migraciones 0001–0107 · Todo en `main` por PR (sin force push)
+Fecha: 2026-10-10 · Código hasta ADR 0313 · Migraciones 0001–0107 · Todo en `main` por PR (sin force push)
 
 Esta auditoría compara el Blueprint con los ADR, el código y las pruebas. Solo se marca un bloqueo cuando está
 escrito qué falta y quién lo da. No se inventan decisiones, límites, precios ni capacidades. El procedimiento exacto
@@ -49,6 +49,7 @@ tiendas y credenciales, decisiones de producto y revisión legal. Nada de eso lo
 | Planes con volumen de lecturas con sesión y de moderación: 60 000 avisos, 40 000 reportes, 20 000 casos | ✅ En cada `pnpm check`: 16 lecturas sin recorrer tablas grandes. Tres índices nuevos: el detalle del caso pasó de 13,7 a 3,9 ms y la cola de 38,7 a 21,3 ms (ADR 0310) |
 | Planes con volumen del camino de un reporte y de 13 trabajos de mantenimiento | ✅ En cada `pnpm check`: ninguno recorre una tabla grande. Cinco índices nuevos: dos reportes con alertas y envío pasaron de 185 a 123 ms (ADR 0311) |
 | Cola de moderación sin consultas por caso | ✅ En cada `pnpm check`: cada fila de más cuesta como mucho una consulta. La cola de 50 casos pasó de 151 a 52 consultas (ADR 0312) |
+| Resto de lecturas con sesión | ✅ Diez más en la prueba de planes. Los informes de calidad y transparencia recorren su periodo a propósito (ADR 0313) |
 | OSV-Scanner y `pnpm audit` | ✅ En GitHub Actions. Solo dos avisos HIGH sin arreglo upstream (`node-forge`, `braces`, herramientas de Expo), aceptados por el propietario hasta el 2026-11-07 y acotados a versión y ruta (ADR 0304, 0305) |
 | Push a `github.com/geovetlf/Dizaster` | ✅ Sin force push. `main` protegida desde el 2026-10-08: cada cambio entra por PR con los 7 jobs de CI en verde (check, delivery, report-comment, supply-chain, security, iac, image); PRs #10–#52 |
 
