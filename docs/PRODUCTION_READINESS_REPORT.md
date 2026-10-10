@@ -1,6 +1,6 @@
 # DIZASTER PRODUCTION READINESS AUDIT
 
-Fecha: 2026-10-10 · Código hasta ADR 0314 · Migraciones 0001–0107 · Todo en `main` por PR (sin force push)
+Fecha: 2026-10-10 · Código hasta ADR 0315 · Migraciones 0001–0107 · Todo en `main` por PR (sin force push)
 
 Esta auditoría compara el Blueprint con los ADR, el código y las pruebas. Solo se marca un bloqueo cuando está
 escrito qué falta y quién lo da. No se inventan decisiones, límites, precios ni capacidades. El procedimiento exacto
@@ -318,7 +318,7 @@ Cada fila dice qué falta, por qué el agente no puede resolverlo, qué quedó l
 | Fuentes del piloto (IGP, INDECI, SENAMHI) | Validar feeds y términos de uso | Términos de terceros; el agente no los acepta por el propietario | Registro de fuentes, ingesta con reintentos y escalonada, USGS activo | temporal | Propietario: confirmar términos de cada fuente | 0 |
 | FIRMS | `MAP_KEY` gratuita | Credencial del propietario | Adaptador listo (ADR 0067) | temporal | Propietario: pedir la clave en NASA FIRMS | 0 |
 | Contacto de ingesta | Correo o URL | Dato del propietario | `INGEST_CONTACT` y aviso en `config-check` (ADR 0307) | temporal | Propietario: dar el contacto | 0 |
-| Decisiones de producto | D1, D2, D3, uso sin cuenta, estado de lanzamiento por país, duración de suspensiones, avisos sociales | Son decisiones de producto | Todo lo que no depende de ellas | temporal | Propietario: responder cada una | 0 |
+| Decisiones de producto | D1, D2, D3, uso sin cuenta, estado de lanzamiento por país, duración de suspensiones, avisos sociales | Son decisiones de producto | Todo lo que no depende de ellas; expediente con alternativas y riesgos en ADR 0315 | temporal | Propietario: responder cada una | 0 |
 | Fronteras en disputa (D-17) | Otros países | Decisión legal y de producto | Piloto: límites oficiales de Perú (ADR 0314) | permanente hasta asesoría | Asesoría antes de abrir otro país | Según asesoría |
 | Datos y revisiones | Revisión nativa de pt y fr, listas de términos, organizaciones para donar, textos regionales | Requieren personas con conocimiento local | Mecanismos con listas vacías | temporal | Propietario: proveerlos | 0 |
 | Pruebas reales | Dispositivo, push, staging, producción | Necesitan los bloqueos anteriores | Ensayo local completo de la entrega (ADR 0282), guardas, rollback | condicionado | Primer APK, luego staging | — |

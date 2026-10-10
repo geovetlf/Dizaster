@@ -1,6 +1,6 @@
 # Estado de la implementación
 
-Actualizado: 2026-10-10 (hasta ADR 0314; auditoría de preparación en `docs/PRODUCTION_READINESS_REPORT.md`). Informe de preparación para producción: `docs/PRODUCTION_READINESS_REPORT.md`.
+Actualizado: 2026-10-10 (hasta ADR 0315; auditoría de preparación en `docs/PRODUCTION_READINESS_REPORT.md`). Informe de preparación para producción: `docs/PRODUCTION_READINESS_REPORT.md`.
 
 ## Etapa 1 — Fundación (hecha)
 
@@ -502,6 +502,7 @@ Actualizado: 2026-10-10 (hasta ADR 0314; auditoría de preparación en `docs/PRO
 | Cola de moderación sin consultas por caso: motivos de toda la página en una consulta (cola de 50: 151 → 52 consultas, 29,9 → ~15 ms) y sin vista previa para la fila de más de las apelaciones (ADR 0312) | ✅ | §5.22, §13 |
 | Resto de lecturas con sesión con volumen: 10 lecturas más de `/v1/me` y `/v1/admin` en la prueba de planes; los informes de calidad y transparencia y la exportación quedan fuera, con motivo (ADR 0313) | ✅ | §5.22, §13.3 |
 | Decisiones D-23 (staging en VM, validado en `envs/staging`) y D-17 (piloto con límites oficiales de Perú) (ADR 0314) | ✅ | §11.5, §20 |
+| Expediente de las siete decisiones pendientes: comportamiento actual, alternativas, riesgos, recomendación y qué pasa si no se decide. Propuesta, no aprobada (ADR 0315) | ✅ | §2, §5, §13 |
 | Contacto configurable en el User-Agent de ingesta (`INGEST_CONTACT`), con aviso en `config-check` si falta en producción (ADR 0307) | ✅ falta el valor del propietario | §9.3 |
 | Licencias, auditoría, SBOM, Dependabot; respaldo con prueba de restauración en CI | ✅ | ADR 0070, `scripts/supply-chain.mjs`, `scripts/db-restore-check.mjs` |
 | Idioma de la app elegible en el perfil (es/en/pt/fr o del teléfono) | ✅ | ADR 0069, `app/language.tsx` |
@@ -588,6 +589,8 @@ Plano de entrega (Blueprint §20, ADR 0260–0275). Ojo con los nombres: las fas
 - Verificado el 2026-10-10: Cloud SQL **no** admite la extensión `h3` (lista oficial de extensiones). D-23 decidido el 2026-10-10: staging en `vm` (ADR 0314).
 
 Bloqueadas o en espera:
+
+Las siete decisiones de producto abiertas tienen su expediente en ADR 0315 (propuesta; ninguna recomendación está aprobada).
 
 - **BLOQUEADA** — Primer APK real de Android: falta `EXPO_TOKEN` (cuenta gratuita de Expo del propietario) o una computadora con el Android SDK; el SDK no se puede descargar en el entorno del agente. `expo prebuild` verificado; pasos locales en `docs/MOBILE_PLATFORMS.md` (ADR 0218).
 - **BLOQUEADA** — Video 720p también en Android (§12.1, paridad): necesita transcodificar en el teléfono (módulo local con Media3 Transformer, Apache-2.0, sin coste). Es código nativo nuevo que no se puede compilar ni probar aquí (sin SDK de Android); se hace con el primer build de desarrollo (EXPO_TOKEN). Mientras tanto el límite de 60 MB acota el coste.
