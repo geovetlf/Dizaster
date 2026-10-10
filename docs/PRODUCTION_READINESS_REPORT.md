@@ -1,6 +1,6 @@
 # DIZASTER PRODUCTION READINESS AUDIT
 
-Fecha: 2026-10-10 · Código hasta ADR 0311 · Migraciones 0001–0107 · Todo en `main` por PR (sin force push)
+Fecha: 2026-10-10 · Código hasta ADR 0312 · Migraciones 0001–0107 · Todo en `main` por PR (sin force push)
 
 Esta auditoría compara el Blueprint con los ADR, el código y las pruebas. Solo se marca un bloqueo cuando está
 escrito qué falta y quién lo da. No se inventan decisiones, límites, precios ni capacidades. El procedimiento exacto
@@ -48,6 +48,7 @@ tiendas y credenciales, decisiones de producto y revisión legal. Nada de eso lo
 | Planes de consulta con volumen: 20 000 eventos, 40 000 posts y 40 000 comentarios | ✅ En cada `pnpm check`: ninguna lectura pública caliente recorre una tabla grande. "Para ti" con sesión pasó de 1,5 s a 19 ms (ADR 0309) |
 | Planes con volumen de lecturas con sesión y de moderación: 60 000 avisos, 40 000 reportes, 20 000 casos | ✅ En cada `pnpm check`: 16 lecturas sin recorrer tablas grandes. Tres índices nuevos: el detalle del caso pasó de 13,7 a 3,9 ms y la cola de 38,7 a 21,3 ms (ADR 0310) |
 | Planes con volumen del camino de un reporte y de 13 trabajos de mantenimiento | ✅ En cada `pnpm check`: ninguno recorre una tabla grande. Cinco índices nuevos: dos reportes con alertas y envío pasaron de 185 a 123 ms (ADR 0311) |
+| Cola de moderación sin consultas por caso | ✅ En cada `pnpm check`: cada fila de más cuesta como mucho una consulta. La cola de 50 casos pasó de 151 a 52 consultas (ADR 0312) |
 | OSV-Scanner y `pnpm audit` | ✅ En GitHub Actions. Solo dos avisos HIGH sin arreglo upstream (`node-forge`, `braces`, herramientas de Expo), aceptados por el propietario hasta el 2026-11-07 y acotados a versión y ruta (ADR 0304, 0305) |
 | Push a `github.com/geovetlf/Dizaster` | ✅ Sin force push. `main` protegida desde el 2026-10-08: cada cambio entra por PR con los 7 jobs de CI en verde (check, delivery, report-comment, supply-chain, security, iac, image); PRs #10–#52 |
 
@@ -145,7 +146,8 @@ En orden de impacto:
 3. **Latencia sin datos reales.** Mitigado el 2026-10-10 (ADR 0309). Con 20 000 eventos, 40 000 posts y 40 000
    comentarios, ninguna lectura pública caliente recorre una tabla grande, y una prueba lo exige en cada `pnpm check`.
    El feed era el único caso lento y bajó de 1,5 s a 19 ms. Lo mismo para 16 lecturas con sesión y de moderación
-   (ADR 0310), para el camino de un reporte y para los trabajos de mantenimiento (ADR 0311). Falta medir en
+   (ADR 0310), para el camino de un reporte y para los trabajos de mantenimiento (ADR 0311). La cola de moderación ya no lanza
+   consultas por caso (ADR 0312). Falta medir en
    staging, con la red y los datos reales.
 4. **Límite por IP.** Detrás de un balanceador o CDN mal configurado, todas las personas compartirían una IP y el
    límite de 300 por minuto las frenaría. La IaC ya pone `TRUST_PROXY=true`; falta confirmar en staging que la API ve la IP de cada cliente.
