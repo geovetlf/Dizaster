@@ -95,6 +95,12 @@ const Env = z.object({
   MEDIA_DAILY_UPLOAD_MB: z.coerce.number().int().min(60).default(300),
   /** Días que se guarda el crudo de cada fuente (ADR 0075); 0 = no se guarda. */
   SOURCE_RAW_RETENTION_DAYS: z.coerce.number().int().min(0).max(365).default(30),
+  /**
+   * Contacto que va en el User-Agent del cliente de ingesta (Blueprint §9.3, ADR 0307): un correo o una URL https
+   * donde una fuente pueda escribir si algo la molesta. Vacío = "contacto pendiente".
+   */
+  INGEST_CONTACT: z.union([z.literal(""), z.string().trim().max(200)
+    .regex(/^(https:\/\/[^\s()]+|[^\s@()]+@[^\s@()]+\.[^\s@()]+)$/, "debe ser un correo o una URL https")]).optional(),
   /** MFA TOTP para moderación y administración (ADR 0090). "auto" = exigida solo en producción. */
   STAFF_MFA_REQUIRED: z.enum(["auto", "true", "false"]).default("auto"),
   MEDIA_UPLOAD_URL_TTL_SECONDS: z.coerce.number().int().min(60).max(3600).default(900),
@@ -153,6 +159,15 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): AppEnv {
 }
 
 /** Acepta un secreto en claro o en base64 (cómodo para variables de entorno de una sola línea). */
+/** Lo que no impide arrancar pero conviene corregir antes de consultar fuentes reales (lo muestra `dzd config-check`). */
+export function configWarnings(env: AppEnv): string[] {
+  const warnings: string[] = [];
+  if (env.NODE_ENV === "production" && !env.INGEST_CONTACT) {
+    warnings.push("INGEST_CONTACT vacío: las fuentes verán \"contacto pendiente\" en el User-Agent de ingesta");
+  }
+  return warnings;
+}
+
 export function decodeSecret(v: string): string {
   const t = v.trim();
   return t.startsWith("-----") || t.startsWith("{") ? t : Buffer.from(t, "base64").toString("utf8");

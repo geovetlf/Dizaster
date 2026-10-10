@@ -23,7 +23,7 @@ import { TrustService } from "./modules/trust/index.js";
 import { APPLE_ISSUERS, DevAttestationVerifier, ExternalAuthService, GOOGLE_ISSUERS, IdentityService, MfaService, OidcIdTokenVerifier, appleKeys, googleKeys, type AttestationVerifier } from "./modules/identity/index.js";
 import type { JWTVerifyGetKey } from "jose";
 import { DisabledEmailSender, LogEmailSender, type EmailSender } from "./platform/email.js";
-import { IngestionScheduler, IngestionService, InstitutionService, NodeHttpFetcher, type HttpFetcher } from "./modules/ingestion/index.js";
+import { IngestionScheduler, IngestionService, InstitutionService, NodeHttpFetcher, ingestionUserAgent, type HttpFetcher } from "./modules/ingestion/index.js";
 import { LocalDiskStorage, MediaService, S3Storage, type StorageProvider } from "./modules/media/index.js";
 import { QualityService } from "./modules/quality/index.js";
 import { ReferenceData } from "./modules/reference/index.js";
@@ -90,7 +90,7 @@ export function buildContainer(env: AppEnv, overrides: { db?: Db; clock?: Clock;
   // Claves de fuentes (SOURCE_KEY_*) y secretos de push (SOURCE_PUSH_SECRET_*): solo del entorno (ADR 0067, 0128).
   const sourceSecrets = Object.fromEntries(Object.entries(process.env).filter(([k]) => k.startsWith("SOURCE_KEY_") || k.startsWith("SOURCE_PUSH_SECRET_")));
   const storage = overrides.storage ?? buildStorage(env, clock);
-  const ingestionScheduler = new IngestionScheduler(db, ingestion, overrides.fetcher ?? new NodeHttpFetcher(), clock, sourceSecrets,
+  const ingestionScheduler = new IngestionScheduler(db, ingestion, overrides.fetcher ?? new NodeHttpFetcher({ timeoutMs: 15_000, maxBytes: 10 * 1024 * 1024, userAgent: ingestionUserAgent(env.INGEST_CONTACT) }), clock, sourceSecrets,
     env.SOURCE_RAW_RETENTION_DAYS > 0 ? { storage, retentionDays: env.SOURCE_RAW_RETENTION_DAYS } : null,
     // `cost` se crea más abajo; la función solo se evalúa en cada tick (ADR 0138).
     () => cost.isKilled(INGESTION_NORMAL_KILL_SWITCH));
