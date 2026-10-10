@@ -30,24 +30,19 @@ function seqScans(node: PlanNode, big: ReadonlySet<string>, out: string[] = []):
   return out;
 }
 
-/**
- * Ejecuta la petición, guarda cada SELECT que lanzó y devuelve las tablas grandes (`esquema.tabla`) que alguno
- * recorre entera.
- */
-export async function scansOf(
-  t: TestContext, url: string, big: ReadonlySet<string>, user?: TestUser,
-): Promise<{ status: number; queries: number; scans: string[] }> {
+/** Ejecuta `action`, guarda cada consulta que lee filas y devuelve las tablas grandes (`esquema.tabla`) que alguna recorre entera. */
+export async function scansDuring(t: TestContext, action: () => Promise<unknown>, big: ReadonlySet<string>): Promise<{ queries: number; scans: string[] }> {
   const seen: { text: string; values: unknown[] }[] = [];
   const proto = pg.Client.prototype as unknown as { query: (...a: unknown[]) => unknown };
   const original = proto.query;
   proto.query = function (this: unknown, ...a: unknown[]) {
     const [text, values] = a;
-    if (typeof text === "string" && /^\s*(SELECT|WITH)\b/i.test(text)) seen.push({ text, values: Array.isArray(values) ? values : [] });
+    // Lecturas y escrituras que buscan filas; un INSERT ... VALUES no recorre nada. EXPLAIN sin ANALYZE no ejecuta.
+    if (typeof text === "string" && /^\s*(SELECT|WITH|UPDATE|DELETE|INSERT\b[\s\S]*\bSELECT\b)/i.test(text)) seen.push({ text, values: Array.isArray(values) ? values : [] });
     return original.apply(this, a);
   };
-  let status: number;
   try {
-    status = (await t.app.inject({ url, ...(user ? { headers: { authorization: `Bearer ${user.token}` } } : {}) })).statusCode;
+    await action();
   } finally {
     proto.query = original;
   }
@@ -56,5 +51,16 @@ export async function scansOf(
     const { rows } = await t.c.db.query<{ "QUERY PLAN": { Plan: PlanNode }[] }>(`EXPLAIN (VERBOSE, FORMAT JSON) ${q.text}`, q.values);
     for (const rel of seqScans(rows[0]!["QUERY PLAN"][0]!.Plan, big)) scans.push(`${rel} ← ${q.text.replace(/\s+/g, " ").trim().slice(0, 160)}`);
   }
-  return { status, queries: seen.length, scans };
+  return { queries: seen.length, scans: [...new Set(scans)] };
+}
+
+/** Lo mismo para una petición GET: además devuelve su estado HTTP. */
+export async function scansOf(
+  t: TestContext, url: string, big: ReadonlySet<string>, user?: TestUser,
+): Promise<{ status: number; queries: number; scans: string[] }> {
+  let status = 0;
+  const r = await scansDuring(t, async () => {
+    status = (await t.app.inject({ url, ...(user ? { headers: { authorization: `Bearer ${user.token}` } } : {}) })).statusCode;
+  }, big);
+  return { status, ...r };
 }
