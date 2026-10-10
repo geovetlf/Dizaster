@@ -21,8 +21,8 @@ Orden recomendado: 1 → 2 → 3 → 4 → 5. El resto no depende del orden.
     administrators to bypass configured protection rules" **desmarcada**.
 
   Si algo falta, la entrega se detiene con el motivo ("incorrecto"). Si la API no responde, también se detiene ("no
-  verificable"). Desde la sesión del agente los entornos no se pueden leer: su estado figura como no verificado hasta la
-  primera ejecución de `deliver.yml`.
+  verificable"). Desde la sesión del agente los entornos no se pueden leer: las dos casillas figuran como **NOT_VERIFIABLE**
+  hasta la primera ejecución de `deliver.yml`, y producción sigue bloqueada mientras tanto.
 - **Propietario, si la primera entrega se detiene por un entorno:** abrir Settings → Environments, corregir lo que diga
   el mensaje y volver a lanzar la entrega.
 - El agente fusiona solo con `squash`, con los 7 checks en verde.

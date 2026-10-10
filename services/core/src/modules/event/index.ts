@@ -1135,7 +1135,7 @@ export class EventService {
         WHERE t.event_id = $1 AND t.type = 'MEDIA_ADDED' AND t.visibility = 'PUBLIC'
           AND ($2::uuid IS NULL OR (t.at, t.id) > (SELECT c.at, c.id FROM event.timeline c WHERE c.id = $2::uuid))
           AND NOT EXISTS (SELECT 1 FROM event.evidence e
-                           WHERE e.evidence_type = 'CITIZEN_REPORT' AND e.ref_id::text = t.payload->>'reportId'
+                           WHERE e.evidence_type = 'CITIZEN_REPORT' AND e.ref_id = (t.payload->>'reportId')::uuid
                              AND e.status IN ('MODERATED','DETACHED'))
         ORDER BY t.at, t.id LIMIT $3`,
       [eventId, p.cursor ?? null, p.limit],
@@ -1402,9 +1402,10 @@ export class EventService {
       `SELECT e.id, e.status, array_agg(ev.ref_id::text) AS refs
          FROM event.events e JOIN event.evidence ev ON ev.event_id = e.id AND ev.status = 'ACTIVE'
         WHERE e.status IN ('ACTIVE','MONITORING') AND e.merged_into_id IS NULL
-          AND e.id IN (SELECT event_id FROM event.evidence WHERE ref_id::text = ANY($1) AND status = 'ACTIVE')
+          AND e.id IN (SELECT event_id FROM event.evidence
+                        WHERE evidence_type IN ('EXTERNAL_ITEM','OFFICIAL_ITEM','SENSOR') AND ref_id = ANY($1::uuid[]) AND status = 'ACTIVE')
         GROUP BY e.id, e.status
-       HAVING bool_and(ev.ref_id::text = ANY($1))`,
+       HAVING bool_and(ev.ref_id = ANY($1::uuid[]))`,
       [[...reasonById.keys()]],
     );
     for (const r of rows) {
