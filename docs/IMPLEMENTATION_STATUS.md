@@ -1,6 +1,6 @@
 # Estado de la implementación
 
-Actualizado: 2026-10-10 (hasta ADR 0311; auditoría de preparación en `docs/PRODUCTION_READINESS_REPORT.md`). Informe de preparación para producción: `docs/PRODUCTION_READINESS_REPORT.md`.
+Actualizado: 2026-10-10 (hasta ADR 0312; auditoría de preparación en `docs/PRODUCTION_READINESS_REPORT.md`). Informe de preparación para producción: `docs/PRODUCTION_READINESS_REPORT.md`.
 
 ## Etapa 1 — Fundación (hecha)
 
@@ -499,6 +499,7 @@ Actualizado: 2026-10-10 (hasta ADR 0311; auditoría de preparación en `docs/PRO
 | Lecturas públicas con volumen (20 000 eventos, 40 000 posts y 40 000 comentarios): ninguna recorre tablas grandes; "Para ti" con corte por ventaja acotada (mismo orden, 1,5 s → 19 ms); "Cerca" por índices espaciales; media y fin de fuentes por `uuid` (ADR 0309) | ✅ | §5.22, §8.4 |
 | Lecturas con sesión y de moderación con volumen (60 000 avisos, 40 000 reportes, 20 000 casos): 16 lecturas sin recorrer tablas grandes; 3 índices nuevos (migración 0106) para mis reportes, cola y detalle de moderación y registro de presencia (ADR 0310) | ✅ | §5.22, §13 |
 | Camino de un reporte y 13 trabajos de mantenimiento con volumen: sin recorrer tablas grandes; 5 índices (migración 0107) para cupo por teléfono, fusiones heredadas, cifrado de fixes antiguos y retención de avisos y ubicaciones (ADR 0311) | ✅ | §5.22, §13.2 |
+| Cola de moderación sin consultas por caso: motivos de toda la página en una consulta (cola de 50: 151 → 52 consultas, 29,9 → ~15 ms) y sin vista previa para la fila de más de las apelaciones (ADR 0312) | ✅ | §5.22, §13 |
 | Contacto configurable en el User-Agent de ingesta (`INGEST_CONTACT`), con aviso en `config-check` si falta en producción (ADR 0307) | ✅ falta el valor del propietario | §9.3 |
 | Licencias, auditoría, SBOM, Dependabot; respaldo con prueba de restauración en CI | ✅ | ADR 0070, `scripts/supply-chain.mjs`, `scripts/db-restore-check.mjs` |
 | Idioma de la app elegible en el perfil (es/en/pt/fr o del teléfono) | ✅ | ADR 0069, `app/language.tsx` |

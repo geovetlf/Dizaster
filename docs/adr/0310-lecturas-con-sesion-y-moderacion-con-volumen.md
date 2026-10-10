@@ -58,7 +58,7 @@ Sin los índices, la prueba falla en esas cuatro lecturas.
 - La cola de moderación y las apelaciones siguen armando cada fila de la página con consultas propias: resumen y
   vista previa del objetivo. Ese trabajo está acotado por el tamaño de página (20 casos, 50 apelaciones) y ahora usa
   índices. No se cambió, porque reescribirlo tocaría la vista previa de cada tipo de objetivo, y con 18–21 ms no lo
-  justifica.
+  justifica. Actualización: ADR 0312 quitó el resumen por caso; queda la vista previa.
 - La cola de duplicados con muchos pares abiertos frente a pocos eventos recorre los eventos. Ese plan es correcto a
   ese tamaño. Con la proporción real, una cola corta frente a todos los eventos, usa índices.
 - Los tiempos son locales. La latencia real se mide en staging (D-18, D-23).

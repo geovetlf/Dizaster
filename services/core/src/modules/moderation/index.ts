@@ -77,6 +77,14 @@ const INVERSE: Partial<Record<ModerationActionType, ModerationActionType>> = {
   HIDE: "RESTORE", REMOVE: "RESTORE", LIMIT: "RESTORE", SUSPEND_USER: "UNSUSPEND_USER",
 };
 
+interface CaseRow {
+  id: string; status: CaseStatus; priority: number; target_type: FlagTargetType; target_id: string; opened_at: Date; updated_at: Date;
+  claimed_by: string | null; claimed_until: Date | null;
+}
+/** Columnas del resumen de un caso. Una toma vencida no se muestra. */
+const CASE_COLUMNS = `id, status, priority, target_type, target_id, opened_at, updated_at, claimed_by,
+       CASE WHEN claimed_until > now() THEN claimed_until END AS claimed_until`;
+
 interface ActionRow {
   id: string; action: ModerationActionType; reason: string; actor: "RULE" | "MODERATOR"; target_type: FlagTargetType; target_id: string; created_at: Date;
 }
@@ -283,14 +291,15 @@ export class ModerationService {
       if (!p || !at || !id) throw new DomainError("VALIDATION", "Cursor inválido");
       cursor = `AND (-priority, opened_at, id) > (-$${params.push(Number(p))}::real, $${params.push(at)}::timestamptz, $${params.push(id)}::uuid)`;
     }
-    const { rows } = await this.db.query<{ id: string; priority: number; opened_at: Date }>(
+    const { rows } = await this.db.query<CaseRow>(
       // Lo que otra persona tomó y no venció no aparece en la cola (ADR 0134).
-      `SELECT id, priority, opened_at FROM moderation.cases
+      `SELECT ${CASE_COLUMNS} FROM moderation.cases
         WHERE status = $1 AND (claimed_until IS NULL OR claimed_until <= now() OR claimed_by IS NOT DISTINCT FROM $3::uuid) ${cursor}
         ORDER BY priority DESC, opened_at, id LIMIT $2`,
       params,
     );
-    const cases = await Promise.all(rows.map((r) => this.summary(this.db, r.id, viewerUserId)));
+    // La página entera con una consulta de motivos, no dos consultas por caso (ADR 0312).
+    const cases = await this.summaries(this.db, rows, viewerUserId);
     const last = rows[rows.length - 1];
     return {
       cases,
@@ -535,13 +544,14 @@ export class ModerationService {
     const open = status === "OPEN";
     const rows = await this.appealRows(
       `ap.status = $1 AND ($2::uuid IS NULL OR ap.id ${open ? ">" : "<"} $2) ORDER BY ap.id ${open ? "ASC" : "DESC"} LIMIT $3`,
-      [status, opts.cursor ?? null, limit + 1],
+      [status, opts.cursor ?? null, limit + 1], limit,
     );
     const page = rows.slice(0, limit);
     return { appeals: page, nextCursor: rows.length > limit ? page[page.length - 1]!.id : null };
   }
 
-  private async appealRows(where: string, params: unknown[]): Promise<AppealView[]> {
+  /** `previews`: cuántas filas llevan vista previa; la fila de más que solo dice si hay otra página no la necesita. */
+  private async appealRows(where: string, params: unknown[], previews = Infinity): Promise<AppealView[]> {
     const { rows } = await this.db.query<ActionRow & { appeal_id: string; appeal_status: AppealView["status"]; text: string; appeal_at: Date }>(
       `SELECT a.id, a.action, a.reason, a.actor, a.target_type, a.target_id, a.created_at,
               ap.id AS appeal_id, ap.status AS appeal_status, ap.text, ap.created_at AS appeal_at
@@ -549,9 +559,9 @@ export class ModerationService {
         WHERE ${where}`,
       params,
     );
-    return Promise.all(rows.map(async (r) => ({
+    return Promise.all(rows.map(async (r, i) => ({
       id: r.appeal_id, status: r.appeal_status, text: r.text, createdAt: r.appeal_at.toISOString(), action: actionView(r),
-      target: await this.preview(this.db, r.target_type, r.target_id).catch(() => null),
+      target: i < previews ? await this.preview(this.db, r.target_type, r.target_id).catch(() => null) : null,
     })));
   }
 
@@ -615,21 +625,30 @@ export class ModerationService {
   }
 
   private async summary(q: Queryable, caseId: string, viewerUserId: string | null = null): Promise<CaseSummary> {
-    const c = (await q.query<{ id: string; status: CaseStatus; priority: number; target_type: FlagTargetType; target_id: string; opened_at: Date; updated_at: Date; claimed_by: string | null; claimed_until: Date | null }>(
-      `SELECT id, status, priority, target_type, target_id, opened_at, updated_at, claimed_by,
-              CASE WHEN claimed_until > now() THEN claimed_until END AS claimed_until
-         FROM moderation.cases WHERE id = $1`, [caseId],
-    )).rows[0];
+    const c = (await q.query<CaseRow>(`SELECT ${CASE_COLUMNS} FROM moderation.cases WHERE id = $1`, [caseId])).rows[0];
     if (!c) throw notFound("Caso");
-    const reasons = await q.query<{ reason: FlagReason; n: number }>(`SELECT reason, count(*)::int AS n FROM moderation.flags WHERE case_id = $1 GROUP BY reason`, [caseId]);
-    const target = await this.preview(q, c.target_type, c.target_id).catch(() => ({ type: c.target_type, id: c.target_id, text: null, authorHandle: null, state: "DELETED", categoryCode: null }));
-    return {
-      id: c.id, status: c.status, priority: c.priority, target,
-      flagCount: reasons.rows.reduce((s, r) => s + r.n, 0),
-      reasons: Object.fromEntries(reasons.rows.map((r) => [r.reason, r.n])),
-      openedAt: c.opened_at.toISOString(), updatedAt: c.updated_at.toISOString(),
-      claim: c.claimed_until ? { mine: c.claimed_by === viewerUserId, until: c.claimed_until.toISOString() } : null,
-    };
+    return (await this.summaries(q, [c], viewerUserId))[0]!;
+  }
+
+  /** Resumen de varios casos ya leídos: los motivos de todos en una consulta; la vista previa sigue siendo una por caso. */
+  private async summaries(q: Queryable, cases: CaseRow[], viewerUserId: string | null): Promise<CaseSummary[]> {
+    if (!cases.length) return [];
+    const reasons = await q.query<{ case_id: string; reason: FlagReason; n: number }>(
+      `SELECT case_id, reason, count(*)::int AS n FROM moderation.flags WHERE case_id = ANY($1::uuid[]) GROUP BY case_id, reason`, [cases.map((c) => c.id)],
+    );
+    const byCase = new Map<string, { reason: FlagReason; n: number }[]>();
+    for (const r of reasons.rows) byCase.set(r.case_id, [...(byCase.get(r.case_id) ?? []), r]);
+    return Promise.all(cases.map(async (c) => {
+      const rs = byCase.get(c.id) ?? [];
+      const target = await this.preview(q, c.target_type, c.target_id).catch(() => ({ type: c.target_type, id: c.target_id, text: null, authorHandle: null, state: "DELETED", categoryCode: null }));
+      return {
+        id: c.id, status: c.status, priority: c.priority, target,
+        flagCount: rs.reduce((s, r) => s + r.n, 0),
+        reasons: Object.fromEntries(rs.map((r) => [r.reason, r.n])),
+        openedAt: c.opened_at.toISOString(), updatedAt: c.updated_at.toISOString(),
+        claim: c.claimed_until ? { mine: c.claimed_by === viewerUserId, until: c.claimed_until.toISOString() } : null,
+      };
+    }));
   }
 
   private async preview(q: Queryable, type: FlagTargetType, id: string): Promise<ModerationTargetPreview> {

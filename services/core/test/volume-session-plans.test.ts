@@ -168,4 +168,20 @@ describe("lecturas con sesión y de moderación con volumen", () => {
     expect(r.queries).toBeGreaterThan(0);
     expect(r.scans).toEqual([]);
   });
+
+  // ADR 0312: una página de la cola o de apelaciones no lanza consultas por fila salvo la vista previa del objeto
+  // (casi todos los objetos clonados no existen y su vista previa es una sola consulta; el de la plantilla es real y
+  // puede sumar un par). Antes la cola leía cada caso y sus motivos aparte: tres consultas por caso.
+  it.each([
+    ["cola de moderación", "/v1/moderation/cases"],
+    ["apelaciones", "/v1/moderation/appeals"],
+  ])("%s: cada fila más cuesta como mucho una consulta", async (_name, base) => {
+    const small = await scansOf(`${base}?limit=10`, mod);
+    const large = await scansOf(`${base}?limit=50`, mod);
+    expect(small.status).toBe(200);
+    expect(large.status).toBe(200);
+    expect(large.queries - small.queries).toBeLessThanOrEqual(40 + 2);
+    expect(large.scans).toEqual([]);
+  });
 });
+
