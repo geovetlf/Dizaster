@@ -35,8 +35,13 @@ export interface HttpFetcher {
   get(url: string, validators: { etag: string | null; lastModified: string | null }): Promise<FetchResult>;
 }
 
+/** User-Agent del cliente de ingesta: se identifica y dice dónde contactar (Blueprint §9.3, ADR 0307). */
+export function ingestionUserAgent(contact?: string): string {
+  return `Dizaster-Ingestion/0.1 (+${contact?.trim() || "contacto pendiente"})`;
+}
+
 export class NodeHttpFetcher implements HttpFetcher {
-  constructor(private readonly opts: { timeoutMs: number; maxBytes: number; userAgent: string } = { timeoutMs: 15_000, maxBytes: 10 * 1024 * 1024, userAgent: "Dizaster-Ingestion/0.1 (+contacto pendiente)" }) {}
+  constructor(private readonly opts: { timeoutMs: number; maxBytes: number; userAgent: string } = { timeoutMs: 15_000, maxBytes: 10 * 1024 * 1024, userAgent: ingestionUserAgent() }) {}
 
   async get(url: string, v: { etag: string | null; lastModified: string | null }): Promise<FetchResult> {
     const headers: Record<string, string> = { "user-agent": this.opts.userAgent };
