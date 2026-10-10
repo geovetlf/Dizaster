@@ -89,7 +89,7 @@ Orden recomendado: 1 → 2 → 3 → 4 → 5. El resto no depende del orden.
 - **Dato verificado el 2026-10-10 (ADR 0308):** Cloud SQL **no** admite la extensión `h3`, que usan la migración 0001
   y los módulos de reportes, eventos y media. Con el código actual, `cloudsql` no arranca. Quedan `vm` (recomendado:
   la misma imagen que CI) o `external` con H3, o bien `cloudsql` después de mover H3 a la aplicación (otro ADR).
-- **Listo:** los módulos `database-cloudsql` y `database-vm` (ADR 0278), migraciones hasta la 0106 con candado y
+- **Listo:** los módulos `database-cloudsql` y `database-vm` (ADR 0278), migraciones hasta la 0107 con candado y
   checksum, y respaldo cifrado con `age`.
 - **Propietario:**
   1. Elegir el modo, el tamaño y la retención de respaldos.
