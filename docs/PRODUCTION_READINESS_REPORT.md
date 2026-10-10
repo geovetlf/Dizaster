@@ -35,7 +35,7 @@ tiendas y credenciales, decisiones de producto y revisión legal. Nada de eso lo
 
 | Verificación | Resultado |
 | --- | --- |
-| `pnpm check`: lint, fronteras de módulos, secretos, workflows y versiones alineadas, typecheck, build y pruebas | ✅ Pruebas: contracts 42, geo-kit 39, móvil 288, backend @BACKEND@, delivery 97 |
+| `pnpm check`: lint, fronteras de módulos, secretos, workflows y versiones alineadas, typecheck, build y pruebas | ✅ Pruebas: contracts 42, geo-kit 39, móvil 288, backend 655, delivery 97 |
 | Empaquetado móvil iOS + Android (`bundle:check`) y paridad nativa | ✅ |
 | Migraciones 0001–0105 sobre PostgreSQL 16 + PostGIS + H3; restauración de respaldo | ✅ |
 | Gitleaks: historial (285 commits) y árbol de trabajo | ✅ sin hallazgos |
@@ -46,7 +46,7 @@ tiendas y credenciales, decisiones de producto y revisión legal. Nada de eso lo
 | Entrega local real: candidata, 10 %, 100 %, carga, candidata rota rechazada, rollback | ✅ ADR 0282 |
 | k6 50 peticiones/s durante 30 s contra la API local | ✅ p95 5 ms, sin 5xx. La base local tiene pocos datos: sirve para detectar regresiones, no predice producción |
 | OSV-Scanner y `pnpm audit` | ✅ En GitHub Actions. Solo dos avisos HIGH sin arreglo upstream (`node-forge`, `braces`, herramientas de Expo), aceptados por el propietario hasta el 2026-11-07 y acotados a versión y ruta (ADR 0304, 0305) |
-| Push a `github.com/geovetlf/Dizaster` | ✅ Sin force push. `main` protegida desde el 2026-10-08: cada cambio entra por PR con los 7 jobs de CI en verde (check, delivery, report-comment, supply-chain, security, iac, image); PRs #10–@LASTPR@ |
+| Push a `github.com/geovetlf/Dizaster` | ✅ Sin force push. `main` protegida desde el 2026-10-08: cada cambio entra por PR con los 7 jobs de CI en verde (check, delivery, report-comment, supply-chain, security, iac, image); PRs #10–#47 |
 
 ## 3. Producto
 
@@ -314,7 +314,7 @@ Cada fila dice qué falta, por qué el agente no puede resolverlo, qué quedó l
 | Datos y revisiones | Revisión nativa de pt y fr, listas de términos, organizaciones para donar, textos regionales | Requieren personas con conocimiento local | Mecanismos con listas vacías | temporal | Propietario: proveerlos | 0 |
 | Pruebas reales | Dispositivo, push, staging, producción | Necesitan los bloqueos anteriores | Ensayo local completo de la entrega (ADR 0282), guardas, rollback | condicionado | Primer APK, luego staging | — |
 | Excepción `node-forge` y `braces` | Arreglo upstream | No hay versión corregida publicada | Acotada a versión y ruta, vence sola el 2026-11-07, aviso en CI desde el 2026-10-23 | temporal | Revisar el 2026-11-07, o antes si sale el arreglo | 0 |
-| Ruleset de etiquetas `v*` | Importar `tags.json` | Esta sesión no puede escribir reglas de GitHub | `tags.json` versionado | opcional | Propietario: importarlo antes de la primera versión | 0 |
+| Ruleset de etiquetas `v*` | Importar `tags.json` | Esta sesión no puede escribir reglas de GitHub | `tags.json` versionado. Hoy ningún workflow construye desde etiquetas y la entrega va por digest, así que aporta poco | opcional | Propietario: importarlo antes de que una versión se publique por etiqueta (`delivery/policy.json` ya acepta firmas de `refs/tags/v*`) | 0 |
 
 **Configuración manual de GitHub que conviene confirmar.** La guarda de la entrega ahora exige en `production` la
 casilla "Allow administrators to bypass" desmarcada, y en `staging` "Protected branches only". Si alguna no está así,
