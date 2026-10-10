@@ -565,7 +565,7 @@ Revisión del Blueprint del 2026-09-30 (tras ADR 0250): completada con ADR 0251�
 
 Revisión del Blueprint del 2026-09-30 (tras ADR 0256): completada con ADR 0257–0276 (retraso de publicación en interacciones, bio moderada, plano de entrega propio, cupos sin carrera, purga de sesiones, fallos visibles, teclado, donaciones D-15). Auditoría completa Blueprint → ADR → código: `docs/PRODUCTION_READINESS_REPORT.md`.
 
-Plano de entrega (Blueprint §20, ADR 0260–0275). Ojo con los nombres: las fases D0–D3 del plano de entrega no son las decisiones pendientes D1–D3 de producto de más abajo. Nivel de autonomía actual: 2 sin GitHub. Marca de bloqueo: BLOCKED_BY_OWNER.
+Plano de entrega (Blueprint §20, ADR 0260–0275). Ojo con los nombres: las fases D0–D3 del plano de entrega no son las decisiones pendientes D1–D3 de producto de más abajo. Nivel de autonomía actual: 2, con el repositorio en GitHub; staging sigue manual por decisión del propietario (2026-10-08). Marca de bloqueo: BLOCKED_BY_OWNER.
 
 - Fase D0 — sin credenciales:
   - ✅ CI endurecido (ADR 0264) y CLI `dzd` con políticas, impacto, plan de gates, autonomía, auditoría encadenada, manifiesto de artefactos, verificación, rollback gradual, revisión de IaC, diagnóstico y documentación (ADR 0265).
@@ -573,10 +573,10 @@ Plano de entrega (Blueprint §20, ADR 0260–0275). Ojo con los nombres: las fas
   - ✅ `infra/tofu/` validado con `tofu validate` y escaneo, sin `apply`; imagen del backend con SBOM, manifiesto y verificación en CI (ADR 0267).
   - ✅ Firma cosign keyless y procedencia SLSA preparadas en CI, verificación en `dzd`, SLO, `env-check`, workflow `deliver`, rulesets, CODEOWNERS y `scripts/github-bootstrap.mjs` (ADR 0277).
 
-- Fase D1 — el repositorio existe desde el 2026-09-30. ✅ Informes en PR (ADR 0284). BLOCKED_BY_OWNER: protección de `main`, entornos y auto-merge de PRs `auto` cambian la configuración del repositorio y esperan su autorización.
+- Fase D1 — el repositorio existe desde el 2026-09-30. ✅ Informes en PR (ADR 0284). ✅ Reglas de `main` y entornos `staging` y `production`, aplicados por el propietario el 2026-10-08 (ADR 0303); la guarda de `deliver.yml` los verifica en cada entrega (ADR 0306). ✅ El agente fusiona sus PR con los 7 checks en verde (autorización del 2026-09-30). Opcional: ruleset de etiquetas `v*`.
 - Fase D2 — BLOCKED_BY_OWNER / BLOCKED_BY_BILLING: necesita proyectos de Google Cloud con facturación y presupuesto autorizados (D-18 actualizada), base de staging (D-23) y plan de GitHub (D-24): Workload Identity Federation, Artifact Registry, firma cosign, despliegue a staging, verificación y rollback.
 - Fase D3 — BLOCKED_BY_OWNER: además de D2, visto bueno del propietario para el nivel 5: promoción a producción por etiqueta, despliegue gradual, respaldo previo a migraciones.
-- Riesgo a verificar en D2: soporte de la extensión `h3` de PostgreSQL en Cloud SQL (ADR 0261).
+- Verificado el 2026-10-10: Cloud SQL **no** admite la extensión `h3` (lista oficial de extensiones). Para D-23 quedan `vm`, `external` o `cloudsql` moviendo antes H3 a la aplicación (ADR 0308).
 
 Bloqueadas o en espera:
 
@@ -600,6 +600,6 @@ Bloqueadas o en espera:
 - **BLOCKED_BY_OWNER** — Quechua y aimara (idiomas de Perú en `country-config.json`): falta una traducción nativa revisada de la interfaz; no se genera con IA (ADR 0216, 0281). Hasta entonces se usa el español.
 - **BLOCKED_BY_OWNER** — Textos regionales por país (ADR 0281): el mecanismo existe y `data/locales/ui-regional.json` está vacío hasta que alguien con uso local proponga ajustes.
 - **BLOCKED_BY_OWNER** — Organizaciones para donar (ADR 0274): el directorio está vacío hasta que el propietario verifique y cargue cada una.
-- **Repositorio oficial**: https://github.com/geovetlf/Dizaster (creado por el propietario el 2026-09-30). Pendiente: reglas de `main` y etiquetas (`.github/rulesets/`), entornos `staging` y `production` y variables de Actions (`scripts/github-bootstrap.mjs`), con autorización del propietario.
+- **Repositorio oficial**: https://github.com/geovetlf/Dizaster (creado por el propietario el 2026-09-30). Reglas de `main` y entornos aplicados el 2026-10-08 (ADR 0303). Pendiente: variables de Actions (`scripts/github-bootstrap.mjs`, cuando existan los proyectos de D-18) y, opcional, el ruleset de etiquetas.
 - **BLOCKED_BY_BILLING** — Proyectos de Google Cloud, facturación y presupuesto (D-18); base de staging (D-23); plan de GitHub (D-24). Hasta entonces `dzd deploy/promote/rollback` solo corren en seco y `infra/tofu` no se aplica.
 - **BLOQUEADA** — Contacto del cliente de ingesta (§9.3): el User-Agent dice "contacto pendiente"; falta el correo o URL de contacto del propietario.

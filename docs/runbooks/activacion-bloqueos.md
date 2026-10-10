@@ -10,30 +10,22 @@ Orden recomendado: 1 → 2 → 3 → 4 → 5. El resto no depende del orden.
 
 ## 1. Reglas de `main` y entornos (GitHub)
 
-- **Aplicado** por el propietario el 2026-10-08 y verificado por el agente por la API (ADR 0303, "Aplicación").
-- **Falta (opcional):** importar `.github/rulesets/tags.json` en Settings → Rules → Rulesets. Hace inmutables las
-  etiquetas `v*`; no bloquea nada hasta la primera versión.
-- **Autorizado** por el propietario el 2026-10-01 03:17. Diseño en ADR 0303.
-- **Listo en el repositorio:**
-  - `.github/rulesets/main.json`: PR obligatorio, los 7 checks de GitHub Actions al día con `main`, historial lineal,
-    sin force push, sin borrado y sin bypass para nadie;
-  - `.github/rulesets/tags.json`: etiquetas `v*` inmutables;
-  - `deliver.yml` se detiene si esas reglas o el entorno `production` faltan (`dzd github-guard`).
-- **Bloqueado para el agente:** esta sesión no puede escribir reglas ni entornos en GitHub (ADR 0303, "Limitación").
-- **Propietario, una sola vez, desde el navegador (también en el teléfono):**
-  1. Descargar `.github/rulesets/main.json` y `.github/rulesets/tags.json` de `main`.
-  2. Settings → Rules → Rulesets → New ruleset → Import a ruleset: importar `main.json` y guardar. Repetir con
-     `tags.json`. No añadir nada a "Bypass list".
-  3. Settings → Environments → New environment `staging`. En "Deployment branches and tags", elegir "Protected
-     branches only". Guardar.
-  4. New environment `production`. Marcar "Required reviewers" y poner `geovetlf`. En "Deployment branches and tags",
-     elegir "Protected branches only". Guardar.
+- **Aplicado** por el propietario el 2026-10-08. El agente verificó `main` por la API (ADR 0303, "Aplicación").
+- **Falta (opcional):** importar `.github/rulesets/tags.json` en Settings → Rules → Rulesets → Import a ruleset. Hace
+  inmutables las etiquetas `v*` y no bloquea nada hasta la primera versión.
+- **Cómo se verifica en cada entrega:** el job `guard` de `deliver.yml` (`dzd github-guard`, ADR 0303 y 0306) exige:
+  - que la entrega se lance desde `main`;
+  - que `main` exija PR y los 7 checks, sin force push y sin borrado;
+  - que `staging` exista con "Deployment branches: Protected branches only";
+  - que `production` tenga a `geovetlf` en "Required reviewers", "Protected branches only" y la casilla "Allow
+    administrators to bypass configured protection rules" **desmarcada**.
 
-  Con `gh` en un ordenador, los pasos 2 a 4 son
-  `node scripts/github-bootstrap.mjs --repo geovetlf/Dizaster --owner geovetlf --only rules --execute`.
-- **Agente, después:** comprueba que `main` figura como protegida, pasa `dzd github-guard` contra la API y abre un PR
-  de prueba para confirmar que no se puede fusionar sin los 7 checks.
-- **Desde ese momento** el agente fusiona solo con `squash` (o `rebase` en Dependabot) y con los 7 checks en verde.
+  Si algo falta, la entrega se detiene con el motivo ("incorrecto"). Si la API no responde, también se detiene ("no
+  verificable"). Desde la sesión del agente los entornos no se pueden leer: su estado figura como no verificado hasta la
+  primera ejecución de `deliver.yml`.
+- **Propietario, si la primera entrega se detiene por un entorno:** abrir Settings → Environments, corregir lo que diga
+  el mensaje y volver a lanzar la entrega.
+- El agente fusiona solo con `squash`, con los 7 checks en verde.
 
 ## 2. EXPO_TOKEN (primer build de iOS y Android)
 
@@ -93,8 +85,11 @@ Orden recomendado: 1 → 2 → 3 → 4 → 5. El resto no depende del orden.
   - `cloudsql` (gestionado);
   - `vm` (imagen propia con PostGIS y H3, la de menor cómputo);
   - `external` (otro proveedor).
-- **Por qué:** es costo y operación. Además, Cloud SQL tiene que ofrecer la extensión `h3` (ADR 0261).
-- **Listo:** los módulos `database-cloudsql` y `database-vm` (ADR 0278), migraciones hasta la 0103 con candado y
+- **Por qué:** es costo y operación.
+- **Dato verificado el 2026-10-10 (ADR 0308):** Cloud SQL **no** admite la extensión `h3`, que usan la migración 0001
+  y los módulos de reportes, eventos y media. Con el código actual, `cloudsql` no arranca. Quedan `vm` (recomendado:
+  la misma imagen que CI) o `external` con H3, o bien `cloudsql` después de mover H3 a la aplicación (otro ADR).
+- **Listo:** los módulos `database-cloudsql` y `database-vm` (ADR 0278), migraciones hasta la 0105 con candado y
   checksum, y respaldo cifrado con `age`.
 - **Propietario:**
   1. Elegir el modo, el tamaño y la retención de respaldos.
@@ -106,7 +101,7 @@ Orden recomendado: 1 → 2 → 3 → 4 → 5. El resto no depende del orden.
      - modo `cloudsql`: `postgres://dizaster:<clave>@/dizaster?host=/cloudsql/<database_connection>`.
 - **Agente:**
   1. Solo en modo `vm`: construir y firmar la imagen `db` desde `infra/docker/db.Dockerfile`.
-  2. Con `cloudsql`, antes del `apply`: comprobar `CREATE EXTENSION h3` en una instancia de prueba autorizada.
+  2. Con `cloudsql`: no aplicar hasta que exista el ADR que mueve H3 a la aplicación.
   3. Ejecutar el job `migrate`.
   4. `pnpm dzd verify --url … --slo`.
 - **Verificación:** `/health/ready` da 200 y el mapa responde con PostGIS.
@@ -184,11 +179,10 @@ Orden recomendado: 1 → 2 → 3 → 4 → 5. El resto no depende del orden.
 
 Están en `docs/IMPLEMENTATION_STATUS.md` → "Bloqueadas o en espera":
 
-- contacto del cliente de ingesta;
+- contacto del cliente de ingesta: el propietario da un correo o URL y se fija `INGEST_CONTACT` en `extra_env` de cada entorno (ADR 0307);
 - textos legales;
 - revisión de las traducciones al portugués y al francés;
 - organizaciones para donar;
-- Sentry;
 - proveedor de IA y su presupuesto (apagado por diseño: nada lo requiere).
 
 En cada caso el código ya funciona sin ese proveedor y se activa por configuración.
