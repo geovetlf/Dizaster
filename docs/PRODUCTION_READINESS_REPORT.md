@@ -1,6 +1,6 @@
 # DIZASTER PRODUCTION READINESS AUDIT
 
-Fecha: 2026-10-01 · Código hasta ADR 0303 · Migraciones 0001–0105 · Todo en `main` por PR (sin force push)
+Fecha: 2026-10-10 · Código hasta ADR 0308 · Migraciones 0001–0105 · Todo en `main` por PR (sin force push)
 
 Esta auditoría compara el Blueprint con los ADR, el código y las pruebas. Solo se marca un bloqueo cuando está
 escrito qué falta y quién lo da. No se inventan decisiones, límites, precios ni capacidades. El procedimiento exacto
@@ -31,11 +31,11 @@ rechazo y rollback.
 **No se puede publicar todavía.** Faltan la facturación de Google Cloud, cuentas de
 tiendas y credenciales, decisiones de producto y revisión legal. Nada de eso lo puede dar el agente.
 
-## 2. Verificación ejecutada (local y en GitHub Actions, actualizada 2026-10-01)
+## 2. Verificación ejecutada (local y en GitHub Actions, actualizada 2026-10-10)
 
 | Verificación | Resultado |
 | --- | --- |
-| `pnpm check`: lint, fronteras de módulos, secretos, workflows, typecheck, build y pruebas | ✅ Pruebas: contracts 42, geo-kit 39, móvil 288, backend 647, delivery 94 |
+| `pnpm check`: lint, fronteras de módulos, secretos, workflows y versiones alineadas, typecheck, build y pruebas | ✅ Pruebas: contracts 42, geo-kit 39, móvil 288, backend 655, delivery 97 |
 | Empaquetado móvil iOS + Android (`bundle:check`) y paridad nativa | ✅ |
 | Migraciones 0001–0105 sobre PostgreSQL 16 + PostGIS + H3; restauración de respaldo | ✅ |
 | Gitleaks: historial (285 commits) y árbol de trabajo | ✅ sin hallazgos |
@@ -45,8 +45,8 @@ tiendas y credenciales, decisiones de producto y revisión legal. Nada de eso lo
 | Firma cosign y atestaciones, de extremo a extremo con registro local y clave local | ✅ La firma keyless espera GitHub |
 | Entrega local real: candidata, 10 %, 100 %, carga, candidata rota rechazada, rollback | ✅ ADR 0282 |
 | k6 50 peticiones/s durante 30 s contra la API local | ✅ p95 5 ms, sin 5xx. La base local tiene pocos datos: sirve para detectar regresiones, no predice producción |
-| OSV-Scanner | ✅ En GitHub Actions (PR #10): `uuid` y `decode-uri-component` corregidos, 0 avisos |
-| Push a `github.com/geovetlf/Dizaster` | ✅ Sin force push. Cada cambio entra por PR con los 7 jobs de CI en verde (check, delivery, report-comment, supply-chain, security, iac, image); PRs #10–#30 |
+| OSV-Scanner y `pnpm audit` | ✅ En GitHub Actions. Solo dos avisos HIGH sin arreglo upstream (`node-forge`, `braces`, herramientas de Expo), aceptados por el propietario hasta el 2026-11-07 y acotados a versión y ruta (ADR 0304, 0305) |
+| Push a `github.com/geovetlf/Dizaster` | ✅ Sin force push. `main` protegida desde el 2026-10-08: cada cambio entra por PR con los 7 jobs de CI en verde (check, delivery, report-comment, supply-chain, security, iac, image); PRs #10–#52 |
 
 ## 3. Producto
 
@@ -97,22 +97,21 @@ tiendas y credenciales, decisiones de producto y revisión legal. Nada de eso lo
 | CI: gates, SBOM, escáneres, imagen con manifiesto | READY | En verde en GitHub Actions en cada PR (#10–#30) |
 | Repositorio oficial y push | READY | `geovetlf/Dizaster`, trabajo por ramas y PRs |
 | Informe de delivery en cada PR | READY | ADR 0284: un comentario que se actualiza en cada push |
-| Reglas de `main`, entornos `staging` y `production`, CODEOWNERS | BLOCKED BY AUTHORIZATION | `scripts/github-bootstrap.mjs`, en seco hasta el visto bueno. En repositorios privados depende del plan de GitHub (D-24) |
+| Reglas de `main`, entornos `staging` y `production` | READY | Aplicados por el propietario el 2026-10-08 (ADR 0303). `main` verificada por la API. Los entornos solo se pueden leer dentro de Actions: la guarda de `deliver.yml` los verifica en cada entrega y se detiene si faltan protecciones o no puede leerlos (ADR 0306). Opcional: ruleset de etiquetas `v*` |
 | Firma keyless, procedencia SLSA y SBOM atestado | READY en código · BLOCKED BY AUTHORIZATION | Identidad `geovetlf/Dizaster` fijada. Se activa con el primer push y la nube (D-18) |
 | Despliegue gradual, promoción del mismo digest, rollback | READY: ensayado local · FINANCIAL AUTHORIZATION REQUIRED en la nube | `deliver.yml`. Producción exige la aprobación del propietario |
 | Destino local, proxy de tráfico, carga (`dzd load`, k6) | READY | ADR 0282 |
 | Delivery Agent opcional | READY | ADR 0283. Propone; el ejecutor valida; no se salta ningún gate. Agente de reglas, sin IA |
 | Migraciones seguras y respaldos | READY | Candado, checksum y bloqueo de cambios destructivos. El destino de los respaldos espera D-18 |
 | IaC OpenTofu: proyectos, IAM mínimo, WIF, registro, secretos, Cloud Run, base de datos (cloudsql, vm o external), media, estado, presupuesto | READY validado · FINANCIAL AUTHORIZATION REQUIRED para aplicar | Nunca se aplicó. Base de staging: D-23 |
-| Nivel de autonomía | READY en 2 | Subir a 4 (staging autónomo) o 5: BLOCKED BY AUTHORIZATION |
+| Nivel de autonomía | READY en 2 | Staging sigue manual por decisión del propietario (2026-10-08). Subir a 4 o 5: BLOCKED BY AUTHORIZATION |
 
 ## 5. Lo que solo puede dar el propietario
 
 En orden de impacto:
 
-1. **Autorizar las reglas de `main` y los entornos** (`scripts/github-bootstrap.mjs`). Costo 0. Los PRs ya no
-   esperan: el agente fusiona los suyos cuando todo está en verde (autorización del 2026-09-30). Quedan abiertos a
-   propósito los de Dependabot #3 (PostGIS 17) y #5 (Node 26). Ver §8.
+1. ✅ **Reglas de `main` y entornos**: aplicados el 2026-10-08. Quedan abiertos a propósito los PR de Dependabot #3
+   (PostGIS 17) y #41 (Node 25), con sus condiciones en ADR 0308. Ver §8.
 2. **`EXPO_TOKEN`** de una cuenta gratuita de Expo. Desbloquea el primer APK, el video 720p, Maestro y el camino a la
    atestación. Costo 0.
 3. **D-18**: proyectos de Google Cloud, facturación y presupuesto mensual por entorno.
@@ -136,10 +135,10 @@ En orden de impacto:
 
 ## 6. Riesgos abiertos
 
-1. **`main` sin protección** (verificado el 2026-10-01: `protected: false`). Hasta que el propietario autorice las
-   reglas (`scripts/github-bootstrap.mjs`), GitHub no exige CI en verde antes de fusionar. Hoy lo garantiza el
-   proceso: el agente solo fusiona con los 7 checks en verde y el SHA esperado.
-2. **La extensión `h3` en Cloud SQL no está verificada.** Si falta, se usa el modo `vm` o `external` (ADR 0261 y 0278).
+1. ✅ **`main` protegida** desde el 2026-10-08 (ADR 0303). Ya no es un riesgo abierto.
+2. **Cloud SQL no admite la extensión `h3`.** Verificado el 2026-10-10 en la lista oficial de extensiones (ADR 0308).
+   Con el código actual, el modo `cloudsql` no sirve. Para D-23 quedan dos caminos: `vm` o `external`, o bien mover
+   H3 a la aplicación con otro ADR.
 3. **Latencia sin datos reales.** Las pruebas de carga corrieron sobre una base casi vacía.
 4. **Límite por IP.** Detrás de un balanceador o CDN mal configurado, todas las personas compartirían una IP y el
    límite de 300 por minuto las frenaría. La IaC ya pone `TRUST_PROXY=true`; falta confirmar en staging que la API ve la IP de cada cliente.
@@ -151,7 +150,7 @@ En orden de impacto:
 ## 7. Siguiente paso mínimo para producción
 
 1. ✅ Push de `main` sin force y CI en verde en cada PR.
-2. El propietario autoriza las reglas de `main` y los entornos.
+2. ✅ El propietario aplicó las reglas de `main` y los entornos (2026-10-08).
 3. Con `EXPO_TOKEN`, el primer APK de prueba.
 4. Con D-18 y D-23, staging y luego producción. Los pasos exactos están en §9.
 
@@ -180,14 +179,26 @@ fusionaron por PR, cada uno con `pnpm check` completo en local y los 7 checks de
 | #29 | 0301 | Códigos internos traducidos en moderación y administración |
 | #30 | 0302 | Historial completo del evento en moderación, con totales |
 | #32 | 0303 | Reglas de `main` y entornos (aplicados por el propietario el 2026-10-08); guarda `dzd github-guard` en la entrega |
+| #36 | 0303 | Reglas aplicadas y verificadas por la API |
+| #37 | 0304 | `source-map-js` 1.2.2, excepción temporal aprobada, parches de la imagen, prueba con hora relativa |
+| #40 | — | `globals` 17, `vitest` 5.0.3; Dependabot ignora mayores de TypeScript y `@types/node` |
+| #43 | 0305 | Excepciones de avisos acotadas a paquete, versión y ruta; aviso en CI 14 días antes |
+| #44 | 0306 | Guarda de entrega: solo desde `main`, `staging` limitado, `production` sin bypass de administradores, "no verificable" distinto de "incorrecto" |
+| #45 | 0308 | Node y PostgreSQL alineados en CI; Dependabot cubre bootstrap; Cloud SQL sin `h3` |
+| #46 | 0307 | Contacto configurable en el User-Agent de ingesta |
 
 Dependabot:
 
-- **Fusionados:** #4, #6, #7, #8 y #9 (acciones de GitHub).
-- **Cerrados:** #1 y #2. Su cambio entró unificado en #24.
-- **Abiertos a propósito:**
-  - #3 (PostGIS 17): Cloud SQL usa PostgreSQL 16 y la imagen local debe ser igual a producción. Necesita su ADR.
-  - #5 (Node 26): `.nvmrc`, `engines` y CI usan Node 22, que es LTS. Se cambia junto, en otro PR, cuando 26 sea LTS.
+- **Fusionados:** #4, #6, #7, #8 y #9 (acciones de GitHub, 2026-10-01); #33 (`setup-node` 7), #38 (dependencias de
+  producción), #42 (eslint 10.12, `@types/node` 22.20.5). #40 tomó `globals` 17 y `vitest` 5.0.3.
+- **Cerrados:** #1 y #2 (entraron unificados en #24); #34 y #39 (TypeScript 7 y `@types/node` 26 no son compatibles;
+  Dependabot ya no los propone); #35 (reemplazado por #38); #5 (reemplazado por #41).
+- **Abiertos a propósito, en rojo hasta cumplir sus condiciones** (ADR 0308; `check:workflows` exige versiones
+  alineadas):
+  - #3 (PostGIS 17): la imagen local, CI y el destino usan PostgreSQL 16. Pasar a 17 necesita un ADR de migración de
+    datos y D-23.
+  - #41 (Node 25): Node 25 ya no tiene soporte desde el 2026-06-01. La migración va a una LTS (26 es LTS desde el
+    2026-10-28), con `.nvmrc`, `engines`, imágenes y CI juntos. Node 22 tiene soporte hasta el 2027-04-30.
 
 ## 9. Pasos exactos: de hoy a staging y a producción
 
@@ -229,7 +240,7 @@ Cada paso dice quién lo hace. Nada se despliega por fusionar en `main`, porque 
    Los comandos exactos están en el runbook, §4 y §5.
 8. **Agente:** `node scripts/github-bootstrap.mjs … --outputs outputs.json --execute`, que carga las variables de
    Actions (`GCP_WIF_PROVIDER` y otras). Desde ahí, CI publica y firma la imagen en cada push a `main`.
-9. **Agente:** solo con `cloudsql`, comprobar `CREATE EXTENSION h3`. Si falla, cambiar al modo `vm`.
+9. **Agente:** con `vm` o `external`, comprobar `CREATE EXTENSION h3` en la base real. `cloudsql` no la admite (ADR 0308).
 10. **Agente:**
     1. Lanzar `deliver.yml` con el digest firmado y `promote=false`. El job aplica las migraciones, despliega al 10 %
        y luego al 100 %.
@@ -275,3 +286,38 @@ Producción no arranca sin verificador de atestación real (`container.ts`) ni s
    del propietario en el entorno `production`.
 9. **Propietario:** aprobar. **Agente:** `dzd verify --slo`. Si falla, `dzd rollback`, que ya está ensayado.
 10. **Propietario:** publicar en las tiendas.
+
+## 10. Estado de cada bloqueo (revisado el 2026-10-10)
+
+Cada fila dice qué falta, por qué el agente no puede resolverlo, qué quedó listo y el siguiente paso mínimo. Tipos:
+
+- **temporal**: se resuelve con una acción única.
+- **condicionado**: depende de otro bloqueo.
+- **permanente**: por diseño, siempre lo hace una persona.
+
+| Bloqueo | Falta | Por qué no lo hace el agente | Ya listo | Tipo | Siguiente paso mínimo | Costo para desbloquear |
+| --- | --- | --- | --- | --- | --- | --- |
+| `EXPO_TOKEN` y primer build | Cuenta de Expo y token | Es una credencial del propietario | `mobile-build.yml` manual, `eas.json`, prebuild verificado, bundle iOS y Android en CI | temporal | Propietario: crear la cuenta y cargar `EXPO_TOKEN` (runbook §2) | 0 (plan gratuito de EAS, con cupo mensual limitado) |
+| Google Cloud y facturación (D-18) | Proyectos, facturación, presupuesto, región | Crea gasto y cuentas | IaC validada y nunca aplicada, presupuesto y alertas en código, `dzd env-check` e `iac-check` | temporal | Propietario: crear los proyectos y fijar el presupuesto (runbook §3) | El que fije el propietario. No se estima sin precios verificados de la región |
+| Base de staging (D-23) | Elegir `vm`, `external` o `cloudsql` (este último exige mover H3 a la app) | Decisión de costo y operación | Módulos `database-vm` y `database-cloudsql`, migrador seguro, respaldo con prueba de restauración | condicionado (D-18) | Propietario: elegir modo. Recomendación técnica: `vm` | Según modo y tamaño; se calcula con el plan de OpenTofu |
+| Media (GCS o R2) | Elegir proveedor y claves | Cuenta y gasto del propietario | Driver S3 probado contra un S3 local, caché, media sin metadatos | condicionado (D-18) | Propietario: elegir proveedor (runbook §5) | Según uso |
+| Proveedor de correo | Elegir proveedor | Decisión y cuenta del propietario | `EMAIL_PROVIDER=none`; se puede entrar solo con Apple o Google | temporal | Propietario: elegir proveedor o confirmar que no hace falta en V1 | Según proveedor |
+| Atestación real | App Attest y Play Integrity | Necesita cuentas de Apple y Google y un build | Interfaz, verificador de desarrollo, producción no arranca sin el real | condicionado (`EXPO_TOKEN` y cuentas) | Propietario: cuentas de Apple (US$99 al año) y Google Play (US$25 una vez) | US$99 al año + US$25 una vez |
+| Push real | Clave APNs `.p8` y cuenta de servicio de Firebase | Credenciales del propietario | Drivers APNs y FCM, `PUSH_DRIVER=live` obligatorio en producción | condicionado (cuentas) | Propietario: generar las claves (runbook §9) | 0 |
+| CSAM | Proveedor y procedimiento de reporte | Decisión legal | Moderación, denuncias y cola de revisión | permanente hasta asesoría | Asesoría legal | Según asesoría |
+| Textos legales | Términos y privacidad revisados | Decisión legal | `data/legal/documents.json` con versionado y aceptación registrada | permanente hasta asesoría | Asesoría legal | Según asesoría |
+| Fuentes del piloto (IGP, INDECI, SENAMHI) | Validar feeds y términos de uso | Términos de terceros; el agente no los acepta por el propietario | Registro de fuentes, ingesta con reintentos y escalonada, USGS activo | temporal | Propietario: confirmar términos de cada fuente | 0 |
+| FIRMS | `MAP_KEY` gratuita | Credencial del propietario | Adaptador listo (ADR 0067) | temporal | Propietario: pedir la clave en NASA FIRMS | 0 |
+| Contacto de ingesta | Correo o URL | Dato del propietario | `INGEST_CONTACT` y aviso en `config-check` (ADR 0307) | temporal | Propietario: dar el contacto | 0 |
+| Decisiones de producto | D1, D2, D3, uso sin cuenta, estado de lanzamiento por país, duración de suspensiones, avisos sociales | Son decisiones de producto | Todo lo que no depende de ellas | temporal | Propietario: responder cada una | 0 |
+| Fronteras en disputa (D-17) | Criterio | Decisión legal y de producto | Mapa con datos abiertos | permanente hasta asesoría | Asesoría | Según asesoría |
+| Datos y revisiones | Revisión nativa de pt y fr, listas de términos, organizaciones para donar, textos regionales | Requieren personas con conocimiento local | Mecanismos con listas vacías | temporal | Propietario: proveerlos | 0 |
+| Pruebas reales | Dispositivo, push, staging, producción | Necesitan los bloqueos anteriores | Ensayo local completo de la entrega (ADR 0282), guardas, rollback | condicionado | Primer APK, luego staging | — |
+| Excepción `node-forge` y `braces` | Arreglo upstream | No hay versión corregida publicada | Acotada a versión y ruta, vence sola el 2026-11-07, aviso en CI desde el 2026-10-23 | temporal | Revisar el 2026-11-07, o antes si sale el arreglo | 0 |
+| Ruleset de etiquetas `v*` | Importar `tags.json` | Esta sesión no puede escribir reglas de GitHub | `tags.json` versionado. Hoy ningún workflow construye desde etiquetas y la entrega va por digest, así que aporta poco | opcional | Propietario: importarlo antes de que una versión se publique por etiqueta (`delivery/policy.json` ya acepta firmas de `refs/tags/v*`) | 0 |
+
+**Configuración manual de GitHub que conviene confirmar.** La guarda de la entrega ahora exige en `production` la
+casilla "Allow administrators to bypass" desmarcada, y en `staging` "Protected branches only". Si alguna no está así,
+la primera ejecución de `deliver.yml` se detiene con el motivo exacto. No hay otra ejecución hasta que exista la nube,
+así que no bloquea nada hoy.
+

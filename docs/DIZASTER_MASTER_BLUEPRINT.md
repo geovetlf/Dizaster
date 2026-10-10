@@ -1152,7 +1152,7 @@ Para cada una hay una recomendación. Puedes aprobar en bloque ("apruebo todas l
 | **D-17** | Fronteras disputadas | Una sola visualización / según país del usuario | **Según país del usuario**, con revisión legal |
 | **D-18** | Hosting | VPS económicos (p. ej. Hetzner/OVH) + R2/Cloudflare / cloud mayor (AWS/GCP/Azure) / PaaS | ~~VPS económicos~~ → **Google Cloud** por instrucción del propietario (2026-09-30, ADR 0261), contenedores portables; crear proyectos y facturación: pendiente de autorización |
 | **D-19** | Idiomas iniciales | Lista | **Español, inglés, portugués, francés** (ajustable según países piloto) |
-| **D-20** | Repositorio | Nuevo repositorio GitHub exclusivo de Dizaster / otro | **Nuevo repositorio exclusivo** (sin relación con WEE ni MelonOffice) |
+| **D-20** | Repositorio | Nuevo repositorio GitHub exclusivo de Dizaster / otro | **Nuevo repositorio exclusivo** (sin relación con WEE ni MelonOffice). Hecho: `github.com/geovetlf/Dizaster`, creado por el propietario el 2026-09-30 |
 | **D-21** | Nombre de marca y dominio | — | Pendiente de tu elección (verificar disponibilidad de dominio y marca) |
 | **D-23** | Base de datos de staging (ADR 0261) | Cloud SQL mínima / PostgreSQL en e2-micro gratuito / staging efímero | **PostgreSQL en e2-micro** mientras no haya usuarios |
 | **D-24** | Plan de GitHub (ADR 0261, 0262) | gratuito / de pago | **Gratuito** + promoción a producción solo desde etiqueta del propietario |
@@ -1244,8 +1244,9 @@ dizaster/
 
 > Añadido el 2026-09-30 por instrucción del propietario ("Adición crítica al Blueprint: Dizaster Build & Delivery
 > Agent"). Decisiones: ADR 0260 (arquitectura y forma mínima), ADR 0261 (Google Cloud, entornos, identidades y
-> secretos), ADR 0262 (políticas, permisos y niveles de autonomía). Esta sección es **diseño**: nada de lo nuevo está
-> implementado todavía; el estado vive en `IMPLEMENTATION_STATUS.md` ("Plano de entrega").
+> secretos), ADR 0262 (políticas, permisos y niveles de autonomía). Esta sección nació como diseño; desde entonces se
+> implementó casi todo lo que no necesita la nube (ADR 0264–0308). El estado vive en `IMPLEMENTATION_STATUS.md`
+> ("Plano de entrega") y en `docs/PRODUCTION_READINESS_REPORT.md`.
 
 ### 20.1 Build & Delivery Agent
 
@@ -1325,8 +1326,9 @@ comprobar que la documentación acompaña al cambio; resumir fallos para que Cla
 
 ### 20.6 Integración con GitHub
 
-- Repositorio propio de Dizaster (D-20, pendiente de crear). Rama `main` protegida: solo entra por PR con gates en
-  verde; sin force-push; historial lineal o merge commits según convención.
+- Repositorio propio de Dizaster: `github.com/geovetlf/Dizaster` (D-20, creado el 2026-09-30). Rama `main`
+  protegida desde el 2026-10-08 (ADR 0303): solo entra por PR con los 7 checks en verde; sin force-push ni borrado;
+  historial lineal; sin bypass.
 - **GitHub Environments** `staging` y `production`; los secretos de despliegue no existen en GitHub: la autenticación
   a Google Cloud es por **Workload Identity Federation** (OIDC, sin claves JSON), condicionada a repositorio, rama y
   entorno.
@@ -1354,16 +1356,16 @@ Todo open source y a costo 0:
 
 | Control | Herramienta | Estado |
 |---|---|---|
-| Secretos en el repo | `scripts/check-secrets.mjs` (propio) + Gitleaks | existe / añadir |
-| Dependencias (SCA) | `pnpm audit` + allowlist con vencimiento; OSV-Scanner | existe / añadir |
+| Secretos en el repo | `scripts/check-secrets.mjs` (propio) + Gitleaks | existe (ADR 0266) |
+| Dependencias (SCA) | `pnpm audit` + allowlist con vencimiento, versión y ruta; OSV-Scanner | existe (ADR 0266, 0305) |
 | Licencias | `security/license-policy.json` | existe |
 | SBOM | CycloneDX (`pnpm sbom`) | existe; se adjunta al artefacto |
-| SAST | Semgrep (reglas comunitarias) o CodeQL si el plan de GitHub lo incluye | añadir |
-| Contenedores | Trivy (imagen) | añadir |
-| IaC | Trivy config / Checkov sobre `infra/tofu` | añadir |
+| SAST | Semgrep con reglas propias | existe (ADR 0266) |
+| Contenedores | Trivy (imagen) | existe (ADR 0267) |
+| IaC | Trivy config sobre `infra/tofu` + `dzd iac-check` | existe (ADR 0267) |
 | Configuración | esquema zod de `config.ts` con guardas de producción | existe; `dzd` lo valida antes de desplegar |
-| IAM | `tofu plan` + política que rechaza roles primitivos (Owner/Editor) y comodines | añadir |
-| Integridad | digest SHA-256 de la imagen, firma Sigstore/cosign keyless | añadir |
+| IAM | `tofu plan` + política que rechaza roles primitivos (Owner/Editor) y comodines | existe (`dzd iac-check`, ADR 0267) |
+| Integridad | digest SHA-256 de la imagen, firma Sigstore/cosign keyless | existe en código (ADR 0277); la firma keyless se activa con la nube (D-18) |
 
 ### 20.9 Testing
 
@@ -1375,8 +1377,8 @@ El Test Orchestrator no reemplaza vitest: decide **qué** correr, **en qué orde
 - Selección: el grafo del monorepo y el mapa de módulos (`check:boundaries`) dicen qué paquetes y pruebas toca un
   cambio. Un cambio en `packages/contracts` o en `migrations/` fuerza la suite completa.
 - Existe hoy: unitarias, integración, API, contrato OpenAPI, base de datos, PostGIS, H3, móvil, restauración de
-  respaldo. Faltan (sin costo): smoke post-despliegue, regresión de IA con fixtures (AI apagada), prueba de rendimiento
-  ligera (k6 local) y E2E móvil (Maestro, en emulador de CI) cuando haya build de desarrollo.
+  respaldo, smoke post-despliegue (`dzd verify`), regresión de IA con fixtures (AI apagada) y prueba de rendimiento
+  ligera (k6 local, ADR 0282). Falta solo el E2E móvil (Maestro), que necesita el primer build (`EXPO_TOKEN`).
 
 ### 20.10 Build
 
@@ -1491,7 +1493,7 @@ automático.**
 
 Cada nivel hereda las prohibiciones del anterior: nadie obtiene root, lee secretos arbitrarios, desactiva gates o
 auditoría, borra respaldos o bases, ni se salta políticas. Todo nivel registra auditoría y tiene rollback. **Hoy:
-nivel 2 sin GitHub** (repositorio pendiente, D-20). Subir de nivel requiere que existan sus piezas y el visto bueno
+nivel 2** con el repositorio en GitHub; staging sigue manual por decisión del propietario (2026-10-08). Subir de nivel requiere que existan sus piezas y el visto bueno
 del propietario (ADR 0262).
 
 ### 20.24 Manejo de fallos
