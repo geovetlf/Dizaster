@@ -46,7 +46,7 @@ tiendas y credenciales, decisiones de producto y revisión legal. Nada de eso lo
 | Entrega local real: candidata, 10 %, 100 %, carga, candidata rota rechazada, rollback | ✅ ADR 0282 |
 | k6 50 peticiones/s durante 30 s contra la API local | ✅ p95 5 ms, sin 5xx. La base local tiene pocos datos: sirve para detectar regresiones, no predice producción |
 | OSV-Scanner y `pnpm audit` | ✅ En GitHub Actions. Solo dos avisos HIGH sin arreglo upstream (`node-forge`, `braces`, herramientas de Expo), aceptados por el propietario hasta el 2026-11-07 y acotados a versión y ruta (ADR 0304, 0305) |
-| Push a `github.com/geovetlf/Dizaster` | ✅ Sin force push. `main` protegida desde el 2026-10-08: cada cambio entra por PR con los 7 jobs de CI en verde (check, delivery, report-comment, supply-chain, security, iac, image); PRs #10–#47 |
+| Push a `github.com/geovetlf/Dizaster` | ✅ Sin force push. `main` protegida desde el 2026-10-08: cada cambio entra por PR con los 7 jobs de CI en verde (check, delivery, report-comment, supply-chain, security, iac, image); PRs #10–#52 |
 
 ## 3. Producto
 
