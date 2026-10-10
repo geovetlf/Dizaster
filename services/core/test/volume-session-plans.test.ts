@@ -161,6 +161,16 @@ describe("lecturas con sesión y de moderación con volumen", () => {
     ["cola de duplicados", () => "/v1/moderation/duplicates", () => mod],
     ["registro de acciones", () => "/v1/admin/moderation-actions", () => mod],
     ["registro de acceso a presencia", () => "/v1/admin/presence-access", () => mod],
+    ["costos", () => "/v1/admin/cost", () => mod],
+    ["registro de acceso a originales", () => "/v1/admin/media-original-access", () => mod],
+    ["cambios de configuración", () => "/v1/admin/config-changes", () => mod],
+    ["solicitudes de autoridades", () => "/v1/admin/authority-requests", () => mod],
+    ["equipo", () => "/v1/admin/staff", () => mod],
+    ["cambios del equipo", () => "/v1/admin/staff/changes", () => mod],
+    ["fuentes", () => "/v1/admin/sources", () => mod],
+    ["mi cuenta", () => "/v1/me/account", () => reporter],
+    ["preferencias de alertas", () => "/v1/me/alert-preferences", () => reporter],
+    ["mis negocios", () => "/v1/me/businesses", () => reporter],
   ];
   it.each(reads)("%s: sin recorrer tablas grandes", async (_name, url, user) => {
     const r = await scansOf(url(), user());
@@ -184,4 +194,3 @@ describe("lecturas con sesión y de moderación con volumen", () => {
     expect(large.scans).toEqual([]);
   });
 });
-
