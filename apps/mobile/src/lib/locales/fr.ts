@@ -612,6 +612,8 @@ export const fr: Record<MessageKey, string> = {
   offlineCopy: "Hors ligne : copie enregistrée",
   searchEvents: "Événements",
   prefMentions: "Quand quelqu’un me mentionne",
+  prefComments: "Quand quelqu’un commente mes publications",
+  prefReplies: "Quand quelqu’un répond à mes commentaires",
   callNow: "Appeler",
   allNumbers: "Voir tous les numéros d’urgence",
   verifiedOnly: "Vérifiés seulement",

@@ -27,6 +27,8 @@ export interface DomainEventMap {
    * no vuelve a avisar a quien ya estaba mencionado. Ya excluye a quien bloqueó al autor.
    */
   UserMentioned: { postId: string; authorProfileId: string; profileIds: string[] };
+  /** Comentario nuevo (ADR 0320). `repliedToProfileId`: autor del comentario al que responde, si es una respuesta. */
+  CommentAdded: { commentId: string; postId: string; authorProfileId: string; repliedToProfileId: string | null };
   ExternalItemIngested: { externalItemId: string; sourceId: string; lane: "NORMAL" | "URGENT" };
   MediaUploaded: { mediaId: string };
   MediaReady: { mediaId: string; phash?: string | null };

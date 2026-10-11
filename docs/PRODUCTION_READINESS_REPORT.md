@@ -1,6 +1,6 @@
 # DIZASTER PRODUCTION READINESS AUDIT
 
-Fecha: 2026-10-11 · Código hasta ADR 0319 · Migraciones 0001–0108 · Todo en `main` por PR (sin force push)
+Fecha: 2026-10-11 · Código hasta ADR 0320 · Migraciones 0001–0109 · Todo en `main` por PR (sin force push)
 
 Esta auditoría compara el Blueprint con los ADR, el código y las pruebas. Solo se marca un bloqueo cuando está
 escrito qué falta y quién lo da. No se inventan decisiones, límites, precios ni capacidades. El procedimiento exacto
@@ -37,7 +37,7 @@ tiendas y credenciales, decisiones de producto y revisión legal. Nada de eso lo
 | --- | --- |
 | `pnpm check`: lint, fronteras de módulos, secretos, workflows y versiones alineadas, typecheck, build y pruebas | ✅ Pruebas: contracts 42, geo-kit 39, móvil 288, backend 717, delivery 97 |
 | Empaquetado móvil iOS + Android (`bundle:check`) y paridad nativa | ✅ |
-| Migraciones 0001–0108 sobre PostgreSQL 16 + PostGIS + H3; restauración de respaldo | ✅ |
+| Migraciones 0001–0109 sobre PostgreSQL 16 + PostGIS + H3; restauración de respaldo | ✅ |
 | Gitleaks: historial (285 commits) y árbol de trabajo | ✅ sin hallazgos |
 | Trivy (dependencias, Dockerfiles, IaC) y Semgrep con reglas propias | ✅ sin HIGH/CRITICAL |
 | Imagen del backend: usuario no root, sin gestores de paquetes | ✅ |
@@ -60,7 +60,7 @@ tiendas y credenciales, decisiones de producto y revisión legal. Nada de eso lo
 | App iOS + Android con paridad | READY en código · BLOCKED BY AUTHORIZATION para compilar | Falta `EXPO_TOKEN`, que viene de una cuenta gratuita de Expo |
 | Publicar en tiendas | FINANCIAL AUTHORIZATION REQUIRED | Apple Developer US$99 al año; Google Play US$25 una vez |
 | Red social: posts, comentarios, reacciones, seguir, feed, búsqueda, negocios | READY | ADR 0268 y 0270 |
-| Avisos por comentarios y respuestas | IN PROGRESS | Aprobado el 2026-10-11: apagados por defecto, con límite diario (ADR 0315) |
+| Avisos por comentarios y respuestas | READY | Apagados por defecto, activables, tope diario configurable; no gastan el límite de los incidentes (ADR 0320) |
 | Reportes con presencia física y privacidad | READY | Cifrado de la ubicación precisa y protección contra triangulación |
 | Retención de la ubicación en categorías sensibles (D1) | READY | 7 días en categorías sensibles, configurable; las filas anteriores se ajustan (ADR 0318). Excepciones legales: BLOCKED_BY_LEGAL |
 | Eventos, deduplicación, fusión | READY | D2 aprobado el 2026-10-11: «No, es otro» solo se registra; prueba de que el evento no cambia (ADR 0315, 0317) |
