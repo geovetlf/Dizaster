@@ -263,6 +263,8 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
         android: { minVersion: c.env.MIN_APP_VERSION_ANDROID || null, storeUrl: c.env.STORE_URL_ANDROID || null },
         ios: { minVersion: c.env.MIN_APP_VERSION_IOS || null, storeUrl: c.env.STORE_URL_IOS || null },
       },
+      // Estado de lanzamiento por país (ADR 0341): abrir un país no exige versión nueva ni que la app envíe su ubicación.
+      launch: c.ref.launchConfig(),
     };
     reply.header("cache-control", "public, max-age=300");
     return body;
