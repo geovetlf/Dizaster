@@ -23,14 +23,20 @@ const DATA_LOSS = /\b(TRUNCATE(?:\s+TABLE)?|DELETE\s+FROM)\s+([a-z_][a-z0-9_]*\.
  * - Cualquier migración nueva → critical (toca la base).
  */
 export function checkMigrations(
-  changes: { path: string; status: "A" | "M" | "D" | "R" }[],
+  changes: { path: string; status: "A" | "M" | "D" | "R"; oldPath?: string | undefined }[],
   readFile: (path: string) => string,
   opts: { dir: string; derivedTables: string[] },
 ): MigrationFinding[] {
   const out: MigrationFinding[] = [];
   const derived = new Set(opts.derivedTables.map((t) => t.toLowerCase()));
+  const isMigration = (p: string | undefined) => !!p && p.startsWith(`${opts.dir}/`) && p.endsWith(".sql");
   for (const c of changes) {
-    if (!c.path.startsWith(`${opts.dir}/`) || !c.path.endsWith(".sql")) continue;
+    // Sacar una migración de su carpeta (renombrarla fuera) equivale a borrarla.
+    if (c.oldPath && isMigration(c.oldPath) && !isMigration(c.path)) {
+      out.push({ file: c.oldPath, class: "blocked", message: "una migración existente no se edita, renombra ni borra: se añade otra" });
+      continue;
+    }
+    if (!isMigration(c.path)) continue;
     if (c.status !== "A") {
       out.push({ file: c.path, class: "blocked", message: "una migración existente no se edita, renombra ni borra: se añade otra" });
       continue;
