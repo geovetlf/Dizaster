@@ -1138,7 +1138,7 @@ Para cada una hay una recomendación. Puedes aprobar en bloque ("apruebo todas l
 | **D-03** | ¿Un POST puede enlazar un EVENT sin presencia? | Sí / No | **Sí**, como mención; solo los REPORT alimentan pin y verificación |
 | **D-04** | ¿Perfiles de negocio pueden crear REPORTs? | Sí / No / Solo institucionales verificados | **Solo** perfiles institucionales oficiales verificados (y como fuente OFFICIAL, no como reporte ciudadano) |
 | **D-05** | Anonimato de reportes | Siempre público / pseudónimo opcional / pseudónimo obligatorio en categorías sensibles | **Pseudónimo opcional**, obligatorio en categorías HIGHLY_SENSITIVE |
-| **D-06** | Retención de ubicación precisa del reportante | 7 / 30 / 90 días | **30 días**, luego generalización a H3 r7 |
+| **D-06** | Retención de ubicación precisa del reportante | 7 / 30 / 90 días | **30 días**, luego generalización a H3 r7. En categorías sensibles, 7 días (D1, aprobado 2026-10-11) |
 | **D-07** | Estados de verificación | Solo los 4 / 4 + banderas DISPUTED, FALSE, OFFICIALLY_DENIED, RETRACTED | **4 + banderas** |
 | **D-08** | Categorías de delincuencia en V1 | Incluir con políticas / incluir sin media de personas / diferir | **Incluir** con ubicación generalizada, prohibición de identificar personas y difuminado de rostros y matrículas |
 | **D-09** | Salud y enfermedades | Ciudadanos reportan brotes / solo oficiales para brotes y ciudadanos para situaciones observables | **Solo oficiales/externas para brotes**; ciudadanos solo situaciones observables |
@@ -1156,6 +1156,18 @@ Para cada una hay una recomendación. Puedes aprobar en bloque ("apruebo todas l
 | **D-21** | Nombre de marca y dominio | — | Pendiente de tu elección (verificar disponibilidad de dominio y marca) |
 | **D-23** | Base de datos de staging (ADR 0261) | Cloud SQL mínima / PostgreSQL en e2-micro gratuito / staging efímero | **PostgreSQL en e2-micro** mientras no haya usuarios. Decidido 2026-10-10: VM propia (Cloud SQL no tiene h3; ADR 0314) |
 | **D-24** | Plan de GitHub (ADR 0261, 0262) | gratuito / de pago | **Gratuito** + promoción a producción solo desde etiqueta del propietario |
+
+**Decisiones de producto aprobadas el 2026-10-11** (el propietario, por escrito; detalle en ADR 0315):
+
+| Decisión | Aprobado |
+|---|---|
+| **D1** — Ubicación precisa en categorías sensibles | 7 días, configurable; cifrada, con acceso controlado y borrado efectivo al vencer. Sustituye a D-06 solo para las categorías sensibles |
+| **D2** — «No, es otro evento» | Solo se registra la discrepancia; el evento, su estado y su agrupación no cambian |
+| **D3** — Reputación pública | «N reportes corroborados», ocultable por cada persona; sin puntajes internos; corroboración comunitaria distinta de la confirmación oficial |
+| Suspensiones | Escalonadas: 24 horas, 7 días o permanentes; apelables y auditadas |
+| Avisos de comentarios y respuestas | Apagados por defecto en V1; la persona puede activarlos; límite diario configurable; nunca compiten con las alertas |
+| Estado de lanzamiento por país (D-02) | Solo `PILOT` y `AVAILABLE` aceptan reportes ciudadanos; el resto, solo lectura; aplicado en el backend |
+| Uso sin cuenta | Solo lectura de contenido público; nada que requiera identidad |
 
 ---
 
