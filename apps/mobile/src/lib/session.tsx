@@ -4,7 +4,18 @@ import { Platform } from "react-native";
 
 /** Evita abrir la pantalla de MFA varias veces si fallan varias peticiones a la vez. */
 let mfaOpen = false;
+/** Última vez que se abrió «Entrar» sola (ADR 0332): una vez aunque fallen varias escrituras a la vez. */
+let lastSignInPrompt: number | null = null;
+
+/** Abre «Entrar» si no se abrió hace un momento. */
+export function promptSignIn(): void {
+  const now = Date.now();
+  if (!shouldPromptSignIn(lastSignInPrompt, now)) return;
+  lastSignInPrompt = now;
+  router.push("/sign-in");
+}
 import { api, onSessionEvents, setSession, type TokenPair } from "./api";
+import { shouldPromptSignIn } from "./auth/guest";
 import { startupPlan } from "./auth/sign-in-flow";
 import { registerReportQueueTask } from "./report/background";
 import { cleanOrphanMedia } from "./report/draft-store";
@@ -80,6 +91,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       // El refresh caducó o fue revocado: se vuelve a entrar con la misma identidad del teléfono.
       // Moderación o administración pide el segundo factor (ADR 0090).
       mfa: () => { if (!mfaOpen) { mfaOpen = true; router.push("/mfa"); setTimeout(() => { mfaOpen = false; }, 3000); } },
+      // Escritura sin cuenta (ADR 0332). El acceso de desarrollo vuelve a entrar solo: ahí no se pide nada.
+      signIn: () => { if (identity.current?.method !== "DEV") promptSignIn(); },
       lost: () => {
         const id = identity.current;
         if (!id) return;

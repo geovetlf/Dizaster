@@ -13,6 +13,7 @@ import { lang, t } from "../lib/i18n";
 import { categoryStyle } from "../lib/ui/categories";
 import { timeAgo } from "../lib/ui/format";
 import { colors, radius, space } from "../theme";
+import { AccountRequired, useIsGuest } from "../components/account-required";
 
 /** Historial de alertas: todas, incluidas las que no sonaron (límite por hora, horas de silencio). */
 export default function AlertsScreen() {
@@ -22,6 +23,8 @@ export default function AlertsScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [savedAt, setSavedAt] = useState<number | null>(null);
+  // Las alertas son de la cuenta (ADR 0317, 0332): sin ella se explica cómo tenerlas.
+  const guest = useIsGuest();
 
   const load = useCallback(async (more: string | null) => {
     try {
@@ -41,7 +44,7 @@ export default function AlertsScreen() {
     }
   }, []);
 
-  useFocusEffect(useCallback(() => { void load(null); }, [load]));
+  useFocusEffect(useCallback(() => { if (!guest) void load(null); }, [load, guest]));
 
   async function openItem(n: NotificationView) {
     if (!n.readAt) {
@@ -58,6 +61,8 @@ export default function AlertsScreen() {
     const r = await api.markNotificationsRead().catch(() => null);
     if (r) { setUnread(r.unread); reportUnread(r.unread); }
   }
+
+  if (guest) return <View style={styles.container}><AccountRequired /></View>;
 
   return (
     <View style={styles.container}>
@@ -89,7 +94,9 @@ export default function AlertsScreen() {
         renderItem={({ item }) => {
           const s = item.kind === "OFFICIAL_UPDATE" ? { icon: "bullhorn-outline" as const, color: colors.link }
             : item.categoryCode ? categoryStyle(item.categoryCode)
-            : item.kind === "MODERATION" ? { icon: "shield-check-outline" as const, color: colors.link } : { icon: "at" as const, color: colors.accent };
+            : item.kind === "MODERATION" ? { icon: "shield-check-outline" as const, color: colors.link }
+            // Comentarios y respuestas (ADR 0320) con su propio icono; las menciones, la arroba.
+            : item.kind === "COMMENT" ? { icon: "comment-outline" as const, color: colors.accent } : { icon: "at" as const, color: colors.accent };
           const note = deliveryNoteKey(item.delivery);
           return (
             <Pressable accessibilityRole="link" style={[styles.row, !item.readAt && styles.unread]} onPress={() => void openItem(item)}>

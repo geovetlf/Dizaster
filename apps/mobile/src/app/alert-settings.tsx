@@ -21,6 +21,7 @@ import { useCoarseLocation } from "../lib/ui/use-coarse-location";
 import { colors, radius, space } from "../theme";
 import { categoryLabel, pickerCategories, useCategoryCatalogVersion } from "../lib/category-store";
 import { appConfig } from "../lib/config/app-config";
+import { AccountRequired, useIsGuest } from "../components/account-required";
 
 const categoryName = categoryLabel;
 
@@ -51,6 +52,8 @@ export default function AlertSettingsScreen() {
   const [zones, setZones] = useState<SavedZone[]>([]);
   const [error, setError] = useState(false);
   const [offlineStyle, setOfflineStyle] = useState<string | null>(null);
+  // Las preferencias son de la cuenta (ADR 0317, 0332).
+  const guest = useIsGuest();
 
   useEffect(() => {
     // Solo si el proveedor de mapa permite descargas por región (config remota).
@@ -62,10 +65,11 @@ export default function AlertSettingsScreen() {
   useFocusEffect(
     useCallback(() => {
       pushPermission().then(setPermission).catch(() => setPermission("ask"));
+      if (guest) return;
       Promise.all([api.alertPreferences(), api.alertSubscriptions(), api.zones()])
         .then(([p, s, z]) => { setPrefs(p); setSubs(s.subscriptions); setZones(z.zones); setError(false); })
         .catch(() => setError(true));
-    }, []),
+    }, [guest]),
   );
 
   async function askPermission() {
@@ -82,8 +86,10 @@ export default function AlertSettingsScreen() {
     setPrefs({ ...prefs, ...patch });
     try {
       setPrefs(await api.updateAlertPreferences(patch));
-    } catch {
+    } catch (e) {
+      // No se da por hecho (ADR 0233) y se dice por qué: sin red, cuenta suspendida… (ADR 0300).
       setPrefs(before);
+      showError(e);
     }
   }
 
@@ -108,6 +114,8 @@ export default function AlertSettingsScreen() {
     setZones((all) => all.filter((z) => z.id !== id));
     await deleteZoneMap(id).catch(() => undefined);
   }
+
+  if (guest) return <View style={styles.container}><AccountRequired /></View>;
 
   if (!prefs) {
     return <View style={styles.container}><Text style={styles.note}>{error ? t("loadError") : ""}</Text></View>;
@@ -278,7 +286,7 @@ function SwitchRow({ label, value, onChange }: { label: string; value: boolean; 
   return (
     <View style={styles.row}>
       <Text style={styles.label}>{label}</Text>
-      <Switch value={value} onValueChange={onChange} trackColor={{ true: colors.accent, false: colors.border }} />
+      <Switch accessibilityLabel={label} value={value} onValueChange={onChange} trackColor={{ true: colors.accent, false: colors.border }} />
     </View>
   );
 }
