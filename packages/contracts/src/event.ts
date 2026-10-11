@@ -107,14 +107,20 @@ export const EventSummary = z.object({
 });
 export type EventSummary = z.infer<typeof EventSummary>;
 
+/** Área oficial afectada simplificada (ADR 0144): solo la aportan fuentes externas u oficiales, nunca un reporte. */
+export const AffectedAreaView = z.object({
+  type: z.literal("MultiPolygon"),
+  coordinates: z.array(z.array(z.array(z.array(z.number())))),
+});
+export type AffectedAreaView = z.infer<typeof AffectedAreaView>;
+
 /** GET /v1/events/:id: si el evento se fusionó, `mergedIntoId` es el destino al que la app redirige (ADR 0093). */
-export type EventDetail = EventSummary & {
-  mergedIntoId: string | null;
-  publicationState: string;
-  /** Área oficial afectada simplificada (ADR 0144): solo la aportan fuentes externas u oficiales, nunca un reporte. */
-  affectedArea?: AffectedAreaView | null;
-};
-export interface AffectedAreaView { type: "MultiPolygon"; coordinates: number[][][][] }
+export const EventDetail = EventSummary.extend({
+  mergedIntoId: z.uuid().nullable(),
+  publicationState: z.string(),
+  affectedArea: AffectedAreaView.nullable().optional(),
+});
+export type EventDetail = z.infer<typeof EventDetail>;
 
 export const TimelineEntryView = z.object({
   id: z.uuid(),
