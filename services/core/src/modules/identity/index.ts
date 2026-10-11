@@ -68,7 +68,7 @@ const hashToken = (t: string) => createHash("sha256").update(t).digest("hex");
 
 export class IdentityService {
   private readonly key: Uint8Array;
-  private readonly statusCache = new Map<string, { status: string; ageOk: boolean; at: number }>();
+  private readonly statusCache = new Map<string, { status: string; ageOk: boolean; suspendedUntil: Date | null; at: number }>();
 
   constructor(
     private readonly db: Db,
@@ -230,16 +230,21 @@ export class IdentityService {
     let cached = this.statusCache.get(userId);
     if (!cached || now - cached.at > 30_000) {
       // Una suspensión que ya cumplió su plazo deja de contar aunque el trabajo horario aún no la haya cerrado.
-      const { rows } = await this.db.query<{ status: string; age_ok: boolean }>(
+      const { rows } = await this.db.query<{ status: string; age_ok: boolean; suspended_until: Date | null }>(
         `SELECT CASE WHEN status = 'SUSPENDED' AND suspended_until <= now() THEN 'ACTIVE' ELSE status END AS status,
-                age_confirmed_at IS NOT NULL AS age_ok FROM identity.users WHERE id = $1`, [userId],
+                age_confirmed_at IS NOT NULL AS age_ok, suspended_until FROM identity.users WHERE id = $1`, [userId],
       );
-      cached = { status: rows[0]?.status ?? "DELETED", ageOk: rows[0]?.age_ok ?? false, at: now };
+      cached = { status: rows[0]?.status ?? "DELETED", ageOk: rows[0]?.age_ok ?? false, suspendedUntil: rows[0]?.suspended_until ?? null, at: now };
       this.statusCache.set(userId, cached);
       if (this.statusCache.size > 10_000) this.statusCache.clear();
     }
     if (cached.status === "SUSPENDED" && opts.allowSuspended) return;
-    if (cached.status === "SUSPENDED") throw new DomainError("ACCOUNT_SUSPENDED", "Tu cuenta está suspendida. Puedes ver el motivo y apelar en Perfil.", 403);
+    // `userId` es siempre el de la propia sesión: el fin de la suspensión es un dato de la persona misma (ADR 0340).
+    // null = permanente (ADR 0319).
+    if (cached.status === "SUSPENDED") {
+      throw new DomainError("ACCOUNT_SUSPENDED", "Tu cuenta está suspendida. Puedes ver el motivo y apelar en Perfil.", 403,
+        { suspendedUntil: cached.suspendedUntil?.toISOString() ?? null });
+    }
     if (cached.status !== "ACTIVE") throw new DomainError("ACCOUNT_INACTIVE", "Cuenta no activa", 403);
     // Edad mínima (D-13): sin declararla se puede leer, pero no publicar, reportar ni interactuar.
     if (opts.requireAge && !cached.ageOk) throw new DomainError("AGE_CONFIRMATION_REQUIRED", "Confirma tu edad para publicar", 403);

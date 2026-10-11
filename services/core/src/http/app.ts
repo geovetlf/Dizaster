@@ -200,7 +200,8 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
     if (err instanceof DomainError) {
       const retry = (err as { retryAfter?: number }).retryAfter;
       if (retry) reply.header("retry-after", String(retry));
-      return reply.status(err.httpStatus).send({ error: err.code, message: err.message });
+      // Los detalles van primero: nunca pisan `error` ni `message` (ADR 0340).
+      return reply.status(err.httpStatus).send({ ...err.details, error: err.code, message: err.message });
     }
     const status = (err as { statusCode?: number }).statusCode;
     if (status && status < 500) return reply.status(status).send({ error: "BAD_REQUEST", message: (err as Error).message });

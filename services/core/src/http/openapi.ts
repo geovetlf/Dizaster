@@ -219,7 +219,11 @@ export function buildOpenApi(routes: readonly string[], version: string): Record
       responses: {
         Error: {
           description: "Error con código estable",
-          content: { "application/json": { schema: { type: "object", required: ["error", "message"], properties: { error: { type: "string" }, message: { type: "string" } } } } },
+          content: { "application/json": { schema: { type: "object", required: ["error", "message"], properties: {
+            error: { type: "string" }, message: { type: "string" },
+            // Solo en ACCOUNT_SUSPENDED y sobre la propia cuenta (ADR 0340): fin de la suspensión, null si es permanente.
+            suspendedUntil: { type: ["string", "null"], format: "date-time" },
+          } } } },
         },
       },
     },
