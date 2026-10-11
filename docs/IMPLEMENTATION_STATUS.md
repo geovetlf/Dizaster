@@ -502,7 +502,7 @@ Actualizado: 2026-10-10 (hasta ADR 0316; auditoría de preparación en `docs/PRO
 | Cola de moderación sin consultas por caso: motivos de toda la página en una consulta (cola de 50: 151 → 52 consultas, 29,9 → ~15 ms) y sin vista previa para la fila de más de las apelaciones (ADR 0312) | ✅ | §5.22, §13 |
 | Resto de lecturas con sesión con volumen: 10 lecturas más de `/v1/me` y `/v1/admin` en la prueba de planes; los informes de calidad y transparencia y la exportación quedan fuera, con motivo (ADR 0313) | ✅ | §5.22, §13.3 |
 | Decisiones D-23 (staging en VM, validado en `envs/staging`) y D-17 (piloto con límites oficiales de Perú) (ADR 0314) | ✅ | §11.5, §20 |
-| Expediente de las siete decisiones pendientes: comportamiento actual, alternativas, riesgos, recomendación y qué pasa si no se decide. Propuesta; suspensiones y avisos sociales decididos por el propietario (ADR 0315) | ✅ | §2, §5, §13 |
+| Las siete decisiones de producto de V1, aprobadas por el propietario el 2026-10-11: D1, D2, D3, suspensiones, avisos sociales, lanzamiento por país y uso sin cuenta (ADR 0315) | ✅ | §2, §5, §13 |
 | La exportación de datos no falla entera por una ubicación cifrada ilegible: sale vacía y marcada (ADR 0316) | ✅ | §13.2 |
 | Contacto configurable en el User-Agent de ingesta (`INGEST_CONTACT`), con aviso en `config-check` si falta en producción (ADR 0307) | ✅ falta el valor del propietario | §9.3 |
 | Licencias, auditoría, SBOM, Dependabot; respaldo con prueba de restauración en CI | ✅ | ADR 0070, `scripts/supply-chain.mjs`, `scripts/db-restore-check.mjs` |
@@ -591,18 +591,18 @@ Plano de entrega (Blueprint §20, ADR 0260–0275). Ojo con los nombres: las fas
 
 Bloqueadas o en espera:
 
-Las decisiones de producto abiertas tienen su expediente en ADR 0315 (propuesta; la duración de las suspensiones y los avisos sociales ya los decidió el propietario).
+Las siete decisiones de producto de V1 quedaron aprobadas por el propietario el 2026-10-11 (ADR 0315). Su implementación va en ADR 0317 en adelante.
 
 - **BLOQUEADA** — Primer APK real de Android: falta `EXPO_TOKEN` (cuenta gratuita de Expo del propietario) o una computadora con el Android SDK; el SDK no se puede descargar en el entorno del agente. `expo prebuild` verificado; pasos locales en `docs/MOBILE_PLATFORMS.md` (ADR 0218).
 - **BLOQUEADA** — Video 720p también en Android (§12.1, paridad): necesita transcodificar en el teléfono (módulo local con Media3 Transformer, Apache-2.0, sin coste). Es código nativo nuevo que no se puede compilar ni probar aquí (sin SDK de Android); se hace con el primer build de desarrollo (EXPO_TOKEN). Mientras tanto el límite de 60 MB acota el coste.
-- **EN ESPERA** — D1: días de retención de la ubicación precisa en categorías sensibles (§2 C-07).
-- **EN ESPERA** — D3: qué se muestra de la reputación en el perfil público (§5.2 vs §13.3).
-- **PENDING DECISION** — D2 (parte de ADR 0156): la respuesta "No, es otro" se guarda en `event.dedup_reviews.reporter_answer`; falta decidir si divide el evento, va a la cola de duplicados u otra cosa. Nada se mueve hasta entonces.
-- **PENDING DECISION** — Estado de lanzamiento por país (C-06, D-02): `launchStatus` (PILOT, AVAILABLE, AVAILABLE_READ_ONLY, RESTRICTED) existe en los datos pero no se aplica; falta decidir qué pasa con los reportes ciudadanos fuera de PILOT/AVAILABLE.
-- ✅ **Decidido 2026-10-10** — Duración de suspensiones: escalonada, 24 h, 7 días o permanente, apelable (ADR 0315). Implementación: siguiente bloque.
+- ✅ **Aprobado 2026-10-11** — D1: ubicación precisa en categorías sensibles 7 días, configurable (ADR 0315).
+- ✅ **Aprobado 2026-10-11** — D3: «N reportes corroborados» en el perfil público, ocultable (ADR 0315).
+- ✅ **Aprobado 2026-10-11** — D2: «No, es otro» solo se registra; el evento no cambia (ADR 0315).
+- ✅ **Aprobado 2026-10-11** — Estado de lanzamiento por país: solo PILOT y AVAILABLE aceptan reportes ciudadanos (ADR 0315).
+- ✅ **Aprobado 2026-10-11** — Suspensiones escalonadas: 24 h, 7 días o permanente, apelables y auditadas (ADR 0315).
 - ✅ **Decidido 2026-10-10** — D-17: el piloto usa los límites oficiales de Perú (INEI en el índice administrativo). Otro país con fronteras en disputa espera asesoría legal. Antes de publicar el mapa de Perú se revisan sus fronteras (ADR 0314).
-- **PENDING DECISION** — Uso sin cuenta (ADR 0171): hoy se puede cerrar "Entrar" y seguir en solo lectura; falta decidir si V1 lo permite o exige cuenta.
-- ✅ **Decidido 2026-10-10** — Avisos sociales (comentarios en mis posts, respuestas a mis comentarios): en V1, apagados por defecto y con límite diario (ADR 0315). Implementación: siguiente bloque.
+- ✅ **Aprobado 2026-10-11** — Uso sin cuenta: solo lectura de contenido público (ADR 0315).
+- ✅ **Aprobado 2026-10-11** — Avisos de comentarios y respuestas: apagados por defecto, activables, con límite diario (ADR 0315).
 - **BLOCKED_BY_CREDENTIALS** — Envío real de push: clave APNs `.p8` (Apple Developer, US$99/año) y cuenta de servicio de Firebase del propietario. Producción exige `PUSH_DRIVER=live`.
 - **BLOCKED_BY_CREDENTIALS** — Atestación real (App Attest / Play Integrity, §8.2, §13.1): solo existe el verificador de desarrollo y el backend no arranca en producción sin uno real (`container.ts`). Necesita el primer build de desarrollo (EXPO_TOKEN) y las cuentas de Apple y Google para obtener y verificar atestaciones reales (ADR 0129).
 - **BLOCKED_BY_OWNER** — Correo de inicio de sesión: `EMAIL_PROVIDER` solo admite `none` y `log`; falta que el propietario elija proveedor (ADR 0170). Con esa elección se escribe el adapter.

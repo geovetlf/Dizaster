@@ -60,11 +60,11 @@ tiendas y credenciales, decisiones de producto y revisión legal. Nada de eso lo
 | App iOS + Android con paridad | READY en código · BLOCKED BY AUTHORIZATION para compilar | Falta `EXPO_TOKEN`, que viene de una cuenta gratuita de Expo |
 | Publicar en tiendas | FINANCIAL AUTHORIZATION REQUIRED | Apple Developer US$99 al año; Google Play US$25 una vez |
 | Red social: posts, comentarios, reacciones, seguir, feed, búsqueda, negocios | READY | ADR 0268 y 0270 |
-| Avisos por comentarios y respuestas | BLOCKED BY AUTHORIZATION | Decisión de producto pendiente |
+| Avisos por comentarios y respuestas | IN PROGRESS | Aprobado el 2026-10-11: apagados por defecto, con límite diario (ADR 0315) |
 | Reportes con presencia física y privacidad | READY | Cifrado de la ubicación precisa y protección contra triangulación |
-| Retención de la ubicación en categorías sensibles (D1) | BLOCKED BY AUTHORIZATION | Decisión de producto |
-| Eventos, deduplicación, fusión | READY | Qué hace "No, es otro" es D2 y espera decisión |
-| Reputación en el perfil (D3) | BLOCKED BY AUTHORIZATION | Decisión de producto |
+| Retención de la ubicación en categorías sensibles (D1) | IN PROGRESS | Aprobado el 2026-10-11: 7 días, configurable (ADR 0315) |
+| Eventos, deduplicación, fusión | READY | D2 aprobado el 2026-10-11: «No, es otro» solo se registra (ADR 0315) |
+| Reputación en el perfil (D3) | IN PROGRESS | Aprobado el 2026-10-11: «N reportes corroborados», ocultable (ADR 0315) |
 | Verificación por reglas; la IA nunca confirma | READY | Pruebas más una regla Semgrep propia |
 | Atestación real del dispositivo | BLOCKED BY AUTHORIZATION | Necesita el primer build y las cuentas de Apple y Google. Producción no arranca sin ella |
 | Fuentes oficiales del piloto (IGP, INDECI, SENAMHI) | BLOCKED BY EXTERNAL DEPENDENCY | Validar los feeds y los términos de uso. USGS está activo |
@@ -125,12 +125,7 @@ En orden de impacto:
 6. Cuentas de Apple Developer y Google Play; clave APNs y Firebase; IDs de inicio de sesión de Apple y Google.
 7. Proveedor de correo.
 8. Asesoría legal: textos legales, CSAM, requerimientos de autoridades, fronteras en disputa.
-9. Decisiones de producto:
-   - D1, D2 y D3;
-   - avisos por comentarios;
-   - uso sin cuenta;
-   - estado de lanzamiento por país;
-   - duración de las suspensiones.
+9. ✅ Decisiones de producto: las siete de V1 se aprobaron el 2026-10-11 (ADR 0315).
 10. Datos y contactos:
     - contacto de ingesta;
     - fuentes del piloto;
@@ -275,12 +270,7 @@ Producción no arranca sin verificador de atestación real (`container.ts`) ni s
    - CSAM;
    - entrega de datos a autoridades;
    - fronteras en disputa.
-5. **Propietario:** decisiones de producto:
-   - D1, D2 y D3;
-   - uso sin cuenta;
-   - estado de lanzamiento por país;
-   - duración de las suspensiones;
-   - avisos sociales.
+5. ✅ **Propietario:** las siete decisiones de producto de V1, aprobadas el 2026-10-11 (ADR 0315).
 
    Cualquier respuesta se implementa como ADR.
 6. **Propietario:** datos:
@@ -318,7 +308,7 @@ Cada fila dice qué falta, por qué el agente no puede resolverlo, qué quedó l
 | Fuentes del piloto (IGP, INDECI, SENAMHI) | Validar feeds y términos de uso | Términos de terceros; el agente no los acepta por el propietario | Registro de fuentes, ingesta con reintentos y escalonada, USGS activo | temporal | Propietario: confirmar términos de cada fuente | 0 |
 | FIRMS | `MAP_KEY` gratuita | Credencial del propietario | Adaptador listo (ADR 0067) | temporal | Propietario: pedir la clave en NASA FIRMS | 0 |
 | Contacto de ingesta | Correo o URL | Dato del propietario | `INGEST_CONTACT` y aviso en `config-check` (ADR 0307) | temporal | Propietario: dar el contacto | 0 |
-| Decisiones de producto | D1, D2, D3, uso sin cuenta, estado de lanzamiento por país, duración de suspensiones, avisos sociales | Son decisiones de producto | Todo lo que no depende de ellas; expediente con alternativas y riesgos en ADR 0315 | temporal | Propietario: responder cada una | 0 |
+| Decisiones de producto | — | — | Las siete de V1 aprobadas el 2026-10-11 (ADR 0315); implementación en ADR 0317 en adelante | resuelto | — | 0 |
 | Fronteras en disputa (D-17) | Otros países | Decisión legal y de producto | Piloto: límites oficiales de Perú (ADR 0314) | permanente hasta asesoría | Asesoría antes de abrir otro país | Según asesoría |
 | Datos y revisiones | Revisión nativa de pt y fr, listas de términos, organizaciones para donar, textos regionales | Requieren personas con conocimiento local | Mecanismos con listas vacías | temporal | Propietario: proveerlos | 0 |
 | Pruebas reales | Dispositivo, push, staging, producción | Necesitan los bloqueos anteriores | Ensayo local completo de la entrega (ADR 0282), guardas, rollback | condicionado | Primer APK, luego staging | — |
