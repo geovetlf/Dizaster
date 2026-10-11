@@ -4,7 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { FeedList } from "../../components/feed-list";
 import { api } from "../../lib/api";
-import { t } from "../../lib/i18n";
+import { t, tf } from "../../lib/i18n";
+import { corroboratedLine } from "../../lib/social/corroborated";
 import { Avatar } from "../../components/avatar";
 import { alertFailure, confirmBlock, openFlag } from "../../lib/moderation/menu";
 import { colors, radius, space } from "../../theme";
@@ -55,6 +56,7 @@ export default function PublicProfileScreen() {
             <Stat n={profile.followerCount} label={t("followers")} />
             <Stat n={profile.followingCount} label={t("followingCount")} />
           </View>
+          {corroboratedLine(profile.corroboratedReports, tf) ? <Text style={styles.corroborated}>{corroboratedLine(profile.corroboratedReports, tf)}</Text> : null}
           {profile.isMe ? null : (
             <Pressable
               accessibilityRole="button"
@@ -106,6 +108,7 @@ const styles = StyleSheet.create({
   name: { color: colors.text, fontSize: 20, fontWeight: "800", marginTop: space.sm },
   handle: { color: colors.textMuted },
   stats: { flexDirection: "row", gap: space.xl, marginVertical: space.md },
+  corroborated: { color: colors.textMuted, fontSize: 13, marginBottom: space.sm },
   stat: { alignItems: "center" },
   statN: { color: colors.text, fontSize: 18, fontWeight: "700" },
   statLabel: { color: colors.textMuted, fontSize: 12 },

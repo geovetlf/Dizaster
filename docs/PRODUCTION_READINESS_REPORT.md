@@ -1,6 +1,6 @@
 # DIZASTER PRODUCTION READINESS AUDIT
 
-Fecha: 2026-10-11 · Código hasta ADR 0320 · Migraciones 0001–0109 · Todo en `main` por PR (sin force push)
+Fecha: 2026-10-11 · Código hasta ADR 0321 · Migraciones 0001–0110 · Todo en `main` por PR (sin force push)
 
 Esta auditoría compara el Blueprint con los ADR, el código y las pruebas. Solo se marca un bloqueo cuando está
 escrito qué falta y quién lo da. No se inventan decisiones, límites, precios ni capacidades. El procedimiento exacto
@@ -37,7 +37,7 @@ tiendas y credenciales, decisiones de producto y revisión legal. Nada de eso lo
 | --- | --- |
 | `pnpm check`: lint, fronteras de módulos, secretos, workflows y versiones alineadas, typecheck, build y pruebas | ✅ Pruebas: contracts 42, geo-kit 39, móvil 288, backend 717, delivery 97 |
 | Empaquetado móvil iOS + Android (`bundle:check`) y paridad nativa | ✅ |
-| Migraciones 0001–0109 sobre PostgreSQL 16 + PostGIS + H3; restauración de respaldo | ✅ |
+| Migraciones 0001–0110 sobre PostgreSQL 16 + PostGIS + H3; restauración de respaldo | ✅ |
 | Gitleaks: historial (285 commits) y árbol de trabajo | ✅ sin hallazgos |
 | Trivy (dependencias, Dockerfiles, IaC) y Semgrep con reglas propias | ✅ sin HIGH/CRITICAL |
 | Imagen del backend: usuario no root, sin gestores de paquetes | ✅ |
@@ -64,7 +64,7 @@ tiendas y credenciales, decisiones de producto y revisión legal. Nada de eso lo
 | Reportes con presencia física y privacidad | READY | Cifrado de la ubicación precisa y protección contra triangulación |
 | Retención de la ubicación en categorías sensibles (D1) | READY | 7 días en categorías sensibles, configurable; las filas anteriores se ajustan (ADR 0318). Excepciones legales: BLOCKED_BY_LEGAL |
 | Eventos, deduplicación, fusión | READY | D2 aprobado el 2026-10-11: «No, es otro» solo se registra; prueba de que el evento no cambia (ADR 0315, 0317) |
-| Reputación en el perfil (D3) | IN PROGRESS | Aprobado el 2026-10-11: «N reportes corroborados», ocultable (ADR 0315) |
+| Reputación en el perfil (D3) | READY | «N reportes corroborados», la parte oficial aparte, ocultable; sin puntajes ni seudónimos (ADR 0321) |
 | Verificación por reglas; la IA nunca confirma | READY | Pruebas más una regla Semgrep propia |
 | Atestación real del dispositivo | BLOCKED BY AUTHORIZATION | Necesita el primer build y las cuentas de Apple y Google. Producción no arranca sin ella |
 | Fuentes oficiales del piloto (IGP, INDECI, SENAMHI) | BLOCKED BY EXTERNAL DEPENDENCY | Validar los feeds y los términos de uso. USGS está activo |
