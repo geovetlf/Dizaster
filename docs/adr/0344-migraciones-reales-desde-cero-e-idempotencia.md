@@ -12,12 +12,13 @@ prueba sobre una base ya creada: `resetDatabase` borra los esquemas propios, per
 comprobaba tres cosas:
 - que las migraciones reales funcionan sobre una base vacía (como el primer despliegue de staging);
 - que volver a migrar no cambia nada;
-- que la numeración no tiene huecos ni repeticiones.
+- que la numeración no tiene repeticiones ni nombres fuera de formato.
 
 ## Decisión
 
 `services/core/test/idempotency-migrations.test.ts`, sobre una base nueva y propia que se borra al final:
-- La numeración de `migrations/` es 0001…N sin huecos ni repeticiones.
+- Los archivos de `migrations/` llevan un prefijo de cuatro cifras único y creciente. Puede haber huecos: cada
+  frente de trabajo usa su propio rango.
 - Dos migradores a la vez sobre la base vacía aplican cada archivo una vez, en orden, y guardan el sha256 de cada
   uno.
 - Dos ejecuciones más devuelven `[]` y no cambian:

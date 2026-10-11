@@ -54,8 +54,10 @@ async function catalog(): Promise<string[]> {
 describe("migraciones reales desde cero", () => {
   it("dos migradores a la vez sobre la base vacía aplican cada archivo una sola vez y en orden", async () => {
     expect(files.length).toBeGreaterThan(100);
-    // Numeración sin huecos ni repeticiones: el orden lexicográfico es el de aplicación.
-    expect(files.map((f) => Number(f.slice(0, 4)))).toEqual(files.map((_, i) => i + 1));
+    // Prefijo de cuatro cifras, único y creciente: el orden lexicográfico es el de aplicación. Puede haber huecos
+    // (cada frente de trabajo usa su propio rango de números).
+    const numbers = files.map((f) => Number(/^(\d{4})_[a-z0-9_]+\.sql$/.exec(f)?.[1] ?? NaN));
+    expect(numbers.every((n, i) => Number.isInteger(n) && (i === 0 || n > numbers[i - 1]!)), files.join(", ")).toBe(true);
     const [a, b] = await Promise.all([migrate(db, MIGRATIONS_DIR), migrate(db, MIGRATIONS_DIR)]);
     expect([...a, ...b].sort()).toEqual(files);
     const { rows } = await db.query<{ name: string; checksum: string; applied_at: Date }>(
