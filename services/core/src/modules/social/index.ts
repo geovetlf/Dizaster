@@ -686,6 +686,42 @@ export class SocialService {
     return { authorHandle: post.author_visibility === "PSEUDONYMOUS" ? null : post.handle, recipients: ok.rows.map((r) => r.id) };
   }
 
+  /**
+   * A quién avisar de un comentario (ADR 0320): a quien escribió la publicación (COMMENTED) y, si es una respuesta, a
+   * quien escribió el comentario respondido (REPLIED; gana si es la misma persona). Nunca a quien comentó, ni a quien
+   * lo bloqueó, ni si el comentario o la publicación ya no se ven. Solo publicaciones de personas, no de negocios.
+   */
+  async commentNoticeContext(
+    q: Queryable, commentId: string, repliedToProfileId: string | null,
+  ): Promise<{ postId: string; commenterProfileId: string; commenterHandle: string; recipients: { profileId: string; match: "COMMENTED" | "REPLIED" }[] } | null> {
+    const { rows } = await q.query<{ post_id: string; commenter: string; handle: string; post_author: string | null }>(
+      `SELECT c.post_id, c.author_profile_id AS commenter, pr.handle, CASE WHEN p.author_type = 'PROFILE' THEN p.author_id END AS post_author
+         FROM social.comments c
+         JOIN social.posts p ON p.id = c.post_id
+         JOIN social.profiles pr ON pr.id = c.author_profile_id
+        WHERE c.id = $1 AND c.deleted_at IS NULL AND c.moderation_state = 'VISIBLE'
+          AND p.deleted_at IS NULL AND p.moderation_state = 'VISIBLE' AND p.visibility = 'PUBLIC' AND ${VISIBLE_NOW}`,
+      [commentId],
+    );
+    const c = rows[0];
+    if (!c) return null;
+    const wanted = new Map<string, "COMMENTED" | "REPLIED">();
+    if (c.post_author) wanted.set(c.post_author, "COMMENTED");
+    if (repliedToProfileId) wanted.set(repliedToProfileId, "REPLIED");
+    wanted.delete(c.commenter);
+    if (wanted.size === 0) return { postId: c.post_id, commenterProfileId: c.commenter, commenterHandle: c.handle, recipients: [] };
+    const ok = await q.query<{ id: string }>(
+      `SELECT pr.id FROM social.profiles pr
+        WHERE pr.id = ANY($1) AND pr.deleted_at IS NULL
+          AND NOT EXISTS (SELECT 1 FROM social.blocks b WHERE b.blocker_profile_id = pr.id AND b.blocked_profile_id = $2)`,
+      [[...wanted.keys()], c.commenter],
+    );
+    return {
+      postId: c.post_id, commenterProfileId: c.commenter, commenterHandle: c.handle,
+      recipients: ok.rows.map((r) => ({ profileId: r.id, match: wanted.get(r.id)! })),
+    };
+  }
+
   async tag(q: Queryable, normalized: string, viewerProfileId: string | null): Promise<TagView> {
     // Una etiqueta que nadie ha usado aún existe igual: se puede seguir antes del primer post.
     const { rows } = await q.query<{ display: string | null; posts: number; followers: number; followed: boolean }>(
@@ -1057,6 +1093,7 @@ export class SocialService {
     );
     if (recent.rows[0]!.n >= perMinute) throw new DomainError("RATE_LIMITED", "Demasiados comentarios seguidos", 429);
     let parent: string | null = null;
+    let repliedTo: string | null = null;
     if (parentId) {
       // Un solo nivel: responder a una respuesta cuelga del comentario raíz.
       const p = await q.query<{ root: string; author: string }>(
@@ -1067,6 +1104,7 @@ export class SocialService {
       if (!p.rows[0]) throw notFound("Comentario");
       if (await this.isBlockedBy(q, p.rows[0].author, profileId)) throw blocked();
       parent = p.rows[0].root;
+      repliedTo = p.rows[0].author;
     }
     const id = newId();
     const ins = await q.query(
@@ -1081,6 +1119,8 @@ export class SocialService {
       throw new DomainError("CLIENT_ID_REUSED", "Ese id ya se usó para otro comentario", 409);
     }
     await this.detectPersonalData(q, "COMMENT", id, text, null);
+    // Avisos de comentarios y respuestas (ADR 0320): carril de lotes, para no adelantarse nunca a un incidente.
+    await publish(q, "CommentAdded", { commentId: id, postId, authorProfileId: profileId, repliedToProfileId: repliedTo }, { lane: "batch" });
     return (await this.commentRows(q, postId, profileId, { onlyId: id }))[0]!;
   }
 

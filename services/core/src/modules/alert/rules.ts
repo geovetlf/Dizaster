@@ -39,6 +39,9 @@ export const DEFAULT_PREFERENCES: AlertPreferences = {
   categories: true,
   statusChanges: true,
   mentions: true,
+  // Avisos de comentarios y respuestas: apagados por defecto en V1 (decisión del propietario, ADR 0315 y 0320).
+  comments: false,
+  replies: false,
   minSeverity: 3,
   maxPerHour: 6,
   quietHours: null,
@@ -79,6 +82,7 @@ export const MATCH_PRIORITY: AlertMatch[] = ["FOLLOWED_EVENT", "REPORTED", "SAVE
 export function wants(p: AlertPreferences, kind: AlertKind, match: AlertMatch, severity: number): boolean {
   if (!p.enabled) return false;
   if (kind === "MENTION") return p.mentions;
+  if (kind === "COMMENT") return match === "REPLIED" ? p.replies : p.comments;
   // Avisos sobre mi propio contenido o cuenta: solo los apaga el interruptor general (ADR 0141).
   if (kind === "MODERATION") return true;
   if (kind !== "NEW_EVENT") {
@@ -204,6 +208,8 @@ export function alertText(
       return moderationNoticeText(lang, "ACTION");
     case "OFFICIAL_UPDATE":
       return officialUpdateText(lang, null);
+    case "COMMENT":
+      return commentText(lang, null, "COMMENTED");
   }
 }
 
@@ -333,6 +339,33 @@ const MENTION_TEXT: Record<Lang, (who: string | null) => { title: string; body: 
   pt: (w) => ({ title: w ? `@${w} mencionou você` : "Você foi mencionado em uma publicação", body: "Toque para ver a publicação." }),
   fr: (w) => ({ title: w ? `@${w} vous a mentionné` : "Vous avez été mentionné dans une publication", body: "Touchez pour voir la publication." }),
 };
+
+/** Avisos de comentarios y respuestas por persona y día cuando no se configura otro valor (ADR 0320). */
+export const DEFAULT_SOCIAL_NOTICES_PER_DAY = 10;
+
+const COMMENT_TEXT: Record<Lang, Record<"COMMENTED" | "REPLIED", (who: string | null) => { title: string; body: string }>> = {
+  es: {
+    COMMENTED: (w) => ({ title: w ? `@${w} comentó tu publicación` : "Comentaron tu publicación", body: "Toca para ver la publicación." }),
+    REPLIED: (w) => ({ title: w ? `@${w} respondió a tu comentario` : "Respondieron a tu comentario", body: "Toca para ver la publicación." }),
+  },
+  en: {
+    COMMENTED: (w) => ({ title: w ? `@${w} commented on your post` : "Someone commented on your post", body: "Tap to see the post." }),
+    REPLIED: (w) => ({ title: w ? `@${w} replied to your comment` : "Someone replied to your comment", body: "Tap to see the post." }),
+  },
+  pt: {
+    COMMENTED: (w) => ({ title: w ? `@${w} comentou sua publicação` : "Comentaram sua publicação", body: "Toque para ver a publicação." }),
+    REPLIED: (w) => ({ title: w ? `@${w} respondeu ao seu comentário` : "Responderam ao seu comentário", body: "Toque para ver a publicação." }),
+  },
+  fr: {
+    COMMENTED: (w) => ({ title: w ? `@${w} a commenté votre publication` : "Quelqu'un a commenté votre publication", body: "Touchez pour voir la publication." }),
+    REPLIED: (w) => ({ title: w ? `@${w} a répondu à votre commentaire` : "Quelqu'un a répondu à votre commentaire", body: "Touchez pour voir la publication." }),
+  },
+};
+
+/** Texto del aviso de comentario o respuesta. Nunca incluye el texto del comentario. */
+export function commentText(lang: Lang, commenterHandle: string | null, match: "COMMENTED" | "REPLIED"): { title: string; body: string } {
+  return COMMENT_TEXT[lang][match](commenterHandle);
+}
 
 /** Texto del aviso de mención. Nunca incluye el texto del post; un post seudónimo no nombra a su autor. */
 export function mentionText(lang: Lang, authorHandle: string | null): { title: string; body: string } {

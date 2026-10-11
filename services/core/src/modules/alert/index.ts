@@ -39,6 +39,8 @@ import {
   DEFAULT_PREFERENCES,
   MATCH_PRIORITY,
   MENTION_LIMITS,
+  DEFAULT_SOCIAL_NOTICES_PER_DAY,
+  commentText,
   mentionText,
   moderationNoticeText,
   officialUpdateText,
@@ -59,7 +61,7 @@ import type { PushMessage, PushSender } from "./push/types.js";
 export { ApnsSender, type ApnsConfig } from "./push/apns.js";
 export { FcmSender, type FcmConfig, type FcmServiceAccount } from "./push/fcm.js";
 export { GuardedSender, LogPushSender, PushGateway, type PushMessage, type PushResult, type PushSender } from "./push/types.js";
-export { DEFAULT_PREFERENCES, MENTION_LIMITS, mentionText, alertText, budgetAlertText, costDegradationText, sourceAlertText, opsAlertText, type OpsAlertKey, decideAlerts, groupText, inQuietHours, localMinutes, wants } from "./rules.js";
+export { DEFAULT_PREFERENCES, DEFAULT_SOCIAL_NOTICES_PER_DAY, MENTION_LIMITS, commentText, mentionText, alertText, budgetAlertText, costDegradationText, sourceAlertText, opsAlertText, type OpsAlertKey, decideAlerts, groupText, inQuietHours, localMinutes, wants } from "./rules.js";
 
 /** Distancia máxima a la costa para asignar un evento marino a un país en las suscripciones por país. */
 export const OFFSHORE_COUNTRY_RADIUS_M = 300_000;
@@ -83,7 +85,7 @@ export interface ReporterDirectory {
 
 interface PrefRow {
   profile_id: string; enabled: boolean; followed_events: boolean; followed_places: boolean; saved_zones: boolean; near_me: boolean;
-  categories: boolean; status_changes: boolean; mentions: boolean;
+  categories: boolean; status_changes: boolean; mentions: boolean; comments: boolean; replies: boolean;
   min_severity: number; max_per_hour: number; quiet_start: number | null; quiet_end: number | null; timezone: string; lang: Lang;
 }
 
@@ -92,7 +94,7 @@ const toPrefs = (r: PrefRow | undefined): AlertPreferences =>
     ? {
         enabled: r.enabled, followedEvents: r.followed_events, followedPlaces: r.followed_places, savedZones: r.saved_zones,
         nearMe: r.near_me, categories: r.categories,
-        statusChanges: r.status_changes, mentions: r.mentions, minSeverity: r.min_severity, maxPerHour: r.max_per_hour,
+        statusChanges: r.status_changes, mentions: r.mentions, comments: r.comments, replies: r.replies, minSeverity: r.min_severity, maxPerHour: r.max_per_hour,
         quietHours: r.quiet_start === null || r.quiet_end === null ? null : { start: r.quiet_start, end: r.quiet_end },
         // Un idioma guardado que esta versión no conoce cae al respaldo global (Language Engine, ADR 0216).
         timezone: r.timezone, lang: isSupportedLang(r.lang) ? r.lang : GLOBAL_FALLBACK[0]!,
@@ -125,7 +127,7 @@ export class AlertService {
     private readonly push: PushSender,
     private readonly clock: Clock,
     private readonly ingestion: Pick<IngestionService, "officialAlertSource">,
-    private readonly opts: { ttlHours: number; reporters?: ReporterDirectory } = { ttlHours: 24 },
+    private readonly opts: { ttlHours: number; reporters?: ReporterDirectory; socialNoticesPerDay?: number } = { ttlHours: 24 },
   ) {}
 
   /** Plazo por defecto de una alerta sin `expires` de la fuente (ADR 0174). */
@@ -156,6 +158,7 @@ export class AlertService {
     // Gravedad recalculada (ADR 0160): si subió a alta avisa SEVERITY_UP; si bajó, solo actualiza el estado.
     dispatcher.on("EventSeverityChanged", "alert.evaluate.severity", (e, tx) => run(e.payload.eventId, tx));
     dispatcher.on("UserMentioned", "alert.mention", (e, tx) => this.mention(tx, e.payload).then(() => undefined));
+    dispatcher.on("CommentAdded", "alert.comment", (e, tx) => this.comment(tx, e.payload).then(() => undefined));
     // Avisos de moderación a la persona afectada (ADR 0141). Una reversión llega como decisión de apelación.
     dispatcher.on("ModerationActionTaken", "alert.moderation-notice", async (e, tx) => {
       const p = e.payload;
@@ -378,6 +381,53 @@ export class AlertService {
     return res.rowCount ?? 0;
   }
 
+  /**
+   * Aviso de comentario o respuesta (ADR 0320). Apagado por defecto: solo a quien activó «comentarios» o
+   * «respuestas». Tope diario por persona (`SOCIAL_NOTICES_PER_DAY`); por encima, el comentario sigue ahí pero no
+   * avisa. Una alerta por comentario y una notificación por persona. No compite con los incidentes: va por el carril
+   * de lotes, no cuenta en su límite por hora y sale después de ellos en cada envío (ver `flush`).
+   */
+  async comment(tx: Queryable, c: { commentId: string; repliedToProfileId: string | null }): Promise<number> {
+    const ctx = await this.social.commentNoticeContext(tx, c.commentId, c.repliedToProfileId);
+    if (!ctx || ctx.recipients.length === 0) return 0;
+    const prefs = await this.prefsFor(tx, ctx.recipients.map((r) => r.profileId));
+    let candidates = ctx.recipients
+      .map((r) => ({ ...r, prefs: prefs.get(r.profileId) ?? DEFAULT_PREFERENCES }))
+      .filter((r) => wants(r.prefs, "COMMENT", r.match, 0));
+    if (candidates.length === 0) return 0;
+    const cap = this.opts.socialNoticesPerDay ?? DEFAULT_SOCIAL_NOTICES_PER_DAY;
+    const today = new Map((await tx.query<{ profile_id: string; n: number }>(
+      `SELECT profile_id, count(*)::int AS n FROM alert.notifications
+        WHERE profile_id = ANY($1) AND match IN ('COMMENTED','REPLIED') AND created_at > $2::timestamptz - interval '24 hours'
+        GROUP BY profile_id`,
+      [candidates.map((r) => r.profileId), this.clock.now()],
+    )).rows.map((r) => [r.profile_id, r.n]));
+    candidates = candidates.filter((r) => (today.get(r.profileId) ?? 0) < cap);
+    if (candidates.length === 0) return 0;
+    const users = await this.social.userIdsForProfiles(tx, candidates.map((r) => r.profileId));
+    const recipients = candidates.flatMap((r) => { const userId = users.get(r.profileId); return userId ? [{ ...r, userId }] : []; });
+    if (recipients.length === 0) return 0;
+
+    const alertId = (await tx.query<{ id: string }>(
+      `INSERT INTO alert.alerts (id, kind, dedup_key, post_id, actor_profile_id, critical)
+       VALUES ($1, 'COMMENT', $2, $3, $4, false)
+       ON CONFLICT (dedup_key) DO UPDATE SET dedup_key = EXCLUDED.dedup_key RETURNING id`,
+      [newId(), `COMMENT:${c.commentId}`, ctx.postId, ctx.commenterProfileId],
+    )).rows[0]!.id;
+    const texts = recipients.map((r) => commentText(r.prefs.lang, ctx.commenterHandle, r.match));
+    const res = await tx.query(
+      `INSERT INTO alert.notifications (id, alert_id, profile_id, user_id, match, title, body)
+       SELECT id, $1, p, u, m, t, b FROM unnest($2::uuid[], $3::uuid[], $4::uuid[], $5::text[], $6::text[], $7::text[]) AS x(id, p, u, m, t, b)
+       ON CONFLICT (profile_id, alert_id) DO NOTHING`,
+      [
+        alertId, recipients.map(() => newId()), recipients.map((r) => r.profileId), recipients.map((r) => r.userId),
+        recipients.map((r) => r.match), texts.map((x) => x.title), texts.map((x) => x.body),
+      ],
+    );
+    if (res.rowCount) await publish(tx, "AlertTriggered", { alertId, eventId: null, kind: "COMMENT" }, { lane: "batch" });
+    return res.rowCount ?? 0;
+  }
+
   /** Quién recibe una alerta y por qué (el motivo más directo si hay varios), filtrado por sus preferencias. */
   private async recipients(
     tx: Queryable,
@@ -468,12 +518,14 @@ export class AlertService {
     await withTransaction(this.db, async (tx) => {
       const { rows } = await tx.query<{
         id: string; profile_id: string; user_id: string; title: string; body: string; event_id: string | null; post_id: string | null; critical: boolean;
-        expires_at: Date | null;
+        expires_at: Date | null; social: boolean;
       }>(
-        `SELECT n.id, n.profile_id, n.user_id, n.title, n.body, a.event_id, a.post_id, a.critical, a.expires_at
+        // Los avisos sociales (ADR 0320) van al final: con la cola llena, primero salen los incidentes.
+        `SELECT n.id, n.profile_id, n.user_id, n.title, n.body, a.event_id, a.post_id, a.critical, a.expires_at,
+                n.match IN ('COMMENTED','REPLIED') AS social
            FROM alert.notifications n JOIN alert.alerts a ON a.id = n.alert_id
           WHERE n.status = 'PENDING' AND (n.next_attempt_at IS NULL OR n.next_attempt_at <= $1)
-          ORDER BY a.critical DESC, n.created_at, n.id
+          ORDER BY a.critical DESC, n.match IN ('COMMENTED','REPLIED'), n.created_at, n.id
           LIMIT ${FLUSH_BATCH}
           FOR UPDATE OF n SKIP LOCKED`,
         [now],
@@ -483,8 +535,9 @@ export class AlertService {
       const prefs = await this.prefsFor(tx, profiles);
       const recent = new Map(
         (await tx.query<{ profile_id: string; n: number }>(
+          // Los avisos sociales no gastan el límite por hora de los incidentes (ADR 0320).
           `SELECT profile_id, count(DISTINCT coalesce(group_id, id))::int AS n FROM alert.notifications
-            WHERE profile_id = ANY($1) AND pushed_at > $2::timestamptz - interval '1 hour' GROUP BY profile_id`,
+            WHERE profile_id = ANY($1) AND pushed_at > $2::timestamptz - interval '1 hour' AND match NOT IN ('COMMENTED','REPLIED') GROUP BY profile_id`,
           [profiles, now],
         )).rows.map((r) => [r.profile_id, r.n]),
       );
@@ -513,33 +566,42 @@ export class AlertService {
           set(items.filter((r) => !r.critical), "SILENT_QUIET_HOURS");
           items = items.filter((r) => r.critical);
         }
+        // Avisos sociales (ADR 0320): aparte de los incidentes. Ya tienen su tope diario, no gastan el límite por hora
+        // y salen en su propio push, que nunca tapa ni se mezcla con un aviso de incidente.
+        const social = items.filter((r) => r.social);
+        items = items.filter((r) => !r.social);
         if ((recent.get(profileId) ?? 0) >= p.maxPerHour) {
           set(items.filter((r) => !r.critical), "SILENT_RATE_LIMIT");
           items = items.filter((r) => r.critical); // una confirmación oficial grave nunca se silencia
         }
-        if (items.length === 0) continue;
-        const targets = devices.get(items[0]!.user_id) ?? [];
-        if (targets.length === 0) { set(items, "NO_DEVICE"); continue; }
+        if (items.length === 0 && social.length === 0) continue;
+        const targets = devices.get((items[0] ?? social[0])!.user_id) ?? [];
+        if (targets.length === 0) { set([...items, ...social], "NO_DEVICE"); continue; }
 
         const lang = p.lang;
-        const single = items.length === 1 ? items[0]! : null;
-        const groupId = single ? null : newId();
-        const content = single ? { title: single.title, body: single.body } : groupText(lang, items.map((r) => r.title));
-        const url = single ? subjectUrl(single) : "dizaster://alerts";
-        const groupKey = single ? (single.event_id ? `event-${single.event_id}` : single.post_id ? `post-${single.post_id}` : "moderation") : "alerts-summary";
-        set(items, single ? "SENT" : "GROUPED", groupId);
-        units.push({
-          ids: items.map((r) => r.id),
-          status: single ? "SENT" : "GROUPED",
-          messages: targets.map((t) => ({
-            provider: t.provider, token: t.token, environment: t.environment, title: content.title, body: content.body, url, groupKey,
-            badge: unread.get(profileId) ?? items.length, critical: items.some((r) => r.critical),
-            data: {
-              ...(single ? { ...(single.event_id ? { eventId: single.event_id } : single.post_id ? { postId: single.post_id } : {}), notificationId: single.id } : {}),
-              kind: single ? (single.event_id ? "event" : single.post_id ? "mention" : "moderation") : "summary",
-            },
-          })),
-        });
+        for (const list of [items, social]) {
+          if (list.length === 0) continue;
+          const single = list.length === 1 ? list[0]! : null;
+          const groupId = single ? null : newId();
+          const content = single ? { title: single.title, body: single.body } : groupText(lang, list.map((r) => r.title));
+          const url = single ? subjectUrl(single) : "dizaster://alerts";
+          const groupKey = single
+            ? (single.event_id ? `event-${single.event_id}` : single.post_id ? `post-${single.post_id}` : "moderation")
+            : list === social ? "social-summary" : "alerts-summary";
+          set(list, single ? "SENT" : "GROUPED", groupId);
+          units.push({
+            ids: list.map((r) => r.id),
+            status: single ? "SENT" : "GROUPED",
+            messages: targets.map((t) => ({
+              provider: t.provider, token: t.token, environment: t.environment, title: content.title, body: content.body, url, groupKey,
+              badge: unread.get(profileId) ?? list.length, critical: list.some((r) => r.critical),
+              data: {
+                ...(single ? { ...(single.event_id ? { eventId: single.event_id } : single.post_id ? { postId: single.post_id } : {}), notificationId: single.id } : {}),
+                kind: single ? (single.event_id ? "event" : single.social ? "comment" : single.post_id ? "mention" : "moderation") : "summary",
+              },
+            })),
+          });
+        }
       }
       const entries = [...status.entries()];
       await tx.query(
@@ -651,13 +713,13 @@ export class AlertService {
     const p = AlertPreferences.parse({ ...(await this.preferences(q, profileId)), ...patch });
     await q.query(
       `INSERT INTO alert.preferences (profile_id, enabled, followed_events, followed_places, categories, status_changes, min_severity,
-                                      max_per_hour, quiet_start, quiet_end, timezone, lang, saved_zones, near_me, mentions)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+                                      max_per_hour, quiet_start, quiet_end, timezone, lang, saved_zones, near_me, mentions, comments, replies)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
        ON CONFLICT (profile_id) DO UPDATE SET enabled = $2, followed_events = $3, followed_places = $4, categories = $5,
          status_changes = $6, min_severity = $7, max_per_hour = $8, quiet_start = $9, quiet_end = $10, timezone = $11, lang = $12,
-         saved_zones = $13, near_me = $14, mentions = $15, updated_at = now()`,
+         saved_zones = $13, near_me = $14, mentions = $15, comments = $16, replies = $17, updated_at = now()`,
       [profileId, p.enabled, p.followedEvents, p.followedPlaces, p.categories, p.statusChanges, p.minSeverity, p.maxPerHour,
-        p.quietHours?.start ?? null, p.quietHours?.end ?? null, p.timezone, p.lang, p.savedZones, p.nearMe, p.mentions],
+        p.quietHours?.start ?? null, p.quietHours?.end ?? null, p.timezone, p.lang, p.savedZones, p.nearMe, p.mentions, p.comments, p.replies],
     );
     // Apagar "cerca de mí" borra en el acto la última ubicación guardada.
     if (!p.nearMe) await q.query(`DELETE FROM alert.last_locations WHERE profile_id = $1`, [profileId]);

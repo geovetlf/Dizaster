@@ -5,7 +5,11 @@ import { CategoryCode, Lang } from "./common.js";
  * Por qué le llega una alerta a esta persona. SAVED_ZONE: una de sus zonas guardadas. NEAR_ME: cerca de la
  * última ubicación aproximada que envió la app al abrirse (D-16).
  */
-export const AlertMatch = z.enum(["FOLLOWED_EVENT", "SAVED_ZONE", "NEAR_ME", "FOLLOWED_PLACE", "CATEGORY", "PREVIOUSLY_ALERTED", "MENTIONED", "MODERATION_NOTICE", "REPORTED"]);
+export const AlertMatch = z.enum([
+  "FOLLOWED_EVENT", "SAVED_ZONE", "NEAR_ME", "FOLLOWED_PLACE", "CATEGORY", "PREVIOUSLY_ALERTED", "MENTIONED", "MODERATION_NOTICE", "REPORTED",
+  // Avisos sociales (ADR 0320): comentaron mi publicación o respondieron a mi comentario.
+  "COMMENTED", "REPLIED",
+]);
 export type AlertMatch = z.infer<typeof AlertMatch>;
 
 /**
@@ -16,8 +20,10 @@ export type AlertMatch = z.infer<typeof AlertMatch>;
  * - RESOLVED: el evento terminó.
  * - MENTION: alguien te mencionó en un post (D-MENTION, ADR 0063). No es un EVENT: lleva al post.
  * - MODERATION: moderación actuó sobre tu contenido o tu cuenta, o decidió tu apelación (ADR 0141). Lleva a "mis avisos".
+ * - COMMENT: comentaron tu publicación o respondieron a tu comentario (ADR 0320). Apagado por defecto, con límite
+ *   diario, y nunca le quita sitio a un aviso de incidente. Lleva al post.
  */
-export const AlertKind = z.enum(["NEW_EVENT", "STATE_CHANGED", "SEVERITY_UP", "RESOLVED", "MENTION", "MODERATION", "OFFICIAL_UPDATE"]);
+export const AlertKind = z.enum(["NEW_EVENT", "STATE_CHANGED", "SEVERITY_UP", "RESOLVED", "MENTION", "MODERATION", "OFFICIAL_UPDATE", "COMMENT"]);
 export type AlertKind = z.infer<typeof AlertKind>;
 
 const minutes = z.number().int().min(0).max(1439);
@@ -34,6 +40,10 @@ export const AlertPreferences = z.object({
   statusChanges: z.boolean(),
   /** Aviso cuando alguien me menciona con @ (ADR 0063). */
   mentions: z.boolean(),
+  /** Aviso cuando comentan mi publicación (ADR 0320). Apagado por defecto en V1. */
+  comments: z.boolean(),
+  /** Aviso cuando responden a mi comentario (ADR 0320). Apagado por defecto en V1. */
+  replies: z.boolean(),
   /** Severidad mínima (1–5) para eventos nuevos en lugares o categorías seguidas. */
   minSeverity: z.number().int().min(1).max(5),
   /** Máximo de avisos push por hora; el resto queda solo en el historial. */

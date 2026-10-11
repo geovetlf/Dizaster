@@ -71,6 +71,8 @@ const Env = z.object({
   OUTBOX_READY_MAX_AGE_SECONDS: z.coerce.number().int().min(30).max(86400).default(300),
   PRESENCE_RETENTION_DAYS: z.coerce.number().int().positive().default(30),
   /** Días de ubicación precisa en categorías SENSITIVE y HIGHLY_SENSITIVE (D1, ADR 0315 y 0318). Nunca más que el general. */
+  /** Avisos de comentarios y respuestas por persona y día (ADR 0320); 0 los apaga para todos. */
+  SOCIAL_NOTICES_PER_DAY: z.coerce.number().int().min(0).max(100).default(10),
   SENSITIVE_PRESENCE_RETENTION_DAYS: z.coerce.number().int().positive().default(7),
   /** Claves de cifrado por columna (ADR 0048): "kid:base64(32 bytes)", separadas por comas; la primera cifra. */
   FIELD_KEYS: z.string().optional(),

@@ -31,12 +31,15 @@ function showError(e: unknown) {
 
 const SEVERITIES = [1, 2, 3, 4, 5] as const;
 const PER_HOUR = [2, 4, 6, 10, 20] as const;
-const TOGGLES: { key: "followedEvents" | "followedPlaces" | "categories" | "statusChanges" | "mentions"; label: MessageKey }[] = [
+const TOGGLES: { key: "followedEvents" | "followedPlaces" | "categories" | "statusChanges" | "mentions" | "comments" | "replies"; label: MessageKey }[] = [
   { key: "followedEvents", label: "prefFollowedEvents" },
   { key: "followedPlaces", label: "prefFollowedPlaces" },
   { key: "categories", label: "prefCategories" },
   { key: "statusChanges", label: "prefStatusChanges" },
   { key: "mentions", label: "prefMentions" },
+  // Comentarios y respuestas (ADR 0320): apagados por defecto, con tope diario; nunca tapan un aviso de incidente.
+  { key: "comments", label: "prefComments" },
+  { key: "replies", label: "prefReplies" },
 ];
 
 /** Qué alertas recibe esta persona. Todo se guarda en el servidor: vale para cualquier teléfono con su cuenta. */
