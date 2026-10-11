@@ -62,7 +62,7 @@ tiendas y credenciales, decisiones de producto y revisión legal. Nada de eso lo
 | Red social: posts, comentarios, reacciones, seguir, feed, búsqueda, negocios | READY | ADR 0268 y 0270 |
 | Avisos por comentarios y respuestas | IN PROGRESS | Aprobado el 2026-10-11: apagados por defecto, con límite diario (ADR 0315) |
 | Reportes con presencia física y privacidad | READY | Cifrado de la ubicación precisa y protección contra triangulación |
-| Retención de la ubicación en categorías sensibles (D1) | IN PROGRESS | Aprobado el 2026-10-11: 7 días, configurable (ADR 0315) |
+| Retención de la ubicación en categorías sensibles (D1) | READY | 7 días en categorías sensibles, configurable; las filas anteriores se ajustan (ADR 0318). Excepciones legales: BLOCKED_BY_LEGAL |
 | Eventos, deduplicación, fusión | READY | D2 aprobado el 2026-10-11: «No, es otro» solo se registra (ADR 0315) |
 | Reputación en el perfil (D3) | IN PROGRESS | Aprobado el 2026-10-11: «N reportes corroborados», ocultable (ADR 0315) |
 | Verificación por reglas; la IA nunca confirma | READY | Pruebas más una regla Semgrep propia |

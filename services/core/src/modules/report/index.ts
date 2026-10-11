@@ -42,7 +42,12 @@ export interface ReportDeps {
   media: MediaService;
   trust: TrustService;
   attestation: AttestationVerifier;
-  limits: { reportsPerHour: number; presenceRetentionDays: number };
+  limits: {
+    reportsPerHour: number;
+    presenceRetentionDays: number;
+    /** Plazo de las categorías SENSITIVE y HIGHLY_SENSITIVE (D1, ADR 0318). */
+    sensitivePresenceRetentionDays: number;
+  };
   /** Cifra el fix preciso del dispositivo (ADR 0048). */
   cipher: FieldCipher;
 }
@@ -236,15 +241,11 @@ export class ReportService {
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::timestamptz + make_interval(days => $11), $12)`,
       [
         reportId, this.d.cipher.encrypt(JSON.stringify(req.presence.fix), reportId), h3(fixPoint, H3_RES.ZONE), presence.fixToPinM, req.presence.mockLocation, attestation,
-        presence.reasons, JSON.stringify(presence.breakdown), presence.ruleVersion, receivedAt, this.d.limits.presenceRetentionDays, JSON.stringify(proofs),
+        presence.reasons, JSON.stringify(presence.breakdown), presence.ruleVersion, receivedAt, this.presenceRetentionDays(req.categoryCode), JSON.stringify(proofs),
       ],
     );
   }
 
-  /**
-   * Retención de privacidad: tras el plazo aprobado (30 días por defecto) se borra el fix preciso del dispositivo
-   * y solo queda la celda H3 r7 (~5 km²) para estadística y antiabuso. Idempotente; lo ejecuta el worker a diario.
-   */
   /**
    * Borrado de cuenta (ADR 0021): la evidencia de presencia se generaliza en el acto, sin esperar la retención,
    * y se desvincula el dispositivo. El reporte sigue contando como evidencia anónima del EVENT.
@@ -440,12 +441,55 @@ export class ReportService {
     return revised;
   }
 
+  /**
+   * Días que se guarda la ubicación precisa del teléfono en un reporte de esta categoría (D1, ADR 0318). Las categorías
+   * SENSITIVE y HIGHLY_SENSITIVE usan el plazo sensible (7 días por defecto); el resto, el general. El dato de la
+   * categoría solo puede acortarlo.
+   */
+  presenceRetentionDays(categoryCode: string): number {
+    const c = this.d.ref.category(categoryCode);
+    const base = c && c.sensitivity !== "NORMAL" ? this.d.limits.sensitivePresenceRetentionDays : this.d.limits.presenceRetentionDays;
+    return Math.min(base, c?.presenceRetentionDays ?? base);
+  }
+
+  /** Categorías cuyo plazo es más corto que el general, con su plazo. */
+  private shorterRetentions(): { codes: string[]; days: number[] } {
+    const codes: string[] = [];
+    const days: number[] = [];
+    for (const c of this.d.ref.categories.categories) {
+      const d = this.presenceRetentionDays(c.code);
+      if (d < this.d.limits.presenceRetentionDays) { codes.push(c.code); days.push(d); }
+    }
+    return { codes, days };
+  }
+
+  /**
+   * Retención de privacidad: tras el plazo de su categoría (30 días por defecto, 7 en categorías sensibles) se borra el
+   * fix preciso del dispositivo y solo queda la celda H3 r7 (~5 km²) para estadística y antiabuso. Idempotente; lo
+   * ejecuta el worker a diario.
+   */
   async generalizeExpiredPresence(now: Date = this.d.clock.now()): Promise<number> {
-    const res = await this.d.db.query(
-      `UPDATE report.presence_evidence SET device_fix = NULL, device_fix_enc = NULL, generalized_at = $1 WHERE expires_at <= $1 AND generalized_at IS NULL`,
-      [now],
-    );
-    return res.rowCount ?? 0;
+    return withTransaction(this.d.db, async (tx) => {
+      // Si el plazo de una categoría se acortó (D1 pasó las sensibles de 30 a 7 días, o cambió la configuración), las
+      // filas ya guardadas se ajustan al plazo nuevo. Nunca se alarga uno ya fijado. Solo mira filas sin generalizar.
+      const { codes, days } = this.shorterRetentions();
+      if (codes.length > 0) {
+        // Recorre solo las filas pendientes (índice parcial presence_expiry_idx) y busca cada reporte por su clave.
+        const limitAt = `(SELECT r.received_at + make_interval(days => c.days)
+                            FROM report.reports r JOIN unnest($1::text[], $2::int[]) AS c(code, days) ON c.code = r.category_code
+                           WHERE r.id = pe.report_id)`;
+        await tx.query(
+          `UPDATE report.presence_evidence pe SET expires_at = ${limitAt}
+            WHERE pe.generalized_at IS NULL AND pe.expires_at > $3 AND pe.expires_at > ${limitAt}`,
+          [codes, days, now],
+        );
+      }
+      const res = await tx.query(
+        `UPDATE report.presence_evidence SET device_fix = NULL, device_fix_enc = NULL, generalized_at = $1 WHERE expires_at <= $1 AND generalized_at IS NULL`,
+        [now],
+      );
+      return res.rowCount ?? 0;
+    });
   }
 
   /** Filas anteriores al cifrado (ADR 0048): se cifran y se vacía la columna en claro. Idempotente, por lotes. */

@@ -504,6 +504,7 @@ Actualizado: 2026-10-10 (hasta ADR 0316; auditoría de preparación en `docs/PRO
 | Decisiones D-23 (staging en VM, validado en `envs/staging`) y D-17 (piloto con límites oficiales de Perú) (ADR 0314) | ✅ | §11.5, §20 |
 | Las siete decisiones de producto de V1, aprobadas por el propietario el 2026-10-11: D1, D2, D3, suspensiones, avisos sociales, lanzamiento por país y uso sin cuenta (ADR 0315) | ✅ | §2, §5, §13 |
 | La exportación de datos no falla entera por una ubicación cifrada ilegible: sale vacía y marcada (ADR 0316) | ✅ | §13.2 |
+| D1: ubicación precisa 7 días en categorías sensibles (`SENSITIVE_PRESENCE_RETENTION_DAYS`), acortable por categoría; las filas anteriores se ajustan al plazo nuevo (ADR 0318) | ✅ | §13.2 |
 | Contacto configurable en el User-Agent de ingesta (`INGEST_CONTACT`), con aviso en `config-check` si falta en producción (ADR 0307) | ✅ falta el valor del propietario | §9.3 |
 | Licencias, auditoría, SBOM, Dependabot; respaldo con prueba de restauración en CI | ✅ | ADR 0070, `scripts/supply-chain.mjs`, `scripts/db-restore-check.mjs` |
 | Idioma de la app elegible en el perfil (es/en/pt/fr o del teléfono) | ✅ | ADR 0069, `app/language.tsx` |
@@ -595,7 +596,7 @@ Las siete decisiones de producto de V1 quedaron aprobadas por el propietario el 
 
 - **BLOQUEADA** — Primer APK real de Android: falta `EXPO_TOKEN` (cuenta gratuita de Expo del propietario) o una computadora con el Android SDK; el SDK no se puede descargar en el entorno del agente. `expo prebuild` verificado; pasos locales en `docs/MOBILE_PLATFORMS.md` (ADR 0218).
 - **BLOQUEADA** — Video 720p también en Android (§12.1, paridad): necesita transcodificar en el teléfono (módulo local con Media3 Transformer, Apache-2.0, sin coste). Es código nativo nuevo que no se puede compilar ni probar aquí (sin SDK de Android); se hace con el primer build de desarrollo (EXPO_TOKEN). Mientras tanto el límite de 60 MB acota el coste.
-- ✅ **Aprobado 2026-10-11** — D1: ubicación precisa en categorías sensibles 7 días, configurable (ADR 0315).
+- ✅ **Aprobado 2026-10-11** — D1: ubicación precisa en categorías sensibles 7 días, configurable (ADR 0315; implementado en ADR 0318; excepciones legales BLOCKED_BY_LEGAL).
 - ✅ **Aprobado 2026-10-11** — D3: «N reportes corroborados» en el perfil público, ocultable (ADR 0315).
 - ✅ **Aprobado 2026-10-11** — D2: «No, es otro» solo se registra; el evento no cambia (ADR 0315).
 - ✅ **Aprobado 2026-10-11** — Estado de lanzamiento por país: solo PILOT y AVAILABLE aceptan reportes ciudadanos (ADR 0315).
