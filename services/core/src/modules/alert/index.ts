@@ -396,6 +396,11 @@ export class AlertService {
       .filter((r) => wants(r.prefs, "COMMENT", r.match, 0));
     if (candidates.length === 0) return 0;
     const cap = this.opts.socialNoticesPerDay ?? DEFAULT_SOCIAL_NOTICES_PER_DAY;
+    // Varios workers procesan comentarios a la vez (ADR 0345): contar y crear el aviso de cada persona va en serie, o
+    // dos comentarios simultáneos verían el mismo recuento y pasarían juntos el tope. Orden fijo: sin interbloqueos.
+    for (const profileId of candidates.map((r) => r.profileId).sort()) {
+      await tx.query(`SELECT pg_advisory_xact_lock(hashtextextended('alert.social-notice:' || $1, 0))`, [profileId]);
+    }
     const today = new Map((await tx.query<{ profile_id: string; n: number }>(
       `SELECT profile_id, count(*)::int AS n FROM alert.notifications
         WHERE profile_id = ANY($1) AND match IN ('COMMENTED','REPLIED') AND created_at > $2::timestamptz - interval '24 hours'
