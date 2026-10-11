@@ -51,6 +51,25 @@ describe("cifrado por columna (ADR 0048)", () => {
       expect(mine.device_fix_enc).toBeUndefined();
     });
 
+    it("un fix que no se puede descifrar no tumba la exportación (ADR 0316)", async () => {
+      const u = await createUser(t, "cifrado_c");
+      const bad = await submit(t, u, reportBody(u, { pin: LIMA }));
+      const good = await submit(t, u, reportBody(u, { pin: LIMA, text: "Otro reporte en el mismo lugar" }));
+      // El mismo texto cifrado en otra fila: el id no coincide con el que lo ata, así que no se descifra.
+      await t.c.db.query(
+        `UPDATE report.presence_evidence SET device_fix_enc = (SELECT device_fix_enc FROM report.presence_evidence WHERE report_id = $2) WHERE report_id = $1`,
+        [bad.body.reportId, good.body.reportId],
+      );
+      const res = await t.app.inject({ url: "/v1/me/export", headers: { authorization: `Bearer ${u.token}` } });
+      expect(res.statusCode, res.body).toBe(200);
+      const reports = res.json().sections.reports.reports as { id: string; device_fix: { lat: number } | null; precise_location_unreadable?: boolean }[];
+      expect(reports.find((x) => x.id === bad.body.reportId)).toMatchObject({ device_fix: null, precise_location_unreadable: true });
+      const ok = reports.find((x) => x.id === good.body.reportId)!;
+      expect(ok.device_fix!.lat).toBeCloseTo(LIMA.lat, 3);
+      expect(ok.precise_location_unreadable).toBeUndefined();
+      expect(reports.find((x) => x.id === bad.body.reportId)).not.toHaveProperty("device_fix_enc");
+    });
+
     it("cifra las filas antiguas en claro", async () => {
       const u = await createUser(t, "cifrado_b");
       const r = await submit(t, u, reportBody(u, { pin: LIMA }));

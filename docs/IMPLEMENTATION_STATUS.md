@@ -1,6 +1,6 @@
 # Estado de la implementación
 
-Actualizado: 2026-10-10 (hasta ADR 0315; auditoría de preparación en `docs/PRODUCTION_READINESS_REPORT.md`). Informe de preparación para producción: `docs/PRODUCTION_READINESS_REPORT.md`.
+Actualizado: 2026-10-10 (hasta ADR 0316; auditoría de preparación en `docs/PRODUCTION_READINESS_REPORT.md`). Informe de preparación para producción: `docs/PRODUCTION_READINESS_REPORT.md`.
 
 ## Etapa 1 — Fundación (hecha)
 
@@ -503,6 +503,7 @@ Actualizado: 2026-10-10 (hasta ADR 0315; auditoría de preparación en `docs/PRO
 | Resto de lecturas con sesión con volumen: 10 lecturas más de `/v1/me` y `/v1/admin` en la prueba de planes; los informes de calidad y transparencia y la exportación quedan fuera, con motivo (ADR 0313) | ✅ | §5.22, §13.3 |
 | Decisiones D-23 (staging en VM, validado en `envs/staging`) y D-17 (piloto con límites oficiales de Perú) (ADR 0314) | ✅ | §11.5, §20 |
 | Expediente de las siete decisiones pendientes: comportamiento actual, alternativas, riesgos, recomendación y qué pasa si no se decide. Propuesta; suspensiones y avisos sociales decididos por el propietario (ADR 0315) | ✅ | §2, §5, §13 |
+| La exportación de datos no falla entera por una ubicación cifrada ilegible: sale vacía y marcada (ADR 0316) | ✅ | §13.2 |
 | Contacto configurable en el User-Agent de ingesta (`INGEST_CONTACT`), con aviso en `config-check` si falta en producción (ADR 0307) | ✅ falta el valor del propietario | §9.3 |
 | Licencias, auditoría, SBOM, Dependabot; respaldo con prueba de restauración en CI | ✅ | ADR 0070, `scripts/supply-chain.mjs`, `scripts/db-restore-check.mjs` |
 | Idioma de la app elegible en el perfil (es/en/pt/fr o del teléfono) | ✅ | ADR 0069, `app/language.tsx` |
