@@ -15,6 +15,14 @@ export type Action =
   | "promote-production" | "migrate-production" | "apply-infra-production" | "rollback-production"
   | "destroy-infra" | "read-secrets" | "change-iam" | "disable-gate" | "delete-backup";
 
+export const ACTIONS: readonly Action[] = [
+  "open-pr", "run-gates", "merge", "build-artifact",
+  "deploy-staging", "migrate-staging", "apply-infra-staging", "rollback-staging",
+  "promote-production", "migrate-production", "apply-infra-production", "rollback-production",
+  "destroy-infra", "read-secrets", "change-iam", "disable-gate", "delete-backup",
+];
+export const OUTCOMES: readonly Outcome[] = ["auto", "review", "approval", "block"];
+
 export interface Decision { allowed: boolean; needs: "none" | "review" | "owner-approval" | "forbidden"; reason: string }
 
 /** Nivel mínimo para que la acción ocurra sin intervención humana. */
@@ -34,6 +42,11 @@ const OWNER_ONLY: Action[] = ["destroy-infra", "migrate-production", "apply-infr
  * cambio (`outcome`). Un rollback nunca espera a la política: devolver el tráfico a lo verificado siempre es más seguro.
  */
 export function decide(level: number, action: Action, outcome: Outcome = "auto"): Decision {
+  // Falla cerrado: un nivel que no es un entero 0–5 (p. ej. `--level abc` → NaN, y `NaN < 4` es falso) o un resultado
+  // de política desconocido (p. ej. `--outcome aproval`) nunca cuentan como permiso.
+  if (!Number.isInteger(level) || level < 0 || level >= LEVELS.length) return { allowed: false, needs: "forbidden", reason: `nivel de autonomía inválido: ${String(level)}` };
+  if (!OUTCOMES.includes(outcome)) return { allowed: false, needs: "forbidden", reason: `resultado de política desconocido: ${String(outcome)}` };
+  if (!ACTIONS.includes(action)) return { allowed: false, needs: "forbidden", reason: `acción desconocida: ${String(action)}` };
   if (FORBIDDEN.includes(action)) return { allowed: false, needs: "forbidden", reason: "prohibido para la automatización en cualquier nivel" };
   if (OWNER_ONLY.includes(action)) return { allowed: false, needs: "owner-approval", reason: "siempre requiere aprobación explícita del propietario" };
   const min = MIN_LEVEL[action] ?? 6;
