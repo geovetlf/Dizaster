@@ -111,7 +111,7 @@ export function buildContainer(env: AppEnv, overrides: { db?: Db; clock?: Clock;
   const reports = new ReportService({
     db, clock, ref, geo, social, events, identity, media, trust,
     attestation: overrides.attestation ?? new DevAttestationVerifier(),
-    limits: { reportsPerHour: env.REPORTS_PER_HOUR_LIMIT, presenceRetentionDays: env.PRESENCE_RETENTION_DAYS },
+    limits: { reportsPerHour: env.REPORTS_PER_HOUR_LIMIT, presenceRetentionDays: env.PRESENCE_RETENTION_DAYS, sensitivePresenceRetentionDays: env.SENSITIVE_PRESENCE_RETENTION_DAYS },
     cipher: fieldCipher,
   });
   trust.usePhoneSignals((q, deviceId) => reports.phoneSignals(q, deviceId));

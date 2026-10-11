@@ -70,6 +70,8 @@ const Env = z.object({
   WORKER_HEARTBEAT_STALE_SECONDS: z.coerce.number().int().min(30).max(3600).default(180),
   OUTBOX_READY_MAX_AGE_SECONDS: z.coerce.number().int().min(30).max(86400).default(300),
   PRESENCE_RETENTION_DAYS: z.coerce.number().int().positive().default(30),
+  /** Días de ubicación precisa en categorías SENSITIVE y HIGHLY_SENSITIVE (D1, ADR 0315 y 0318). Nunca más que el general. */
+  SENSITIVE_PRESENCE_RETENTION_DAYS: z.coerce.number().int().positive().default(7),
   /** Claves de cifrado por columna (ADR 0048): "kid:base64(32 bytes)", separadas por comas; la primera cifra. */
   FIELD_KEYS: z.string().optional(),
   DATA_DIR: z.string().optional(),
@@ -131,6 +133,9 @@ export type AppEnv = z.infer<typeof Env>;
 
 export function loadEnv(source: NodeJS.ProcessEnv = process.env): AppEnv {
   const env = Env.parse(source);
+  if (env.SENSITIVE_PRESENCE_RETENTION_DAYS > env.PRESENCE_RETENTION_DAYS) {
+    throw new Error("SENSITIVE_PRESENCE_RETENTION_DAYS no puede superar PRESENCE_RETENTION_DAYS (D1, ADR 0318)");
+  }
   if (env.NODE_ENV === "production" && env.EMAIL_PROVIDER === "log") {
     throw new Error("EMAIL_PROVIDER=log no puede usarse en producción");
   }

@@ -31,6 +31,11 @@ export const CategoryConfig = z.object({
    * ADR 0099). Solo para HIGHLY_SENSITIVE; 0 = sin retraso. Una fuente oficial o externa lo publica en el acto.
    */
   publishDelayMinutes: z.number().int().min(0).max(1440).default(0),
+  /**
+   * Días que se guarda la ubicación precisa del teléfono en reportes de esta categoría (D1, ADR 0318). Opcional: solo
+   * acorta el plazo que toca por sensibilidad, nunca lo alarga.
+   */
+  presenceRetentionDays: z.number().int().min(1).max(365).optional(),
 });
 /** Retraso de publicación de una categoría HIGHLY_SENSITIVE, editable por administración (ADR 0109). */
 export const SetPublishDelayRequest = z.object({ minutes: z.number().int().min(0).max(1440), reason: AdminReason });
