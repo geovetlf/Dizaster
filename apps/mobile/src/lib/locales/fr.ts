@@ -634,6 +634,7 @@ export const fr: Record<MessageKey, string> = {
   why_LATE_OFFLINE_SUBMISSION: "Envoyé longtemps après la prise (hors ligne) : cela ne prouve plus la présence.",
   rejected_INVALID_CATEGORY: "Cette catégorie n'existe pas. Choisissez-en une autre.",
   rejected_OFFICIAL_ONLY: "Seules les sources officielles publient cette catégorie. Vous pouvez la publier comme post.",
+  rejected_COUNTRY_READ_ONLY: "Dizaster n'accepte pas encore de signalements dans ce pays. Vous pouvez toujours consulter la carte et les alertes.",
   sourcesSection: "Sources",
   howToHelp: "Comment aider",
   howToHelpNote: "Organisations vérifiées. Le lien s'ouvre hors de l'application ; Dizaster ne reçoit ni ne gère d'argent.",

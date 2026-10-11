@@ -173,7 +173,7 @@ describe("¿es este el mismo evento?", () => {
 describe("ciclo de vida", () => {
   it("un evento sin actividad pasa a MONITORING y luego a RESOLVED, con registro en la timeline", async () => {
     const u = await createUser(t, "ciclo");
-    const r = await submit(t, u, reportBody(u, { pin: offset(LIMA, -90000) }));
+    const r = await submit(t, u, reportBody(u, { pin: offset(LIMA, -90000, 60000) }));
     const inFiveHours = new Date(Date.now() + 5 * 3600_000); // accidente: ventana 120 min → monitoreo a las 4 h
     await t.c.events.applyLifecycle(t.c.db, inFiveHours);
     expect((await t.app.inject({ url: `/v1/events/${r.body.eventId}` })).json().status).toBe("MONITORING");
@@ -185,7 +185,7 @@ describe("ciclo de vida", () => {
 
   it("un evento en seguimiento vuelve a activo cuando llega un reporte nuevo (ADR 0215)", async () => {
     const [u, v] = [await createUser(t, "ciclo_a"), await createUser(t, "ciclo_b")];
-    const pin = offset(LIMA, -95000);
+    const pin = offset(LIMA, -95000, 60000);
     const r = await submit(t, u, reportBody(u, { pin }));
     const eventId = r.body.eventId!;
     // Solo se adelanta el reloj del ciclo: la última actividad sigue siendo la del primer reporte.

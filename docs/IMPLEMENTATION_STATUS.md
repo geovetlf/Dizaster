@@ -1,6 +1,6 @@
 # Estado de la implementación
 
-Actualizado: 2026-10-10 (hasta ADR 0316; auditoría de preparación en `docs/PRODUCTION_READINESS_REPORT.md`). Informe de preparación para producción: `docs/PRODUCTION_READINESS_REPORT.md`.
+Actualizado: 2026-10-11 (hasta ADR 0317; auditoría de preparación en `docs/PRODUCTION_READINESS_REPORT.md`). Informe de preparación para producción: `docs/PRODUCTION_READINESS_REPORT.md`.
 
 ## Etapa 1 — Fundación (hecha)
 
@@ -504,6 +504,7 @@ Actualizado: 2026-10-10 (hasta ADR 0316; auditoría de preparación en `docs/PRO
 | Decisiones D-23 (staging en VM, validado en `envs/staging`) y D-17 (piloto con límites oficiales de Perú) (ADR 0314) | ✅ | §11.5, §20 |
 | Las siete decisiones de producto de V1, aprobadas por el propietario el 2026-10-11: D1, D2, D3, suspensiones, avisos sociales, lanzamiento por país y uso sin cuenta (ADR 0315) | ✅ | §2, §5, §13 |
 | La exportación de datos no falla entera por una ubicación cifrada ilegible: sale vacía y marcada (ADR 0316) | ✅ | §13.2 |
+| Estado de lanzamiento por país aplicado en el backend (solo PILOT y AVAILABLE aceptan reportes); prueba estructural de uso sin cuenta en toda la API; D2 sin efecto sobre el evento (ADR 0317) | ✅ | §2, §8.2, §11.5 |
 | Contacto configurable en el User-Agent de ingesta (`INGEST_CONTACT`), con aviso en `config-check` si falta en producción (ADR 0307) | ✅ falta el valor del propietario | §9.3 |
 | Licencias, auditoría, SBOM, Dependabot; respaldo con prueba de restauración en CI | ✅ | ADR 0070, `scripts/supply-chain.mjs`, `scripts/db-restore-check.mjs` |
 | Idioma de la app elegible en el perfil (es/en/pt/fr o del teléfono) | ✅ | ADR 0069, `app/language.tsx` |
@@ -597,11 +598,11 @@ Las siete decisiones de producto de V1 quedaron aprobadas por el propietario el 
 - **BLOQUEADA** — Video 720p también en Android (§12.1, paridad): necesita transcodificar en el teléfono (módulo local con Media3 Transformer, Apache-2.0, sin coste). Es código nativo nuevo que no se puede compilar ni probar aquí (sin SDK de Android); se hace con el primer build de desarrollo (EXPO_TOKEN). Mientras tanto el límite de 60 MB acota el coste.
 - ✅ **Aprobado 2026-10-11** — D1: ubicación precisa en categorías sensibles 7 días, configurable (ADR 0315).
 - ✅ **Aprobado 2026-10-11** — D3: «N reportes corroborados» en el perfil público, ocultable (ADR 0315).
-- ✅ **Aprobado 2026-10-11** — D2: «No, es otro» solo se registra; el evento no cambia (ADR 0315).
-- ✅ **Aprobado 2026-10-11** — Estado de lanzamiento por país: solo PILOT y AVAILABLE aceptan reportes ciudadanos (ADR 0315).
+- ✅ **Aprobado 2026-10-11** — D2: «No, es otro» solo se registra; el evento no cambia (ADR 0315; implementado en ADR 0317).
+- ✅ **Aprobado 2026-10-11** — Estado de lanzamiento por país: solo PILOT y AVAILABLE aceptan reportes ciudadanos (ADR 0315; implementado en ADR 0317).
 - ✅ **Aprobado 2026-10-11** — Suspensiones escalonadas: 24 h, 7 días o permanente, apelables y auditadas (ADR 0315).
 - ✅ **Decidido 2026-10-10** — D-17: el piloto usa los límites oficiales de Perú (INEI en el índice administrativo). Otro país con fronteras en disputa espera asesoría legal. Antes de publicar el mapa de Perú se revisan sus fronteras (ADR 0314).
-- ✅ **Aprobado 2026-10-11** — Uso sin cuenta: solo lectura de contenido público (ADR 0315).
+- ✅ **Aprobado 2026-10-11** — Uso sin cuenta: solo lectura de contenido público (ADR 0315; implementado en ADR 0317).
 - ✅ **Aprobado 2026-10-11** — Avisos de comentarios y respuestas: apagados por defecto, activables, con límite diario (ADR 0315).
 - **BLOCKED_BY_CREDENTIALS** — Envío real de push: clave APNs `.p8` (Apple Developer, US$99/año) y cuenta de servicio de Firebase del propietario. Producción exige `PUSH_DRIVER=live`.
 - **BLOCKED_BY_CREDENTIALS** — Atestación real (App Attest / Play Integrity, §8.2, §13.1): solo existe el verificador de desarrollo y el backend no arranca en producción sin uno real (`container.ts`). Necesita el primer build de desarrollo (EXPO_TOKEN) y las cuentas de Apple y Google para obtener y verificar atestaciones reales (ADR 0129).

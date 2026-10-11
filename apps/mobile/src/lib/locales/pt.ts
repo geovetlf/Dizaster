@@ -634,6 +634,7 @@ export const pt: Record<MessageKey, string> = {
   why_LATE_OFFLINE_SUBMISSION: "Foi enviado muito depois de feito (sem conexão); já não prova presença.",
   rejected_INVALID_CATEGORY: "Essa categoria não existe. Escolha outra.",
   rejected_OFFICIAL_ONLY: "Só fontes oficiais publicam esta categoria. Você pode publicar como post.",
+  rejected_COUNTRY_READ_ONLY: "O Dizaster ainda não aceita relatos neste país. Você ainda pode consultar o mapa e os alertas.",
   sourcesSection: "Fontes",
   howToHelp: "Como ajudar",
   howToHelpNote: "Organizações verificadas. O link abre fora do app; o Dizaster não recebe nem gerencia dinheiro.",

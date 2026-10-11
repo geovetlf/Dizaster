@@ -160,7 +160,7 @@ describe("la IA no puede producir OFFICIALLY_CONFIRMED", () => {
 
 describe("estados negativos: DISPUTED y FALSE", () => {
   let eventId = "";
-  const pin = offset(LIMA, -60000, -20000);
+  const pin = offset(LIMA, -60000, 40000);
 
   it("DISPUTED cuando personas presentes niegan el evento; se levanta si las confirmaciones lo superan", async () => {
     const [a, b, c, d] = await Promise.all(["d1", "d2", "d3", "d4"].map((h) => createUser(t, h)));
