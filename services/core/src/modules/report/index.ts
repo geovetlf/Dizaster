@@ -73,6 +73,10 @@ export class ReportService {
     if (prior.rows[0]) return prior.rows[0].result;
 
     const country = geo.countryOf(req.pin);
+    // Estado de lanzamiento (ADR 0317): fuera de PILOT y AVAILABLE el país es de solo lectura para los reportes.
+    if (!ref.acceptsCitizenReports(country)) {
+      return { outcome: "REJECTED", code: "COUNTRY_READ_ONLY", reason: "Dizaster todavía no acepta reportes en este lugar; puedes seguir consultando" };
+    }
     const category = ref.category(req.categoryCode, country);
     if (!category || !ref.isLeaf(req.categoryCode)) return { outcome: "REJECTED", code: "INVALID_CATEGORY", reason: "Categoría no válida" };
     if (!category.citizenReportable) return { outcome: "REJECTED", code: "OFFICIAL_ONLY", reason: "Esta categoría solo la publican fuentes oficiales o externas" };

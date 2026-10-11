@@ -221,13 +221,13 @@ describe("media en reportes y eventos", () => {
     )).rows[0]!;
     const u = await createUser(t, "media_presence");
     const cam = await uploadReady(u, makeJpeg(), { capturedAt: new Date().toISOString() });
-    const r = await submit(t, u, { ...reportBody(u, { pin: { lat: -12.9, lng: -77.03 } }), mediaIds: [cam] });
+    const r = await submit(t, u, { ...reportBody(u, { pin: { lat: -12.9, lng: -76.5 } }), mediaIds: [cam] });
     expect(await breakdown(r.body.reportId)).toMatchObject({ rule_version: "presence-4", score_breakdown: { mediaInApp: 1 } });
 
     const g = await createUser(t, "media_gallery");
     const gallery = await uploadReady(g, makeJpeg({ exif: false }), { capturedAt: new Date().toISOString(), capturedInApp: false });
     // D-10 (ADR 0166): en un reporte solo va media capturada con la cámara de la app; en un post, la galería sí.
-    const r2 = await t.app.inject({ method: "POST", url: "/v1/reports", headers: auth(g), payload: { ...reportBody(g, { pin: { lat: -12.95, lng: -77.03 } }), mediaIds: [gallery] } });
+    const r2 = await t.app.inject({ method: "POST", url: "/v1/reports", headers: auth(g), payload: { ...reportBody(g, { pin: { lat: -12.95, lng: -76.5 } }), mediaIds: [gallery] } });
     expect(r2.statusCode).toBe(400);
     expect(r2.json()).toMatchObject({ error: "MEDIA_NOT_CAPTURED_IN_APP" });
     const post = await t.app.inject({ method: "POST", url: "/v1/posts", headers: auth(g), payload: { text: "Foto de ayer del puente", mediaIds: [gallery] } });
@@ -268,7 +268,7 @@ describe("media en reportes y eventos", () => {
     const up = (await requestUpload(v, file)).json();
     expect((await put(up.upload, file)).statusCode).toBe(200);
     await t.app.inject({ method: "POST", url: `/v1/media/${up.mediaId}/complete`, headers: auth(v) });
-    const late = await submit(t, v, { ...reportBody(v, { pin: { lat: -12.6, lng: -77.03 } }), mediaIds: [up.mediaId] });
+    const late = await submit(t, v, { ...reportBody(v, { pin: { lat: -12.6, lng: -76.5 } }), mediaIds: [up.mediaId] });
     expect((await t.c.db.query(`SELECT media_hashes FROM event.events WHERE id = $1`, [late.body.eventId])).rows[0]).toEqual({ media_hashes: [] });
     await t.c.dispatcher.drain();
     const after = (await t.c.db.query<{ media_hashes: string[] }>(`SELECT media_hashes FROM event.events WHERE id = $1`, [late.body.eventId])).rows[0]!;
@@ -310,9 +310,9 @@ describe("galería del evento (ADR 0203)", () => {
     // Dos reportes: con uno solo, ocultarlo oculta también el evento entero.
     const [u, other] = [await createUser(t, "gal_mod"), await createUser(t, "gal_mod_2")];
     const id = await uploadReady(u, makeJpeg());
-    const r = await submit(t, u, { ...reportBody(u, { pin: { lat: -12.71, lng: -77.03 } }), mediaIds: [id] });
+    const r = await submit(t, u, { ...reportBody(u, { pin: { lat: -12.71, lng: -76.5 } }), mediaIds: [id] });
     const eventId = r.body.eventId!;
-    expect((await submit(t, other, reportBody(other, { pin: { lat: -12.7101, lng: -77.03 } }))).body.eventId).toBe(eventId);
+    expect((await submit(t, other, reportBody(other, { pin: { lat: -12.7101, lng: -76.5 } }))).body.eventId).toBe(eventId);
     expect((await gallery(eventId)).media.map((m) => m.id)).toEqual([id]);
     await t.c.events.moderateEvidence(t.c.db, "CITIZEN_REPORT", r.body.reportId!, true);
     expect((await gallery(eventId)).media).toHaveLength(0);
@@ -323,9 +323,9 @@ describe("galería del evento (ADR 0203)", () => {
   it("va por páginas sin repetir fotos", async () => {
     const [a, b] = [await createUser(t, "gal_page_a"), await createUser(t, "gal_page_b")];
     const ida = await uploadReady(a, makeJpeg());
-    const ra = await submit(t, a, { ...reportBody(a, { pin: { lat: -12.81, lng: -77.03 } }), mediaIds: [ida] });
+    const ra = await submit(t, a, { ...reportBody(a, { pin: { lat: -12.81, lng: -76.5 } }), mediaIds: [ida] });
     const idb = await uploadReady(b, makeJpeg());
-    const rb = await submit(t, b, { ...reportBody(b, { pin: { lat: -12.8101, lng: -77.03 } }), mediaIds: [idb] });
+    const rb = await submit(t, b, { ...reportBody(b, { pin: { lat: -12.8101, lng: -76.5 } }), mediaIds: [idb] });
     expect(rb.body.eventId).toBe(ra.body.eventId);
     const p1 = await gallery(ra.body.eventId!, "?limit=1");
     expect(p1.media.map((m) => m.id)).toEqual([ida]);

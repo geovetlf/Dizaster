@@ -14,6 +14,21 @@ const review = async (reportId: string) => (await t.c.db.query(
   `SELECT r.status, r.reporter_answer FROM event.dedup_reviews r JOIN event.evidence e ON e.id = r.evidence_id WHERE e.ref_id = $1`, [reportId],
 )).rows[0];
 
+/** Todo lo que describe un evento y su agrupación: si "No, es otro" tocara algo, esto cambiaría. */
+async function eventFootprint(eventId: string) {
+  const q = async (sql: string, params: unknown[] = [eventId]) => (await t.c.db.query(sql, params)).rows;
+  return {
+    event: await q(`SELECT * FROM event.events WHERE id = $1`),
+    events: await q(`SELECT count(*)::int AS n FROM event.events`, []),
+    evidence: await q(`SELECT id, evidence_type, ref_id FROM event.evidence WHERE event_id = $1 ORDER BY id`),
+    timeline: await q(`SELECT count(*)::int AS n FROM event.timeline WHERE event_id = $1`),
+    statusLog: await q(`SELECT count(*)::int AS n FROM event.status_log WHERE event_id = $1`),
+    merges: await q(`SELECT count(*)::int AS n FROM event.merge_log`, []),
+    splits: await q(`SELECT count(*)::int AS n FROM event.split_log`, []),
+    duplicates: await q(`SELECT count(*)::int AS n FROM event.duplicate_candidates`, []),
+  };
+}
+
 describe("¿Es el mismo evento? (ADR 0156)", () => {
   it("un adjunto en la franja ambigua pregunta; Sí cierra la revisión y No queda anotado", async () => {
     const pin = offset(LIMA, 60_000);
@@ -35,10 +50,15 @@ describe("¿Es el mismo evento? (ADR 0156)", () => {
 
     const third = (await submit(t, c!, reportBody(c!, { category: "fire.structure", pin: offset(pin, 260) }))).body;
     expect(third.askSameEvent).toBe(true);
+    await t.c.dispatcher.drain();
+    const before = await eventFootprint(first.eventId!);
     expect((await answer(c!, third.reportId!, "DIFFERENT")).statusCode).toBe(200);
-    // "No" espera la decisión D2: se anota, la revisión sigue abierta y el reporte sigue en el evento.
+    await t.c.dispatcher.drain();
+    // D2 (decisión del propietario, ADR 0315): "No" solo se registra. La revisión sigue abierta, el reporte sigue en
+    // el evento y nada del evento cambia: ni su fila, ni su línea de tiempo, ni sus registros, ni la cola de duplicados.
     expect(await review(third.reportId!)).toEqual({ status: "OPEN", reporter_answer: "DIFFERENT" });
     expect((await t.c.db.query(`SELECT event_id FROM report.reports WHERE id = $1`, [third.reportId])).rows[0]).toEqual({ event_id: first.eventId });
+    expect(await eventFootprint(first.eventId!)).toEqual(before);
     expect((await answer(a!, first.reportId!, "SAME")).statusCode).toBe(409);
 
     // Mi respuesta sale en mi exportación de datos (ADR 0256), sin candidatos ni puntuación.
