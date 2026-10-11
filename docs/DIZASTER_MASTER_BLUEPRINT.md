@@ -1159,15 +1159,15 @@ Para cada una hay una recomendación. Puedes aprobar en bloque ("apruebo todas l
 
 **Decisiones de producto aprobadas el 2026-10-11** (el propietario, por escrito; detalle en ADR 0315):
 
-| Decisión | Aprobado |
-|---|---|
-| **D1** — Ubicación precisa en categorías sensibles | 7 días, configurable; cifrada, con acceso controlado y borrado efectivo al vencer. Sustituye a D-06 solo para las categorías sensibles |
-| **D2** — «No, es otro evento» | Solo se registra la discrepancia; el evento, su estado y su agrupación no cambian |
-| **D3** — Reputación pública | «N reportes corroborados», ocultable por cada persona; sin puntajes internos; corroboración comunitaria distinta de la confirmación oficial |
-| Suspensiones | Escalonadas: 24 horas, 7 días o permanentes; apelables y auditadas |
-| Avisos de comentarios y respuestas | Apagados por defecto en V1; la persona puede activarlos; límite diario configurable; nunca compiten con las alertas |
-| Estado de lanzamiento por país (D-02) | Solo `PILOT` y `AVAILABLE` aceptan reportes ciudadanos; el resto, solo lectura; aplicado en el backend |
-| Uso sin cuenta | Solo lectura de contenido público; nada que requiera identidad |
+| Decisión | Aprobado | Implementado |
+|---|---|---|
+| **D1** — Ubicación precisa en categorías sensibles | 7 días, configurable; cifrada, con acceso controlado y borrado efectivo al vencer. Sustituye a D-06 solo para las categorías sensibles | ✅ ADR 0318 |
+| **D2** — «No, es otro evento» | Solo se registra la discrepancia; el evento, su estado y su agrupación no cambian | ✅ ADR 0317 |
+| **D3** — Reputación pública | «N reportes corroborados», ocultable por cada persona; sin puntajes internos; corroboración comunitaria distinta de la confirmación oficial | ✅ ADR 0321 |
+| Suspensiones | Escalonadas: 24 horas, 7 días o permanentes; apelables y auditadas | ✅ ADR 0319 |
+| Avisos de comentarios y respuestas | Apagados por defecto en V1; la persona puede activarlos; límite diario configurable; nunca compiten con las alertas | ✅ ADR 0320 |
+| Estado de lanzamiento por país (D-02) | Solo `PILOT` y `AVAILABLE` aceptan reportes ciudadanos; el resto, solo lectura; aplicado en el backend | ✅ ADR 0317 |
+| Uso sin cuenta | Solo lectura de contenido público; nada que requiera identidad | ✅ ADR 0317 |
 
 ---
 

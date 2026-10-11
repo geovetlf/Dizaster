@@ -28,14 +28,17 @@ El código de V1 está **terminado y probado localmente**:
 El camino completo de entrega se ensayó con contenedores reales (ADR 0282): despliegue gradual, verificación, carga,
 rechazo y rollback.
 
-**No se puede publicar todavía.** Faltan la facturación de Google Cloud, cuentas de
-tiendas y credenciales, decisiones de producto y revisión legal. Nada de eso lo puede dar el agente.
+Las siete decisiones de producto de V1 que aprobó el propietario el 2026-10-11 están implementadas y probadas
+(ADR 0317–0321, §11).
 
-## 2. Verificación ejecutada (local y en GitHub Actions, actualizada 2026-10-10)
+**No se puede publicar todavía.** Faltan la facturación de Google Cloud, cuentas de tiendas y credenciales, y
+revisión legal. Nada de eso lo puede dar el agente.
+
+## 2. Verificación ejecutada (local y en GitHub Actions, actualizada 2026-10-11)
 
 | Verificación | Resultado |
 | --- | --- |
-| `pnpm check`: lint, fronteras de módulos, secretos, workflows y versiones alineadas, typecheck, build y pruebas | ✅ Pruebas: contracts 42, geo-kit 39, móvil 288, backend 717, delivery 97 |
+| `pnpm check`: lint, fronteras de módulos, secretos, workflows y versiones alineadas, typecheck, build y pruebas | ✅ Pruebas: contracts 42, geo-kit 39, móvil 294, backend 759, delivery 97 |
 | Empaquetado móvil iOS + Android (`bundle:check`) y paridad nativa | ✅ |
 | Migraciones 0001–0110 sobre PostgreSQL 16 + PostGIS + H3; restauración de respaldo | ✅ |
 | Gitleaks: historial (285 commits) y árbol de trabajo | ✅ sin hallazgos |
@@ -50,8 +53,9 @@ tiendas y credenciales, decisiones de producto y revisión legal. Nada de eso lo
 | Planes con volumen del camino de un reporte y de 13 trabajos de mantenimiento | ✅ En cada `pnpm check`: ninguno recorre una tabla grande. Cinco índices nuevos: dos reportes con alertas y envío pasaron de 185 a 123 ms (ADR 0311) |
 | Cola de moderación sin consultas por caso | ✅ En cada `pnpm check`: cada fila de más cuesta como mucho una consulta. La cola de 50 casos pasó de 151 a 52 consultas (ADR 0312) |
 | Resto de lecturas con sesión | ✅ Diez más en la prueba de planes. Los informes de calidad y transparencia recorren su periodo a propósito (ADR 0313) |
+| Decisiones de producto de V1 (ADR 0317–0321) | ✅ Pruebas propias de cada una: estado por país, uso sin cuenta en toda la API, D2, D1, suspensiones, avisos sociales y D3. Las consultas nuevas pasan la prueba de planes con volumen |
 | OSV-Scanner y `pnpm audit` | ✅ En GitHub Actions. Solo dos avisos HIGH sin arreglo upstream (`node-forge`, `braces`, herramientas de Expo), aceptados por el propietario hasta el 2026-11-07 y acotados a versión y ruta (ADR 0304, 0305) |
-| Push a `github.com/geovetlf/Dizaster` | ✅ Sin force push. `main` protegida desde el 2026-10-08: cada cambio entra por PR con los 7 jobs de CI en verde (check, delivery, report-comment, supply-chain, security, iac, image); PRs #10–#52 |
+| Push a `github.com/geovetlf/Dizaster` | ✅ Sin force push. `main` protegida desde el 2026-10-08: cada cambio entra por PR con los 7 jobs de CI en verde (check, delivery, report-comment, supply-chain, security, iac, image); PRs #10–#66 |
 
 ## 3. Producto
 
@@ -124,7 +128,8 @@ En orden de impacto:
 5. Almacenamiento de media: GCS o R2.
 6. Cuentas de Apple Developer y Google Play; clave APNs y Firebase; IDs de inicio de sesión de Apple y Google.
 7. Proveedor de correo.
-8. Asesoría legal: textos legales, CSAM, requerimientos de autoridades, fronteras en disputa.
+8. Asesoría legal: textos legales, CSAM, requerimientos de autoridades, fronteras en disputa y excepciones legales
+   de conservación de la ubicación precisa (D1, ADR 0318).
 9. ✅ Decisiones de producto: las siete de V1 se aprobaron el 2026-10-11 (ADR 0315).
 10. Datos y contactos:
     - contacto de ingesta;
@@ -150,6 +155,16 @@ En orden de impacto:
 6. **Un blob de 2.2 MB en el historial** (`.whl`, commit 3729a0a, eliminado en 3fd4b63). No es un secreto. No se
    reescribió el historial.
 7. **Traducciones pt y fr sin revisión nativa.**
+8. **Excepciones legales de conservación de la ubicación (D1).** BLOCKED_BY_LEGAL. No hay mecanismo de retención
+   legal. Las copias de seguridad guardan el dato cifrado hasta que caducan, y su plazo se fija con D-18 (ADR 0318).
+9. **Suspensiones anteriores al 2026-10-11** no tienen duración: siguen permanentes hasta que moderación las levante
+   o una apelación las revierta. Los listados que solo miran el estado pueden tardar hasta una hora en ver que una
+   suspensión venció. Escribir y moderar ya respetan el plazo (ADR 0319).
+10. **Valores técnicos de partida, cambiables por configuración:**
+    - 10 avisos de comentarios y respuestas por persona y día (`SOCIAL_NOTICES_PER_DAY`, ADR 0320);
+    - 7 días de ubicación precisa en categorías sensibles (`SENSITIVE_PRESENCE_RETENTION_DAYS`, ADR 0318).
+11. **Una app sin actualizar no puede suspender.** La API exige la duración de la suspensión. Solo afecta a
+    moderación, y se resuelve actualizando la app.
 
 ## 7. Siguiente paso mínimo para producción
 
@@ -286,7 +301,7 @@ Producción no arranca sin verificador de atestación real (`container.ts`) ni s
 9. **Propietario:** aprobar. **Agente:** `dzd verify --slo`. Si falla, `dzd rollback`, que ya está ensayado.
 10. **Propietario:** publicar en las tiendas.
 
-## 10. Estado de cada bloqueo (revisado el 2026-10-10)
+## 10. Estado de cada bloqueo (revisado el 2026-10-11)
 
 Cada fila dice qué falta, por qué el agente no puede resolverlo, qué quedó listo y el siguiente paso mínimo. Tipos:
 
@@ -308,7 +323,8 @@ Cada fila dice qué falta, por qué el agente no puede resolverlo, qué quedó l
 | Fuentes del piloto (IGP, INDECI, SENAMHI) | Validar feeds y términos de uso | Términos de terceros; el agente no los acepta por el propietario | Registro de fuentes, ingesta con reintentos y escalonada, USGS activo | temporal | Propietario: confirmar términos de cada fuente | 0 |
 | FIRMS | `MAP_KEY` gratuita | Credencial del propietario | Adaptador listo (ADR 0067) | temporal | Propietario: pedir la clave en NASA FIRMS | 0 |
 | Contacto de ingesta | Correo o URL | Dato del propietario | `INGEST_CONTACT` y aviso en `config-check` (ADR 0307) | temporal | Propietario: dar el contacto | 0 |
-| Decisiones de producto | — | — | Las siete de V1 aprobadas el 2026-10-11 (ADR 0315); implementación en ADR 0317 en adelante | resuelto | — | 0 |
+| Decisiones de producto | — | — | Las siete de V1 aprobadas el 2026-10-11 (ADR 0315) e implementadas (ADR 0317–0321) | resuelto | — | 0 |
+| Excepciones legales de retención (D1) | Saber si alguna norma obliga a conservar la ubicación precisa más de 7 días | Decisión legal | Plazo de 7 días aplicado, sin mecanismo de retención legal (ADR 0318) | permanente hasta asesoría | Asesoría legal | Según asesoría |
 | Fronteras en disputa (D-17) | Otros países | Decisión legal y de producto | Piloto: límites oficiales de Perú (ADR 0314) | permanente hasta asesoría | Asesoría antes de abrir otro país | Según asesoría |
 | Datos y revisiones | Revisión nativa de pt y fr, listas de términos, organizaciones para donar, textos regionales | Requieren personas con conocimiento local | Mecanismos con listas vacías | temporal | Propietario: proveerlos | 0 |
 | Pruebas reales | Dispositivo, push, staging, producción | Necesitan los bloqueos anteriores | Ensayo local completo de la entrega (ADR 0282), guardas, rollback | condicionado | Primer APK, luego staging | — |
@@ -328,4 +344,33 @@ Consecuencias:
 - La guarda de `deliver.yml` (ADR 0306) las comprueba en la primera ejecución. Si alguna falta, o si la API no
   responde, se detiene: "incorrecto" en el primer caso, "no verificable" en el segundo.
 - No bloquean el desarrollo local ni las tareas independientes.
+
+## 11. Decisiones de producto de V1: implementación (2026-10-11)
+
+El propietario aprobó las siete por escrito el 2026-10-11 (ADR 0315). Cada una se fusionó por PR, con `pnpm check`
+completo en local y los 7 checks de GitHub Actions en verde. Ninguna crea recursos ni gasto, y ninguna llega a
+producción por fusionarse: `deliver.yml` solo corre a mano.
+
+| Decisión | ADR | PR | Commit en `main` | Qué se aplica |
+| --- | --- | --- | --- | --- |
+| Registro de las siete | 0315 | #60 | c241805 | Expediente aceptado; tabla en el Blueprint |
+| Estado por país, uso sin cuenta, D2 | 0317 | #62 | a8a05c2 | Solo PILOT y AVAILABLE aceptan reportes, en el backend; sin sesión, toda escritura responde 401; «No, es otro» no cambia el evento |
+| D1 | 0318 | #63 | b321c1f | 7 días de ubicación precisa en categorías sensibles, configurable; filas antiguas ajustadas |
+| Suspensiones | 0319 | #64 | c2235dd | 24 horas, 7 días o permanente; vencimiento registrado; apelables; auditadas |
+| Avisos sociales | 0320 | #65 | 79fb9a1 | Apagados por defecto; tope diario; no compiten con incidentes |
+| D3 | 0321 | #66 | d798556 | «N reportes corroborados», la parte oficial aparte, ocultable |
+
+**Pendiente de decisión:** ninguna decisión de producto de V1.
+
+**Pendiente de autorización:**
+- las del §5: `EXPO_TOKEN`, D-18, media, cuentas de tiendas y push, y proveedor de correo;
+- la verificación de las casillas de entornos que figuran como NOT_VERIFIABLE en el §10;
+- la migración a Node 26 LTS, aprobada para después del 2026-10-28.
+
+**Pendiente de asesoría legal:**
+- textos legales;
+- CSAM;
+- entrega de datos a autoridades;
+- fronteras de otros países;
+- excepciones de retención de D1.
 
