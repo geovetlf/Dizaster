@@ -33,6 +33,9 @@ export interface CountryConfigEntry {
   geo?: { cityLevel?: 1 | 2 | 3; districtLevel?: 1 | 2 | 3; levelNames?: Partial<Record<"1" | "2" | "3", string>> };
 }
 
+const LAUNCH_STATUSES = new Set(["PILOT", "AVAILABLE", "AVAILABLE_READ_ONLY", "RESTRICTED"]);
+const CITIZEN_REPORT_STATUSES = new Set<string>(["PILOT", "AVAILABLE"]);
+
 export class ReferenceData {
   readonly categories: CategoryCatalog;
   readonly emergency: EmergencyDataset;
@@ -40,6 +43,7 @@ export class ReferenceData {
   private readonly countries: Map<string, CountryConfigEntry>;
   readonly countriesVersion: string;
   private readonly defaultMinAge: number;
+  private readonly defaultLaunchStatus: CountryConfigEntry["launchStatus"];
   readonly sources: Array<Record<string, unknown>>;
   /** Listas de términos que envían a revisión (ADR 0148). Empiezan vacías. */
   readonly moderationTerms: ModerationTermList;
@@ -53,8 +57,15 @@ export class ReferenceData {
     this.categories = CategoryCatalog.parse(read("categories/categories.json"));
     this.emergency = EmergencyDataset.parse(read("emergency-numbers/emergency-numbers.json"));
     this.byCode = new Map(this.categories.categories.map((c) => [c.code, c]));
-    const countryFile = read("countries/country-config.json") as { version: string; defaults?: { minAge?: number }; countries: CountryConfigEntry[] };
+    const countryFile = read("countries/country-config.json") as {
+      version: string; defaults?: { minAge?: number; launchStatus?: CountryConfigEntry["launchStatus"] }; countries: CountryConfigEntry[];
+    };
     this.defaultMinAge = Math.max(DEFAULT_MIN_AGE, countryFile.defaults?.minAge ?? 0);
+    // Un estado mal escrito no puede abrir un país: falla al arrancar. Sin valor por defecto, solo lectura.
+    this.defaultLaunchStatus = countryFile.defaults?.launchStatus ?? "AVAILABLE_READ_ONLY";
+    for (const st of [this.defaultLaunchStatus, ...countryFile.countries.map((c) => c.launchStatus)]) {
+      if (!LAUNCH_STATUSES.has(st)) throw new Error(`country-config.json: launchStatus desconocido: ${String(st)}`);
+    }
     this.countriesVersion = countryFile.version;
     this.countries = new Map(countryFile.countries.map((c) => [c.iso2, c]));
     this.sources = (read("source-registry/sources.json") as { sources: Array<Record<string, unknown>> }).sources;
@@ -102,6 +113,16 @@ export class ReferenceData {
 
   country(iso2: string): CountryConfigEntry | undefined {
     return this.countries.get(iso2);
+  }
+
+  /** Estado de lanzamiento del país; sin país conocido o sin entrada, el de `defaults` (ADR 0317). */
+  launchStatus(iso2: string | null): CountryConfigEntry["launchStatus"] {
+    return (iso2 ? this.countries.get(iso2)?.launchStatus : undefined) ?? this.defaultLaunchStatus;
+  }
+
+  /** Solo los países PILOT y AVAILABLE aceptan reportes ciudadanos (decisión del propietario, ADR 0315). */
+  acceptsCitizenReports(iso2: string | null): boolean {
+    return CITIZEN_REPORT_STATUSES.has(this.launchStatus(iso2));
   }
 }
 

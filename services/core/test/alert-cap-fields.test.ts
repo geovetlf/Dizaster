@@ -71,7 +71,7 @@ describe("campos CAP en las alertas", () => {
   });
 
   it("si el aviso oficial ya venció al confirmar un evento existente, la alerta queda EXPIRED sin sonar (ADR 0241)", async () => {
-    const pin = offset(LIMA, 1_200_000);
+    const pin = offset(LIMA, 1_000_000, 200_000);
     await t.app.inject({ method: "PUT", url: "/v1/me/approximate-location", headers: auth(u), payload: offset(pin, 100) });
     const w = await createUser(t, "testigo_vencido");
     const rep = await submit(t, w, reportBody(w, { category: "natural.tsunami", pin }));

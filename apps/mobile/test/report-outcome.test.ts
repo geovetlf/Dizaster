@@ -4,6 +4,7 @@ import { outcomeLines } from "../src/lib/report/outcome";
 const msgs: Record<string, string> = {
   created: "Creado", attached: "Sumado", downgraded: "Bajó a post", rejected: "Rechazado",
   why_LOW_ACCURACY: "GPS impreciso", why_MOCK_LOCATION: "Ubicación simulada", rejected_OFFICIAL_ONLY: "Solo oficiales",
+  rejected_COUNTRY_READ_ONLY: "Solo lectura aquí",
 };
 const t = (k: string) => msgs[k] as string;
 
@@ -14,6 +15,8 @@ describe("outcomeLines (§8.2)", () => {
   });
   it("traduce el rechazo por código y cae al texto del servidor si no lo conoce", () => {
     expect(outcomeLines({ outcome: "REJECTED", code: "OFFICIAL_ONLY", reason: "x" }, t as never)).toEqual(["Rechazado", "Solo oficiales"]);
+    // Estado de lanzamiento por país (ADR 0317): el rechazo explica que aquí solo se puede consultar.
+    expect(outcomeLines({ outcome: "REJECTED", code: "COUNTRY_READ_ONLY", reason: "x" }, t as never)).toEqual(["Rechazado", "Solo lectura aquí"]);
     expect(outcomeLines({ outcome: "REJECTED", code: "INVALID_CATEGORY", reason: "Categoría no válida" }, t as never)).toEqual(["Rechazado", "Categoría no válida"]);
   });
   it("éxitos en una línea", () => {

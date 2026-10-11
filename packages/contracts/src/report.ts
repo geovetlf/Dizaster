@@ -56,7 +56,8 @@ export const PresenceRejectionReason = z.enum([
 ]);
 export type PresenceRejectionReason = z.infer<typeof PresenceRejectionReason>;
 
-export const ReportRejectionCode = z.enum(["INVALID_CATEGORY", "OFFICIAL_ONLY"]);
+// COUNTRY_READ_ONLY: el país no está en PILOT ni AVAILABLE (ADR 0317).
+export const ReportRejectionCode = z.enum(["INVALID_CATEGORY", "OFFICIAL_ONLY", "COUNTRY_READ_ONLY"]);
 export type ReportRejectionCode = z.infer<typeof ReportRejectionCode>;
 
 export const SubmitReportResponse = z.discriminatedUnion("outcome", [
