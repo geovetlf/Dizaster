@@ -1,6 +1,6 @@
 # Estado de la implementación
 
-Actualizado: 2026-10-11 (hasta ADR 0318; auditoría de preparación en `docs/PRODUCTION_READINESS_REPORT.md`). Informe de preparación para producción: `docs/PRODUCTION_READINESS_REPORT.md`.
+Actualizado: 2026-10-11 (hasta ADR 0319; auditoría de preparación en `docs/PRODUCTION_READINESS_REPORT.md`). Informe de preparación para producción: `docs/PRODUCTION_READINESS_REPORT.md`.
 
 ## Etapa 1 — Fundación (hecha)
 
@@ -506,6 +506,7 @@ Actualizado: 2026-10-11 (hasta ADR 0318; auditoría de preparación en `docs/PRO
 | La exportación de datos no falla entera por una ubicación cifrada ilegible: sale vacía y marcada (ADR 0316) | ✅ | §13.2 |
 | Estado de lanzamiento por país aplicado en el backend (solo PILOT y AVAILABLE aceptan reportes); prueba estructural de uso sin cuenta en toda la API; D2 sin efecto sobre el evento (ADR 0317) | ✅ | §2, §8.2, §11.5 |
 | D1: ubicación precisa 7 días en categorías sensibles (`SENSITIVE_PRESENCE_RETENTION_DAYS`), acortable por categoría; las filas anteriores se ajustan al plazo nuevo (ADR 0318) | ✅ | §13.2 |
+| Suspensiones de 24 horas, 7 días o permanentes, con vencimiento automático registrado, apelables y auditadas; duración elegida en la app (ADR 0319, migración 0108) | ✅ | §13 |
 | Contacto configurable en el User-Agent de ingesta (`INGEST_CONTACT`), con aviso en `config-check` si falta en producción (ADR 0307) | ✅ falta el valor del propietario | §9.3 |
 | Licencias, auditoría, SBOM, Dependabot; respaldo con prueba de restauración en CI | ✅ | ADR 0070, `scripts/supply-chain.mjs`, `scripts/db-restore-check.mjs` |
 | Idioma de la app elegible en el perfil (es/en/pt/fr o del teléfono) | ✅ | ADR 0069, `app/language.tsx` |
@@ -601,7 +602,7 @@ Las siete decisiones de producto de V1 quedaron aprobadas por el propietario el 
 - ✅ **Aprobado 2026-10-11** — D3: «N reportes corroborados» en el perfil público, ocultable (ADR 0315).
 - ✅ **Aprobado 2026-10-11** — D2: «No, es otro» solo se registra; el evento no cambia (ADR 0315; implementado en ADR 0317).
 - ✅ **Aprobado 2026-10-11** — Estado de lanzamiento por país: solo PILOT y AVAILABLE aceptan reportes ciudadanos (ADR 0315; implementado en ADR 0317).
-- ✅ **Aprobado 2026-10-11** — Suspensiones escalonadas: 24 h, 7 días o permanente, apelables y auditadas (ADR 0315).
+- ✅ **Aprobado 2026-10-11** — Suspensiones escalonadas: 24 h, 7 días o permanente, apelables y auditadas (ADR 0315; implementado en ADR 0319).
 - ✅ **Decidido 2026-10-10** — D-17: el piloto usa los límites oficiales de Perú (INEI en el índice administrativo). Otro país con fronteras en disputa espera asesoría legal. Antes de publicar el mapa de Perú se revisan sus fronteras (ADR 0314).
 - ✅ **Aprobado 2026-10-11** — Uso sin cuenta: solo lectura de contenido público (ADR 0315; implementado en ADR 0317).
 - ✅ **Aprobado 2026-10-11** — Avisos de comentarios y respuestas: apagados por defecto, activables, con límite diario (ADR 0315).

@@ -128,11 +128,39 @@ export class IdentityService {
     });
   }
 
-  /** Suspender o reactivar una cuenta (moderación). Surte efecto en todas las instancias en ≤ 30 s. */
-  async setUserStatus(q: Queryable, userId: string, status: "ACTIVE" | "SUSPENDED"): Promise<void> {
-    await q.query(`UPDATE identity.users SET status = $2, updated_at = now() WHERE id = $1 AND status <> 'DELETED'`, [userId, status]);
+  /**
+   * Suspender o reactivar una cuenta (moderación). Surte efecto en todas las instancias en ≤ 30 s. `until` es el fin
+   * de la suspensión (null = permanente, ADR 0319). Si ya estaba suspendida, queda el fin más lejano: una suspensión
+   * corta nunca acorta otra más larga. Devuelve el fin efectivo (null = permanente o cuenta no suspendida).
+   */
+  async setUserStatus(q: Queryable, userId: string, status: "ACTIVE" | "SUSPENDED", until: Date | null = null): Promise<{ until: Date | null }> {
+    const { rows } = status === "ACTIVE"
+      ? await q.query<{ suspended_until: Date | null }>(
+        `UPDATE identity.users SET status = 'ACTIVE', suspended_until = NULL, updated_at = now() WHERE id = $1 AND status <> 'DELETED' RETURNING suspended_until`,
+        [userId])
+      : await q.query<{ suspended_until: Date | null }>(
+        `UPDATE identity.users SET status = 'SUSPENDED', updated_at = now(),
+                suspended_until = CASE
+                  WHEN $2::timestamptz IS NULL THEN NULL
+                  WHEN status = 'SUSPENDED' AND suspended_until IS NULL THEN NULL
+                  WHEN status = 'SUSPENDED' THEN GREATEST(suspended_until, $2::timestamptz)
+                  ELSE $2::timestamptz END
+          WHERE id = $1 AND status <> 'DELETED' RETURNING suspended_until`,
+        [userId, until]);
     this.statusCache.delete(userId);
     this.rolesCache.delete(userId);
+    return { until: rows[0]?.suspended_until ?? null };
+  }
+
+  /** Reactiva las cuentas cuya suspensión ya cumplió su plazo (trabajo horario, ADR 0319). Devuelve sus ids. */
+  async expireSuspensions(q: Queryable, now: Date): Promise<string[]> {
+    const { rows } = await q.query<{ id: string }>(
+      `UPDATE identity.users SET status = 'ACTIVE', suspended_until = NULL, updated_at = now()
+        WHERE status = 'SUSPENDED' AND suspended_until <= $1 RETURNING id`,
+      [now],
+    );
+    for (const r of rows) { this.statusCache.delete(r.id); this.rolesCache.delete(r.id); }
+    return rows.map((r) => r.id);
   }
 
   // ───────────── Términos y políticas (ADR 0176) ─────────────
@@ -201,8 +229,10 @@ export class IdentityService {
     const now = Date.now();
     let cached = this.statusCache.get(userId);
     if (!cached || now - cached.at > 30_000) {
+      // Una suspensión que ya cumplió su plazo deja de contar aunque el trabajo horario aún no la haya cerrado.
       const { rows } = await this.db.query<{ status: string; age_ok: boolean }>(
-        `SELECT status, age_confirmed_at IS NOT NULL AS age_ok FROM identity.users WHERE id = $1`, [userId],
+        `SELECT CASE WHEN status = 'SUSPENDED' AND suspended_until <= now() THEN 'ACTIVE' ELSE status END AS status,
+                age_confirmed_at IS NOT NULL AS age_ok FROM identity.users WHERE id = $1`, [userId],
       );
       cached = { status: rows[0]?.status ?? "DELETED", ageOk: rows[0]?.age_ok ?? false, at: now };
       this.statusCache.set(userId, cached);
@@ -279,7 +309,7 @@ export class IdentityService {
     const now = Date.now();
     const hit = this.rolesCache.get(userId);
     if (hit && now - hit.at <= 30_000) return hit.roles;
-    const { rows } = await this.db.query<{ roles: string[] }>(`SELECT roles FROM identity.users WHERE id = $1 AND status = 'ACTIVE'`, [userId]);
+    const { rows } = await this.db.query<{ roles: string[] }>(`SELECT roles FROM identity.users WHERE id = $1 AND (status = 'ACTIVE' OR (status = 'SUSPENDED' AND suspended_until <= now()))`, [userId]);
     const roles = rows[0]?.roles ?? [];
     this.rolesCache.set(userId, { roles, at: now });
     if (this.rolesCache.size > 10_000) this.rolesCache.clear();
@@ -416,7 +446,7 @@ export class IdentityService {
    */
   async phoneOf(q: Queryable, deviceId: string): Promise<{ deviceIds: string[]; suspendedAccount: boolean }> {
     const { rows } = await q.query<{ id: string; suspended: boolean }>(
-      `SELECT o.id, u.status = 'SUSPENDED' AS suspended
+      `SELECT o.id, (u.status = 'SUSPENDED' AND (u.suspended_until IS NULL OR u.suspended_until > now())) AS suspended
          FROM identity.devices d
          JOIN identity.devices o ON o.id = d.id OR (d.hardware_key IS NOT NULL AND o.hardware_key = d.hardware_key)
          JOIN identity.users u ON u.id = o.user_id

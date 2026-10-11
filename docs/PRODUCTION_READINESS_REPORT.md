@@ -1,6 +1,6 @@
 # DIZASTER PRODUCTION READINESS AUDIT
 
-Fecha: 2026-10-11 · Código hasta ADR 0318 · Migraciones 0001–0107 · Todo en `main` por PR (sin force push)
+Fecha: 2026-10-11 · Código hasta ADR 0319 · Migraciones 0001–0108 · Todo en `main` por PR (sin force push)
 
 Esta auditoría compara el Blueprint con los ADR, el código y las pruebas. Solo se marca un bloqueo cuando está
 escrito qué falta y quién lo da. No se inventan decisiones, límites, precios ni capacidades. El procedimiento exacto
@@ -37,7 +37,7 @@ tiendas y credenciales, decisiones de producto y revisión legal. Nada de eso lo
 | --- | --- |
 | `pnpm check`: lint, fronteras de módulos, secretos, workflows y versiones alineadas, typecheck, build y pruebas | ✅ Pruebas: contracts 42, geo-kit 39, móvil 288, backend 717, delivery 97 |
 | Empaquetado móvil iOS + Android (`bundle:check`) y paridad nativa | ✅ |
-| Migraciones 0001–0107 sobre PostgreSQL 16 + PostGIS + H3; restauración de respaldo | ✅ |
+| Migraciones 0001–0108 sobre PostgreSQL 16 + PostGIS + H3; restauración de respaldo | ✅ |
 | Gitleaks: historial (285 commits) y árbol de trabajo | ✅ sin hallazgos |
 | Trivy (dependencias, Dockerfiles, IaC) y Semgrep con reglas propias | ✅ sin HIGH/CRITICAL |
 | Imagen del backend: usuario no root, sin gestores de paquetes | ✅ |
@@ -72,7 +72,7 @@ tiendas y credenciales, decisiones de producto y revisión legal. Nada de eso lo
 | Push real (APNs y FCM) | BLOCKED BY AUTHORIZATION | Clave `.p8` y cuenta de servicio de Firebase |
 | Mapa MapLibre | READY en código · FINANCIAL AUTHORIZATION REQUIRED para las teselas propias | Hoy usa teselas de demostración |
 | Media: fotos y video sin metadatos de ubicación | READY · video 720p en Android BLOCKED BY AUTHORIZATION | La transcodificación nativa llega con el primer build |
-| Moderación y apelaciones | READY | Las listas de términos quedan vacías hasta que el propietario las llene. La duración de las suspensiones espera decisión |
+| Moderación y apelaciones | READY | Las listas de términos quedan vacías hasta que el propietario las llene. Suspensiones de 24 horas, 7 días o permanentes (ADR 0319) |
 | Detección de CSAM | LEGAL REVIEW REQUIRED | Proveedor y procedimiento de reporte |
 | Requerimientos de autoridades | READY el registro · LEGAL REVIEW REQUIRED la entrega | Solo registro auditado |
 | Textos legales | LEGAL REVIEW REQUIRED | |

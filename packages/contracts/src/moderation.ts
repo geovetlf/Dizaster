@@ -32,10 +32,19 @@ export const ModerationActionType = z.enum([
 ]);
 export type ModerationActionType = z.infer<typeof ModerationActionType>;
 
+/** Duración de una suspensión (decisión del propietario, ADR 0315 y 0319). */
+export const SuspensionDuration = z.enum(["HOURS_24", "DAYS_7", "PERMANENT"]);
+export type SuspensionDuration = z.infer<typeof SuspensionDuration>;
+
 export const TakeActionRequest = z.object({
   action: ModerationActionType,
   /** Obligatorio y visible para la persona afectada (transparencia). */
   reason: z.string().trim().min(10).max(1000),
+  /** Obligatoria para SUSPEND_USER y no admitida en las demás acciones. */
+  suspension: SuspensionDuration.optional(),
+}).refine((r) => (r.action === "SUSPEND_USER") === (r.suspension !== undefined), {
+  message: "La suspensión exige su duración (HOURS_24, DAYS_7 o PERMANENT), y solo la suspensión la lleva",
+  path: ["suspension"],
 });
 export type TakeActionRequest = z.infer<typeof TakeActionRequest>;
 
@@ -79,6 +88,8 @@ export interface ModerationActionView {
   targetType: FlagTargetType;
   targetId: string;
   createdAt: string;
+  /** Solo SUSPEND_USER: la duración y cuándo termina (null = permanente). */
+  suspension?: { duration: SuspensionDuration; until: string | null };
 }
 
 export interface CaseDetail extends CaseSummary {
