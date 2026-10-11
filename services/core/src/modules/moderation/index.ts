@@ -23,10 +23,11 @@ import {
   type MyNoticesResponse,
   type ModerationTargetPreview,
   DATA_EXPORT_ROW_LIMIT,
+  can,
 } from "@dizaster/contracts";
 import { z } from "zod";
 import { withTransaction, type Db, type Queryable } from "../../platform/db.js";
-import { DomainError, notFound } from "../../platform/errors.js";
+import { DomainError, forbidden, notFound } from "../../platform/errors.js";
 import { newId } from "../../platform/ids.js";
 import { publish, type OutboxDispatcher } from "../../platform/outbox.js";
 import type { EventService } from "../event/index.js";
@@ -469,6 +470,14 @@ export class ModerationService {
         const state = ({ HIDE: "HIDDEN", REMOVE: "REMOVED", RESTORE: "VISIBLE" } as const)[p.action as "HIDE"];
         if (state) await this.social.setCommentModeration(tx, p.targetId, state);
       }
+      // Cuentas de administración (ADR 0327): solo otra persona de administración las suspende o reactiva. Sin esto,
+      // moderación podía dejar sin administradores al sistema (y nadie podría quitarle su rol) o deshacer lo que
+      // decidió administración.
+      if ((p.action === "SUSPEND_USER" || p.action === "UNSUSPEND_USER")
+        && (await this.identity.staffRolesOf(tx, t.authorUserId)).includes("admin")
+        && !can(await this.identity.liveRoles(p.moderatorUserId), "admin")) {
+        throw forbidden("Solo administración puede suspender o reactivar una cuenta de administración");
+      }
       if (p.action === "SUSPEND_USER") {
         // La duración la valida TakeActionRequest; sin ella no se suspende (ADR 0319).
         if (!p.suspension) throw new DomainError("VALIDATION", "La suspensión exige su duración");
@@ -744,7 +753,7 @@ export class ModerationService {
   /** Acciones sobre mi contenido o cuenta, mis apelaciones y mis denuncias. Nunca quién me denunció. */
   async exportData(q: Queryable, who: { userId: string; profileId: string }): Promise<Record<string, unknown[]>> {
     const actions = await q.query(
-      `SELECT id, target_type, target_id, action, actor, reason, created_at FROM moderation.actions WHERE affected_user_id = $1 ORDER BY created_at DESC LIMIT ${DATA_EXPORT_ROW_LIMIT + 1}`, [who.userId],
+      `SELECT id, target_type, target_id, action, actor, reason, suspension, suspended_until, created_at FROM moderation.actions WHERE affected_user_id = $1 ORDER BY created_at DESC LIMIT ${DATA_EXPORT_ROW_LIMIT + 1}`, [who.userId],
     );
     const appeals = await q.query(`SELECT id, action_id, text, status, decision_reason, created_at, decided_at FROM moderation.appeals WHERE appellant_user_id = $1`, [who.userId]);
     const flags = await q.query(`SELECT target_type, target_id, reason, note, created_at FROM moderation.flags WHERE reporter_profile_id = $1 ORDER BY created_at DESC LIMIT ${DATA_EXPORT_ROW_LIMIT + 1}`, [who.profileId]);
