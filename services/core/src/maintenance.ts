@@ -23,7 +23,7 @@ export async function runJobs(jobs: readonly Job[], log: (msg: string, data: Rec
   return { failed };
 }
 
-/** Cada hora: ciclo de vida (sin cerrar eventos con aviso vigente), fin oficial, archivo, degradación por costo, prioridades y duplicados. */
+/** Cada hora: ciclo de vida (sin cerrar eventos con aviso vigente), fin oficial, archivo, degradación por costo, prioridades, fin de suspensiones y duplicados. */
 export function hourlyJobs(c: Container): Job[] {
   return [
     // Cada cambio de estado y su evento de dominio (outbox) en una sola transacción (ADR 0244): si algo falla a
@@ -37,6 +37,8 @@ export function hourlyJobs(c: Container): Job[] {
       return undefined;
     }],
     ["moderation.priorities", () => c.moderation.refreshPriorities()],
+    // Suspensiones de 24 horas o 7 días que ya cumplieron su plazo (ADR 0319).
+    ["moderation.suspensions.expire", () => c.moderation.expireSuspensions(c.clock.now())],
     ["events.duplicates", () => c.events.sweepDuplicates(c.db, c.clock.now())],
   ];
 }

@@ -6,7 +6,7 @@ import { LoadState } from "../components/load-state";
 import { api } from "../lib/api";
 import { classifyLoadError, type LoadErrorKind } from "../lib/errors/load-error";
 import { lang, t } from "../lib/i18n";
-import { actionReasonText, appendNotices, validReason } from "../lib/moderation/logic";
+import { actionReasonText, appendNotices, suspensionText, validReason } from "../lib/moderation/logic";
 import { timeAgo } from "../lib/ui/format";
 import { colors, radius, space } from "../theme";
 import { ErrorText } from "../components/error-text";
@@ -60,6 +60,7 @@ function Notice({ notice, onChange }: { notice: ModerationNotice; onChange: (n: 
   return (
     <View style={styles.card}>
       <Text style={styles.title}>{t(`action_${notice.action.action}`)} · {timeAgo(notice.action.createdAt, lang)}</Text>
+      {notice.action.suspension ? <Text style={styles.meta}>{suspensionText(notice.action, lang, t)}</Text> : null}
       <Text style={styles.reason}>{actionReasonText(notice.action, lang, t)}</Text>
       {notice.appeal ? (
         <Text style={styles.meta}>{t(`appealStatus_${notice.appeal.status}`)}{notice.appeal.decisionReason ? ` · ${notice.appeal.decisionReason}` : ""}</Text>

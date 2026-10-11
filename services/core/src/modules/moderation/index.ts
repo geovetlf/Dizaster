@@ -9,6 +9,7 @@ import {
   CreateFlagRequest,
   DecideAppealRequest,
   TakeActionRequest,
+  type SuspensionDuration,
   type AppealView,
   type CaseDetail,
   type CaseStatus,
@@ -87,7 +88,11 @@ const CASE_COLUMNS = `id, status, priority, target_type, target_id, opened_at, u
 
 interface ActionRow {
   id: string; action: ModerationActionType; reason: string; actor: "RULE" | "MODERATOR"; target_type: FlagTargetType; target_id: string; created_at: Date;
+  suspension?: SuspensionDuration | null; suspended_until?: Date | null;
 }
+
+/** Plazo de cada duración de suspensión (ADR 0319); PERMANENT no tiene fin. */
+const SUSPENSION_MS: Record<SuspensionDuration, number | null> = { HOURS_24: 24 * 3_600_000, DAYS_7: 7 * 86_400_000, PERMANENT: null };
 
 /**
  * Moderation Layer (Blueprint §5.21): denuncias → casos con prioridad determinista → acciones auditables →
@@ -313,7 +318,7 @@ export class ModerationService {
       `SELECT reason, note, created_at FROM moderation.flags WHERE case_id = $1 AND note IS NOT NULL ORDER BY created_at DESC LIMIT 50`, [caseId],
     );
     const actions = await this.db.query<ActionRow>(
-      `SELECT id, action, reason, actor, target_type, target_id, created_at FROM moderation.actions WHERE case_id = $1 ORDER BY created_at`, [caseId],
+      `SELECT id, action, reason, actor, target_type, target_id, created_at, suspension, suspended_until FROM moderation.actions WHERE case_id = $1 ORDER BY created_at`, [caseId],
     );
     const edits = base.target.type === "POST" ? await this.social.postEdits(this.db, base.target.id) : [];
     return {
@@ -334,7 +339,7 @@ export class ModerationService {
         throw new DomainError("CASE_CLAIMED", "Otra persona está revisando este caso", 409);
       }
       if (!ALLOWED[c.target_type].includes(a.action)) throw new DomainError("VALIDATION", `${a.action} no aplica a ${c.target_type}`);
-      await this.apply(tx, { caseId, targetType: c.target_type, targetId: c.target_id, action: a.action, reason: a.reason, moderatorUserId });
+      await this.apply(tx, { caseId, targetType: c.target_type, targetId: c.target_id, action: a.action, reason: a.reason, moderatorUserId, suspension: a.suspension });
       const closes = CLOSES[a.action];
       if (closes && c.status === "OPEN") {
         await tx.query(`UPDATE moderation.cases SET status = $2, resolved_at = now(), resolved_by = $3, updated_at = now(), claimed_by = NULL, claimed_until = NULL WHERE id = $1`, [caseId, closes, moderatorUserId]);
@@ -417,9 +422,13 @@ export class ModerationService {
 
   private async apply(
     tx: Queryable,
-    p: { caseId: string | null; targetType: FlagTargetType; targetId: string; action: ModerationActionType; reason: string; moderatorUserId: string; reverses?: string },
+    p: {
+      caseId: string | null; targetType: FlagTargetType; targetId: string; action: ModerationActionType; reason: string; moderatorUserId: string; reverses?: string;
+      suspension?: SuspensionDuration;
+    },
   ): Promise<void> {
     let affectedUserId: string | null = null;
+    let suspendedUntil: Date | null = null;
     if (p.targetType === "EVENT") {
       if (p.action === "MARK_DISPUTED") {
         await this.verification.moderatorSetNegative({ eventId: p.targetId, moderatorUserId: p.moderatorUserId, to: "DISPUTED", reason: p.reason, evidenceRefs: [] });
@@ -460,22 +469,53 @@ export class ModerationService {
         const state = ({ HIDE: "HIDDEN", REMOVE: "REMOVED", RESTORE: "VISIBLE" } as const)[p.action as "HIDE"];
         if (state) await this.social.setCommentModeration(tx, p.targetId, state);
       }
-      if (p.action === "SUSPEND_USER") await this.identity.setUserStatus(tx, t.authorUserId, "SUSPENDED");
+      if (p.action === "SUSPEND_USER") {
+        // La duración la valida TakeActionRequest; sin ella no se suspende (ADR 0319).
+        if (!p.suspension) throw new DomainError("VALIDATION", "La suspensión exige su duración");
+        const ms = SUSPENSION_MS[p.suspension];
+        suspendedUntil = (await this.identity.setUserStatus(tx, t.authorUserId, "SUSPENDED", ms === null ? null : new Date(Date.now() + ms))).until;
+      }
       if (p.action === "UNSUSPEND_USER") await this.identity.setUserStatus(tx, t.authorUserId, "ACTIVE");
     }
     await this.log(tx, { caseId: p.caseId, targetType: p.targetType, targetId: p.targetId, affectedUserId, action: p.action, actor: "MODERATOR",
-      moderatorUserId: p.moderatorUserId, reason: p.reason, reverses: p.reverses ?? null });
+      moderatorUserId: p.moderatorUserId, reason: p.reason, reverses: p.reverses ?? null,
+      ...(p.action === "SUSPEND_USER" ? { suspension: p.suspension!, suspendedUntil } : {}) });
+  }
+
+  /**
+   * Cierra las suspensiones que cumplieron su plazo (trabajo horario, ADR 0319). Cada reactivación queda en el
+   * registro de acciones como UNSUSPEND_USER automática, sobre el mismo objeto que motivó la suspensión.
+   */
+  async expireSuspensions(now: Date = new Date()): Promise<{ count: number }> {
+    return withTransaction(this.db, async (tx) => {
+      const users = await this.identity.expireSuspensions(tx, now);
+      for (const userId of users) {
+        const last = (await tx.query<{ case_id: string | null; target_type: FlagTargetType; target_id: string }>(
+          `SELECT case_id, target_type, target_id FROM moderation.actions
+            WHERE affected_user_id = $1 AND action = 'SUSPEND_USER' ORDER BY created_at DESC LIMIT 1`, [userId],
+        )).rows[0];
+        if (!last) continue;
+        await this.log(tx, { caseId: last.case_id, targetType: last.target_type, targetId: last.target_id, affectedUserId: userId, action: "UNSUSPEND_USER",
+          actor: "RULE", moderatorUserId: null, reason: "La suspensión terminó al cumplir su plazo" });
+      }
+      return { count: users.length };
+    });
   }
 
   private async log(
     tx: Queryable,
-    p: { caseId: string | null; targetType: FlagTargetType; targetId: string; affectedUserId: string | null; action: ModerationActionType; actor: "RULE" | "MODERATOR"; moderatorUserId: string | null; reason: string; reverses?: string | null },
+    p: {
+      caseId: string | null; targetType: FlagTargetType; targetId: string; affectedUserId: string | null; action: ModerationActionType; actor: "RULE" | "MODERATOR";
+      moderatorUserId: string | null; reason: string; reverses?: string | null; suspension?: SuspensionDuration; suspendedUntil?: Date | null;
+    },
   ): Promise<void> {
     const id = newId();
     await tx.query(
-      `INSERT INTO moderation.actions (id, case_id, target_type, target_id, affected_user_id, action, actor, moderator_user_id, reason, reverses_action_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-      [id, p.caseId, p.targetType, p.targetId, p.affectedUserId, p.action, p.actor, p.moderatorUserId, p.reason, p.reverses ?? null],
+      `INSERT INTO moderation.actions (id, case_id, target_type, target_id, affected_user_id, action, actor, moderator_user_id, reason, reverses_action_id,
+                                       suspension, suspended_until)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+      [id, p.caseId, p.targetType, p.targetId, p.affectedUserId, p.action, p.actor, p.moderatorUserId, p.reason, p.reverses ?? null,
+        p.suspension ?? null, p.suspendedUntil ?? null],
     );
     await publish(tx, "ModerationActionTaken", {
       actionId: id, targetType: p.targetType, targetId: p.targetId, action: p.action, actor: p.actor,
@@ -508,7 +548,7 @@ export class ModerationService {
 
   private async noticeRows(userId: string, p: { cursor?: string | null; actionId?: string; limit: number }): Promise<ModerationNotice[]> {
     const { rows } = await this.db.query<ActionRow & { appeal_id: string | null; appeal_status: AppealView["status"] | null; decision_reason: string | null }>(
-      `SELECT a.id, a.action, a.reason, a.actor, a.target_type, a.target_id, a.created_at,
+      `SELECT a.id, a.action, a.reason, a.actor, a.target_type, a.target_id, a.created_at, a.suspension, a.suspended_until,
               ap.id AS appeal_id, ap.status AS appeal_status, ap.decision_reason
          FROM moderation.actions a LEFT JOIN moderation.appeals ap ON ap.action_id = a.id
         WHERE a.affected_user_id = $1 AND a.action NOT IN ('DISMISS','RESTORE','UNSUSPEND_USER','APPROVE_MEDIA')
@@ -553,7 +593,7 @@ export class ModerationService {
   /** `previews`: cuántas filas llevan vista previa; la fila de más que solo dice si hay otra página no la necesita. */
   private async appealRows(where: string, params: unknown[], previews = Infinity): Promise<AppealView[]> {
     const { rows } = await this.db.query<ActionRow & { appeal_id: string; appeal_status: AppealView["status"]; text: string; appeal_at: Date }>(
-      `SELECT a.id, a.action, a.reason, a.actor, a.target_type, a.target_id, a.created_at,
+      `SELECT a.id, a.action, a.reason, a.actor, a.target_type, a.target_id, a.created_at, a.suspension, a.suspended_until,
               ap.id AS appeal_id, ap.status AS appeal_status, ap.text, ap.created_at AS appeal_at
          FROM moderation.appeals ap JOIN moderation.actions a ON a.id = ap.action_id
         WHERE ${where}`,
@@ -597,7 +637,7 @@ export class ModerationService {
   /** Registro de acciones para administración (ADR 0239): quién moderó qué, más recientes primero, con cursor. */
   async actionLog(q: Queryable, f: { moderatorUserId?: string; cursor?: string; limit: number }): Promise<{ actions: Array<ModerationActionView & { moderatorUserId: string | null }>; nextCursor: string | null }> {
     const { rows } = await q.query<ActionRow & { moderator_user_id: string | null }>(
-      `SELECT a.id, a.action, a.reason, a.actor, a.target_type, a.target_id, a.created_at, a.moderator_user_id
+      `SELECT a.id, a.action, a.reason, a.actor, a.target_type, a.target_id, a.created_at, a.suspension, a.suspended_until, a.moderator_user_id
          FROM moderation.actions a
         WHERE ($1::uuid IS NULL OR a.moderator_user_id = $1) AND ($2::uuid IS NULL OR a.id < $2)
         ORDER BY a.id DESC LIMIT $3`,
@@ -707,7 +747,10 @@ export class ModerationService {
 }
 
 function actionView(r: ActionRow): ModerationActionView {
-  return { id: r.id, action: r.action, reason: r.reason, actor: r.actor, targetType: r.target_type, targetId: r.target_id, createdAt: r.created_at.toISOString() };
+  return {
+    id: r.id, action: r.action, reason: r.reason, actor: r.actor, targetType: r.target_type, targetId: r.target_id, createdAt: r.created_at.toISOString(),
+    ...(r.suspension ? { suspension: { duration: r.suspension, until: r.suspended_until?.toISOString() ?? null } } : {}),
+  };
 }
 
 function parse<T extends z.ZodType>(schema: T, value: unknown): z.infer<T> {

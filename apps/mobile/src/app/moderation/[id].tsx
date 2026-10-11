@@ -1,11 +1,11 @@
-import type { CaseDetail, ModerationActionType, PresenceReview } from "@dizaster/contracts";
+import type { CaseDetail, ModerationActionType, PresenceReview, SuspensionDuration } from "@dizaster/contracts";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import { Alert, Image, Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { api } from "../../lib/api";
 import { API_URL } from "../../lib/config";
 import { lang, t, verificationLabel } from "../../lib/i18n";
-import { actionReasonText, actionsFor, isSevere, presenceLines, reasonSummary, targetStateText, validReason } from "../../lib/moderation/logic";
+import { actionReasonText, actionsFor, isSevere, presenceLines, reasonSummary, SUSPENSION_DURATIONS, suspensionText, targetStateText, validReason } from "../../lib/moderation/logic";
 import { timeAgo } from "../../lib/ui/format";
 import { colors, radius, space } from "../../theme";
 import { ErrorText } from "../../components/error-text";
@@ -18,6 +18,8 @@ export default function CaseScreen() {
   const [error, setError] = useState<string | null>(null);
   const [presence, setPresence] = useState<PresenceReview | null>(null);
   const [original, setOriginal] = useState<{ mediaId: string; uri: string } | null>(null);
+  // Suspender exige elegir la duración antes (ADR 0319): 24 horas, 7 días o permanente.
+  const [suspension, setSuspension] = useState<SuspensionDuration | null>(null);
 
   // Al abrir el caso se toma (ADR 0134); si otra persona lo tiene, se ve igual pero sin poder actuar. Al salir se suelta.
   useEffect(() => {
@@ -35,8 +37,9 @@ export default function CaseScreen() {
   async function apply(action: ModerationActionType) {
     if (!c) return;
     try {
-      setC(await api.moderationAct(c.id, action, reason.trim()));
+      setC(await api.moderationAct(c.id, action, reason.trim(), action === "SUSPEND_USER" ? suspension ?? undefined : undefined));
       setReason("");
+      setSuspension(null);
       setError(null);
     } catch (e) {
       setError((e as Error).message);
@@ -70,7 +73,8 @@ export default function CaseScreen() {
 
   function confirm(action: ModerationActionType) {
     if (!isSevere(action)) return void apply(action);
-    Alert.alert(t(`action_${action}`), t("confirmSevere"), [
+    const title = action === "SUSPEND_USER" && suspension ? `${t("action_SUSPEND_USER")} · ${t(`suspension_${suspension}`)}` : t(`action_${action}`);
+    Alert.alert(title, t("confirmSevere"), [
       { text: t("cancel"), style: "cancel" },
       { text: t("apply"), style: "destructive", onPress: () => void apply(action) },
     ]);
@@ -112,7 +116,7 @@ export default function CaseScreen() {
       {c.actions.length ? <Text style={styles.section}>{t("timeline")}</Text> : null}
       {c.actions.map((a) => (
         <Text key={a.id} style={styles.meta}>
-          {timeAgo(a.createdAt, lang)} · {t(`action_${a.action}`)}{a.actor === "RULE" ? ` (${t("ruleActor")})` : ""} · {actionReasonText(a, lang, t)}
+          {timeAgo(a.createdAt, lang)} · {t(`action_${a.action}`)}{a.actor === "RULE" ? ` (${t("ruleActor")})` : ""}{a.suspension ? ` · ${suspensionText(a, lang, t)}` : ""} · {actionReasonText(a, lang, t)}
         </Text>
       ))}
 
@@ -125,12 +129,29 @@ export default function CaseScreen() {
             <Text style={styles.actionText}>{t("viewPresence")}</Text>
           </Pressable>
         ) : null}
-        {actionsFor(c.target.type).map((a) => (
-          <Pressable key={a} accessibilityRole="button" disabled={!ok} style={[styles.action, isSevere(a) && styles.severe, !ok && styles.disabled]} onPress={() => confirm(a)}>
-            <Text style={styles.actionText}>{t(`action_${a}`)}</Text>
-          </Pressable>
-        ))}
+        {actionsFor(c.target.type).map((a) => {
+          const enabled = ok && (a !== "SUSPEND_USER" || suspension !== null);
+          return (
+            <Pressable key={a} accessibilityRole="button" accessibilityState={{ disabled: !enabled }} disabled={!enabled}
+              style={[styles.action, isSevere(a) && styles.severe, !enabled && styles.disabled]} onPress={() => confirm(a)}>
+              <Text style={styles.actionText}>{t(`action_${a}`)}</Text>
+            </Pressable>
+          );
+        })}
       </View>
+      {actionsFor(c.target.type).includes("SUSPEND_USER") ? (
+        <>
+          <Text style={styles.meta}>{t("suspensionDuration")}</Text>
+          <View style={styles.actions} accessibilityRole="radiogroup">
+            {SUSPENSION_DURATIONS.map((d) => (
+              <Pressable key={d} accessibilityRole="radio" accessibilityState={{ checked: suspension === d }}
+                style={[styles.action, suspension === d && styles.severe]} onPress={() => setSuspension(suspension === d ? null : d)}>
+                <Text style={styles.actionText}>{t(`suspension_${d}`)}</Text>
+              </Pressable>
+            ))}
+          </View>
+        </>
+      ) : null}
     </ScrollView>
   );
 }

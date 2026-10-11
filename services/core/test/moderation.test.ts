@@ -12,8 +12,8 @@ const handleOf = async (u: TestUser) => (await t.c.db.query<{ handle: string }>(
 const postId = async (text: string) => (await t.c.db.query<{ id: string }>(`SELECT id FROM social.posts WHERE text = $1`, [text])).rows[0]!.id;
 const flag = (u: TestUser, payload: object) => t.app.inject({ method: "POST", url: "/v1/flags", headers: auth(u), payload });
 const queue = async () => (await t.app.inject({ url: "/v1/moderation/cases", headers: auth(mod) })).json() as { cases: CaseSummary[] };
-const act = (u: TestUser, caseId: string, action: string, reason = "Incumple las normas de la comunidad") =>
-  t.app.inject({ method: "POST", url: `/v1/moderation/cases/${caseId}/actions`, headers: auth(u), payload: { action, reason } });
+const act = (u: TestUser, caseId: string, action: string, reason = "Incumple las normas de la comunidad", extra: object = {}) =>
+  t.app.inject({ method: "POST", url: `/v1/moderation/cases/${caseId}/actions`, headers: auth(u), payload: { action, reason, ...extra } });
 
 async function asRole(handle: string, role: "moderator" | "admin"): Promise<TestUser> {
   const u = await createUser(t, handle);
@@ -134,7 +134,7 @@ describe("suspensión, seudónimos y eventos", () => {
     expect(c.target.authorHandle).toBeNull();
     expect(JSON.stringify(await (await t.app.inject({ url: `/v1/moderation/cases/${c.id}`, headers: auth(mod) })).json())).not.toContain(await handleOf(anon));
 
-    expect((await act(mod, c.id, "SUSPEND_USER", "Amenazas reiteradas a otras personas")).json()).toMatchObject({ status: "RESOLVED" });
+    expect((await act(mod, c.id, "SUSPEND_USER", "Amenazas reiteradas a otras personas", { suspension: "PERMANENT" })).json()).toMatchObject({ status: "RESOLVED" });
     const blockedWrite = await t.app.inject({ method: "POST", url: `/v1/posts/${id}/comments`, headers: auth(anon), payload: { text: "hola" } });
     expect(blockedWrite.statusCode).toBe(403);
     expect(blockedWrite.json().error).toBe("ACCOUNT_SUSPENDED");
