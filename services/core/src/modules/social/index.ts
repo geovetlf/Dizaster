@@ -906,11 +906,12 @@ export class SocialService {
   }
 
   /** Perfil público: los contadores solo incluyen posts con autoría pública. */
-  async profile(q: Queryable, handle: string, viewerProfileId: string | null): Promise<ProfileView & { id: string }> {
+  async profile(q: Queryable, handle: string, viewerProfileId: string | null): Promise<Omit<ProfileView, "corroboratedReports"> & { id: string; userId: string; showCorroborated: boolean }> {
     const { rows } = await q.query<{
-      id: string; handle: string; display_name: string; bio: string | null; avatar_url: string | null; created_at: Date; followers: number; following: number; posts: number; followed: boolean; blocked: boolean;
+      id: string; user_id: string; handle: string; display_name: string; bio: string | null; avatar_url: string | null; created_at: Date; followers: number; following: number; posts: number; followed: boolean; blocked: boolean;
+      show_corroborated_reports: boolean;
     }>(
-      `SELECT pr.id, pr.handle, pr.display_name, pr.bio, pr.avatar_url, pr.created_at,
+      `SELECT pr.id, pr.user_id, pr.handle, pr.display_name, pr.bio, pr.avatar_url, pr.created_at, pr.show_corroborated_reports,
               (SELECT count(*) FROM social.follows f WHERE f.target_type = 'PROFILE' AND f.target_id = pr.id::text)::int AS followers,
               (SELECT count(*) FROM social.follows f WHERE f.follower_profile_id = pr.id AND f.target_type = 'PROFILE')::int AS following,
               (SELECT count(*) FROM social.posts p WHERE p.author_type = 'PROFILE' AND p.author_id = pr.id AND p.author_visibility = 'PUBLIC' AND p.visibility = 'PUBLIC'
@@ -923,7 +924,8 @@ export class SocialService {
     const r = rows[0];
     if (!r) throw notFound("Perfil");
     return {
-      id: r.id, handle: r.handle, displayName: r.display_name, bio: r.bio, avatarUrl: r.avatar_url, createdAt: r.created_at.toISOString(),
+      id: r.id, userId: r.user_id, showCorroborated: r.show_corroborated_reports,
+      handle: r.handle, displayName: r.display_name, bio: r.bio, avatarUrl: r.avatar_url, createdAt: r.created_at.toISOString(),
       followerCount: r.followers, followingCount: r.following, postCount: r.posts, followedByMe: r.followed, blockedByMe: r.blocked, isMe: r.id === viewerProfileId,
     };
   }
@@ -963,11 +965,14 @@ export class SocialService {
   }
 
   /** Ajustes propios del perfil (no públicos). */
-  async settings(q: Queryable, profileId: string): Promise<{ units: Units; country: string | null; mentionsFrom: MentionsFrom }> {
-    const { rows } = await q.query<{ units: Units; home_country: string | null; mentions_from: MentionsFrom }>(
-      `SELECT units, home_country, mentions_from FROM social.profiles WHERE id = $1 AND deleted_at IS NULL`, [profileId]);
+  async settings(q: Queryable, profileId: string): Promise<{ units: Units; country: string | null; mentionsFrom: MentionsFrom; showCorroboratedReports: boolean }> {
+    const { rows } = await q.query<{ units: Units; home_country: string | null; mentions_from: MentionsFrom; show_corroborated_reports: boolean }>(
+      `SELECT units, home_country, mentions_from, show_corroborated_reports FROM social.profiles WHERE id = $1 AND deleted_at IS NULL`, [profileId]);
     if (!rows[0]) throw notFound("Perfil");
-    return { units: rows[0].units, country: rows[0].home_country?.trim() ?? null, mentionsFrom: rows[0].mentions_from };
+    return {
+      units: rows[0].units, country: rows[0].home_country?.trim() ?? null, mentionsFrom: rows[0].mentions_from,
+      showCorroboratedReports: rows[0].show_corroborated_reports,
+    };
   }
 
   /** Editar mi perfil (ADR 0044). La bio vacía se guarda como NULL. */
@@ -979,6 +984,7 @@ export class SocialService {
     if (patch.units !== undefined) sets.push(`units = $${params.push(patch.units)}`);
     if (patch.country !== undefined) sets.push(`home_country = $${params.push(patch.country)}`);
     if (patch.mentionsFrom !== undefined) sets.push(`mentions_from = $${params.push(patch.mentionsFrom)}`);
+    if (patch.showCorroboratedReports !== undefined) sets.push(`show_corroborated_reports = $${params.push(patch.showCorroboratedReports)}`);
     const res = await q.query(`UPDATE social.profiles SET ${sets.join(", ")}, updated_at = now() WHERE id = $1 AND deleted_at IS NULL`, params);
     if (res.rowCount === 0) throw notFound("Perfil");
     // Mismas reglas que posts y comentarios (ADR 0088, 0148, 0263): nombre y bio van a revisión si parecen exponer

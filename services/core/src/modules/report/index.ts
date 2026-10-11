@@ -468,6 +468,22 @@ export class ReportService {
   }
 
   /**
+   * «N reportes corroborados» del perfil público (D3, ADR 0321). Solo reportes con nombre (nunca seudónimos: el perfil
+   * no puede delatarlos), aceptados, que afirman el hecho y con presencia ALTA o MEDIA. Cuenta eventos distintos: varios
+   * reportes del mismo evento suman uno. Lo demás (evidencia activa, evento corroborado y publicado) lo decide el
+   * Event Engine.
+   */
+  async corroboratedTally(q: Queryable, userId: string): Promise<{ total: number; official: number }> {
+    const { rows } = await q.query<{ id: string }>(
+      `SELECT id FROM report.reports
+        WHERE author_user_id = $1 AND status = 'ACCEPTED' AND assertion = 'OCCURRING' AND anonymity_mode = 'PUBLIC'
+          AND presence_band IN ('HIGH','MEDIUM') AND event_id IS NOT NULL`,
+      [userId],
+    );
+    return this.d.events.corroborationTally(q, rows.map((r) => r.id));
+  }
+
+  /**
    * Retención de privacidad: tras el plazo de su categoría (30 días por defecto, 7 en categorías sensibles) se borra el
    * fix preciso del dispositivo y solo queda la celda H3 r7 (~5 km²) para estadística y antiabuso. Idempotente; lo
    * ejecuta el worker a diario.

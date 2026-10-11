@@ -115,6 +115,12 @@ export interface ProfileView {
   /** Bloqueaste a esta persona: sus posts y comentarios con nombre no te aparecen. */
   blockedByMe: boolean;
   isMe: boolean;
+  /**
+   * D3 (ADR 0321): eventos distintos que esta persona reportó con su nombre y que hoy están corroborados. `official`
+   * es la parte con confirmación de una fuente oficial: la corroboración comunitaria no es confirmación oficial.
+   * `null` si la persona lo ocultó. Nunca cuenta reportes seudónimos ni muestra puntajes internos.
+   */
+  corroboratedReports: { total: number; official: number } | null;
 }
 
 export const ProfileSearchQuery = z.object({
@@ -186,6 +192,8 @@ export interface MyProfile extends ProfileView {
    */
   country: string | null;
   mentionsFrom: MentionsFrom;
+  /** Mostrar «N reportes corroborados» en mi perfil público (D3, ADR 0321). */
+  showCorroboratedReports: boolean;
 }
 
 /** Cambios de mi perfil. El handle no se cambia en V1: rompería menciones y enlaces compartidos. */
@@ -198,6 +206,7 @@ export const UpdateProfileRequest = z
     /** `null` = quitarlo. El servidor comprueba que exista en el dataset de fronteras. */
     country: z.string().regex(/^[A-Z]{2}$/).nullable().optional(),
     mentionsFrom: MentionsFrom.optional(),
+    showCorroboratedReports: z.boolean().optional(),
   })
   .refine((v) => Object.keys(v).length > 0, "Nada que cambiar");
 export type UpdateProfileRequest = z.infer<typeof UpdateProfileRequest>;

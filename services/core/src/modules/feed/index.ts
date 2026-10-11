@@ -56,6 +56,8 @@ export class FeedService {
     private readonly ref: ReferenceData,
     private readonly geo: GeoService,
     private readonly business: BusinessService,
+    /** Recuento público de reportes corroborados (D3, ADR 0321). */
+    private readonly reputation?: { corroboratedTally(q: Queryable, userId: string): Promise<{ total: number; official: number }> },
   ) {}
 
   registerHandlers(dispatcher: OutboxDispatcher): void {
@@ -164,8 +166,9 @@ export class FeedService {
   }
 
   async profile(q: Queryable, handle: string, viewerProfileId: string | null): Promise<ProfileView> {
-    const { id: _id, ...view } = await this.social.profile(q, handle, viewerProfileId);
-    return view;
+    const { id: _id, userId, showCorroborated, ...view } = await this.social.profile(q, handle, viewerProfileId);
+    const corroboratedReports = showCorroborated && this.reputation ? await this.reputation.corroboratedTally(q, userId) : null;
+    return { ...view, corroboratedReports };
   }
 
   async me(q: Queryable, profileId: string): Promise<MyProfile> {

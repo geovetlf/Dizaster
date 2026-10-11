@@ -116,7 +116,7 @@ export function buildContainer(env: AppEnv, overrides: { db?: Db; clock?: Clock;
   });
   trust.usePhoneSignals((q, deviceId) => reports.phoneSignals(q, deviceId));
   const business = new BusinessService(db);
-  const feed = new FeedService(social, events, media, ref, geo, business);
+  const feed = new FeedService(social, events, media, ref, geo, business, reports);
   const dispatcher = new OutboxDispatcher(db);
   events.registerHandlers(dispatcher);
   verification.registerHandlers(dispatcher);

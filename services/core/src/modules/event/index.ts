@@ -1081,6 +1081,34 @@ export class EventService {
   }
 
   /** Lo que el Alert Engine necesita de un EVENT: solo datos públicos (lugar contextual, estado, severidad). */
+  /**
+   * D3 (ADR 0321): de estos reportes ciudadanos, en cuántos eventos distintos siguen contando como evidencia y el
+   * evento está hoy corroborado y publicado. `official`: la parte con confirmación oficial. Un evento en disputa o
+   * falso, fusionado en otro, oculto por moderación, o una evidencia retirada, no cuentan.
+   */
+  async corroborationTally(q: Queryable, reportIds: readonly string[]): Promise<{ total: number; official: number }> {
+    if (reportIds.length === 0) return { total: 0, official: 0 };
+    const { rows } = await q.query<{ total: number; official: number }>(
+      // Por cada reporte, su evidencia y su evento se buscan por clave (los LIMIT 1 impiden que el planificador lo
+      // convierta en un recorrido de las tablas de evidencia o de eventos).
+      `SELECT count(DISTINCT e.id)::int AS total,
+              count(DISTINCT e.id) FILTER (WHERE e.verification_level = 'OFFICIALLY_CONFIRMED')::int AS official
+         FROM unnest($1::uuid[]) AS r(id)
+         CROSS JOIN LATERAL (
+           SELECT v.event_id FROM event.evidence v
+            WHERE v.evidence_type = 'CITIZEN_REPORT' AND v.ref_id = r.id AND v.status = 'ACTIVE'
+            LIMIT 1) ev
+         CROSS JOIN LATERAL (
+           SELECT x.id, x.verification_level FROM event.events x
+            WHERE x.id = ev.event_id
+              AND x.verification_level IN ('COMMUNITY_CORROBORATED','EXTERNALLY_CORROBORATED','OFFICIALLY_CONFIRMED')
+              AND x.negative_state = 'NONE' AND x.publication_state = 'PUBLISHED' AND x.merged_into_id IS NULL
+            LIMIT 1) e`,
+      [reportIds],
+    );
+    return rows[0] ?? { total: 0, official: 0 };
+  }
+
   async alertSnapshot(q: Queryable, id: string): Promise<{
     id: string; categoryCode: string; severity: number; publicState: PublicVerificationState; publicationState: string;
     status: EventSummary["status"]; place: ContextualLocation | null; regionId: string | null; districtId: string | null;
