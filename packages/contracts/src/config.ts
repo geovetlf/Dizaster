@@ -21,6 +21,22 @@ export type MapProviderConfig = z.infer<typeof MapProviderConfig>;
 export const PlatformUpdate = z.object({ minVersion: z.string().nullable(), storeUrl: z.string().nullable() });
 export type PlatformUpdate = z.infer<typeof PlatformUpdate>;
 
+/** Estado de lanzamiento de un país (ADR 0315/0317). Solo PILOT y AVAILABLE aceptan reportes ciudadanos. */
+export const LaunchStatus = z.enum(["PILOT", "AVAILABLE", "AVAILABLE_READ_ONLY", "RESTRICTED"]);
+export type LaunchStatus = z.infer<typeof LaunchStatus>;
+
+/**
+ * Estado de lanzamiento por país publicado en /v1/config (ADR 0341), leído de `data/countries/country-config.json`.
+ * Misma forma que el archivo empaquetado en la app (`defaults` + `countries`): un país sin entrada usa `defaults`.
+ * Solo códigos y estados; ningún dato de la persona ni de su ubicación.
+ */
+export const CountryLaunchConfig = z.object({
+  version: z.string(),
+  defaults: z.object({ launchStatus: LaunchStatus, acceptsCitizenReports: z.boolean() }),
+  countries: z.array(z.object({ iso2: z.string().regex(/^[A-Z]{2}$/), launchStatus: LaunchStatus, acceptsCitizenReports: z.boolean() })),
+});
+export type CountryLaunchConfig = z.infer<typeof CountryLaunchConfig>;
+
 export const AppConfig = z.object({
   apiVersion: z.literal("v1"),
   map: MapProviderConfig,
@@ -40,6 +56,8 @@ export const AppConfig = z.object({
   appUpdate: z.object({ android: PlatformUpdate, ios: PlatformUpdate }).default({
     android: { minVersion: null, storeUrl: null }, ios: { minVersion: null, storeUrl: null },
   }),
+  /** Opcional: un servidor anterior no lo envía y la app usa entonces el archivo empaquetado (ADR 0341). */
+  launch: CountryLaunchConfig.optional(),
 });
 export type AppConfig = z.infer<typeof AppConfig>;
 

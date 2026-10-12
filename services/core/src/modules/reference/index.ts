@@ -9,6 +9,7 @@ import {
   ModerationTermList,
   LegalDocumentsFile,
   type CategoryConfig,
+  type CountryLaunchConfig,
   type EmergencyNumber,
 } from "@dizaster/contracts";
 
@@ -123,6 +124,19 @@ export class ReferenceData {
   /** Solo los países PILOT y AVAILABLE aceptan reportes ciudadanos (decisión del propietario, ADR 0315). */
   acceptsCitizenReports(iso2: string | null): boolean {
     return CITIZEN_REPORT_STATUSES.has(this.launchStatus(iso2));
+  }
+
+  /**
+   * Tabla pública de estados de lanzamiento para /v1/config (ADR 0341): solo código, estado y si acepta reportes
+   * ciudadanos, con la misma regla que `acceptsCitizenReports`. Sin notas internas ni otros campos del archivo.
+   */
+  launchConfig(): CountryLaunchConfig {
+    const entry = (launchStatus: CountryConfigEntry["launchStatus"]) => ({ launchStatus, acceptsCitizenReports: CITIZEN_REPORT_STATUSES.has(launchStatus) });
+    return {
+      version: this.countriesVersion,
+      defaults: entry(this.defaultLaunchStatus),
+      countries: [...this.countries.values()].map((c) => ({ iso2: c.iso2, ...entry(c.launchStatus) })),
+    };
   }
 }
 
