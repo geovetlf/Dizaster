@@ -88,24 +88,9 @@ export class ReportService {
     // con historial de manipulación o con una cuenta suspendida tiene el cupo más bajo.
     const phone = device ? await this.d.identity.phoneOf(db, device.id) : null;
     const phoneDevices = phone?.deviceIds ?? [];
-    const recent = await db.query<{ mine: number; phone: number; mine_day: number; phone_day: number }>(
-      `SELECT count(*) FILTER (WHERE author_user_id = $1 AND received_at > now() - interval '1 hour')::int AS mine,
-              count(*) FILTER (WHERE device_id = ANY($2) AND received_at > now() - interval '1 hour')::int AS phone,
-              count(*) FILTER (WHERE author_user_id = $1)::int AS mine_day,
-              count(*) FILTER (WHERE device_id = ANY($2))::int AS phone_day
-         FROM report.reports WHERE (author_user_id = $1 OR device_id = ANY($2)) AND received_at > now() - interval '24 hours'`,
-      [session.userId, phoneDevices],
-    );
     const quota = await this.d.trust.reportQuota(db, session.userId, this.d.limits.reportsPerHour,
       phone ? { suspendedAccount: phone.suspendedAccount, tamperSignals30d: await this.tamperSignals(db, phoneDevices) } : null);
-    // Cuentas nuevas o con mal historial tienen menos cupo (Blueprint §13.3).
-    if (Math.max(recent.rows[0]!.mine, recent.rows[0]!.phone) >= quota) {
-      throw new DomainError("RATE_LIMITED", "Demasiados reportes en la última hora", 429);
-    }
-    // Tope diario (ADR 0132): un múltiplo del cupo por hora, así la reputación también lo escala.
-    if (Math.max(recent.rows[0]!.mine_day, recent.rows[0]!.phone_day) >= quota * REPORTS_PER_DAY_FACTOR) {
-      throw new DomainError("RATE_LIMITED", "Demasiados reportes en las últimas 24 horas", 429);
-    }
+    await this.assertQuota(db, session.userId, phoneDevices, quota);
     const attachable = await this.d.media.assertAttachable(db, session.profileId, req.mediaIds, { requireInAppCapture: true });
     const mediaProofs = await this.d.media.inAppCaptures(db, session.profileId, req.mediaIds);
 
@@ -128,6 +113,16 @@ export class ReportService {
     const anonymity = category.forcePseudonymous ? "PSEUDONYMOUS" : req.anonymityMode;
 
     return withTransaction(db, async (tx) => {
+      // Envíos simultáneos de la misma cuenta o del mismo teléfono (ADR 0345): se ordenan aquí, y dentro del candado se
+      // repite lo que se comprobó antes sin él. Un reintento que llegó a la vez devuelve la respuesta del primero y el
+      // cupo cuenta lo ya confirmado por los demás envíos.
+      await tx.query(`SELECT pg_advisory_xact_lock(hashtextextended('report.submit:' || $1, 0))`, [session.userId]);
+      if (device) await tx.query(`SELECT pg_advisory_xact_lock(hashtextextended('report.submit-phone:' || $1, 0))`, [device.phoneId]);
+      const raced = await tx.query<{ result: SubmitReportResponse }>(
+        `SELECT result FROM report.reports WHERE author_user_id = $1 AND client_report_id = $2`, [session.userId, req.clientReportId],
+      );
+      if (raced.rows[0]) return raced.rows[0].result;
+      await this.assertQuota(tx, session.userId, phoneDevices, quota);
       const reportId = newId();
       // Categorías HIGHLY_SENSITIVE con retraso (ADR 0099): el post y el evento que cree esperan antes de ser públicos.
       const delay = await this.d.events.publishDelayFor(tx, category);
@@ -220,6 +215,25 @@ export class ReportService {
       await publish(tx, "ReportSubmitted", { reportId, eventId, presenceBand: presence.band, assertion: req.assertion }, { lane: "interactive" });
       return result;
     });
+  }
+
+  /** Cupo por hora y tope diario por cuenta y por teléfono (ADR 0131, 0132). Cuentas nuevas o con mal historial tienen menos. */
+  private async assertQuota(q: Queryable, userId: string, phoneDevices: string[], quota: number): Promise<void> {
+    const recent = await q.query<{ mine: number; phone: number; mine_day: number; phone_day: number }>(
+      `SELECT count(*) FILTER (WHERE author_user_id = $1 AND received_at > now() - interval '1 hour')::int AS mine,
+              count(*) FILTER (WHERE device_id = ANY($2) AND received_at > now() - interval '1 hour')::int AS phone,
+              count(*) FILTER (WHERE author_user_id = $1)::int AS mine_day,
+              count(*) FILTER (WHERE device_id = ANY($2))::int AS phone_day
+         FROM report.reports WHERE (author_user_id = $1 OR device_id = ANY($2)) AND received_at > now() - interval '24 hours'`,
+      [userId, phoneDevices],
+    );
+    if (Math.max(recent.rows[0]!.mine, recent.rows[0]!.phone) >= quota) {
+      throw new DomainError("RATE_LIMITED", "Demasiados reportes en la última hora", 429);
+    }
+    // Tope diario (ADR 0132): un múltiplo del cupo por hora, así la reputación también lo escala.
+    if (Math.max(recent.rows[0]!.mine_day, recent.rows[0]!.phone_day) >= quota * REPORTS_PER_DAY_FACTOR) {
+      throw new DomainError("RATE_LIMITED", "Demasiados reportes en las últimas 24 horas", 429);
+    }
   }
 
   private async storePresenceEvidence(
