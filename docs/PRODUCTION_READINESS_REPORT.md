@@ -1,6 +1,6 @@
 # DIZASTER PRODUCTION READINESS AUDIT
 
-Fecha: 2026-10-11 · Código hasta ADR 0321 · Migraciones 0001–0110 · Todo en `main` por PR (sin force push)
+Fecha: 2026-10-12 · Código hasta ADR 0346 · Migraciones 0001–0111 y 0119 · Todo en `main` por PR (sin force push)
 
 Esta auditoría compara el Blueprint con los ADR, el código y las pruebas. Solo se marca un bloqueo cuando está
 escrito qué falta y quién lo da. No se inventan decisiones, límites, precios ni capacidades. El procedimiento exacto
@@ -31,16 +31,19 @@ rechazo y rollback.
 Las siete decisiones de producto de V1 que aprobó el propietario el 2026-10-11 están implementadas y probadas
 (ADR 0317–0321, §11).
 
+El 2026-10-12 una auditoría en siete frentes paralelos (rendimiento, seguridad, app, delivery, contratos y dos
+huecos entre app y backend) corrigió fallos reales y los fusionó por PR con CI en verde (§12).
+
 **No se puede publicar todavía.** Faltan la facturación de Google Cloud, cuentas de tiendas y credenciales, y
 revisión legal. Nada de eso lo puede dar el agente.
 
-## 2. Verificación ejecutada (local y en GitHub Actions, actualizada 2026-10-11)
+## 2. Verificación ejecutada (local y en GitHub Actions, actualizada 2026-10-12)
 
 | Verificación | Resultado |
 | --- | --- |
-| `pnpm check`: lint, fronteras de módulos, secretos, workflows y versiones alineadas, typecheck, build y pruebas | ✅ Pruebas: contracts 42, geo-kit 39, móvil 294, backend 759, delivery 97 |
+| `pnpm check`: lint, fronteras de módulos, secretos, workflows y versiones alineadas, typecheck, build y pruebas | ✅ Pruebas (sobre `main` 1ac259e, más las 8 de #74 en móvil): contracts 45, geo-kit 39, móvil 318, backend 799, delivery 128 |
 | Empaquetado móvil iOS + Android (`bundle:check`) y paridad nativa | ✅ |
-| Migraciones 0001–0110 sobre PostgreSQL 16 + PostGIS + H3; restauración de respaldo | ✅ |
+| Migraciones 0001–0111 y 0119 sobre PostgreSQL 16 + PostGIS + H3; restauración de respaldo | ✅ |
 | Gitleaks: historial (285 commits) y árbol de trabajo | ✅ sin hallazgos |
 | Trivy (dependencias, Dockerfiles, IaC) y Semgrep con reglas propias | ✅ sin HIGH/CRITICAL |
 | Imagen del backend: usuario no root, sin gestores de paquetes | ✅ |
@@ -54,8 +57,10 @@ revisión legal. Nada de eso lo puede dar el agente.
 | Cola de moderación sin consultas por caso | ✅ En cada `pnpm check`: cada fila de más cuesta como mucho una consulta. La cola de 50 casos pasó de 151 a 52 consultas (ADR 0312) |
 | Resto de lecturas con sesión | ✅ Diez más en la prueba de planes. Los informes de calidad y transparencia recorren su periodo a propósito (ADR 0313) |
 | Decisiones de producto de V1 (ADR 0317–0321) | ✅ Pruebas propias de cada una: estado por país, uso sin cuenta en toda la API, D2, D1, suspensiones, avisos sociales y D3. Las consultas nuevas pasan la prueba de planes con volumen |
+| Auditoría en frentes paralelos (2026-10-12) | ✅ Escrituras simultáneas, contratos estrictos, compatibilidad hacia atrás, guardas de entrega y nuevas pruebas de volumen en cada `pnpm check` (§12) |
+| Node 26.11.1 sin cambiar archivos | ✅ lint, typecheck, build y 1262 pruebas. No activado: Node 26 aún no es LTS (ADR 0339) |
 | OSV-Scanner y `pnpm audit` | ✅ En GitHub Actions. Solo dos avisos HIGH sin arreglo upstream (`node-forge`, `braces`, herramientas de Expo), aceptados por el propietario hasta el 2026-11-07 y acotados a versión y ruta (ADR 0304, 0305) |
-| Push a `github.com/geovetlf/Dizaster` | ✅ Sin force push. `main` protegida desde el 2026-10-08: cada cambio entra por PR con los 7 jobs de CI en verde (check, delivery, report-comment, supply-chain, security, iac, image); PRs #10–#66 |
+| Push a `github.com/geovetlf/Dizaster` | ✅ Sin force push. `main` protegida desde el 2026-10-08: cada cambio entra por PR con los 7 jobs de CI en verde (check, delivery, report-comment, supply-chain, security, iac, image); PRs #10–#74 |
 
 ## 3. Producto
 
@@ -165,6 +170,14 @@ En orden de impacto:
     - 7 días de ubicación precisa en categorías sensibles (`SENSITIVE_PRESENCE_RETENTION_DAYS`, ADR 0318).
 11. **Una app sin actualizar no puede suspender.** La API exige la duración de la suspensión. Solo afecta a
     moderación, y se resuelve actualizando la app.
+12. **Oráculo residual de ubicación en la deduplicación automática.** Un reporte sin evento elegido se compara con
+    el punto preciso y la respuesta dice a qué evento se sumó. Cuesta reportes reales con cupo; cambiarlo afecta la
+    calidad de la deduplicación (ADR 0329). Ver §12.
+13. **Más PRs salen `critical`** en el informe de delivery tras ampliar la clasificación (ADR 0337). Es intencional:
+    producción pide aprobación para cifrado, autenticación, media, fuentes oficiales y su contraparte en la app.
+14. **El estado de un país tarda hasta 5 minutos** en llegar a la app (caché de `/v1/config`). El servidor decide
+    siempre (ADR 0334, 0341).
+15. **Node 26 no trae `corepack`.** El PR de migración debe instalar pnpm fijado por otra vía (ADR 0339).
 
 ## 7. Siguiente paso mínimo para producción
 
@@ -373,4 +386,45 @@ producción por fusionarse: `deliver.yml` solo corre a mano.
 - entrega de datos a autoridades;
 - fronteras de otros países;
 - excepciones de retención de D1.
+
+## 12. Auditoría en frentes paralelos (2026-10-12)
+
+Siete frentes trabajaron a la vez, cada uno con su rama, su base de pruebas y sus archivos. Cada PR pasó `pnpm check`
+completo en local y los 7 jobs de GitHub Actions antes de fusionarse. Ninguno crea recursos, gasto ni credenciales,
+ni cambia una decisión de producto.
+
+| Frente | ADR | PR | Commit en `main` | Qué corrigió |
+| --- | --- | --- | --- | --- |
+| Seguridad y privacidad | 0327–0330 | #68 | befaa56 | Moderación podía suspender a un administrador; la exportación omitía la suspensión propia y la preferencia del recuento; un contra-reporte permitía acotar el punto preciso de un evento sensible |
+| Delivery e IaC | 0337–0339 | #69 | 946d29a | `deliver.yml` migraba staging antes de comprobar la autonomía; guardas que fallaban abiertas; archivos sensibles clasificados `medium`; renombres mal clasificados; auditoría sin commit |
+| App móvil | 0332, 0333 | #70 | ef903ce | Rechazos 422 mostrados como error genérico o «sin conexión»; formularios de escritura abiertos sin cuenta; país en solo lectura sin aviso previo; interruptores sin nombre accesible |
+| Rendimiento | 0322 | #71 | 1d0c87a | Salud de fuentes leía 159 379 filas por petición; retención de corridas recorría la tabla; fin de suspensiones con una consulta por cuenta |
+| Huecos backend de la app | 0340, 0341 | #72 | c6997dc | El 403 de suspensión no traía la fecha de fin; el estado por país no se podía consultar sin enviar ubicación |
+| Contratos y concurrencia | 0342–0346 | #73 | 1ac259e | 500 en un reporte reenviado a la vez; cupo de reportes superable en paralelo; contadores sociales desfasados; tope de avisos superable con varios workers |
+| App: estado por país | 0334 | #74 | 9eae505 | La app usa el estado de `/v1/config` y vuelve al empaquetado si falta |
+
+**Revisado sin fallos:** IDOR en rutas propias, roles con MFA vigente, seudónimos en el recuento de ADR 0321, avisos
+de comentarios sin texto, `suspended_until` fuera de respuestas públicas, campos no declarados en las respuestas,
+reintentos del outbox, migraciones desde cero y acciones de workflows fijadas por SHA.
+
+**Decisiones opcionales del propietario** (no bloquean nada; hoy queda lo que dicen los ADR vigentes):
+- ¿Solo administración debe poder suspender también a moderación, verificación u operación? Hoy moderación puede
+  suspender a moderación (ADR 0319).
+- Oráculo residual de la deduplicación automática (riesgo 12): mantener la calidad actual o medir contra el punto
+  público en eventos sensibles.
+- Avisos de comentarios ya enviados: hoy no vencen ni se retiran si se borra el comentario.
+- Recuento de «reportes corroborados»: hoy se calcula al vuelo (unos 20 ms con 3000 reportes); guardarlo calculado
+  lo haría más barato pero con retraso.
+- Valores nuevos en enums de datasets que la app valida: una prueba lo bloquea; antes de añadir uno hay que elegir
+  entre parse tolerante en la app o subir la versión mínima (ADR 0343).
+
+**Pendiente con fecha:**
+- Node 26 LTS: a partir del 2026-10-28, si `nodejs.org` lo marca LTS, un PR alineado según `docs/node-26-migracion.md`
+  que sustituye a #41.
+- `node-forge` y `braces`: sin versión corregida al 2026-10-11 (ADR 0330); revisar antes del 2026-11-07.
+- #3 (PostGIS 17) y #41 (Node 25) siguen abiertos y sin fusionar, con sus condiciones de ADR 0308.
+
+**Autorizaciones que siguen faltando:** las de §5 y §10 sin cambios: `EXPO_TOKEN`, D-18, tamaño de la VM de staging,
+media, cuentas de tiendas y push, proveedor de correo, las dos casillas NOT_VERIFIABLE de los entornos y la asesoría
+legal (textos, CSAM, autoridades, retención de D1 y fronteras de otros países).
 
