@@ -498,11 +498,17 @@ export class ModerationService {
   async expireSuspensions(now: Date = new Date()): Promise<{ count: number }> {
     return withTransaction(this.db, async (tx) => {
       const users = await this.identity.expireSuspensions(tx, now);
+      if (users.length === 0) return { count: 0 };
+      // La última suspensión de cada cuenta, todas en una consulta (ADR 0322); antes, una por cuenta.
+      const lastOf = new Map((await tx.query<{ affected_user_id: string; case_id: string | null; target_type: FlagTargetType; target_id: string }>(
+        `SELECT u.id AS affected_user_id, last.case_id, last.target_type, last.target_id
+           FROM unnest($1::uuid[]) AS u(id)
+           CROSS JOIN LATERAL (
+             SELECT a.case_id, a.target_type, a.target_id FROM moderation.actions a
+              WHERE a.affected_user_id = u.id AND a.action = 'SUSPEND_USER' ORDER BY a.created_at DESC LIMIT 1) last`, [users],
+      )).rows.map((r) => [r.affected_user_id, r]));
       for (const userId of users) {
-        const last = (await tx.query<{ case_id: string | null; target_type: FlagTargetType; target_id: string }>(
-          `SELECT case_id, target_type, target_id FROM moderation.actions
-            WHERE affected_user_id = $1 AND action = 'SUSPEND_USER' ORDER BY created_at DESC LIMIT 1`, [userId],
-        )).rows[0];
+        const last = lastOf.get(userId);
         if (!last) continue;
         await this.log(tx, { caseId: last.case_id, targetType: last.target_type, targetId: last.target_id, affectedUserId: userId, action: "UNSUSPEND_USER",
           actor: "RULE", moderatorUserId: null, reason: "La suspensión terminó al cumplir su plazo" });

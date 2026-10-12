@@ -54,6 +54,40 @@ export async function scansDuring(t: TestContext, action: () => Promise<unknown>
   return { queries: seen.length, scans: [...new Set(scans)] };
 }
 
+interface AnalyzedNode extends PlanNode { "Actual Rows": number; "Actual Loops": number; "Rows Removed by Filter"?: number; Plans?: AnalyzedNode[] }
+function rowsRead(node: AnalyzedNode, tables: ReadonlySet<string>, out: Map<string, number>): void {
+  const rel = node["Relation Name"] ? `${node.Schema}.${node["Relation Name"]}` : null;
+  if (rel && tables.has(rel)) out.set(rel, (out.get(rel) ?? 0) + (node["Actual Rows"] + (node["Rows Removed by Filter"] ?? 0)) * node["Actual Loops"]);
+  for (const child of node.Plans ?? []) rowsRead(child, tables, out);
+}
+
+/**
+ * Filas que las lecturas (SELECT) de `action` leen de cada tabla de `tables` (ADR 0322). Un recorrido por índice que
+ * lee toda la historia de una clave no sale como Seq Scan, pero crece igual con el volumen: esto lo cuenta. Repite
+ * cada SELECT con EXPLAIN ANALYZE después de la acción.
+ */
+export async function rowsReadDuring(t: TestContext, action: () => Promise<unknown>, tables: ReadonlySet<string>): Promise<Map<string, number>> {
+  const seen: { text: string; values: unknown[] }[] = [];
+  const proto = pg.Client.prototype as unknown as { query: (...a: unknown[]) => unknown };
+  const original = proto.query;
+  proto.query = function (this: unknown, ...a: unknown[]) {
+    const [text, values] = a;
+    if (typeof text === "string" && /^\s*SELECT\b/i.test(text) && !/\bFOR\s+UPDATE\b/i.test(text)) seen.push({ text, values: Array.isArray(values) ? values : [] });
+    return original.apply(this, a);
+  };
+  try {
+    await action();
+  } finally {
+    proto.query = original;
+  }
+  const out = new Map<string, number>();
+  for (const q of seen) {
+    const { rows } = await t.c.db.query<{ "QUERY PLAN": { Plan: AnalyzedNode }[] }>(`EXPLAIN (ANALYZE, VERBOSE, FORMAT JSON) ${q.text}`, q.values);
+    rowsRead(rows[0]!["QUERY PLAN"][0]!.Plan, tables, out);
+  }
+  return out;
+}
+
 /** Lo mismo para una petición GET: además devuelve su estado HTTP. */
 export async function scansOf(
   t: TestContext, url: string, big: ReadonlySet<string>, user?: TestUser,
