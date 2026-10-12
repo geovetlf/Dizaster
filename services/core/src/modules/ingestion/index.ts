@@ -121,19 +121,22 @@ export class IngestionService {
       runs_ok: string; runs_failed: string; items_new: string;
       change_from: SourceStatus | null; change_to: SourceStatus | null; change_reason: string | null; change_at: Date | null;
     }>(
+      // Cada dato lee solo lo que necesita por índice (ADR 0322): la última corrida, la última correcta y el último error
+      // (de la más nueva hacia atrás) y las cifras del último día. Antes se agregaba toda la historia de cada fuente.
       `SELECT s.key, s.name, s.trust_tier, s.status, s.country_scope, s.urgent_capable, st.consecutive_failures, st.open_until,
-              r.last_run_at, r.last_ok_at, r.runs_ok, r.runs_failed, r.items_new,
+              (SELECT x.started_at FROM ingestion.runs x WHERE x.source_id = s.id ORDER BY x.started_at DESC LIMIT 1) AS last_run_at,
+              (SELECT x.started_at FROM ingestion.runs x WHERE x.source_id = s.id AND x.status IN ('OK','NOT_MODIFIED')
+                ORDER BY x.started_at DESC LIMIT 1) AS last_ok_at,
+              r.runs_ok, r.runs_failed, r.items_new,
               (SELECT error FROM ingestion.runs x WHERE x.source_id = s.id AND x.status = 'FAILED' ORDER BY started_at DESC LIMIT 1) AS last_error,
               l.from_status AS change_from, l.to_status AS change_to, l.reason AS change_reason, l.at AS change_at
          FROM ingestion.sources s
          LEFT JOIN ingestion.source_state st ON st.source_id = s.id
          LEFT JOIN LATERAL (
-           SELECT max(started_at) AS last_run_at,
-                  max(started_at) FILTER (WHERE status IN ('OK','NOT_MODIFIED')) AS last_ok_at,
-                  count(*) FILTER (WHERE status IN ('OK','NOT_MODIFIED') AND started_at > $1::timestamptz - interval '24 hours') AS runs_ok,
-                  count(*) FILTER (WHERE status = 'FAILED' AND started_at > $1::timestamptz - interval '24 hours') AS runs_failed,
-                  coalesce(sum(items_new) FILTER (WHERE started_at > $1::timestamptz - interval '24 hours'), 0) AS items_new
-             FROM ingestion.runs WHERE source_id = s.id) r ON true
+           SELECT count(*) FILTER (WHERE status IN ('OK','NOT_MODIFIED')) AS runs_ok,
+                  count(*) FILTER (WHERE status = 'FAILED') AS runs_failed,
+                  coalesce(sum(items_new), 0) AS items_new
+             FROM ingestion.runs WHERE source_id = s.id AND started_at > $1::timestamptz - interval '24 hours') r ON true
          LEFT JOIN LATERAL (SELECT from_status, to_status, reason, at FROM ingestion.source_status_log WHERE source_id = s.id ORDER BY at DESC LIMIT 1) l ON true
         ORDER BY (s.status = 'ACTIVE') DESC, s.key`,
       [now],
