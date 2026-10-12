@@ -4,12 +4,12 @@
   "default": "medium",
   "rules": [
     { "class": "low", "paths": ["docs/**", "**/*.md", "services/core/test/**", "apps/mobile/test/**", "packages/*/test/**", "tools/*/test/**", "apps/mobile/src/lib/locales/**"], "reason": "documentación, pruebas o traducciones" },
-    { "class": "critical", "paths": ["services/core/src/modules/identity/**", "services/core/src/platform/auth*.ts", "services/core/src/platform/crypto*.ts", "services/core/src/platform/config.ts", "services/core/src/platform/rate-limit.ts"], "reason": "autenticación, autorización, cifrado o guardas de configuración" },
-    { "class": "critical", "paths": ["services/core/src/modules/report/**", "packages/geo-kit/src/**"], "reason": "presencia, ubicación y generalización de privacidad" },
-    { "class": "critical", "paths": ["services/core/src/modules/verification/**", "services/core/src/modules/event/**", "services/core/src/modules/alert/**", "services/core/src/modules/ingestion/**"], "reason": "verificación de incidentes, alertas y fuentes oficiales" },
+    { "class": "critical", "paths": ["services/core/src/modules/identity/**", "services/core/src/platform/auth*.ts", "services/core/src/platform/crypto*.ts", "services/core/src/platform/config.ts", "services/core/src/platform/rate-limit.ts", "services/core/src/platform/field-cipher.ts", "services/core/src/http/app.ts", "apps/mobile/src/lib/auth/**"], "reason": "autenticación, autorización, cifrado o guardas de configuración" },
+    { "class": "critical", "paths": ["services/core/src/modules/report/**", "services/core/src/modules/media/**", "services/core/src/http/log.ts", "packages/geo-kit/src/**", "apps/mobile/src/lib/report/**", "apps/mobile/src/lib/media/**"], "reason": "presencia, ubicación, metadatos de la media y generalización de privacidad" },
+    { "class": "critical", "paths": ["services/core/src/modules/verification/**", "services/core/src/modules/event/**", "services/core/src/modules/alert/**", "services/core/src/modules/ingestion/**", "data/source-registry/**"], "reason": "verificación de incidentes, alertas y fuentes oficiales" },
     { "class": "critical", "paths": ["services/core/src/modules/moderation/**", "services/core/src/modules/trust/**"], "reason": "Trust & Safety" },
     { "class": "critical", "paths": ["services/core/migrations/**"], "reason": "base de datos" },
-    { "class": "critical", "paths": ["data/emergency-numbers/**", "apps/mobile/src/app/emergency*", "apps/mobile/src/lib/emergency/**"], "reason": "funciones de emergencia" },
+    { "class": "critical", "paths": ["data/emergency-numbers/**", "apps/mobile/src/app/emergency*", "apps/mobile/src/lib/emergency/**", "apps/mobile/src/lib/emergency*"], "reason": "funciones de emergencia" },
     { "class": "critical", "paths": ["infra/**", ".github/**", "delivery/**", "tools/delivery/src/**", "scripts/check-*.mjs", "scripts/supply-chain.mjs", "security/**"], "reason": "infraestructura, CI, políticas o gates de seguridad" },
     { "class": "critical", "paths": ["pnpm-lock.yaml", "pnpm-workspace.yaml", "patches/**", "package.json", "*/*/package.json"], "reason": "dependencias" }
   ],

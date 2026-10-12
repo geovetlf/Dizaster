@@ -59,6 +59,15 @@ pnpm dzd audit stats
 El rollback solo mueve tráfico. Si la versión nueva incluyó una migración, ver
 `docs/runbooks/migracion-fallida.md`.
 
+Autonomía y resultado de la política (ADR 0338):
+
+- `deliver.yml` corre `pnpm dzd guard --action migrate-staging --actor github:<login>` (y `migrate-production` y
+  `promote-production` en producción) **antes** de migrar o desplegar. Con el nivel vigente (2) solo un owner pasa; si
+  falla, no se tocó nada.
+- `dzd promote` sin `--outcome` cuenta `approval`: la automatización no promueve sin declarar el resultado de la
+  política, y un valor desconocido (`--outcome aproval`) se rechaza. Una persona (owner) no pasa por esta decisión.
+- Cada registro de `deploy`, `promote`, `rollback` y `agent run` lleva `commit`, `ref` y `runId` de CI, si existen.
+
 ## Firma, procedencia, SLO y entornos (ADR 0277)
 
 ```sh

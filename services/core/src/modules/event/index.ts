@@ -268,8 +268,12 @@ export class EventService {
   }
 
   private async validateTarget(tx: Queryable, c: EventCandidate, category: CategoryConfig): Promise<{ ok: true; eventId: string } | { ok: false; reason: string }> {
-    const { rows } = await tx.query<{ id: string; category_code: string; lat: number; lng: number; status: string; merged_into_id: string | null }>(
-      `SELECT id, category_code, ST_Y(geom::geometry) AS lat, ST_X(geom::geometry) AS lng, status, merged_into_id
+    // En categorías sensibles se mide contra el punto público y su margen, nunca contra el preciso (ADR 0329): si no,
+    // aceptar o rechazar «demasiado lejos» servía para ubicar el punto preciso probando pines.
+    const { rows } = await tx.query<{ id: string; category_code: string; lat: number; lng: number; status: string; merged_into_id: string | null; sensitivity: Sensitivity }>(
+      `SELECT id, category_code, status, merged_into_id, sensitivity,
+              ST_Y((CASE WHEN sensitivity = 'NORMAL' THEN geom ELSE public_geom END)::geometry) AS lat,
+              ST_X((CASE WHEN sensitivity = 'NORMAL' THEN geom ELSE public_geom END)::geometry) AS lng
          FROM event.events WHERE id = $1 FOR UPDATE`,
       [c.userSelectedEventId],
     );
@@ -280,7 +284,7 @@ export class EventService {
     if (categoryCompatibility(c.categoryCode, ev.category_code, category.compatibleWith) === 0) {
       return { ok: false, reason: "Categoría incompatible con el evento" };
     }
-    const maxDistance = Math.max(category.dedupRadiusM * 1.5, category.presenceRadiusM);
+    const maxDistance = Math.max(category.dedupRadiusM * 1.5, category.presenceRadiusM) + (ev.sensitivity === "NORMAL" ? 0 : generalizationMarginM(ev.sensitivity));
     if (this.geo.distanceMeters(c.point, { lat: ev.lat, lng: ev.lng }) > maxDistance) {
       return { ok: false, reason: "El evento está demasiado lejos del lugar del reporte" };
     }
