@@ -65,7 +65,7 @@ describe("estado de lanzamiento por país (ADR 0317, 0332)", () => {
     expect(launchStatusIn(real, null)).toBe(real.defaults.launchStatus);
     // El script de datos lo copia al bundle y la pantalla de reporte lo consulta antes de dejar escribir.
     expect(readFileSync(new URL("../scripts/sync-reference-data.mjs", import.meta.url), "utf8")).toContain("country-config.json");
-    expect(src("app/report.tsx")).toMatch(/if \(!reportsOpenIn\(where\)\)/);
+    expect(src("app/report.tsx")).toMatch(/if \(!reportsOpenIn\(where, launch\)\)/);
   });
 });
 

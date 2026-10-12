@@ -33,7 +33,7 @@ import { useAnnounce } from "../lib/a11y/announce";
 import { betterFix, pinFollowsFix, pushRecent, WATCH_INTERVAL_MS, WATCH_MAX_MS, FIX_TARGET_ACCURACY_M } from "../lib/report/fix-refine";
 import { recoverPendingCapture, type CaptureKind, type CaptureSource } from "../lib/media/capture";
 import { draftWorthKeeping, type ReportDraft } from "../lib/report/draft";
-import { reportsOpenIn } from "../lib/geo/launch-status";
+import { LAUNCH_CONFIG_WAIT_MS, reportsOpenIn } from "../lib/geo/launch-status";
 import { queuedReasonText } from "../lib/report/rejection";
 import { AccountRequired, useIsGuest } from "../components/account-required";
 import { clearDraft, loadDraft, saveDraft } from "../lib/report/draft-store";
@@ -190,8 +190,10 @@ export default function ReportScreen() {
     const here = { lat: loc.coords.latitude, lng: loc.coords.longitude };
     const where = countryOf(here);
     // Estado de lanzamiento (ADR 0317, 0332): fuera de PILOT y AVAILABLE no se prepara el reporte. El servidor lo
-    // rechaza igual; aquí se dice antes de escribir y adjuntar fotos. Mapa, alertas y emergencias siguen.
-    if (!reportsOpenIn(where)) {
+    // rechaza igual; aquí se dice antes de escribir y adjuntar fotos. Mapa, alertas y emergencias siguen. El dato
+    // sale de /v1/config si llega (ADR 0334; sin enviar la ubicación) y si no, del archivo empaquetado.
+    const launch = (await withTimeout(appConfig(), LAUNCH_CONFIG_WAIT_MS).catch(() => null))?.launch;
+    if (!reportsOpenIn(where, launch)) {
       setStatus(t("rejected_COUNTRY_READ_ONLY"));
       setBlocked("country");
       return;
