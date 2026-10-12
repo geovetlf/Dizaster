@@ -33,6 +33,9 @@ import { useAnnounce } from "../lib/a11y/announce";
 import { betterFix, pinFollowsFix, pushRecent, WATCH_INTERVAL_MS, WATCH_MAX_MS, FIX_TARGET_ACCURACY_M } from "../lib/report/fix-refine";
 import { recoverPendingCapture, type CaptureKind, type CaptureSource } from "../lib/media/capture";
 import { draftWorthKeeping, type ReportDraft } from "../lib/report/draft";
+import { reportsOpenIn } from "../lib/geo/launch-status";
+import { queuedReasonText } from "../lib/report/rejection";
+import { AccountRequired, useIsGuest } from "../components/account-required";
 import { clearDraft, loadDraft, saveDraft } from "../lib/report/draft-store";
 
 
@@ -40,6 +43,8 @@ type Phase = "category" | "locating" | "compose";
 
 export default function ReportScreen() {
   const session = useSession();
+  // Sin cuenta solo se lee (ADR 0317, 0332): no se deja preparar un reporte que el servidor va a rechazar.
+  const guest = useIsGuest();
   // "Aquí no pasa nada" desde un evento: contra-reporte presencial sobre ese evento (Blueprint §10.2).
   const params = useLocalSearchParams<{ eventId?: string; category?: string; deny?: string }>();
   const deny = params.deny === "1" && !!params.eventId;
@@ -58,8 +63,9 @@ export default function ReportScreen() {
   const [status, setStatus] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [call, setCall] = useState<CallTarget>({ kind: "list" });
-  // Por qué no hay fix (ADR 0183): sin permiso (ir a Ajustes) o sin señal a tiempo (reintentar).
-  const [blocked, setBlocked] = useState<"denied" | "timeout" | null>(null);
+  // Por qué no hay fix (ADR 0183): sin permiso (ir a Ajustes) o sin señal a tiempo (reintentar). `country`: el país
+  // donde está la persona todavía no acepta reportes (ADR 0317, 0332).
+  const [blocked, setBlocked] = useState<"denied" | "timeout" | "country" | null>(null);
   const recent = useRef<Location.LocationObject[]>([]);
   // Borrador (ADR 0191): el que se ofrece retomar y el aviso de que ya se envió (no se vuelve a guardar).
   const [draft, setDraft] = useState<ReportDraft | null>(null);
@@ -71,7 +77,7 @@ export default function ReportScreen() {
   useAnnounce(status);
 
   useEffect(() => {
-    if (!deny) return;
+    if (!deny || guest) return;
     const c = findCategory(params.category ?? "");
     if (!c?.citizenReportable) return;
     setTarget(params.eventId ?? null);
@@ -182,8 +188,16 @@ export default function ReportScreen() {
     }
     recent.current = pushRecent(recent.current, loc);
     const here = { lat: loc.coords.latitude, lng: loc.coords.longitude };
+    const where = countryOf(here);
+    // Estado de lanzamiento (ADR 0317, 0332): fuera de PILOT y AVAILABLE no se prepara el reporte. El servidor lo
+    // rechaza igual; aquí se dice antes de escribir y adjuntar fotos. Mapa, alertas y emergencias siguen.
+    if (!reportsOpenIn(where)) {
+      setStatus(t("rejected_COUNTRY_READ_ONLY"));
+      setBlocked("country");
+      return;
+    }
     // Los ajustes que rigen son los del país donde está la persona (radio de presencia, etc.; ADR 0152).
-    const local = categoryIn(c.code, countryOf(here));
+    const local = categoryIn(c.code, where);
     if (!local?.citizenReportable) {
       setCategory(null);
       setPhase("category");
@@ -240,11 +254,17 @@ export default function ReportScreen() {
       await clearDraft({ discardMedia: false }).catch(() => undefined);
       setMedia([]);
       setStatus(media.length ? t("uploadingMedia") : t("sending"));
-      const mine = await flushUntilSent(body.clientReportId);
-      if (!mine) {
-        setStatus(t("queuedOffline"));
+      const result = await flushUntilSent(body.clientReportId);
+      // Detenido por un error definitivo (rechazo, cuenta suspendida…): se dice por qué y dónde quedó (ADR 0333).
+      if (result.kind === "stuck") {
+        setStatus(`${queuedReasonText(result.reason, t)}\n${t("reportStuck")}`);
         return;
       }
+      if (result.kind === "queued") {
+        setStatus(result.offline || !result.lastError ? t("queuedOffline") : `${result.lastError}\n${t("queuedState_RETRYING")}`);
+        return;
+      }
+      const mine = result.response;
       setStatus(describe(mine));
       if (mine.outcome === "ATTACHED_TO_EVENT" && mine.askSameEvent) askSameEvent(mine.reportId);
       if ("eventId" in mine) router.replace(`/event/${mine.eventId}`);
@@ -256,6 +276,7 @@ export default function ReportScreen() {
   }
 
   if (update.required) return <UpdateRequired storeUrl={update.storeUrl} />;
+  if (guest) return <AccountRequired />;
 
   if (phase === "category" || !category) {
     return (
@@ -314,10 +335,16 @@ export default function ReportScreen() {
       <View style={styles.container}>
         <Text style={styles.title}>{cat.names[lang] ?? cat.names["es"]}</Text>
         {callFirst}
+        {blocked === "country" ? <Text accessibilityRole="header" style={[styles.section, styles.status]}>{t("countryReadOnlyTitle")}</Text> : null}
         <Text style={styles.status}>{status}</Text>
         {blocked === "denied" ? (
           <Pressable accessibilityRole="button" style={styles.row} onPress={() => void Linking.openSettings()}>
             <Text style={styles.rowText}>{t("openSettings")}</Text>
+          </Pressable>
+        ) : null}
+        {blocked === "country" ? (
+          <Pressable accessibilityRole="button" style={styles.row} onPress={() => router.push("/emergency")}>
+            <Text style={styles.rowText}>{t("emergencyTitle")}</Text>
           </Pressable>
         ) : null}
         {blocked === "timeout" ? (
@@ -384,7 +411,7 @@ export default function ReportScreen() {
       ) : (
         <View style={styles.switchRow}>
           <Text style={styles.rowText}>{t("pseudonymous")}</Text>
-          <Switch value={pseudonymous} onValueChange={setPseudonymous} />
+          <Switch accessibilityLabel={t("pseudonymous")} value={pseudonymous} onValueChange={setPseudonymous} />
         </View>
       )}
       <Text style={styles.note}>{t("privacyNote")}</Text>
@@ -397,7 +424,7 @@ export default function ReportScreen() {
 }
 
 function describe(r: SubmitReportResponse): string {
-  return outcomeLines(r, t, (iso) => formatInZone(iso, lang, undefined, "time") ?? iso).join("\n");
+  return outcomeLines(r, t, (iso) => formatInZone(iso, lang, undefined, "time") ?? iso, lang).join("\n");
 }
 
 const styles = StyleSheet.create({

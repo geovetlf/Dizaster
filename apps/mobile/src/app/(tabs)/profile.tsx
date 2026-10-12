@@ -13,6 +13,7 @@ import { lang, t, tf } from "../../lib/i18n";
 import { LANGUAGE_NAMES } from "../../lib/language";
 import { reportQueue } from "../../lib/report/outbox";
 import { useSession } from "../../lib/session";
+import { isGuest } from "../../lib/auth/guest";
 import { isRtlNow } from "../../lib/ui/apply-direction";
 import { forwardChevron } from "../../lib/ui/direction";
 import { colors, radius, space } from "../../theme";
@@ -20,6 +21,8 @@ import { colors, radius, space } from "../../theme";
 /** Perfil: acceso al perfil público y ajustes de este teléfono. */
 export default function ProfileScreen() {
   const session = useSession();
+  // Sin cuenta (ADR 0317, 0332): «Entrar» arriba y solo lo que funciona sin cuenta (emergencias, idioma, acerca de).
+  const guest = isGuest(session);
   const [alerts, setAlerts] = useState(false);
   const [pending, setPending] = useState(0);
   const [handle, setHandle] = useState<string | null>(null);
@@ -28,11 +31,11 @@ export default function ProfileScreen() {
   const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
-    if (!session.ready) return;
+    if (!session.ready || guest) return;
     api.me().then((p) => setHandle(p.handle)).catch(() => setHandle(null));
     api.account().then((a) => setRoles(a.roles)).catch(() => setRoles([]));
     api.myModeration().then((r) => setNotices(r.notices.length)).catch(() => setNotices(0));
-  }, [session.ready]);
+  }, [session.ready, guest]);
 
   useFocusEffect(
     useCallback(() => {
@@ -74,37 +77,49 @@ export default function ProfileScreen() {
     <SafeAreaView style={styles.safe} edges={["top"]}>
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={styles.title}>{t("profile")}</Text>
-        {handle ? <Row icon="account-circle-outline" label={t("myPublicProfile")} value={`@${handle}`} onPress={() => router.push(`/u/${handle}`)} /> : null}
-        {handle ? <Row icon="account-edit-outline" label={t("editProfile")} onPress={() => router.push("/profile-edit")} /> : null}
-        <Row icon="bell-outline" label={t("alerts")} value={alerts ? t("alertsOn") : t("alertsOff")} onPress={() => (alerts ? router.push("/alert-settings") : void turnOnAlerts())} />
-        <Row icon="cloud-upload-outline" label={t("pendingReports")} value={String(pending)} />
-        <Row icon="clipboard-text-clock-outline" label={t("myReports")} onPress={() => router.push("/my-reports")} />
-        <Row icon="star-outline" label={t("followingTitle")} onPress={() => router.push("/following")} />
-        <Row icon="account-cancel-outline" label={t("blockedTitle")} onPress={() => router.push("/blocked")} />
-        <Row icon="phone-alert" label={t("emergencyTitle")} onPress={() => router.push("/emergency")} />
-        {notices > 0 ? <Row icon="gavel" label={t("myModeration")} value={String(notices)} onPress={() => router.push("/my-moderation")} /> : null}
-        {can(roles, "event.verify") ? <Row icon="shield-check-outline" label={t("moderation")} onPress={() => router.push("/moderation")} /> : null}
-        {can(roles, "ops.view") ? <Row icon="chart-bar" label={t("costTitle")} onPress={() => router.push("/admin-cost")} /> : null}
-        {can(roles, "ops.view") ? <Row icon="gauge" label={t("qualityTitle")} onPress={() => router.push("/admin-quality")} /> : null}
-        {can(roles, "ops.view") ? <Row icon="access-point-network" label={t("adminSources")} onPress={() => router.push("/admin-sources")} /> : null}
-        {can(roles, "ops.view") ? <Row icon="bug-outline" label={t("adminCrashes")} onPress={() => router.push("/admin-crashes")} /> : null}
-        {can(roles, "admin") ? <Row icon="storefront-check-outline" label={t("adminBusinesses")} onPress={() => router.push("/admin-businesses")} /> : null}
-        {can(roles, "admin") ? <Row icon="map-marker-account-outline" label={t("presenceLogTitle")} onPress={() => router.push("/admin-presence")} /> : null}
-        {can(roles, "admin") ? <Row icon="timer-sand" label={t("adminDelays")} onPress={() => router.push("/admin-delays")} /> : null}
-        {can(roles, "admin") ? <Row icon="history" label={t("adminConfigHistory")} onPress={() => router.push("/admin-config-history")} /> : null}
-        {can(roles, "admin") ? <Row icon="gavel" label={t("adminModerationLog")} onPress={() => router.push("/admin-moderation-log")} /> : null}
-        {can(roles, "admin") ? <Row icon="scale-balance" label={t("adminAuthority")} onPress={() => router.push("/admin-authority")} /> : null}
-        {can(roles, "admin") ? <Row icon="file-chart-outline" label={t("adminTransparency")} onPress={() => router.push("/admin-transparency")} /> : null}
-        {can(roles, "admin") ? <Row icon="account-key-outline" label={t("adminStaff")} onPress={() => router.push("/admin-staff")} /> : null}
-        {isStaff(roles) ? <Row icon="two-factor-authentication" label={t("mfaTitle")} onPress={() => router.push("/mfa")} /> : null}
-        <Row icon="storefront-outline" label={t("myBusinesses")} onPress={() => router.push("/my-businesses")} />
-        <Row icon="cellphone-lock" label={t("sessionsTitle")} onPress={() => router.push("/sessions")} />
-        <Row icon="email-lock-outline" label={t("signInMethods")} onPress={() => router.push("/sign-in-methods")} />
-        <Row icon="download-outline" label={t("exportData")} value={exporting ? t("exportPreparing") : undefined} onPress={() => void onExport()} />
-        <Row icon="logout" label={t("signOut")} onPress={onSignOut} />
-        <Row icon="account-remove-outline" label={t("deleteAccount")} onPress={() => router.push("/delete-account")} />
-        <Row icon="translate" label={t("language")} value={LANGUAGE_NAMES[lang]} onPress={() => router.push("/language")} />
-        <Row icon="information-outline" label={t("aboutTitle")} onPress={() => router.push("/about")} />
+        {guest ? (
+          <>
+            <Row icon="login" label={t("signInAction")} onPress={() => router.push("/sign-in")} />
+            <Text style={styles.guestNote}>{t("accountRequiredBody")}</Text>
+            <Row icon="phone-alert" label={t("emergencyTitle")} onPress={() => router.push("/emergency")} />
+            <Row icon="translate" label={t("language")} value={LANGUAGE_NAMES[lang]} onPress={() => router.push("/language")} />
+            <Row icon="information-outline" label={t("aboutTitle")} onPress={() => router.push("/about")} />
+          </>
+        ) : (
+          <>
+            {handle ? <Row icon="account-circle-outline" label={t("myPublicProfile")} value={`@${handle}`} onPress={() => router.push(`/u/${handle}`)} /> : null}
+            {handle ? <Row icon="account-edit-outline" label={t("editProfile")} onPress={() => router.push("/profile-edit")} /> : null}
+            <Row icon="bell-outline" label={t("alerts")} value={alerts ? t("alertsOn") : t("alertsOff")} onPress={() => (alerts ? router.push("/alert-settings") : void turnOnAlerts())} />
+            <Row icon="cloud-upload-outline" label={t("pendingReports")} value={String(pending)} />
+            <Row icon="clipboard-text-clock-outline" label={t("myReports")} onPress={() => router.push("/my-reports")} />
+            <Row icon="star-outline" label={t("followingTitle")} onPress={() => router.push("/following")} />
+            <Row icon="account-cancel-outline" label={t("blockedTitle")} onPress={() => router.push("/blocked")} />
+            <Row icon="phone-alert" label={t("emergencyTitle")} onPress={() => router.push("/emergency")} />
+            {notices > 0 ? <Row icon="gavel" label={t("myModeration")} value={String(notices)} onPress={() => router.push("/my-moderation")} /> : null}
+            {can(roles, "event.verify") ? <Row icon="shield-check-outline" label={t("moderation")} onPress={() => router.push("/moderation")} /> : null}
+            {can(roles, "ops.view") ? <Row icon="chart-bar" label={t("costTitle")} onPress={() => router.push("/admin-cost")} /> : null}
+            {can(roles, "ops.view") ? <Row icon="gauge" label={t("qualityTitle")} onPress={() => router.push("/admin-quality")} /> : null}
+            {can(roles, "ops.view") ? <Row icon="access-point-network" label={t("adminSources")} onPress={() => router.push("/admin-sources")} /> : null}
+            {can(roles, "ops.view") ? <Row icon="bug-outline" label={t("adminCrashes")} onPress={() => router.push("/admin-crashes")} /> : null}
+            {can(roles, "admin") ? <Row icon="storefront-check-outline" label={t("adminBusinesses")} onPress={() => router.push("/admin-businesses")} /> : null}
+            {can(roles, "admin") ? <Row icon="map-marker-account-outline" label={t("presenceLogTitle")} onPress={() => router.push("/admin-presence")} /> : null}
+            {can(roles, "admin") ? <Row icon="timer-sand" label={t("adminDelays")} onPress={() => router.push("/admin-delays")} /> : null}
+            {can(roles, "admin") ? <Row icon="history" label={t("adminConfigHistory")} onPress={() => router.push("/admin-config-history")} /> : null}
+            {can(roles, "admin") ? <Row icon="gavel" label={t("adminModerationLog")} onPress={() => router.push("/admin-moderation-log")} /> : null}
+            {can(roles, "admin") ? <Row icon="scale-balance" label={t("adminAuthority")} onPress={() => router.push("/admin-authority")} /> : null}
+            {can(roles, "admin") ? <Row icon="file-chart-outline" label={t("adminTransparency")} onPress={() => router.push("/admin-transparency")} /> : null}
+            {can(roles, "admin") ? <Row icon="account-key-outline" label={t("adminStaff")} onPress={() => router.push("/admin-staff")} /> : null}
+            {isStaff(roles) ? <Row icon="two-factor-authentication" label={t("mfaTitle")} onPress={() => router.push("/mfa")} /> : null}
+            <Row icon="storefront-outline" label={t("myBusinesses")} onPress={() => router.push("/my-businesses")} />
+            <Row icon="cellphone-lock" label={t("sessionsTitle")} onPress={() => router.push("/sessions")} />
+            <Row icon="email-lock-outline" label={t("signInMethods")} onPress={() => router.push("/sign-in-methods")} />
+            <Row icon="download-outline" label={t("exportData")} value={exporting ? t("exportPreparing") : undefined} onPress={() => void onExport()} />
+            <Row icon="logout" label={t("signOut")} onPress={onSignOut} />
+            <Row icon="account-remove-outline" label={t("deleteAccount")} onPress={() => router.push("/delete-account")} />
+            <Row icon="translate" label={t("language")} value={LANGUAGE_NAMES[lang]} onPress={() => router.push("/language")} />
+            <Row icon="information-outline" label={t("aboutTitle")} onPress={() => router.push("/about")} />
+          </>
+        )}
         <Text style={styles.note}>{t("privacyNote")}</Text>
         <Text style={styles.version}>Dizaster {Application.nativeApplicationVersion ?? ""}</Text>
       </ScrollView>
@@ -139,5 +154,6 @@ const styles = StyleSheet.create({
   rowValue: { color: colors.textMuted },
   rowAction: { color: colors.accentText, fontWeight: "600" },
   note: { color: colors.textMuted, marginTop: space.lg },
+  guestNote: { color: colors.textMuted, marginBottom: space.md },
   version: { color: colors.textMuted, marginTop: space.xl, fontSize: 12 },
 });

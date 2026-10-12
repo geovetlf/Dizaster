@@ -90,11 +90,15 @@ export const SERVER_ERROR_KEYS: Readonly<Record<string, MessageKey>> = {
 
 /** Mensaje que ve la persona para una respuesta de error del servidor. */
 export function serverErrorMessage(
-  body: { error?: unknown; message?: unknown } | null | undefined,
+  body: { error?: unknown; message?: unknown; suspendedUntil?: unknown; suspended_until?: unknown } | null | undefined,
   status: number,
   lang: Lang,
   translate: (key: MessageKey) => string,
+  fmtDate: (iso: string) => string = (iso) => iso,
 ): string {
+  // Suspensión con fecha de fin (ADR 0319, 0332): se dice hasta cuándo en todos los idiomas, si el servidor la manda.
+  const until = suspendedUntil(body);
+  if (body?.error === "ACCOUNT_SUSPENDED" && until) return translate("errAccountSuspendedUntil").replace("{date}", fmtDate(until));
   const message = typeof body?.message === "string" && body.message.trim() ? body.message : null;
   if (lang === "es" && message) return message;
   const code = typeof body?.error === "string" ? body.error : null;
@@ -103,6 +107,14 @@ export function serverErrorMessage(
   if (message && lang === "es") return message;
   const byStatus = STATUS_KEYS[status] ?? (status >= 500 ? "errInternal" : status >= 400 ? "errValidation" : undefined);
   return byStatus ? translate(byStatus) : `HTTP ${status}`;
+}
+
+/** Fin de la suspensión en el cuerpo del 403 (`suspendedUntil` o `suspended_until`); null si no viene o no es fecha. */
+export function suspendedUntil(body: unknown): string | null {
+  if (!body || typeof body !== "object") return null;
+  const b = body as { suspendedUntil?: unknown; suspended_until?: unknown };
+  const v = typeof b.suspendedUntil === "string" ? b.suspendedUntil : typeof b.suspended_until === "string" ? b.suspended_until : null;
+  return v && !Number.isNaN(Date.parse(v)) ? v : null;
 }
 
 /** Estado HTTP → texto, para códigos que la app todavía no conoce (ADR 0281). */

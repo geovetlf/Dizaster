@@ -9,6 +9,9 @@ import { EtagCache } from "./http/etag-cache";
 import { isMfaError } from "./auth/mfa";
 import { networkErrorKey } from "./errors/network-error";
 import { serverErrorMessage } from "./errors/server-error";
+import { guestWriteRejected } from "./auth/guest";
+import { rejectionReason } from "./report/rejection";
+import { formatInZone } from "./ui/format";
 import { lang, t } from "./i18n";
 import { pageQuery } from "./ui/pages";
 import type { Sender } from "./report/queue";
@@ -20,7 +23,7 @@ export interface TokenPair { token: string; refreshToken: string; expiresIn: num
 
 let token: string | null = null;
 let refreshToken: string | null = null;
-let listeners: { rotated?: (refreshToken: string) => void; lost?: () => void; mfa?: () => void } = {};
+let listeners: { rotated?: (refreshToken: string) => void; lost?: () => void; mfa?: () => void; signIn?: () => void } = {};
 
 /** Sesión actual. `null` al borrar la cuenta. */
 export function setSession(pair: Pick<TokenPair, "token" | "refreshToken"> | null) {
@@ -33,7 +36,10 @@ export function setSession(pair: Pick<TokenPair, "token" | "refreshToken"> | nul
 /** Hay sesión en memoria (la tarea en segundo plano solo envía con la app viva y con sesión, ADR 0190). */
 export const hasSession = () => token !== null;
 
-/** `rotated`: guardar el refresh nuevo. `lost`: la sesión no se pudo renovar. `mfa`: moderación pide el segundo factor. */
+/**
+ * `rotated`: guardar el refresh nuevo. `lost`: la sesión no se pudo renovar. `mfa`: moderación pide el segundo factor.
+ * `signIn`: alguien sin cuenta intentó escribir (ADR 0317, 0332): se abre «Entrar».
+ */
 export function onSessionEvents(l: typeof listeners) { listeners = l; }
 
 /** Renueva con el refresh rotatorio. Una sola renovación en vuelo aunque fallen varias peticiones a la vez. */
@@ -56,6 +62,9 @@ const renew = singleFlight(async (): Promise<boolean> => {
  * todos (una petición con `Authorization` no se cachea en una CDN compartida, ADR 0078).
  */
 const NO_AUTH_PREFIXES = ["/v1/auth/", "/v1/events/tiles/", "/v1/client-crashes"];
+
+/** Fecha de fin de una suspensión en el formato regional de la app (ADR 0332). */
+const fmtUntil = (iso: string) => formatInZone(iso, lang, undefined, "datetime") ?? iso;
 
 /** GET condicionales con ETag (ADR 0084): un 304 reutiliza el cuerpo ya descargado. */
 const etags = new EtagCache();
@@ -85,7 +94,9 @@ async function request<T>(path: string, init: RequestInit = {}, retried = false)
   }
   const body = (await res.json().catch(() => ({}))) as T & { message?: string };
   if (res.status === 403 && isMfaError(body)) listeners.mfa?.();
-  if (!res.ok) throw Object.assign(new Error(serverErrorMessage(body, res.status, lang, t)), { status: res.status, body, requestId: res.headers.get("x-request-id") ?? requestId });
+  // Sin cuenta solo se lee (ADR 0317): una escritura rechazada por falta de sesión lleva a «Entrar» (ADR 0332).
+  if (guestWriteRejected(res.status, init.method ?? "GET", path, token !== null)) listeners.signIn?.();
+  if (!res.ok) throw Object.assign(new Error(serverErrorMessage(body, res.status, lang, t, fmtUntil)), { status: res.status, body, requestId: res.headers.get("x-request-id") ?? requestId });
   if (isGet) etags.store(path, res.headers.get("etag"), body);
   return body;
 }
@@ -345,6 +356,9 @@ export const sendReport: Sender = async (body) => {
     return { ok: true, response: await api.submitReport(body) };
   } catch (err) {
     const status = (err as { status?: number }).status;
+    // Rechazo del reporte (422, ADR 0317, 0333): definitivo, con su código para explicarlo en el idioma de la persona.
+    const rejected = rejectionReason(status, (err as { body?: unknown }).body);
+    if (rejected) return { ok: false, retryable: false, error: rejected };
     // 401: sesión vencida o revocada; el reporte espera al nuevo inicio de sesión, no se pierde.
     const retryable = status === undefined || status >= 500 || status === 429 || status === 401;
     return { ok: false, retryable, error: (err as Error).message, ...(status === undefined ? { offline: true } : {}) };

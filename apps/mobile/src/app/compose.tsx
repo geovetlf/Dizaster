@@ -14,6 +14,7 @@ import { composeProblem } from "../lib/social/compose";
 import { colors, radius, space } from "../theme";
 import { UpdateRequired, useUpdateRequirement } from "../components/update-required";
 import { ErrorText } from "../components/error-text";
+import { AccountRequired, useIsGuest } from "../components/account-required";
 
 /**
  * Publicar sin reporte (D-03): opinión, apoyo o noticia, desde cualquier lugar. Si se abre desde un evento lo
@@ -35,8 +36,10 @@ export default function ComposeScreen() {
   const [businesses, setBusinesses] = useState<BusinessView[]>([]);
   // Versión por debajo de la mínima (ADR 0164): no se envía; emergencias sigue a mano.
   const update = useUpdateRequirement();
+  // Sin cuenta solo se lee (ADR 0317, 0332).
+  const guest = useIsGuest();
   const [asBusiness, setAsBusiness] = useState<string | null>(params.asBusiness ?? null);
-  useEffect(() => { api.myBusinesses().then((r) => setBusinesses(r.businesses)).catch(() => undefined); }, []);
+  useEffect(() => { if (!guest) api.myBusinesses().then((r) => setBusinesses(r.businesses)).catch(() => undefined); }, [guest]);
 
   // Id del borrador (ADR 0178): igual en cada reintento, así un corte de red nunca publica dos veces.
   const clientId = useRef(newId()).current;
@@ -74,6 +77,7 @@ export default function ComposeScreen() {
   }
 
   if (update.required) return <UpdateRequired storeUrl={update.storeUrl} />;
+  if (guest) return <AccountRequired />;
 
   return (
     <ScrollView automaticallyAdjustKeyboardInsets style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
@@ -109,7 +113,7 @@ export default function ComposeScreen() {
       {asBusiness ? null : (
         <View style={styles.switchRow}>
           <Text style={styles.rowText}>{t("pseudonymous")}</Text>
-          <Switch value={pseudonymous} onValueChange={setPseudonymous} />
+          <Switch accessibilityLabel={t("pseudonymous")} value={pseudonymous} onValueChange={setPseudonymous} />
         </View>
       )}
       <Text style={styles.note}>{t("composeNote")}</Text>

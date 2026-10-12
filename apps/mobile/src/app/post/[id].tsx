@@ -1,5 +1,5 @@
 import type { CommentView, FeedPost } from "@dizaster/contracts";
-import { useLocalSearchParams } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import { Alert, FlatList, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { categoryName } from "../../components/feed-list";
@@ -20,10 +20,13 @@ import { appendPage } from "../../lib/ui/pages";
 import { LoadState } from "../../components/load-state";
 import { classifyLoadError, type LoadErrorKind } from "../../lib/errors/load-error";
 import { ErrorText } from "../../components/error-text";
+import { useIsGuest } from "../../components/account-required";
 
 /** Una publicación y sus comentarios. Destino de dizaster://post/<id> y https://<dominio>/p/<id> (ADR 0083). */
 export default function PostCommentsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  // Sin cuenta se leen los comentarios; para escribir hay que entrar (ADR 0317, 0332).
+  const guest = useIsGuest();
   const [comments, setComments] = useState<CommentView[]>([]);
   // Siguiente página de comentarios (ADR 0106); null cuando ya están todos.
   const [next, setNext] = useState<string | null>(null);
@@ -130,7 +133,7 @@ export default function PostCommentsScreen() {
                   <Icon name={liked ? "heart" : "heart-outline"} size={16} color={liked ? colors.like : colors.textMuted} />
                   {item.reactions.LIKE ? <Text style={styles.time}>{item.reactions.LIKE}</Text> : null}
                 </Pressable>
-                <Pressable accessibilityRole="button" hitSlop={8} onPress={() => setReplyTo(item)}>
+                <Pressable accessibilityRole="button" hitSlop={8} onPress={() => (guest ? router.push("/sign-in") : setReplyTo(item))}>
                   <Text style={styles.link}>{t("replyAction")}</Text>
                 </Pressable>
                 {item.mine ? (
@@ -149,12 +152,20 @@ export default function PostCommentsScreen() {
           <Text style={styles.time}>{t("replyingTo")} {replyTo.author.displayName}  ✕</Text>
         </Pressable>
       ) : null}
+      {guest ? (
+        <View style={styles.composer}>
+          <Pressable accessibilityRole="button" style={[styles.send, styles.signIn]} onPress={() => router.push("/sign-in")}>
+            <Text style={styles.sendText}>{t("signInToComment")}</Text>
+          </Pressable>
+        </View>
+      ) : (
       <View style={styles.composer}>
         <TextInput accessibilityLabel={t("writeComment")} value={text} onChangeText={setText} maxLength={1000} multiline placeholder={t("writeComment")} placeholderTextColor={colors.textMuted} style={styles.input} />
         <Pressable accessibilityRole="button" disabled={busy || !text.trim()} style={[styles.send, (busy || !text.trim()) && styles.disabled]} onPress={() => void send()}>
           <Text style={styles.sendText}>{t("publish")}</Text>
         </Pressable>
       </View>
+      )}
     </KeyboardAvoidingView>
   );
 }
@@ -177,5 +188,6 @@ const styles = StyleSheet.create({
   input: { flex: 1, color: colors.text, backgroundColor: colors.surface, borderRadius: radius.md, paddingHorizontal: space.md, paddingVertical: 10, maxHeight: 120 },
   send: { backgroundColor: colors.accent, borderRadius: radius.md, paddingHorizontal: space.lg, paddingVertical: 12 },
   disabled: { opacity: 0.5 },
+  signIn: { flex: 1, alignItems: "center" },
   sendText: { color: colors.white, fontWeight: "600" },
 });
