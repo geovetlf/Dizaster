@@ -4,7 +4,7 @@ import { useCallback, useState } from "react";
 import { Alert, FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import { api } from "../lib/api";
 import { lang, t } from "../lib/i18n";
-import { uploadErrorText } from "../lib/media/upload-errors";
+import { queuedReasonText } from "../lib/report/rejection";
 import { canWithdraw, myReportLines, queuedState } from "../lib/report/my-reports";
 import { discardQueuedReport, reportQueue, retryQueuedReport } from "../lib/report/outbox";
 import type { QueuedReport } from "../lib/report/queue";
@@ -56,7 +56,7 @@ export default function MyReportsScreen() {
         return (
           <View key={q.clientReportId} style={styles.card}>
             <Text style={styles.title}>{categoryName(q.body.categoryCode)} · {timeAgo(q.createdAt, lang)}</Text>
-            <Text style={styles.meta}>{t(`queuedState_${state}`)}{state === "STUCK" && q.stuck ? ` · ${uploadErrorText(q.stuck.reason, t)}` : ""}</Text>
+            <Text style={styles.meta}>{t(`queuedState_${state}`)}{state === "STUCK" && q.stuck ? ` · ${queuedReasonText(q.stuck.reason, t)}` : ""}</Text>
             {q.media?.length ? <Text style={styles.meta}>{t("queuedMediaKept")}</Text> : null}
             <View style={styles.actions}>
               <Pressable accessibilityRole="button" onPress={() => void retryQueuedReport(q.clientReportId).then(load).catch(load)}><Text style={styles.link}>{t("queuedRetry")}</Text></Pressable>

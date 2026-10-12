@@ -11,7 +11,7 @@ import { isAgeBlocked } from "../lib/account/age-gate";
 import { pendingPolicies } from "../lib/account/policies";
 import { api } from "../lib/api";
 import { onLanguageChange } from "../lib/language-store";
-import { SessionProvider, useSession } from "../lib/session";
+import { promptSignIn, SessionProvider, useSession } from "../lib/session";
 import { colors } from "../theme";
 
 const header = { headerStyle: { backgroundColor: colors.bg }, headerTintColor: colors.text, headerTitleAlign: "center" as const, contentStyle: { backgroundColor: colors.bg } };
@@ -103,7 +103,7 @@ export default function RootLayout() {
 function SignInGate() {
   const { ready, needsSignIn } = useSession();
   useEffect(() => {
-    if (ready && needsSignIn) router.push("/sign-in");
+    if (ready && needsSignIn) promptSignIn();
   }, [ready, needsSignIn]);
   return null;
 }
@@ -126,12 +126,13 @@ function PolicyGate() {
 
 /** Edad mínima (ADR 0049): si la cuenta aún no la declaró, se pide una vez por arranque (salvo menores ya avisados). */
 function AgeGate() {
-  const { ready } = useSession();
+  const { ready, needsSignIn } = useSession();
   useEffect(() => {
-    if (!ready) return;
+    // Sin cuenta no hay edad que declarar: se pide después de entrar.
+    if (!ready || needsSignIn) return;
     Promise.all([api.account(), isAgeBlocked()])
       .then(([a, blocked]) => { if (!a.ageConfirmed && !blocked) router.push("/age-check"); })
       .catch(() => undefined);
-  }, [ready]);
+  }, [ready, needsSignIn]);
   return null;
 }

@@ -181,6 +181,26 @@ export class ReportQueue {
 }
 
 /**
+ * Qué pasó con un reporte recién guardado tras un intento de envío (ADR 0333): enviado, detenido por un error
+ * definitivo (rechazo, cuenta suspendida…), o sigue en cola, sin red o reintentando. Antes un reporte detenido se
+ * anunciaba como "sin conexión, se enviará solo", que es falso: no sale hasta que la persona lo reintente.
+ */
+export type SubmitStatus =
+  | { kind: "sent"; response: SubmitReportResponse }
+  | { kind: "stuck"; reason: string }
+  | { kind: "queued"; offline: boolean; lastError: string | null };
+
+export function submitStatus(clientReportId: string, result: FlushResult, pending: readonly QueuedReport[]): SubmitStatus | null {
+  const response = result.byClientId[clientReportId];
+  if (response) return { kind: "sent", response };
+  const item = pending.find((p) => p.clientReportId === clientReportId);
+  // Ya no está en la cola y este envío no lo incluyó: lo envió otro envío en curso o se descartó.
+  if (!item) return null;
+  if (item.stuck) return { kind: "stuck", reason: item.stuck.reason };
+  return { kind: "queued", offline: item.attempts === 0, lastError: item.lastError };
+}
+
+/**
  * Espera antes del siguiente reintento automático con la app abierta: 15 s, 30 s, 1 min… hasta 5 min.
  * NO AI REQUIRED.
  */
