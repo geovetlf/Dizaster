@@ -38,6 +38,8 @@ pnpm --filter @dizaster/core dev        # API en :8080
 pnpm --filter @dizaster/mobile start    # requiere development build (MapLibre no funciona en Expo Go)
 ```
 
+Probar en un teléfono Android por USB, sin EAS: [`docs/PROBAR_EN_ANDROID.md`](docs/PROBAR_EN_ANDROID.md).
+
 ## Verificación
 
 ```bash

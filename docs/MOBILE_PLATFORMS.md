@@ -45,8 +45,9 @@ Todo esto funciona en Linux, sin Mac.
 Se lanza a mano desde GitHub Actions (workflow `mobile-build`) o con `npx eas-cli build -p all --profile preview`.
 No se ejecuta en cada push para no gastar el cupo de builds (cost-first).
 
-La app usa módulos nativos (MapLibre, SQLite, almacenamiento seguro), así que **no funciona en Expo Go**:
-hay que instalar una build propia (APK en Android).
+La app usa MapLibre, un módulo nativo que Expo Go no incluye, así que **no funciona en Expo Go**: hay que instalar
+una build propia (APK en Android). Para probarla en un Android físico, paso a paso y sin EAS:
+[`PROBAR_EN_ANDROID.md`](PROBAR_EN_ANDROID.md).
 
 ## Build local de Android (sin EAS)
 
