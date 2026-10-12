@@ -4,7 +4,7 @@ import { sendReport } from "../api";
 import { discardLocal } from "../media/capture";
 import { uploadMedia } from "../media/upload";
 import { cameOnline, type NetState } from "./connectivity";
-import { ReportQueue, retryDelayMs, type FlushResult, type QueuedReport } from "./queue";
+import { ReportQueue, retryDelayMs, submitStatus, type FlushResult, type QueuedReport, type SubmitStatus } from "./queue";
 import { SqliteQueueStorage } from "./sqlite-storage";
 
 /** Cola única de la app: la usan la pantalla de reporte y el reenvío automático. */
@@ -24,16 +24,18 @@ export function flushReports(): Promise<FlushResult> {
 }
 
 /**
- * Envía un reporte recién guardado y devuelve su respuesta, o null si quedó en cola (sin conexión).
+ * Envía un reporte recién guardado y dice qué pasó (ADR 0333): enviado, detenido por un error definitivo o en cola.
  * Si ya había un envío en curso, espera a que termine y vuelve a intentar para incluir este reporte.
  */
-export async function flushUntilSent(clientReportId: string): Promise<FlushResult["byClientId"][string] | null> {
+export async function flushUntilSent(clientReportId: string): Promise<SubmitStatus> {
+  let last: SubmitStatus | null = null;
   for (let i = 0; i < 2; i++) {
-    const r = await flushReports();
-    if (r.byClientId[clientReportId]) return r.byClientId[clientReportId];
-    if (!(await reportQueue.pending()).some((p) => p.clientReportId === clientReportId)) return null;
+    last = submitStatus(clientReportId, await flushReports(), await reportQueue.pending());
+    // Sin rastro en la cola: lo envió otro envío en curso o se descartó; no hay nada más que decir aquí.
+    if (!last) return { kind: "queued", offline: false, lastError: null };
+    if (last.kind !== "queued") return last;
   }
-  return null;
+  return last ?? { kind: "queued", offline: true, lastError: null };
 }
 
 /** Descartar un reporte sin enviar (decisión de la persona): sale de la cola y se borran sus copias locales. */

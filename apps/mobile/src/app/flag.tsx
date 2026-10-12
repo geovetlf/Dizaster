@@ -8,6 +8,7 @@ import { t } from "../lib/i18n";
 import { FLAG_REASONS } from "../lib/moderation/logic";
 import { colors, radius, space } from "../theme";
 import { ErrorText } from "../components/error-text";
+import { AccountRequired, useIsGuest } from "../components/account-required";
 
 /** Denunciar un post, comentario, evento o perfil. La persona denunciada nunca sabe quién fue. */
 export default function FlagScreen() {
@@ -16,6 +17,10 @@ export default function FlagScreen() {
   const [reason, setReason] = useState<FlagReason | null>(null);
   const [note, setNote] = useState("");
   const [state, setState] = useState<"idle" | "sending" | "sent" | "error">("idle");
+  // Denunciar exige cuenta (ADR 0317, 0332).
+  const guest = useIsGuest();
+  // Motivo del fallo ya traducido (cuenta suspendida, límite…); sin motivo, el genérico.
+  const [failure, setFailure] = useState<string | null>(null);
 
   async function send() {
     if (!reason || !type.success || !params.targetId) return;
@@ -23,10 +28,13 @@ export default function FlagScreen() {
     try {
       await api.flag({ targetType: type.data, targetId: params.targetId, reason, ...(note.trim() ? { note: note.trim() } : {}) });
       setState("sent");
-    } catch {
+    } catch (e) {
+      setFailure(e instanceof Error && e.message ? e.message : null);
       setState("error");
     }
   }
+
+  if (guest) return <AccountRequired />;
 
   if (state === "sent") {
     return (
@@ -48,7 +56,7 @@ export default function FlagScreen() {
         </Pressable>
       ))}
       <TextInput accessibilityLabel={t("flagNote")} value={note} onChangeText={setNote} maxLength={500} multiline placeholder={t("flagNote")} placeholderTextColor={colors.textMuted} style={styles.input} />
-      {state === "error" ? <ErrorText style={styles.error}>{t("loadError")}</ErrorText> : null}
+      {state === "error" ? <ErrorText style={styles.error}>{failure ?? t("loadError")}</ErrorText> : null}
       <Pressable accessibilityRole="button" disabled={!reason || state === "sending"} style={[styles.button, (!reason || state === "sending") && styles.disabled]} onPress={() => void send()}>
         <Text style={styles.buttonText}>{t("flag")}</Text>
       </Pressable>

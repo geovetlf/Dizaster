@@ -22,6 +22,17 @@ describe("accesibilidad", () => {
     expect(missing).toEqual([]);
   });
 
+  it("cada <Switch> tiene accessibilityLabel (ADR 0332): el lector de pantalla no lo une al texto de al lado", () => {
+    const missing: string[] = [];
+    for (const f of files(SRC)) {
+      const src = readFileSync(f, "utf8");
+      for (const m of src.matchAll(/<Switch\b([\s\S]*?)\/>/g)) {
+        if (!m[1]!.includes("accessibilityLabel")) missing.push(`${f.slice(SRC.length)}:${src.slice(0, m.index).split("\n").length}`);
+      }
+    }
+    expect(missing).toEqual([]);
+  });
+
   it("ninguna etiqueta accesible escrita a mano fuera de las traducciones", () => {
     const hard: string[] = [];
     for (const f of files(SRC)) {
