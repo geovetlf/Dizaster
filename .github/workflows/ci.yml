@@ -9,9 +9,11 @@ on:
 permissions:
   contents: read
 
+# En un PR, un push nuevo cancela la ejecución anterior. En main no: cada commit de main termina su CI y, con Google
+# Cloud activado, su imagen firmada; cortar a medias dejaba commits sin imagen ni resultado (ADR 0338).
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   check:

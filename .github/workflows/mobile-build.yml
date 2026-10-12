@@ -48,4 +48,8 @@ jobs:
           test -n "$DIZASTER_EAS_PROJECT_ID" || { echo "::error::Falta la variable DIZASTER_EAS_PROJECT_ID"; exit 1; }
       - run: pnpm run sync-data
       - name: EAS Build
-        run: npx --yes eas-cli@24.8.0 build --platform "${{ inputs.platform }}" --profile "${{ inputs.profile }}" --non-interactive --no-wait
+        # Las entradas llegan por env: nunca se interpolan dentro del script (ADR 0338).
+        env:
+          PLATFORM: ${{ inputs.platform }}
+          PROFILE: ${{ inputs.profile }}
+        run: npx --yes eas-cli@24.8.0 build --platform "$PLATFORM" --profile "$PROFILE" --non-interactive --no-wait

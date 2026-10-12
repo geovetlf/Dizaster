@@ -96,6 +96,9 @@ export function validateProposal(p: AgentProposal, policy: Policy, outcome: Outc
     const injected = Object.entries(inject).filter(([k]) => k === "policy" || INJECT[step.command]?.includes(k));
     const argv = [cmd!, ...sub, ...[...Object.entries(step.flags), ...injected].flatMap(([k, v]) => (v === "true" ? [`--${k}`] : [`--${k}`, v])), "--actor", `agent:${p.agent}`];
     const mutates = ["deploy", "promote", "rollback"].includes(step.command);
+    // El resultado de la política lo pone el ejecutor (de la política del repositorio), nunca el agente: así el comando
+    // vuelve a decidir con lo mismo que decidió aquí, y sin él `dzd promote` cuenta "approval" (falla cerrado).
+    if ((step.command === "deploy" || step.command === "promote") && !local) argv.push("--outcome", outcome);
     if (mutates && execute && d.allowed) argv.push("--execute");
     out.push({ step, argv, allowed: d.allowed, reason: d.reason });
     if (!d.allowed) blocked = true;

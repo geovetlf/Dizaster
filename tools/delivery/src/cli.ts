@@ -9,7 +9,7 @@ import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { sha256File, verifyManifest, type ArtifactManifest } from "./artifact.js";
 import { RuleAgent, validateProposal } from "./agent.js";
 import { appendAudit, readLog, verifyLog, type Actor } from "./audit.js";
-import { decide, isHuman, LEVELS, type Action } from "./autonomy.js";
+import { ACTIONS, decide, isHuman, LEVELS, OUTCOMES, type Action } from "./autonomy.js";
 import { CloudRunTarget, type Runner } from "./cloudrun.js";
 import { costGate } from "./cost.js";
 import { rollbackTo, rollout, type DeployTarget } from "./deploy.js";
@@ -71,6 +71,20 @@ function runner(): Runner {
   if (!flags.has("execute")) return async (c, args) => { console.log(`[en seco] ${c} ${args.join(" ")}`); return ""; };
   return async (c, args) => execFileSync(c, args, { encoding: "utf8", stdio: ["ignore", "pipe", "inherit"] });
 }
+
+/**
+ * Resultado de política que declara quien llama (`--outcome`). Falla cerrado: un valor desconocido se rechaza y, sin
+ * la bandera, producción cuenta como "approval" (el caso más estricto que no bloquea): la automatización tiene que
+ * declarar el resultado de la política para promover, y el ejecutor del agente lo pone desde la política del repositorio.
+ */
+function declaredOutcome(env: string): Outcome {
+  const o = flag("outcome", env === "production" ? "approval" : "auto")!;
+  if (!(OUTCOMES as readonly string[]).includes(o)) fail(`--outcome: ${OUTCOMES.join(", ")} (no "${o}")`);
+  return o as Outcome;
+}
+
+/** Contexto de CI para la trazabilidad de cada registro (commit, rama y ejecución del workflow). */
+const ciTrace = () => ({ commit: process.env["GITHUB_SHA"], ref: process.env["GITHUB_REF"], runId: process.env["GITHUB_RUN_ID"] });
 
 /** La automatización respeta el nivel de autonomía; una persona que ejecuta el comando decide por sí misma. */
 function guard(action: Action, outcome: Outcome = "auto"): void {
@@ -193,6 +207,17 @@ switch (cmd) {
     const d = decide(Number(flag("level", String(policy.autonomyLevel))), action, flag("outcome", "auto") as Outcome);
     out(d, () => `${action}: ${d.allowed ? "permitido" : `no (${d.needs})`} — ${d.reason}`);
     if (!d.allowed) process.exit(3);
+    break;
+  }
+  case "guard": {
+    // Comprobación previa de un workflow (ADR 0338): ¿puede este actor hacer esta acción con el nivel vigente? Se corre
+    // antes de cualquier efecto (p. ej. migraciones), no al final. Usa siempre el nivel de la política: no admite --level.
+    const action = flag("action") as Action | undefined;
+    if (!action || !ACTIONS.includes(action)) fail(`--action: ${ACTIONS.join(", ")}`);
+    if (flags.has("level")) fail("guard usa el nivel de la política; --level no se admite");
+    if (!flags.has("actor")) fail("--actor es obligatorio");
+    guard(action, declaredOutcome(action.endsWith("-production") ? "production" : "staging"));
+    console.log(`✓ ${action} permitido para ${flag("actor")}`);
     break;
   }
   case "audit": {
@@ -393,7 +418,7 @@ switch (cmd) {
       if (flag("key")) verifySignature(flag("image") ?? fail("--image es obligatorio con --key"), digest, env);
       else console.log("local: firma no exigida (staging y production sí la exigen)");
     } else {
-      guard(env === "production" ? "promote-production" : "deploy-staging", flag("outcome", "auto") as Outcome);
+      guard(env === "production" ? "promote-production" : "deploy-staging", declaredOutcome(env));
       // Solo imágenes firmadas por CI (ADR 0277), en staging y en producción.
       verifySignature(flag("image") ?? fail("--image es obligatorio (REGIÓN-docker.pkg.dev/PROYECTO/dizaster/core)"), digest, env);
     }
@@ -412,7 +437,7 @@ switch (cmd) {
       at: new Date().toISOString(), actor: flag("actor", "human")!,
     });
     appendAudit(flag("log", "delivery-audit.jsonl")!, {
-      actor: flag("actor", "human") as Actor, action: cmd, environment: env === "local" ? "development" : env, artifactDigest: digest,
+      actor: flag("actor", "human") as Actor, action: cmd, environment: env === "local" ? "development" : env, artifactDigest: digest, ...ciTrace(),
       result: dry ? "ok" : res.outcome === "deployed" ? "ok" : res.outcome === "rolled-back" ? "rolled-back" : "failed",
       details: { dryRun: dry, steps: res.steps },
     });
@@ -435,7 +460,7 @@ switch (cmd) {
     await rollbackTo(target, to.revision);
     const serving = lastServing(history, env, service);
     appendRelease(releases, { ...to, outcome: flags.has("execute") ? "rollback" : "dry-run", previous: serving?.revision ?? null, at: new Date().toISOString(), actor: flag("actor", "human")! });
-    appendAudit(flag("log", "delivery-audit.jsonl")!, { actor: flag("actor", "human") as Actor, action: "rollback", environment: env === "local" ? "development" : env, artifactDigest: to.revision.digest, result: "ok", details: { dryRun: !flags.has("execute"), migration: to.migration } });
+    appendAudit(flag("log", "delivery-audit.jsonl")!, { actor: flag("actor", "human") as Actor, action: "rollback", environment: env === "local" ? "development" : env, artifactDigest: to.revision.digest, ...ciTrace(), result: "ok", details: { dryRun: !flags.has("execute"), migration: to.migration } });
     console.log(`${flags.has("execute") ? "" : "[en seco] "}tráfico al 100 % en ${to.revision.name} (${to.revision.digest.slice(0, 19)}…); esquema compatible hasta ${to.migration ?? "—"}`);
     break;
   }
@@ -462,7 +487,7 @@ switch (cmd) {
       const r = spawnSync(process.execPath, [process.argv[1]!, ...v.argv], { stdio: "inherit" });
       if (r.status !== 0) fail(`✗ ${v.step.command} falló (código ${r.status}); el agente no continúa.`);
     }
-    appendAudit(flag("log", "delivery-audit.jsonl")!, { actor: `agent:${proposal.agent}`, action: "agent-run", environment: env === "local" ? "development" : env, artifactDigest: flag("digest"), result: "ok", details: { steps: steps.map((v) => v.step.command), stop: proposal.stop ?? null } });
+    appendAudit(flag("log", "delivery-audit.jsonl")!, { actor: `agent:${proposal.agent}`, action: "agent-run", environment: env === "local" ? "development" : env, artifactDigest: flag("digest"), ...ciTrace(), result: "ok", details: { steps: steps.map((v) => v.step.command), stop: proposal.stop ?? null } });
     if (proposal.stop) { console.log(`■ ${proposal.stop.reason}`); process.exit(proposal.stop.needs === "owner-approval" ? 3 : 0); }
     break;
   }
@@ -482,6 +507,6 @@ switch (cmd) {
     break;
   }
   default:
-    console.log("uso: dzd <inspect|plan|policy|run-gates|autonomy|audit [verify|stats]|artifact [verify]|verify [--repeat N --slo]|slo|env-check|github-guard|provenance [verify]|signature verify|iac-check|diagnose|docs|report|cost|config-check|deploy|promote|rollback [--env local]|local-proxy|load|agent [run]> [--json]");
+    console.log("uso: dzd <inspect|plan|policy|run-gates|autonomy|guard|audit [verify|stats]|artifact [verify]|verify [--repeat N --slo]|slo|env-check|github-guard|provenance [verify]|signature verify|iac-check|diagnose|docs|report|cost|config-check|deploy|promote|rollback [--env local]|local-proxy|load|agent [run]> [--json]");
     if (cmd) process.exit(1);
 }
