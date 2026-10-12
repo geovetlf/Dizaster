@@ -1,6 +1,6 @@
 # Estado de la implementación
 
-Actualizado: 2026-10-11 (hasta ADR 0321; auditoría de preparación en `docs/PRODUCTION_READINESS_REPORT.md`). Informe de preparación para producción: `docs/PRODUCTION_READINESS_REPORT.md`.
+Actualizado: 2026-10-12 (hasta ADR 0346; auditoría de preparación en `docs/PRODUCTION_READINESS_REPORT.md`). Informe de preparación para producción: `docs/PRODUCTION_READINESS_REPORT.md`.
 
 ## Etapa 1 — Fundación (hecha)
 
@@ -509,6 +509,13 @@ Actualizado: 2026-10-11 (hasta ADR 0321; auditoría de preparación en `docs/PRO
 | Suspensiones de 24 horas, 7 días o permanentes, con vencimiento automático registrado, apelables y auditadas; duración elegida en la app (ADR 0319, migración 0108) | ✅ | §13 |
 | Avisos de comentarios y respuestas: apagados por defecto, activables en la app, tope diario `SOCIAL_NOTICES_PER_DAY`, sin gastar el límite por hora de los incidentes (ADR 0320, migración 0109) | ✅ | §5.10 |
 | D3: «N reportes corroborados» en el perfil público, eventos distintos con reportes con nombre y presencia, la parte oficial aparte, ocultable (ADR 0321, migración 0110) | ✅ | §5, §6 |
+| Rendimiento con volumen de lo añadido el 2026-10-11 y de la salud de fuentes: `/v1/admin/sources` de 210–300 ms a menos de 1 ms, retención de corridas sin recorrer la tabla, fin de suspensiones sin una consulta por cuenta (ADR 0322, migración 0111, PR #71) | ✅ | §15 |
+| Seguridad B: solo administración suspende o reactiva cuentas de administración (ADR 0327); exportación con la suspensión propia y la preferencia del recuento, borrado de avisos de comentarios (ADR 0328); evento sensible elegido medido contra su punto público (ADR 0329); node-forge y braces sin arreglo, excepción intacta hasta el 2026-11-07 (ADR 0330); PR #68 | ✅ | §13 |
+| App: sin cuenta, país en solo lectura y suspensión reflejados en la interfaz; 401 abre «Entrar»; rechazos 422 traducidos y detenidos en «Mis reportes»; interruptores con nombre accesible (ADR 0332, 0333, PR #70); estado por país leído de `/v1/config` con respaldo empaquetado (ADR 0334, PR #74) | ✅ | §2, §8.2 |
+| Delivery: clasificación de riesgo ampliada y aplicada a renombres (ADR 0337); `dzd guard` antes de migrar, guardas que fallan cerrado, auditoría con commit, ref y ejecución, `check:workflows` más estricto (ADR 0338); PR #69 | ✅ | §15 |
+| Migración a Node 26: análisis y plan (`docs/node-26-migracion.md`); suite completa verde con Node 26.11.1 sin cambiar archivos; se activa tras el 2026-10-28 con LTS comprobado (ADR 0339, Propuesto) | ⏳ condicionado a la fecha | §15 |
+| 403 `ACCOUNT_SUSPENDED` con `suspendedUntil` solo para la propia sesión (ADR 0340); `/v1/config` publica `launch` con el estado por país (ADR 0341); PR #72 | ✅ | §8.2, §11.5 |
+| Contratos: respuestas validadas en estricto contra esquemas espejo (ADR 0342), línea base de compatibilidad hacia atrás (ADR 0343), migraciones desde cero e idempotentes (ADR 0344), cuatro carreras corregidas en reportes, contadores y avisos (ADR 0345, migración 0119), outbox y push sin duplicados (ADR 0346); PR #73 | ✅ | §15 |
 | Contacto configurable en el User-Agent de ingesta (`INGEST_CONTACT`), con aviso en `config-check` si falta en producción (ADR 0307) | ✅ falta el valor del propietario | §9.3 |
 | Licencias, auditoría, SBOM, Dependabot; respaldo con prueba de restauración en CI | ✅ | ADR 0070, `scripts/supply-chain.mjs`, `scripts/db-restore-check.mjs` |
 | Idioma de la app elegible en el perfil (es/en/pt/fr o del teléfono) | ✅ | ADR 0069, `app/language.tsx` |
