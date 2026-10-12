@@ -1395,7 +1395,7 @@ export class SocialService {
   /** Perfil, publicaciones, comentarios, reacciones, seguimientos, bloqueos y negocios propios. */
   async exportData(q: Queryable, who: { userId: string; profileId: string }): Promise<Record<string, unknown[]>> {
     const p = who.profileId;
-    const profile = await q.query(`SELECT id, handle, display_name, bio, avatar_url, home_country, locale, units, mentions_from, created_at FROM social.profiles WHERE id = $1`, [p]);
+    const profile = await q.query(`SELECT id, handle, display_name, bio, avatar_url, home_country, locale, units, mentions_from, show_corroborated_reports, created_at FROM social.profiles WHERE id = $1`, [p]);
     const businesses = await q.query(
       `SELECT id, handle, name, category, country, verification_status, description, address_public, contact_phone, contact_url, moderation_state, created_at, deleted_at
          FROM social.business_profiles WHERE owner_user_id = $1`, [who.userId],

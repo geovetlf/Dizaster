@@ -3,7 +3,7 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { matchesAny } from "./glob.js";
 import { checkMigrations, type MigrationFinding } from "./migrations.js";
-import { classifyPath, maxClass, type Policy, type RiskClass } from "./policy.js";
+import { classifyPath, maxClass, rank, type Policy, type RiskClass } from "./policy.js";
 
 export interface Change { path: string; status: "A" | "M" | "D" | "R"; oldPath?: string }
 export interface WorkspacePackage { name: string; dir: string; deps: string[] }
@@ -73,7 +73,14 @@ export function withDependents(changed: string[], pkgs: WorkspacePackage[]): str
  * rutas, grafo del workspace y el contenido de las migraciones nuevas.
  */
 export function analyze(changes: Change[], policy: Policy, opts: { pkgs: WorkspacePackage[]; readFile: (p: string) => string; ref?: string }): Impact {
-  const files = changes.map((c) => ({ path: c.path, status: c.status, ...classifyPath(policy, c.path) }));
+  // Un renombre se clasifica por su origen y su destino: mover un archivo crítico a `docs/` (o borrarlo de su sitio)
+  // sigue siendo un cambio crítico.
+  const files = changes.map((c) => {
+    const to = classifyPath(policy, c.path);
+    const from = c.oldPath ? classifyPath(policy, c.oldPath) : null;
+    const pick = from && rank(from.class) > rank(to.class) ? { class: from.class, reasons: from.reasons.map((r) => `${r} (origen ${c.oldPath})`) } : to;
+    return { path: c.path, status: c.status, ...pick };
+  });
   const touched = changes.flatMap((c) => (c.oldPath ? [c.path, c.oldPath] : [c.path]));
   const packages = [...new Set(touched.map((p) => packageOf(p, opts.pkgs)?.name).filter((n): n is string => !!n))].sort();
   const coreModules = [...new Set(touched.map((p) => /^services\/core\/src\/modules\/([^/]+)\//.exec(p)?.[1]).filter((m): m is string => !!m))].sort();

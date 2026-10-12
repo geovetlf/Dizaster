@@ -321,6 +321,15 @@ export class IdentityService {
     return roles;
   }
 
+  /**
+   * Roles de personal guardados en la cuenta, esté o no suspendida (ADR 0327). Para decidir quién puede suspender o
+   * reactivar a alguien del personal; no sirve para autorizar a quien actúa (eso es `liveRoles`).
+   */
+  async staffRolesOf(q: Queryable, userId: string): Promise<StaffRole[]> {
+    const { rows } = await q.query<{ roles: string[] }>(`SELECT roles FROM identity.users WHERE id = $1 AND status <> 'DELETED'`, [userId]);
+    return (rows[0]?.roles ?? []).filter((r): r is StaffRole => (STAFF_ROLES as readonly string[]).includes(r));
+  }
+
   /** Personal con roles y últimos cambios (ADR 0167). Los handles los pone quien llama. */
   async staff(): Promise<{ members: { userId: string; roles: StaffRole[] }[]; changes: { userId: string; role: StaffRole; action: "GRANT" | "REVOKE"; reason: string; at: Date }[]; changesNextCursor: string | null }> {
     const members = await this.db.query<{ id: string; roles: string[] }>(
@@ -714,7 +723,7 @@ export class IdentityService {
   /** Cuenta, dispositivos, sesiones y aceptaciones. Sin secretos: ni hashes de token ni tokens push. */
   async exportData(q: Queryable, userId: string): Promise<Record<string, unknown[]>> {
     const account = await q.query(
-      `SELECT u.id, u.status, u.roles, u.primary_locale, u.age_confirmed_min, u.age_confirmed_at, u.created_at,
+      `SELECT u.id, u.status, u.suspended_until, u.roles, u.primary_locale, u.age_confirmed_min, u.age_confirmed_at, u.created_at,
               EXISTS (SELECT 1 FROM identity.mfa_totp m WHERE m.user_id = u.id AND m.confirmed_at IS NOT NULL) AS mfa_enabled
          FROM identity.users u WHERE u.id = $1`, [userId],
     );
