@@ -177,7 +177,7 @@ En orden de impacto:
     producción pide aprobación para cifrado, autenticación, media, fuentes oficiales y su contraparte en la app.
 14. **El estado de un país tarda hasta 5 minutos** en llegar a la app (caché de `/v1/config`). El servidor decide
     siempre (ADR 0334, 0341).
-15. **Node 26 no trae `corepack`.** El PR de migración debe instalar pnpm fijado por otra vía (ADR 0339).
+15. **Node 26 no trae `corepack`.** Resuelto en el ADR 0348: pnpm se instala fijado a `packageManager` en la imagen.
 
 ## 7. Siguiente paso mínimo para producción
 

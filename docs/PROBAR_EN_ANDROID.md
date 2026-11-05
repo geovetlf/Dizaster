@@ -14,7 +14,7 @@ Este APK es una app aparte (`app.dizaster.mobile`, nombre «Dizaster»). No toca
 
 ## 1. Requisitos en tu ordenador (una sola vez)
 
-- Git y **Node 22.12 o superior**.
+- Git y **Node 26 LTS (26.13 o superior)**.
 - **Docker Desktop** (para la base de datos y la API).
 - **Android Studio** con, en *SDK Manager*: Android SDK Platform 36, Android SDK Build-Tools 36 y Android SDK
   Platform-Tools. El NDK 27.1 lo descarga Gradle la primera vez si aceptaste las licencias del SDK.
@@ -30,7 +30,7 @@ Clona Dizaster en una carpeta propia, separada de cualquier otro proyecto.
 ```sh
 git clone https://github.com/geovetlf/Dizaster.git dizaster
 cd dizaster
-corepack enable
+npm install -g pnpm@10.33.0          # Node 26 no trae corepack (ADR 0348)
 pnpm install
 docker compose up -d --build api      # base de datos, migraciones y API, solo en localhost:8080
 curl http://localhost:8080/health      # debe responder {"status":"ok"}

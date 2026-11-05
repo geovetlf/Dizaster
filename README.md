@@ -24,7 +24,7 @@ docs/                Blueprint, ADRs, estado
 
 ## Requisitos
 
-Node 22, pnpm 10, PostgreSQL 16 con PostGIS 3 y H3 (o Docker).
+Node 26 LTS, pnpm 10, PostgreSQL 16 con PostGIS 3 y H3 (o Docker).
 
 ## Desarrollo
 

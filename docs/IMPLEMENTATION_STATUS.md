@@ -516,6 +516,7 @@ Actualizado: 2026-10-12 (hasta ADR 0346; auditoría de preparación en `docs/PRO
 | Migración a Node 26: análisis y plan (`docs/node-26-migracion.md`); suite completa verde con Node 26.11.1 sin cambiar archivos; se activa tras el 2026-10-28 con LTS comprobado (ADR 0339, Propuesto) | ⏳ condicionado a la fecha | §15 |
 | 403 `ACCOUNT_SUSPENDED` con `suspendedUntil` solo para la propia sesión (ADR 0340); `/v1/config` publica `launch` con el estado por país (ADR 0341); PR #72 | ✅ | §8.2, §11.5 |
 | Contratos: respuestas validadas en estricto contra esquemas espejo (ADR 0342), línea base de compatibilidad hacia atrás (ADR 0343), migraciones desde cero e idempotentes (ADR 0344), cuatro carreras corregidas en reportes, contadores y avisos (ADR 0345, migración 0119), outbox y push sin duplicados (ADR 0346); PR #73 | ✅ | §15 |
+| Node 26 LTS: `.nvmrc`, `engines`, imagen por digest y `@types/node` 26; pnpm sin corepack en la imagen (ADR 0348, ejecuta el 0339) | ✅ | §16 |
 | Contacto configurable en el User-Agent de ingesta (`INGEST_CONTACT`), con aviso en `config-check` si falta en producción (ADR 0307) | ✅ falta el valor del propietario | §9.3 |
 | Licencias, auditoría, SBOM, Dependabot; respaldo con prueba de restauración en CI | ✅ | ADR 0070, `scripts/supply-chain.mjs`, `scripts/db-restore-check.mjs` |
 | Idioma de la app elegible en el perfil (es/en/pt/fr o del teléfono) | ✅ | ADR 0069, `app/language.tsx` |
