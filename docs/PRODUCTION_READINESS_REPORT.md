@@ -59,7 +59,7 @@ revisión legal. Nada de eso lo puede dar el agente.
 | Decisiones de producto de V1 (ADR 0317–0321) | ✅ Pruebas propias de cada una: estado por país, uso sin cuenta en toda la API, D2, D1, suspensiones, avisos sociales y D3. Las consultas nuevas pasan la prueba de planes con volumen |
 | Auditoría en frentes paralelos (2026-10-12) | ✅ Escrituras simultáneas, contratos estrictos, compatibilidad hacia atrás, guardas de entrega y nuevas pruebas de volumen en cada `pnpm check` (§12) |
 | Node 26.11.1 sin cambiar archivos | ✅ lint, typecheck, build y 1262 pruebas. No activado: Node 26 aún no es LTS (ADR 0339) |
-| OSV-Scanner y `pnpm audit` | ✅ En GitHub Actions. Solo dos avisos HIGH sin arreglo upstream (`node-forge`, `braces`, herramientas de Expo), aceptados por el propietario hasta el 2026-11-07 y acotados a versión y ruta (ADR 0304, 0305) |
+| OSV-Scanner y `pnpm audit` | ✅ En GitHub Actions. Sin HIGH pendientes desde ADR 0347 (2026-11-05): `node-forge` 1.4.2 y `zod` 4.6.7 corregidos, `vite` 8.3.5. Solo queda `braces` (herramienta de Expo) con excepción acotada hasta el 2026-11-07 (ADR 0304, 0305, 0347) |
 | Push a `github.com/geovetlf/Dizaster` | ✅ Sin force push. `main` protegida desde el 2026-10-08: cada cambio entra por PR con los 7 jobs de CI en verde (check, delivery, report-comment, supply-chain, security, iac, image); PRs #10–#74 |
 
 ## 3. Producto
@@ -341,7 +341,7 @@ Cada fila dice qué falta, por qué el agente no puede resolverlo, qué quedó l
 | Fronteras en disputa (D-17) | Otros países | Decisión legal y de producto | Piloto: límites oficiales de Perú (ADR 0314) | permanente hasta asesoría | Asesoría antes de abrir otro país | Según asesoría |
 | Datos y revisiones | Revisión nativa de pt y fr, listas de términos, organizaciones para donar, textos regionales | Requieren personas con conocimiento local | Mecanismos con listas vacías | temporal | Propietario: proveerlos | 0 |
 | Pruebas reales | Dispositivo, push, staging, producción | Necesitan los bloqueos anteriores | Ensayo local completo de la entrega (ADR 0282), guardas, rollback | condicionado | Primer APK, luego staging | — |
-| Excepción `node-forge` y `braces` | Arreglo upstream | No hay versión corregida publicada | Acotada a versión y ruta, vence sola el 2026-11-07, aviso en CI desde el 2026-10-23 | temporal | Revisar el 2026-11-07, o antes si sale el arreglo | 0 |
+| Excepción `braces` | Arreglo upstream | Sin versión corregida; `pnpm audit` ya no lo reporta (2026-11-05) | Acotada a versión y ruta, vence sola el 2026-11-07. `node-forge` se retiró con ADR 0347 | temporal | Renovar solo con confirmación escrita del propietario, o retirar si se confirma que el aviso ya no aplica | 0 |
 | Ruleset de etiquetas `v*` | Importar `tags.json` | Esta sesión no puede escribir reglas de GitHub | `tags.json` versionado. Hoy ningún workflow construye desde etiquetas y la entrega va por digest, así que aporta poco | opcional | Propietario: importarlo antes de que una versión se publique por etiqueta (`delivery/policy.json` ya acepta firmas de `refs/tags/v*`) | 0 |
 
 **Configuración manual de GitHub: NOT_VERIFIABLE.** Desde la sesión del agente no se puede leer la API de entornos.
@@ -421,7 +421,7 @@ reintentos del outbox, migraciones desde cero y acciones de workflows fijadas po
 **Pendiente con fecha:**
 - Node 26 LTS: a partir del 2026-10-28, si `nodejs.org` lo marca LTS, un PR alineado según `docs/node-26-migracion.md`
   que sustituye a #41.
-- `node-forge` y `braces`: sin versión corregida al 2026-10-11 (ADR 0330); revisar antes del 2026-11-07.
+- `node-forge`: corregido en 1.4.2 (ADR 0347). `braces`: sin versión corregida al 2026-10-11 (ADR 0330); revisar antes del 2026-11-07.
 - #3 (PostGIS 17) y #41 (Node 25) siguen abiertos y sin fusionar, con sus condiciones de ADR 0308.
 
 **Autorizaciones que siguen faltando:** las de §5 y §10 sin cambios: `EXPO_TOKEN`, D-18, tamaño de la VM de staging,
