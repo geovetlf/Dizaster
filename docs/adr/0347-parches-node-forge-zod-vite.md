@@ -1,4 +1,4 @@
-# ADR 0347 — Parches de node-forge, zod y vite; se quita la excepción de node-forge
+# ADR 0347 — Parches de seguridad de dependencias; se quita la excepción de node-forge
 
 - Estado: Aceptado
 - Fecha: 2026-11-05
@@ -7,36 +7,38 @@
 
 ## Contexto
 
-El 2026-11-05 `node scripts/supply-chain.mjs audit` (pnpm audit de producción) fallaba en `main` con cinco avisos HIGH
-nuevos y uno de `node-forge` que ya tenía versión corregida:
+Desde el 2026-11-05 el job `security` de `main` falla. No es un cambio de código: salieron avisos nuevos contra
+versiones que ya estaban en el lockfile.
 
-| Paquete | Avisos HIGH | Versión corregida | Ruta | Afecta a |
-| --- | --- | --- | --- | --- |
-| `node-forge` ≤1.4.0 | 6 (incluido GHSA-86w9, excepción ADR 0304) | 1.4.1+ (ninguna para GHSA-86w9, pero 1.4.1+ queda fuera de su rango) | `@expo/cli` | herramienta de desarrollo |
-| `vite` 8.3.0–8.3.2 | 1 (GHSA-587h) | 8.3.3 | `vitest` | pruebas |
-| `zod` <4.6.6 | 1 (GHSA-mrhx) | 4.6.6 | `packages/contracts` y `services/core` | **API** (validación de entradas) |
-| `zod` 3.25.76 | (mismo aviso) | ninguna en la rama 3 | `@expo/cli` | herramienta de desarrollo |
-
-`braces` 3.0.3 (GHSA-vfj7, excepción ADR 0304) ya no aparece en `pnpm audit`. No pude confirmarlo en la base de
-avisos de GitHub desde el entorno del agente, así que su excepción se mantiene sin cambios hasta su revisión.
+- `pnpm supply-chain audit` (gate de HIGH y CRITICAL): cinco avisos HIGH nuevos de `zod`, `vite` y `node-forge`.
+  - `zod` <4.6.6 (GHSA-mrhx) alcanza la validación de entradas de la API, a través de `packages/contracts`.
+  - `vite` 8.3.1 (GHSA-587h) en vitest, solo pruebas.
+  - `node-forge` 1.4.0: seis avisos HIGH, incluido GHSA-86w9 (excepción del ADR 0304). Todos se corrigen en 1.4.1.
+- OSV-Scanner (job `security`, que falla con cualquier aviso, también LOW y MODERATE): además de lo anterior,
+  `fastify` 5.12.5 (GHSA-389g, API), `fast-uri` 3.1.8 y 4.2.1 (vía ajv y fastify), `glob` 13 y `minimatch` 10 (solo
+  herramientas de desarrollo) y `deepmerge` 4.3.1 (LOW, sin versión corregida, solo `@expo/config`).
 
 ## Decisión
 
-- `zod` sube a `^4.6.7` en `packages/contracts` y `services/core`. Es el único cambio que toca el código de la API.
+- `zod` `^4.6.7` en `packages/contracts` y `services/core`. Es el único cambio que toca código de la API.
+- `fastify` `^5.12.6` en `services/core`.
 - `pnpm.overrides` en `pnpm-workspace.yaml`:
-  - `node-forge: 1.4.2`, corrige todos sus avisos y sigue sin entrar en la imagen de la API ni en el bundle;
-  - `vite: 8.3.5`, solo en las pruebas;
-  - `zod@<4: 4.6.7`: `@expo/cli` fuerza zod 3 y su rama 3 no tiene parche. Se probó con `expo config`, `native:check`
+  - `node-forge: 1.4.2`: corrige todos sus avisos; sigue solo en `@expo/cli`.
+  - `vite: 8.3.5`: solo en las pruebas.
+  - `zod@<4: 4.6.7`: `@expo/cli` pide zod 3 y su rama 3 no tiene parche. Se probó con `expo config`, `native:check`
     (prebuild Android e iOS) y la suite completa.
-- Se quita la excepción de `node-forge` en `security/audit-allowlist.json`, `.trivyignore` y `osv-scanner.toml`. Ya no
-  hace falta. La de `braces` no cambia.
-- `zod` 3 en `@expo/cli` no tiene excepción: el override la elimina. Si un día vuelve a aparecer un aviso de zod sin
-  corregir, se decide con el propietario antes de añadir nada.
+  - `fast-uri@<3.1.9: 3.1.9` y `fast-uri@>=4.0.0 <4.2.3: 4.2.3`.
+  - `glob@<14.0.2: 14.0.2` y `minimatch@<11.0.1: 11.0.1`: solo dependencias de desarrollo.
+- Se quita la excepción de `node-forge` en `security/audit-allowlist.json`, `.trivyignore` y `osv-scanner.toml`.
+- La excepción de `braces` (GHSA-vfj7) no cambia. `pnpm audit` y OSV-Scanner ya no la reportan (OSV la marca como
+  «unused ignore»), pero no pude consultar la base de avisos de GitHub desde el entorno del agente. Su retirada o
+  renovación la decide el propietario antes del 2026-11-07.
+- `deepmerge` (LOW, sin versión corregida) no tiene excepción. Bloquea el job `security` de OSV-Scanner hasta que el
+  propietario decida. Una excepción acotada requiere su aprobación escrita, como en el ADR 0304.
 
 ## Consecuencias
 
-- `pnpm supply-chain` pasa con 0 HIGH y 0 CRITICAL pendientes. Quedan 6 avisos LOW y 6 MODERATE de `fast-uri`, `glob`,
-  `minimatch`, `deepmerge` y `fastify` (ninguno HIGH; no gobernados por el gate).
-- La excepción de `braces` vence el 2026-11-07 (`osv-scanner.toml` y `.trivyignore`); la revisión del propietario sigue
-  pendiente. Si el aviso ya no existe en la base de datos, la excepción puede retirarse en otro PR.
-- ADR 0304 y 0330 quedan superadas en lo que toca a `node-forge`.
+- `pnpm supply-chain audit` pasa: 0 HIGH y 0 CRITICAL. Solo queda `deepmerge` (LOW) en `pnpm audit`.
+- `zod` 3 de `@expo/cli` deja de existir en el lockfile.
+- Riesgo: `zod` y `fastify` son dependencias de la API; los tests de contratos y core pasan (45 y 799).
+  `glob` y `minimatch` cambian de rama mayor en herramientas de desarrollo; el lint y el prebuild pasan.
