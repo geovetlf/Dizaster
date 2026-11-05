@@ -1,6 +1,6 @@
 import { generateKeyPairSync } from "node:crypto";
 import { createServer as createHttpServer, type IncomingMessage, type Server } from "node:http";
-import { createServer as createH2Server, type Http2Server, type IncomingHttpHeaders } from "node:http2";
+import { createServer as createH2Server, type Http2Server, type IncomingHttpHeaders, type ServerHttp2Stream } from "node:http2";
 import type { AddressInfo } from "node:net";
 import { decodeJwt, decodeProtectedHeader } from "jose";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -24,7 +24,7 @@ describe("APNs (HTTP/2 contra un servidor local)", () => {
 
   beforeAll(async () => {
     server = createH2Server();
-    server.on("stream", (stream, headers) => {
+    server.on("stream", (stream: ServerHttp2Stream, headers) => {
       let raw = "";
       stream.setEncoding("utf8");
       stream.on("data", (c: string) => { raw += c; });

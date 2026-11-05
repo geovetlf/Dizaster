@@ -76,8 +76,8 @@ describe("check:workflows", () => {
   });
 
   it("Node desalineado entre .nvmrc y engines falla (ADR 0308)", () => {
-    const r = checkWith(swap(".nvmrc", /^22/, "26"));
+    const r = checkWith(swap(".nvmrc", /^26/, "24"));
     expect(r.status).toBe(1);
-    expect(r.out).toContain("no coincide con .nvmrc (26)");
+    expect(r.out).toContain("no coincide con .nvmrc (24)");
   });
 });

@@ -1,6 +1,6 @@
 # ADR 0339 — Migración a Node 26 LTS: condición de activación y alcance
 
-- Estado: **Propuesto** (no se aplica hasta cumplir la condición de activación y tener el visto bueno del propietario)
+- Estado: Aceptado. Ejecutado por el ADR 0348 (2026-11-05), con la condición de activación cumplida y el visto bueno del propietario del 2026-10-10
 - Fecha: 2026-10-11
 - Relación con el Blueprint: §16, §20.7; ADR 0273, 0308
 - IA: **NO AI REQUIRED**. Costo: 0. Sin migraciones.

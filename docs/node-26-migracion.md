@@ -1,6 +1,6 @@
 # Migración a Node 26: análisis previo (sin aplicar)
 
-Estado: **análisis**. Aquí no se cambia nada: `.nvmrc`, `engines`, las imágenes y los workflows siguen en Node 22. La
+Estado: **aplicado** por el ADR 0348 (2026-11-05). Lo que sigue es el análisis previo, que se conserva como registro. La
 decisión y su condición de activación están en el ADR 0339 (Propuesto). Fecha del análisis: 2026-10-11.
 
 ## 1. Condición de activación

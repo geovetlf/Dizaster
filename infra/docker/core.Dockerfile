@@ -1,8 +1,9 @@
 # Imagen única del backend: el mismo artefacto corre como API (server) o como worker.
 # Imagen base fijada por digest (ADR 0273): Dependabot (docker) propone la actualización.
-FROM node:22-bookworm-slim@sha256:c3de60bf2f9dd0ac6370e6117950ff62d6e339527e7472301c9c78a017978392 AS build
+FROM node:26-bookworm-slim@sha256:add5c17c14752c54d2f3d519ec46a3815684d41c33f198bcb09fb998f7dcbf68 AS build
 WORKDIR /repo
-RUN corepack enable
+# Node 25 y posteriores no traen corepack (ADR 0348): pnpm se instala fijado a la versión de packageManager.
+RUN npm install -g pnpm@10.33.0
 COPY . .
 RUN pnpm install --frozen-lockfile --filter @dizaster/core... \
  && pnpm --filter "./packages/*" --filter @dizaster/core run build \
@@ -11,7 +12,7 @@ RUN pnpm install --frozen-lockfile --filter @dizaster/core... \
  && find /out/node_modules -path '*geo-tz/data/*' ! -name 'timezones-1970.*' -delete \
  && cp -r data /data
 
-FROM node:22-bookworm-slim@sha256:c3de60bf2f9dd0ac6370e6117950ff62d6e339527e7472301c9c78a017978392
+FROM node:26-bookworm-slim@sha256:add5c17c14752c54d2f3d519ec46a3815684d41c33f198bcb09fb998f7dcbf68
 ENV NODE_ENV=production DATA_DIR=/data
 # Parches de seguridad de Debian publicados después de la imagen base (perl-base deb12u4 el 2026-10-08, ADR 0304).
 # El escaneo de la imagen en CI falla si queda un HIGH/CRITICAL con arreglo disponible.

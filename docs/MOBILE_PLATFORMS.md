@@ -57,7 +57,7 @@ nativo sin errores (paquete `app.dizaster.mobile`), pero compilar exige el Andro
 computadora con internet normal se puede compilar gratis así:
 
 ```sh
-# Requisitos: Node 22, pnpm, JDK 17 o 21 y Android SDK (Android Studio o command-line tools) con ANDROID_HOME.
+# Requisitos: Node 26 LTS, pnpm, JDK 17 o 21 y Android SDK (Android Studio o command-line tools) con ANDROID_HOME.
 pnpm install
 cd apps/mobile
 npx expo prebuild --platform android --clean      # genera apps/mobile/android (no se versiona)
